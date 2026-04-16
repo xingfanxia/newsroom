@@ -17,7 +17,11 @@ export type LiveSource = Source & {
 };
 
 export async function getLiveSources(): Promise<LiveSource[]> {
-  if (!process.env.DATABASE_URL && !process.env.POSTGRES_URL) {
+  if (
+    !process.env.POSTGRES_URL &&
+    !process.env.DATABASE_URL &&
+    !process.env.POSTGRES_PRISMA_URL
+  ) {
     return fallbackFromCatalog();
   }
 

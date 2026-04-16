@@ -1,31 +1,60 @@
-import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-http";
+import postgres from "postgres";
+import { drizzle } from "drizzle-orm/postgres-js";
 import * as schema from "./schema";
 
-// Neon serverless driver runs over HTTPS and is Fluid-compatible. fetchConnectionCache
-// is now always-on by default, no explicit opt-in needed.
-
-function resolveUrl() {
+/**
+ * Postgres connection for AI·HOT.
+ *
+ * Works with any Postgres + pgvector (Supabase / Railway / self-hosted).
+ * On Supabase (via Vercel Marketplace), these env vars are auto-wired:
+ *   POSTGRES_URL              — pooled connection (port 6543, PgBouncer transaction mode)
+ *   POSTGRES_URL_NON_POOLING  — direct connection (port 5432, for migrations / long tx)
+ *
+ * Runtime uses the pooled URL with `prepare: false` because PgBouncer's
+ * transaction mode does not support prepared statements.
+ */
+function resolveRuntimeUrl() {
   const url =
+    process.env.POSTGRES_URL ??
     process.env.DATABASE_URL ??
-    process.env.DATABASE_URL_UNPOOLED ??
-    process.env.POSTGRES_URL;
+    process.env.POSTGRES_PRISMA_URL;
   if (!url) {
     throw new Error(
-      "DATABASE_URL is not set. Install Neon via Vercel Marketplace or set it manually.",
+      "POSTGRES_URL is not set. Link Supabase via Vercel Marketplace, or set DATABASE_URL manually.",
     );
   }
   return url;
 }
 
-let cached: ReturnType<typeof drizzle<typeof schema>> | null = null;
+let cachedSql: ReturnType<typeof postgres> | null = null;
+let cachedDb: ReturnType<typeof drizzle<typeof schema>> | null = null;
 
 export function db() {
-  if (!cached) {
-    const sql = neon(resolveUrl());
-    cached = drizzle(sql, { schema, casing: "snake_case" });
+  if (!cachedDb) {
+    cachedSql = postgres(resolveRuntimeUrl(), {
+      // PgBouncer transaction mode — no prepared statements across tx boundaries.
+      prepare: false,
+      // One connection per Fluid invocation; pool handles fan-in.
+      max: 1,
+      // Quick idle release so hot invocations don't hoard connections.
+      idle_timeout: 20,
+      // Connection timeout in seconds.
+      connect_timeout: 10,
+      // Don't crash the process on pool errors — surface via throw.
+      onnotice: () => {},
+    });
+    cachedDb = drizzle(cachedSql, { schema, casing: "snake_case" });
   }
-  return cached;
+  return cachedDb;
+}
+
+/** Close the underlying pool — used by scripts that need a clean exit. */
+export async function closeDb() {
+  if (cachedSql) {
+    await cachedSql.end({ timeout: 5 });
+    cachedSql = null;
+    cachedDb = null;
+  }
 }
 
 export { schema };
