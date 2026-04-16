@@ -42,6 +42,10 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
       titleEn: items.titleEn,
       summaryZh: items.summaryZh,
       summaryEn: items.summaryEn,
+      editorNoteZh: items.editorNoteZh,
+      editorNoteEn: items.editorNoteEn,
+      editorAnalysisZh: items.editorAnalysisZh,
+      editorAnalysisEn: items.editorAnalysisEn,
       url: items.url,
       importance: items.importance,
       tier: items.tier,
@@ -91,6 +95,15 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
         ? r.titleEn ?? r.titleZh ?? r.title
         : r.titleZh ?? r.titleEn ?? r.title;
 
+    const editorNote =
+      q.locale === "en"
+        ? r.editorNoteEn ?? r.editorNoteZh
+        : r.editorNoteZh ?? r.editorNoteEn;
+    const editorAnalysis =
+      q.locale === "en"
+        ? r.editorAnalysisEn ?? r.editorAnalysisZh
+        : r.editorAnalysisZh ?? r.editorAnalysisEn;
+
     return {
       id: String(r.id),
       source: {
@@ -114,6 +127,8 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
           ? r.clusterMemberCount - 1
           : undefined,
       locale: (r.sourceLocale ?? "multi") as Story["locale"],
+      editorNote: editorNote ?? undefined,
+      editorAnalysis: editorAnalysis ?? undefined,
     };
   });
 }

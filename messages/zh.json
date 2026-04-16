@@ -39,7 +39,8 @@
     "thumbsUp": "有价值",
     "thumbsDown": "不够好",
     "bookmark": "收藏",
-    "crossSource": "另有 {count} 个源也报道了此事件"
+    "crossSource": "另有 {count} 个源也报道了此事件",
+    "editorNote": "编辑点评"
   },
   "iteration": {
     "title": "策略迭代",

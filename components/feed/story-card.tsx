@@ -71,6 +71,18 @@ export function StoryCard({ story }: { story: Story }) {
         {story.summary}
       </p>
 
+      {/* Editor note — short executive commentary for featured+p1 items */}
+      {story.editorNote && (
+        <div className="mt-3 border-l-2 border-[var(--color-cyan)]/50 bg-[rgba(62,230,230,0.04)] px-3 py-2">
+          <div className="mb-0.5 text-[11px] uppercase tracking-[0.14em] text-[var(--color-cyan)]/80">
+            {t("editorNote")}
+          </div>
+          <p className="text-[13.5px] leading-[1.6] text-[var(--color-fg)]">
+            {story.editorNote}
+          </p>
+        </div>
+      )}
+
       {/* Tags — translated via i18n tags dict, raw fallback for entities */}
       <div className="mt-3 flex flex-wrap items-center gap-1.5">
         {story.tags.map((tag) => (

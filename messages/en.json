@@ -39,7 +39,8 @@
     "thumbsUp": "Looks good",
     "thumbsDown": "Not great",
     "bookmark": "Save",
-    "crossSource": "{count} other source{count, plural, one {} other {s}} also reported this"
+    "crossSource": "{count} other source{count, plural, one {} other {s}} also reported this",
+    "editorNote": "Editor's take"
   },
   "iteration": {
     "title": "Policy Iterations",

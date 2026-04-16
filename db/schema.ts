@@ -233,6 +233,14 @@ export const items = pgTable(
     reasoning: text("reasoning"),
     enrichedAt: timestamp("enriched_at", { withTimezone: true }),
     policyVersion: text("policy_version"),
+    // ── Editorial commentary (R7) — only populated for tier in (featured, p1) ──
+    /** 1-2 sentence executive take (≤160 chars). */
+    editorNoteZh: text("editor_note_zh"),
+    editorNoteEn: text("editor_note_en"),
+    /** 3-5 paragraph markdown analysis (≤900 words). */
+    editorAnalysisZh: text("editor_analysis_zh"),
+    editorAnalysisEn: text("editor_analysis_en"),
+    commentaryAt: timestamp("commentary_at", { withTimezone: true }),
     // ── Clustering (M2) ──
     embedding: halfvec("embedding", { dimensions: 3072 }),
     clusterId: integer("cluster_id").references(() => clusters.id, {

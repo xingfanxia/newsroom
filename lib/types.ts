@@ -47,6 +47,10 @@ export type Story = {
   url: string;
   crossSourceCount?: number;
   locale: "en" | "zh" | "multi";
+  /** Optional editor commentary — populated for featured/p1 items only. */
+  editorNote?: string;
+  /** Optional long-form analysis (markdown). */
+  editorAnalysis?: string;
 };
 
 export type FeedbackEntry = {

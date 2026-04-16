@@ -67,12 +67,13 @@ function buildRss(args: {
         : "";
       const score = `<importance>${s.importance}</importance>`;
       const tier = `<tier>${s.tier}</tier>`;
-      // Cross-source hint — most RSS readers ignore unknown elements but advanced
-      // consumers (our own dashboard in the future) can use them.
       const cross =
         s.crossSourceCount != null
           ? `<crossSourceCount>${s.crossSourceCount}</crossSourceCount>`
           : "";
+      // content:encoded — full body combining editor note + summary + analysis.
+      // Most readers render this in the detail pane; fallback to <description>.
+      const contentHtml = buildContentHtml(s);
       return `    <item>
       <title>${escape(s.title)}</title>
       <link>${escape(s.url)}</link>
@@ -80,6 +81,7 @@ function buildRss(args: {
       <pubDate>${new Date(s.publishedAt).toUTCString()}</pubDate>
       <source>${escape(s.source.publisher)}</source>
       <description><![CDATA[${s.summary}]]></description>
+      <content:encoded><![CDATA[${contentHtml}]]></content:encoded>
       ${tagsLine}
       ${score}
       ${tier}
@@ -91,6 +93,7 @@ function buildRss(args: {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0"
   xmlns:atom="http://www.w3.org/2005/Atom"
+  xmlns:content="http://purl.org/rss/1.0/modules/content/"
   xmlns:radar="${siteUrl}/schemas/radar/1.0">
   <channel>
     <title>${escape(title)}</title>
@@ -103,6 +106,42 @@ function buildRss(args: {
 ${items}
   </channel>
 </rss>`;
+}
+
+/**
+ * Minimal markdown-ish → HTML rendering for RSS content:encoded.
+ * Preserves the headings and paragraph breaks produced by the commentary stage
+ * without pulling in a full markdown library in a Fluid route.
+ */
+function mdToHtml(md: string): string {
+  const escaped = md
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+  const withHeadings = escaped
+    .replace(/^## (.+)$/gm, "<h3>$1</h3>")
+    .replace(/^# (.+)$/gm, "<h2>$1</h2>");
+  const paragraphs = withHeadings
+    .split(/\n\s*\n/)
+    .map((block) =>
+      block.trimStart().startsWith("<h") ? block : `<p>${block.trim()}</p>`,
+    )
+    .filter(Boolean)
+    .join("\n");
+  return paragraphs;
+}
+
+function buildContentHtml(s: {
+  summary: string;
+  editorNote?: string;
+  editorAnalysis?: string;
+}): string {
+  const note = s.editorNote
+    ? `<blockquote><strong>Editor&rsquo;s take:</strong> ${s.editorNote}</blockquote>`
+    : "";
+  const summary = `<p>${s.summary}</p>`;
+  const analysis = s.editorAnalysis ? `<hr/>${mdToHtml(s.editorAnalysis)}` : "";
+  return `${note}${summary}${analysis}`;
 }
 
 function escape(s: string): string {
