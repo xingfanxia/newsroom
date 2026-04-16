@@ -104,6 +104,8 @@ async function enrichOne(item: Item, policy: PolicyT): Promise<void> {
   try {
     const result = await generateStructured({
       ...profiles.enrich,
+      task: "enrich",
+      itemId: item.id,
       system: ENRICH_SYSTEM,
       messages: [
         {
@@ -129,7 +131,7 @@ async function enrichOne(item: Item, policy: PolicyT): Promise<void> {
   let embedding: number[];
   try {
     const eText = `${item.title}\n\n${enriched.summaryZh}`;
-    const result = await embed({ value: eText });
+    const result = await embed({ value: eText, task: "embed", itemId: item.id });
     embedding = result.embedding;
   } catch (err) {
     throw tag(err, "embed");
@@ -140,6 +142,8 @@ async function enrichOne(item: Item, policy: PolicyT): Promise<void> {
   try {
     const result = await generateStructured({
       ...profiles.score,
+      task: "score",
+      itemId: item.id,
       system: scoreSystem(policy.content),
       messages: [
         {

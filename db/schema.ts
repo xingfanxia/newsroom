@@ -11,6 +11,7 @@ import {
   index,
   serial,
   customType,
+  numeric,
 } from "drizzle-orm/pg-core";
 import type {
   SourceKind as TSourceKind,
@@ -255,6 +256,45 @@ export const items = pgTable(
   }),
 );
 
+/**
+ * llm_usage — per-call LLM token usage and cost ledger.
+ * One row per generateText / generateStructured / embed call. Cost is computed
+ * at insert time using LiteLLM pricing (see lib/llm/pricing.ts); rows with
+ * null cost_usd indicate a model that wasn't in the pricing table at call time.
+ */
+export const llmUsage = pgTable(
+  "llm_usage",
+  {
+    id: serial("id").primaryKey(),
+    provider: text("provider").notNull(),
+    /** The fully-qualified model/deployment string as seen by the provider. */
+    model: text("model").notNull(),
+    /** Business task label — 'enrich' | 'score' | 'embed' | 'commentary' | 'newsletter' | 'agent' | 'other'. */
+    task: text("task"),
+    inputTokens: integer("input_tokens").notNull().default(0),
+    cachedInputTokens: integer("cached_input_tokens").notNull().default(0),
+    outputTokens: integer("output_tokens").notNull().default(0),
+    reasoningTokens: integer("reasoning_tokens").notNull().default(0),
+    /** USD. 6 decimal places so sub-cent totals stay accurate across many rows. */
+    costUsd: numeric("cost_usd", { precision: 12, scale: 6 }),
+    /** Optional FK to items — set when the call enriched a specific story. */
+    itemId: integer("item_id"),
+    durationMs: integer("duration_ms"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    createdAtIdx: index("llm_usage_created_at_idx").on(t.createdAt),
+    providerModelIdx: index("llm_usage_provider_model_idx").on(
+      t.provider,
+      t.model,
+      t.createdAt,
+    ),
+    taskIdx: index("llm_usage_task_idx").on(t.task, t.createdAt),
+  }),
+);
+
 // ── Types ───────────────────────────────────────────────────────
 export type Source = typeof sources.$inferSelect;
 export type NewSource = typeof sources.$inferInsert;
@@ -266,5 +306,7 @@ export type Item = typeof items.$inferSelect;
 export type NewItem = typeof items.$inferInsert;
 export type Cluster = typeof clusters.$inferSelect;
 export type NewCluster = typeof clusters.$inferInsert;
+export type LlmUsage = typeof llmUsage.$inferSelect;
+export type NewLlmUsage = typeof llmUsage.$inferInsert;
 
 export type { TSourceKind, TSourceGroup, TCadence };

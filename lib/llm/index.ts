@@ -24,6 +24,11 @@ import type {
   EmbedManyResult,
 } from "./types";
 import { LLMError } from "./types";
+import {
+  recordUsage,
+  extractCachedTokens,
+  extractReasoningTokens,
+} from "./usage";
 
 export type {
   LLMProvider,
@@ -174,6 +179,7 @@ export async function generateText(
 ): Promise<GenerateTextResult> {
   const provider = resolveProvider(req.provider);
   const model = modelFor(provider, { deployment: req.deployment });
+  const started = Date.now();
   try {
     const result = await aiGenerateText({
       model,
@@ -184,6 +190,19 @@ export async function generateText(
       ...(req.temperature !== undefined
         ? { temperature: req.temperature }
         : {}),
+    });
+    recordUsage({
+      provider,
+      model: modelId(model),
+      task: req.task,
+      itemId: req.itemId,
+      tokens: {
+        inputTokens: result.usage?.inputTokens,
+        outputTokens: result.usage?.outputTokens,
+        cachedInputTokens: extractCachedTokens(result.providerMetadata),
+        reasoningTokens: extractReasoningTokens(result.providerMetadata),
+      },
+      durationMs: Date.now() - started,
     });
     return {
       text: result.text,
@@ -207,6 +226,7 @@ export async function generateStructured<T extends z.ZodTypeAny>(
 ): Promise<GenerateStructuredResult<T>> {
   const provider = resolveProvider(req.provider);
   const model = modelFor(provider, { deployment: req.deployment });
+  const started = Date.now();
   try {
     const result = await aiGenerateObject({
       model,
@@ -220,6 +240,19 @@ export async function generateStructured<T extends z.ZodTypeAny>(
       ...(req.temperature !== undefined
         ? { temperature: req.temperature }
         : {}),
+    });
+    recordUsage({
+      provider,
+      model: modelId(model),
+      task: req.task,
+      itemId: req.itemId,
+      tokens: {
+        inputTokens: result.usage?.inputTokens,
+        outputTokens: result.usage?.outputTokens,
+        cachedInputTokens: extractCachedTokens(result.providerMetadata),
+        reasoningTokens: extractReasoningTokens(result.providerMetadata),
+      },
+      durationMs: Date.now() - started,
     });
     return {
       data: result.object as z.infer<T>,
@@ -274,12 +307,22 @@ function embeddingModelFor(provider: LLMProvider) {
 export async function embed(req: EmbedRequest): Promise<EmbedResult> {
   const provider = resolveProvider(req.provider, "AIHOT_EMBED_PROVIDER");
   const model = embeddingModelFor(provider);
+  const started = Date.now();
   try {
     const result = await aiEmbed({ model, value: req.value });
+    const resolvedModel = modelId(model as unknown as LanguageModel);
+    recordUsage({
+      provider,
+      model: resolvedModel,
+      task: req.task ?? "embed",
+      itemId: req.itemId,
+      tokens: { inputTokens: result.usage?.tokens, outputTokens: 0 },
+      durationMs: Date.now() - started,
+    });
     return {
       embedding: result.embedding,
       provider,
-      model: modelId(model as unknown as LanguageModel),
+      model: resolvedModel,
       tokens: result.usage?.tokens,
     };
   } catch (err) {
@@ -296,12 +339,22 @@ export async function embedMany(
 ): Promise<EmbedManyResult> {
   const provider = resolveProvider(req.provider, "AIHOT_EMBED_PROVIDER");
   const model = embeddingModelFor(provider);
+  const started = Date.now();
   try {
     const result = await aiEmbedMany({ model, values: req.values });
+    const resolvedModel = modelId(model as unknown as LanguageModel);
+    recordUsage({
+      provider,
+      model: resolvedModel,
+      task: req.task ?? "embed",
+      itemId: req.itemId,
+      tokens: { inputTokens: result.usage?.tokens, outputTokens: 0 },
+      durationMs: Date.now() - started,
+    });
     return {
       embeddings: result.embeddings,
       provider,
-      model: modelId(model as unknown as LanguageModel),
+      model: resolvedModel,
       tokens: result.usage?.tokens,
     };
   } catch (err) {

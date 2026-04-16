@@ -9,6 +9,23 @@ export type LLMProvider =
 
 export type ReasoningEffort = "minimal" | "low" | "medium" | "high" | "xhigh";
 
+/** Business task label — used for cost accounting in the llm_usage table. */
+export type LLMTask =
+  | "enrich"
+  | "score"
+  | "embed"
+  | "commentary"
+  | "newsletter"
+  | "agent"
+  | "other";
+
+export type LLMUsageContext = {
+  /** Categorizes the call for cost dashboards. */
+  task?: LLMTask;
+  /** Link usage back to the item being processed, when applicable. */
+  itemId?: number;
+};
+
 export type GenerateTextRequest = {
   provider?: LLMProvider;
   /** Override the default deployment for this provider (mainly for Azure). */
@@ -24,7 +41,7 @@ export type GenerateTextRequest = {
   /** Reasoning-family models (Opus 4.7, Gemini 3 Pro, GPT-5) reject temperature.
    *  Only pass it when calling non-reasoning models. */
   temperature?: number;
-};
+} & LLMUsageContext;
 
 export type GenerateStructuredRequest<T extends z.ZodTypeAny> =
   GenerateTextRequest & {
@@ -54,13 +71,13 @@ export type EmbedRequest = {
   provider?: LLMProvider;
   value: string;
   dimensions?: number;
-};
+} & LLMUsageContext;
 
 export type EmbedManyRequest = {
   provider?: LLMProvider;
   values: string[];
   dimensions?: number;
-};
+} & LLMUsageContext;
 
 export type EmbedResult = {
   embedding: number[];

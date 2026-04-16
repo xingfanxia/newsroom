@@ -524,7 +524,7 @@ export const sourceCatalog: Source[] = [
   // ── High-priority personal blogs ────────────────────────────────
   {
     id: "yage-computing-life",
-    name: { en: "Computing Life (grapeot / 杨格)", zh: "Computing Life · 杨格" },
+    name: { en: "Computing Life (鸭哥 / grapeot)", zh: "Computing Life · 鸭哥" },
     url: "https://yage.ai/feeds/atom.xml",
     kind: "atom",
     group: "research",
