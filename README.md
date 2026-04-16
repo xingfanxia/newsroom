@@ -3,6 +3,9 @@
 > **A bilingual AI-native news intelligence dashboard with a self-iterating editorial agent.**
 > Inspired by Linear's dark-mode-native architecture; cyan-neon accent; zh/en locale-first.
 
+🌐 **Live**: [newsroom-orpin.vercel.app](https://newsroom-orpin.vercel.app) → redirects to `/zh`
+📦 **Repo**: [github.com/xingfanxia/newsroom](https://github.com/xingfanxia/newsroom)
+
 [中文](#中文) · [English](#english)
 
 ---
