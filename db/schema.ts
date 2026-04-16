@@ -23,6 +23,37 @@ import type {
 // which lets us store text-embedding-3-large's native 3072-dim output
 // without Matryoshka truncation. Same storage as vector(1536) at 6144 bytes.
 
+/** Encode number[] into pgvector text format. Rejects non-finite cells. */
+export function halfvecToDriver(value: number[]): string {
+  for (const n of value) {
+    if (!Number.isFinite(n)) {
+      throw new Error("halfvec: non-finite cell in input");
+    }
+  }
+  return `[${value.join(",")}]`;
+}
+
+/** Decode pgvector text format to number[]. Rejects any non-finite cell. */
+export function halfvecFromDriver(value: unknown): number[] {
+  if (typeof value !== "string") return value as unknown as number[];
+  const trimmed =
+    value.startsWith("[") && value.endsWith("]") ? value.slice(1, -1) : value;
+  if (trimmed.length === 0) return [];
+  return trimmed.split(",").map((raw) => {
+    const cell = raw.trim();
+    if (cell === "") {
+      throw new Error("halfvec: empty cell in embedding");
+    }
+    const n = Number(cell);
+    if (!Number.isFinite(n)) {
+      throw new Error(
+        `halfvec: non-finite cell in embedding (input="${cell.slice(0, 40)}")`,
+      );
+    }
+    return n;
+  });
+}
+
 export const halfvec = customType<{
   data: number[];
   driverData: string;
@@ -35,14 +66,10 @@ export const halfvec = customType<{
     return `halfvec(${config.dimensions})`;
   },
   fromDriver(value): number[] {
-    if (typeof value !== "string") return value as unknown as number[];
-    const trimmed = value.startsWith("[") && value.endsWith("]")
-      ? value.slice(1, -1)
-      : value;
-    return trimmed.split(",").map(Number);
+    return halfvecFromDriver(value);
   },
   toDriver(value: number[]): string {
-    return `[${value.join(",")}]`;
+    return halfvecToDriver(value);
   },
 });
 

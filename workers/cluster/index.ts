@@ -11,6 +11,7 @@ export type ClusterReport = {
   assigned: number;
   newClusters: number;
   durationMs: number;
+  errors?: { itemId: number; reason: string }[];
 };
 
 /**
@@ -49,59 +50,20 @@ export async function runClusterBatch(): Promise<ClusterReport> {
   let assigned = 0;
   let newClusters = 0;
 
+  const errors: { itemId: number; reason: string }[] = [];
+
   for (const p of pending) {
-    // Nearest neighbor: find another clustered item within window that's the
-    // lead of its cluster (or closest to this item). We use items.cluster_id
-    // to find an existing cluster, and pgvector `<->` to get the cosine distance.
-    // Simpler approach: find nearest enriched neighbor OVERALL, if it's clustered,
-    // join that cluster; otherwise create a new one.
-    const threshold = 1 - SIMILARITY_THRESHOLD; // convert sim → distance
-
-    const nearest = await client.execute(sql`
-      SELECT
-        i.id,
-        i.cluster_id,
-        (i.embedding <=> (SELECT embedding FROM items WHERE id = ${p.id})) AS distance
-      FROM items i
-      WHERE i.id <> ${p.id}
-        AND i.embedding IS NOT NULL
-        AND i.clustered_at IS NOT NULL
-        AND i.clustered_at > now() - (${WINDOW_HOURS}::text || ' hours')::interval
-      ORDER BY i.embedding <=> (SELECT embedding FROM items WHERE id = ${p.id})
-      LIMIT 1
-    `);
-
-    const row = (nearest as { rows?: unknown[] }).rows?.[0] as
-      | { id: number; cluster_id: number | null; distance: number }
-      | undefined;
-
-    let clusterId: number;
-
-    if (row && row.distance <= threshold && row.cluster_id != null) {
-      // Join existing cluster
-      clusterId = row.cluster_id;
-      await client
-        .update(clusters)
-        .set({
-          memberCount: sql`${clusters.memberCount} + 1`,
-          updatedAt: new Date(),
-        })
-        .where(sql`${clusters.id} = ${clusterId}`);
-      assigned++;
-    } else {
-      // New single-member cluster
-      const [created] = await client
-        .insert(clusters)
-        .values({ leadItemId: p.id, memberCount: 1 })
-        .returning({ id: clusters.id });
-      clusterId = created.id;
-      newClusters++;
+    try {
+      const outcome = await assignOneToCluster(p.id);
+      if (outcome === "assigned") assigned++;
+      else if (outcome === "created") newClusters++;
+      // "already-claimed" outcomes are silent — a concurrent run got there first.
+    } catch (err) {
+      errors.push({
+        itemId: p.id,
+        reason: err instanceof Error ? err.message : String(err),
+      });
     }
-
-    await client
-      .update(items)
-      .set({ clusterId, clusteredAt: new Date() })
-      .where(sql`${items.id} = ${p.id}`);
   }
 
   return {
@@ -109,5 +71,100 @@ export async function runClusterBatch(): Promise<ClusterReport> {
     assigned,
     newClusters,
     durationMs: Date.now() - started,
+    errors,
   };
+}
+
+type AssignOutcome = "assigned" | "created" | "already-claimed";
+
+async function assignOneToCluster(itemId: number): Promise<AssignOutcome> {
+  const client = db();
+  const threshold = 1 - SIMILARITY_THRESHOLD; // cosine sim → distance
+
+  // Widened neighbor search: include ANY enriched+embedded item (not just ones
+  // already clustered). If the nearest is unclustered-but-near, we promote it
+  // to a cluster lead so near-duplicates in the same batch can still merge.
+  const nearestResult = await client.execute(sql`
+    WITH target AS (
+      SELECT embedding FROM items WHERE id = ${itemId}
+    )
+    SELECT
+      i.id,
+      i.cluster_id,
+      i.clustered_at,
+      (i.embedding <=> (SELECT embedding FROM target)) AS distance
+    FROM items i
+    WHERE i.id <> ${itemId}
+      AND i.embedding IS NOT NULL
+      AND i.enriched_at IS NOT NULL
+      AND i.published_at > now() - make_interval(hours => ${WINDOW_HOURS})
+    ORDER BY i.embedding <=> (SELECT embedding FROM target)
+    LIMIT 1
+  `);
+
+  const nearest = (nearestResult as { rows?: unknown[] }).rows?.[0] as
+    | {
+        id: number;
+        cluster_id: number | null;
+        clustered_at: Date | null;
+        distance: number;
+      }
+    | undefined;
+
+  let clusterId: number;
+  let outcome: AssignOutcome;
+
+  if (nearest && nearest.distance <= threshold) {
+    if (nearest.cluster_id != null) {
+      // Neighbor already in a cluster — join it.
+      clusterId = nearest.cluster_id;
+      outcome = "assigned";
+    } else {
+      // Neighbor is enriched but not yet clustered. Promote neighbor to be
+      // the lead of a new shared cluster, assign both items to it.
+      const [created] = await client
+        .insert(clusters)
+        .values({ leadItemId: nearest.id, memberCount: 1 })
+        .returning({ id: clusters.id });
+      clusterId = created.id;
+      // Best-effort: claim the neighbor atomically too so concurrent runs don't
+      // re-cluster it. If somebody else got there first, our later join is harmless.
+      await client
+        .update(items)
+        .set({ clusterId, clusteredAt: new Date() })
+        .where(sql`${items.id} = ${nearest.id} AND ${items.clusteredAt} IS NULL`);
+      outcome = "assigned";
+    }
+  } else {
+    // No neighbor above threshold — new singleton cluster.
+    const [created] = await client
+      .insert(clusters)
+      .values({ leadItemId: itemId, memberCount: 0 })
+      .returning({ id: clusters.id });
+    clusterId = created.id;
+    outcome = "created";
+  }
+
+  // Atomic claim: only increment member_count if we successfully assigned the item.
+  // If another worker beat us to this row, the UPDATE returns 0 rows and we
+  // silently no-op instead of double-counting.
+  const claimed = await client
+    .update(items)
+    .set({ clusterId, clusteredAt: new Date() })
+    .where(sql`${items.id} = ${itemId} AND ${items.clusteredAt} IS NULL`)
+    .returning({ id: items.id });
+
+  if (claimed.length === 0) {
+    return "already-claimed";
+  }
+
+  await client
+    .update(clusters)
+    .set({
+      memberCount: sql`${clusters.memberCount} + 1`,
+      updatedAt: new Date(),
+    })
+    .where(sql`${clusters.id} = ${clusterId}`);
+
+  return outcome;
 }

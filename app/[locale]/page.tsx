@@ -8,7 +8,7 @@ import {
   TimelineSection,
 } from "@/components/feed/timeline-rail";
 import { mockStories } from "@/lib/mock/stories";
-import { getFeaturedStories } from "@/lib/items/live";
+import { getFeaturedStories, hasLiveStories } from "@/lib/items/live";
 import { formatDateHeader } from "@/lib/utils";
 import type { Story } from "@/lib/types";
 import { HotNewsTabsClient } from "./_hot-news-tabs";
@@ -24,19 +24,34 @@ export default async function HotNewsPage({
   const t = await getTranslations("hotNews");
   const tabT = await getTranslations("hotNews.tabs");
 
-  // Graceful fallback: use live DB until it has enriched rows, then mock.
-  // Once enrichment catches up, the live feed replaces mock automatically.
+  // Graceful fallback ladder:
+  //   1. Any featured stories live in DB? → show them
+  //   2. DB has ANY enriched stories? → widen to `all` tier so slow news days
+  //      don't silently revert to mock. This prevents mock leaking back in
+  //      once enrichment has kicked off at least once.
+  //   3. DB has nothing enriched yet → mock (first deploy / cold start only)
   let stories: Story[] = [];
+  let live = false;
   try {
-    stories = await getFeaturedStories({
-      tier: "featured",
-      locale: locale as "zh" | "en",
-      limit: 40,
-    });
+    live = await hasLiveStories();
+    if (live) {
+      stories = await getFeaturedStories({
+        tier: "featured",
+        locale: locale as "zh" | "en",
+        limit: 40,
+      });
+      if (stories.length === 0) {
+        stories = await getFeaturedStories({
+          tier: "all",
+          locale: locale as "zh" | "en",
+          limit: 40,
+        });
+      }
+    }
   } catch {
-    stories = [];
+    live = false;
   }
-  if (stories.length === 0) stories = mockStories;
+  if (!live) stories = mockStories;
 
   const grouped = groupByDay(stories);
 
@@ -50,7 +65,7 @@ export default async function HotNewsPage({
                 {t("title")}
               </h1>
               <p className="mt-1 text-[14px] leading-relaxed text-[var(--color-fg-muted)]">
-                {t("subtitle", { count: mockStories.length })}
+                {t("subtitle", { count: stories.length })}
               </p>
             </div>
 
