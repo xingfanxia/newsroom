@@ -1,7 +1,7 @@
 # AI·HOT — Data Ingestion & AI Pipeline Architecture
 
 > Blueprint for how raw feeds become curated, scored, summarized, tagged stories — and how editor feedback rewrites the curation policy.
-> **Status**: design-complete, implementation deferred to later milestones. The current UI is powered by mock fixtures that match this contract.
+> **Status**: M0 + M1 + M2 shipped. M3 (feedback) next. See Section 6 for milestone progress and deviations from this blueprint.
 
 ---
 
@@ -208,14 +208,23 @@ Seed watchlist (v0): `@sama`, `@AndrewYNg`, `@ylecun`, `@drjimfan`, `@karpathy`,
 
 ## 6. Implementation milestones
 
-| Milestone | Scope | When |
+| Milestone | Scope | Status |
 |---|---|---|
-| **M0 — Shell** *(current)* | Next.js app with i18n, full UI built against mock data; source catalog in TS | shipped |
-| **M1 — Read-only ingestion** | Fetcher + Normalizer workers, source catalog populated from TS → DB, `信源` page shows live health | +2 weeks |
-| **M2 — Enrich + Score** | LLM enrichment pipeline, first policy file, real `热点资讯` feed | +4 weeks |
-| **M3 — Feedback** | `👍/👎/⭐` writes to DB, `策略迭代` page shows real metrics | +5 weeks |
-| **M4 — Agent loop** | Claude Agent SDK integration, diff viewer, version rollout | +7 weeks |
-| **M5 — Clustering + X** | Embedding store, dedup, `X监控` live, `低粉爆文` surface | +10 weeks |
+| **M0 — Shell** | Next.js 16 + next-intl v4 + Tailwind v4 + UI from screenshots + mock fixtures | ✅ shipped |
+| **M1 — Read-only ingestion** | Supabase Postgres + drizzle, 41 sources seeded, RSS/Atom/RSSHub fetcher with SSRF guard, normalizer with canonical URL + sha256 dedup, 4 cron routes + `信源` live | ✅ shipped |
+| **M2 — Enrich + Score + Cluster** | Vercel AI SDK v6 + Azure OpenAI (standard for enrich at low reasoning + score at high reasoning), `text-embedding-3-large` native 3072-dim via `halfvec` + HNSW cosine, cluster dedup at 0.88/48h, `热点资讯` live feed with fallback ladder. Ultra-review: 3 CRITICAL + 7 HIGH all fixed. | ✅ shipped |
+| **M3 — Feedback + Auth** | `feedback` table + Supabase Auth magic-link + real metrics on `策略迭代` page + `POST /api/feedback` | ⏳ next |
+| **M4 — Editorial agent** | Agent SDK session reads feedback, diffs `editorial.skill.md`, streams to console, versioned rollout. Uses `azure-openai-pro` @ `xhigh` reasoning. | planned |
+| **M5 — X monitor + Low-follower + cluster UI** | X watchlist via Apify/X API v2, viral-score detector, "also reported by N sources" chips | planned |
+
+### Deviations from original blueprint (what actually shipped vs. what Section 2 specified)
+
+- **Clustering path (§2.6)**: implemented as its own cron (`/api/cron/cluster`) not baked into enrich. Widened neighbor search (§2.6 said "lead_item_id only"; we search all enriched) so same-batch siblings merge without a two-pass fix. Atomic row claim via `WHERE clustered_at IS NULL RETURNING` prevents double-counting.
+- **Embeddings (§2.4)**: `voyage-3 / text-embedding-3-large` — we picked **text-embedding-3-large native 3072 dims** stored as `halfvec(3072)` (not truncated to 1536 via Matryoshka). Same storage as `vector(1536)`, full quality, fits pgvector HNSW's 4000-dim cap.
+- **Scoring model (§2.5)**: "Sonnet 4.6" placeholder → shipped as **Azure `gpt-5.4-standard` at `reasoning_effort: high`**. Pro is faster/cheaper at comparable quality for rubric tasks; pro reserved for the lower-volume M4 agent.
+- **LLM SDK choice**: original plan assumed direct vendor SDKs — migrated to **Vercel AI SDK v6** + `@ai-sdk/{anthropic,google,azure,openai}` for unified `generateText` / `generateObject` / `embed` across providers.
+- **Prompt injection defense** (not in original §2): XML-fence untrusted content + system-prompt framing + control-sequence neutralization (added per security review).
+- **Cron timing**: enrich every 15 min, cluster every 30 min, catch-up normalize every 6 h.
 
 ---
 
