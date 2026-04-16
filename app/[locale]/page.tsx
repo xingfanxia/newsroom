@@ -1,5 +1,5 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { Search, SlidersHorizontal } from "lucide-react";
+import { Search, SlidersHorizontal, Rss } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { StoryCard } from "@/components/feed/story-card";
@@ -77,6 +77,16 @@ export default async function HotNewsPage({
                   p1: tabT("p1"),
                 }}
               />
+              <a
+                href={`/api/feed/${locale}/rss.xml`}
+                title="Subscribe via RSS"
+                aria-label="RSS feed"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--color-fg-dim)] transition-all hover:bg-white/[0.04] hover:text-[var(--color-cyan)]"
+                target="_blank"
+                rel="noreferrer"
+              >
+                <Rss size={14} />
+              </a>
               <LocaleSwitcher />
             </div>
           </div>

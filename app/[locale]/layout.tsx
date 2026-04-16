@@ -27,6 +27,14 @@ export const metadata: Metadata = {
   icons: {
     icon: "/favicon.svg",
   },
+  alternates: {
+    types: {
+      "application/rss+xml": [
+        { url: "/api/feed/en/rss.xml", title: "AX's AI RADAR (English)" },
+        { url: "/api/feed/zh/rss.xml", title: "AX 的 AI 雷达 (中文)" },
+      ],
+    },
+  },
 };
 
 // Dashboard — render on-demand, skip static prerender
