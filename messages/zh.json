@@ -1,0 +1,171 @@
+{
+  "brand": {
+    "name": "AI·HOT",
+    "tagline": "AI 行业新闻情报台"
+  },
+  "nav": {
+    "hotNews": "热点资讯",
+    "lowFollower": "低粉爆文",
+    "xMonitor": "X 监控",
+    "saved": "收藏",
+    "sources": "信源",
+    "adminLabel": "后台",
+    "system": "系统",
+    "policy": "精选策略",
+    "iterations": "策略迭代",
+    "users": "用户",
+    "logout": "退出"
+  },
+  "localeSwitcher": {
+    "label": "语言",
+    "zh": "中文",
+    "en": "English"
+  },
+  "hotNews": {
+    "title": "热点资讯",
+    "subtitle": "精选 · AI 自动挑选的高价值内容 · 本页 {count} 条",
+    "search": "搜索标题 / 摘要...",
+    "filter": "筛选",
+    "tabs": {
+      "featured": "精选",
+      "all": "全部",
+      "p1": "P1"
+    },
+    "empty": "暂无匹配结果"
+  },
+  "story": {
+    "featured": "精选",
+    "thumbsUp": "有价值",
+    "thumbsDown": "不够好",
+    "bookmark": "收藏",
+    "crossSource": "另有 {count} 个源也报道了此事件"
+  },
+  "iteration": {
+    "title": "策略迭代",
+    "subtitle": "用真实反馈推动策略更新。这里负责拉取反馈、生成草稿、审核 diff 和回滚版本。",
+    "readinessTitle": "迭代就绪度",
+    "readinessHeadline": "已经具备迭代输入，可以开始生成新草稿",
+    "readinessDescription": "当前累计 {count} 条反馈。建议先跑一轮迭代，再结合 diff 和版本历史确认是否发布。",
+    "viewLiveSamples": "查看线上样本",
+    "returnToPolicy": "返回精选策略",
+    "metrics": {
+      "totalFeedback": "总反馈",
+      "totalFeedbackNote": "已可驱动下一轮策略迭代",
+      "agreed": "赞同",
+      "agreedNote": "可保留的正向判断",
+      "disagreed": "反对",
+      "disagreedNote": "优先处理这些反向样本"
+    },
+    "recent": {
+      "title": "最近反馈",
+      "count": "{count} 条"
+    },
+    "console": {
+      "title": "迭代控制台",
+      "subtitle": "Agent 会读取反馈并生成 Skill 改进草稿；没有反馈时不允许空跑",
+      "start": "开始生成新草稿",
+      "lines": {
+        "boot": "启动 Claude Agent...",
+        "loadFeedback": "加载反馈数据...",
+        "loadedFeedback": "已加载 {total} 条反馈（{agreed} 赞同 / {disagreed} 反对）",
+        "agentStart": "Agent 开始工作...",
+        "sessionOpen": "Agent 会话已建立",
+        "procedureStart": "我来按照工作流程操作。首先读取当前的 Skill 文件。",
+        "readFile": "读取文件: {path}",
+        "working": "Agent 工作中...",
+        "finishing": "Agent 执行完毕，生成结果...",
+        "done": "迭代完成",
+        "versioned": "策略已更新为 {version}"
+      }
+    },
+    "diff": {
+      "title": "变更预览",
+      "apply": "确认应用",
+      "cancel": "取消",
+      "toast": "策略已更新为 {version}, Worker 下次 enrich 将使用新策略。",
+      "close": "关闭"
+    },
+    "versionHistory": {
+      "title": "版本历史",
+      "count": "{count} 个版本"
+    }
+  },
+  "sources": {
+    "title": "信源",
+    "subtitle": "为 AI·HOT 提供内容输入的所有站点与接口",
+    "kindFilter": {
+      "all": "全部类型",
+      "rss": "RSS",
+      "atom": "Atom",
+      "api": "API",
+      "rsshub": "RSSHub",
+      "scrape": "抓取"
+    },
+    "localeFilter": {
+      "all": "全部语言",
+      "zh": "中文",
+      "en": "English",
+      "multi": "多语言"
+    },
+    "groups": {
+      "vendor-official": "厂商官方",
+      "media": "媒体与出版",
+      "newsletter": "新闻信",
+      "research": "论文与研究",
+      "social": "社交与社区",
+      "product": "产品与发布",
+      "podcast": "播客与视频",
+      "policy": "政策与监管",
+      "market": "市场与融资"
+    },
+    "columns": {
+      "name": "名称",
+      "kind": "类型",
+      "locale": "语言",
+      "cadence": "频率",
+      "priority": "优先级"
+    },
+    "cadence": {
+      "live": "实时",
+      "hourly": "每小时",
+      "daily": "每日",
+      "weekly": "每周"
+    }
+  },
+  "lowFollower": {
+    "title": "低粉爆文",
+    "subtitle": "低关注量账号发出的高互动内容 — 先找到 Alpha，再看它是否值得上热点"
+  },
+  "xMonitor": {
+    "title": "X 监控",
+    "subtitle": "追踪指定账号的实时发言 — 实验室、研究员、趋势捕手"
+  },
+  "saved": {
+    "title": "收藏",
+    "subtitle": "你手动点过星的故事"
+  },
+  "admin": {
+    "system": {
+      "title": "系统",
+      "subtitle": "worker 队列、调度与日志"
+    },
+    "policy": {
+      "title": "精选策略",
+      "subtitle": "当前生效的 editorial.skill.md — 只读视图"
+    },
+    "users": {
+      "title": "用户",
+      "subtitle": "成员与权限"
+    }
+  },
+  "common": {
+    "comingSoon": "即将推出",
+    "comingSoonDescription": "此模块正在建设中，后续版本将上线。",
+    "relativeTime": {
+      "justNow": "刚刚",
+      "minutesAgo": "{count} 分钟前",
+      "hoursAgo": "{count} 小时前",
+      "daysAgo": "{count} 天前"
+    }
+  }
+}

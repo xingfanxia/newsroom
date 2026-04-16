@@ -1,0 +1,171 @@
+{
+  "brand": {
+    "name": "AI·HOT",
+    "tagline": "AI industry newsroom"
+  },
+  "nav": {
+    "hotNews": "Hot News",
+    "lowFollower": "Low-follower Viral",
+    "xMonitor": "X Monitor",
+    "saved": "Saved",
+    "sources": "Sources",
+    "adminLabel": "Admin",
+    "system": "System",
+    "policy": "Curation Policy",
+    "iterations": "Policy Iterations",
+    "users": "Users",
+    "logout": "Log out"
+  },
+  "localeSwitcher": {
+    "label": "Language",
+    "zh": "中文",
+    "en": "English"
+  },
+  "hotNews": {
+    "title": "Hot News",
+    "subtitle": "Featured · AI-curated high-value stories · {count} on this page",
+    "search": "Search title / summary…",
+    "filter": "Filter",
+    "tabs": {
+      "featured": "Featured",
+      "all": "All",
+      "p1": "P1"
+    },
+    "empty": "No matching stories"
+  },
+  "story": {
+    "featured": "Featured",
+    "thumbsUp": "Looks good",
+    "thumbsDown": "Not great",
+    "bookmark": "Save",
+    "crossSource": "{count} other source{count, plural, one {} other {s}} also reported this"
+  },
+  "iteration": {
+    "title": "Policy Iterations",
+    "subtitle": "Real editor feedback rewrites the curation policy. This panel pulls feedback, drafts a new version, reviews the diff, and rolls back.",
+    "readinessTitle": "Iteration readiness",
+    "readinessHeadline": "Enough input to start a new draft",
+    "readinessDescription": "{count} feedback items accumulated. Run one iteration, then review the diff + version history before shipping.",
+    "viewLiveSamples": "View live samples",
+    "returnToPolicy": "Back to policy",
+    "metrics": {
+      "totalFeedback": "Total feedback",
+      "totalFeedbackNote": "Enough to drive the next iteration",
+      "agreed": "Agreed",
+      "agreedNote": "Positive signals to keep",
+      "disagreed": "Disagreed",
+      "disagreedNote": "Focus on these first"
+    },
+    "recent": {
+      "title": "Recent feedback",
+      "count": "{count} item{count, plural, one {} other {s}}"
+    },
+    "console": {
+      "title": "Iteration console",
+      "subtitle": "The agent reads feedback and drafts a Skill update. It refuses to run when there is no feedback.",
+      "start": "Start new draft",
+      "lines": {
+        "boot": "Booting Claude Agent…",
+        "loadFeedback": "Loading feedback…",
+        "loadedFeedback": "Loaded {total} items ({agreed} 👍 / {disagreed} 👎)",
+        "agentStart": "Agent starting…",
+        "sessionOpen": "Agent session established",
+        "procedureStart": "Following workflow. First, read the current Skill file.",
+        "readFile": "Read file: {path}",
+        "working": "Agent working…",
+        "finishing": "Agent finished, rendering result…",
+        "done": "Iteration complete",
+        "versioned": "Policy updated to {version}"
+      }
+    },
+    "diff": {
+      "title": "Change preview",
+      "apply": "Apply",
+      "cancel": "Cancel",
+      "toast": "Policy updated to {version}. Next enrichment pass will use the new policy.",
+      "close": "Close"
+    },
+    "versionHistory": {
+      "title": "Version history",
+      "count": "{count} version{count, plural, one {} other {s}}"
+    }
+  },
+  "sources": {
+    "title": "Sources",
+    "subtitle": "Every site and API that feeds content into AI·HOT",
+    "kindFilter": {
+      "all": "All kinds",
+      "rss": "RSS",
+      "atom": "Atom",
+      "api": "API",
+      "rsshub": "RSSHub",
+      "scrape": "Scrape"
+    },
+    "localeFilter": {
+      "all": "All languages",
+      "zh": "Chinese",
+      "en": "English",
+      "multi": "Multilingual"
+    },
+    "groups": {
+      "vendor-official": "Vendor official",
+      "media": "Media & publishing",
+      "newsletter": "Newsletters",
+      "research": "Papers & research",
+      "social": "Social & community",
+      "product": "Products & launches",
+      "podcast": "Podcasts & video",
+      "policy": "Policy & regulation",
+      "market": "Market & funding"
+    },
+    "columns": {
+      "name": "Name",
+      "kind": "Kind",
+      "locale": "Language",
+      "cadence": "Cadence",
+      "priority": "Priority"
+    },
+    "cadence": {
+      "live": "Live",
+      "hourly": "Hourly",
+      "daily": "Daily",
+      "weekly": "Weekly"
+    }
+  },
+  "lowFollower": {
+    "title": "Low-follower Viral",
+    "subtitle": "High-engagement posts from small accounts — early signal before the mainstream."
+  },
+  "xMonitor": {
+    "title": "X Monitor",
+    "subtitle": "Realtime watchlist of labs, researchers, and trend spotters on X/Twitter."
+  },
+  "saved": {
+    "title": "Saved",
+    "subtitle": "Stories you starred."
+  },
+  "admin": {
+    "system": {
+      "title": "System",
+      "subtitle": "Worker queues, schedules, and logs."
+    },
+    "policy": {
+      "title": "Curation Policy",
+      "subtitle": "The live editorial.skill.md — read-only view."
+    },
+    "users": {
+      "title": "Users",
+      "subtitle": "Members and permissions."
+    }
+  },
+  "common": {
+    "comingSoon": "Coming soon",
+    "comingSoonDescription": "This module is under construction — shipping in a later release.",
+    "relativeTime": {
+      "justNow": "just now",
+      "minutesAgo": "{count} min ago",
+      "hoursAgo": "{count} hour{count, plural, one {} other {s}} ago",
+      "daysAgo": "{count} day{count, plural, one {} other {s}} ago"
+    }
+  }
+}

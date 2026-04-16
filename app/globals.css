@@ -1,1 +1,181 @@
 @import "tailwindcss";
+
+/* ------------------------------------------------------------------
+   AI·HOT — Design Tokens
+   Source of truth: /DESIGN.md
+   Linear-inspired dark shell with a neon cyan accent.
+------------------------------------------------------------------ */
+
+@theme inline {
+  /* Fonts */
+  --font-sans: "Inter Variable", "Inter", "PingFang SC", "Noto Sans SC",
+    "Microsoft YaHei", -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", "JetBrains Mono Variable", ui-monospace,
+    "SF Mono", Menlo, monospace;
+
+  /* Surfaces */
+  --color-canvas: #0a0d14;
+  --color-panel: #0f1420;
+  --color-elevated: #111a2b;
+  --color-hover: #1a2438;
+
+  /* Text */
+  --color-fg: #f0f5fa;
+  --color-fg-muted: #a8b4c2;
+  --color-fg-dim: #6b7689;
+  --color-fg-faint: #4a5361;
+
+  /* Cyan accent */
+  --color-cyan: #3ee6e6;
+  --color-cyan-hover: #5ef5f5;
+  --color-cyan-dim: #22c7c7;
+
+  /* Status */
+  --color-positive: #22c55e;
+  --color-positive-soft: #86efac;
+  --color-negative: #ef4444;
+  --color-negative-soft: #fca5a5;
+  --color-warning: #f59e0b;
+  --color-info: #60a5fa;
+
+  /* Borders */
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-subtle: rgba(255, 255, 255, 0.05);
+  --color-border-cyan: rgba(62, 230, 230, 0.3);
+  --color-rail: rgba(255, 255, 255, 0.06);
+}
+
+/* Base */
+html {
+  color-scheme: dark;
+  background: var(--color-canvas);
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  font-feature-settings: "cv01", "ss03";
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  min-height: 100dvh;
+}
+
+/* Radial background glow for a subtle "observatory" feel */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(800px 400px at 20% -10%, rgba(62, 230, 230, 0.04), transparent 60%),
+    radial-gradient(600px 400px at 90% 110%, rgba(62, 230, 230, 0.03), transparent 60%);
+  z-index: 0;
+}
+
+/* Focus ring default */
+:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-canvas), 0 0 0 4px var(--color-border-cyan);
+  border-radius: inherit;
+}
+
+/* Tabular numerals */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Scrollbar (WebKit) */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Selection */
+::selection {
+  background: rgba(62, 230, 230, 0.25);
+  color: #f0f5fa;
+}
+
+/* Surface helpers */
+.surface-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 8px;
+}
+.surface-elevated {
+  background: var(--color-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+.surface-featured {
+  background-image:
+    linear-gradient(135deg, rgba(62, 230, 230, 0.06), transparent 60%),
+    rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(62, 230, 230, 0.12);
+  border-radius: 12px;
+}
+
+/* Console dot indicators */
+.console-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  flex-shrink: 0;
+  margin-top: 9px;
+}
+.console-dot-info { background: var(--color-cyan-dim); }
+.console-dot-reading { background: var(--color-warning); }
+.console-dot-done { background: var(--color-fg-dim); }
+.console-dot-success { background: var(--color-positive); }
+
+/* Diff viewer */
+.diff-line {
+  padding: 1px 12px 1px 14px;
+  border-left: 2px solid transparent;
+  white-space: pre-wrap;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.diff-line-add {
+  background: rgba(34, 197, 94, 0.06);
+  color: var(--color-positive-soft);
+  border-left-color: var(--color-positive);
+}
+.diff-line-remove {
+  background: rgba(239, 68, 68, 0.06);
+  color: var(--color-negative-soft);
+  border-left-color: var(--color-negative);
+}
+.diff-line-context { color: var(--color-fg-dim); }
+.diff-line-meta { color: var(--color-cyan-dim); font-weight: 510; }
+
+/* Animations */
+@keyframes pulse-cyan {
+  0%, 100% { box-shadow: 0 0 18px rgba(62, 230, 230, 0.12); }
+  50% { box-shadow: 0 0 28px rgba(62, 230, 230, 0.25); }
+}
+.pulse-cyan { animation: pulse-cyan 3s ease-in-out infinite; }
+
+@keyframes orbit {
+  to { transform: rotate(360deg); }
+}
+.orbit { animation: orbit 12s linear infinite; transform-origin: center; }
+
+/* Skeleton */
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+.skeleton { animation: skeleton-pulse 1.5s ease-in-out infinite; background: rgba(255,255,255,0.04); }
