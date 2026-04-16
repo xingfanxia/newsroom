@@ -168,5 +168,37 @@
       "hoursAgo": "{count} 小时前",
       "daysAgo": "{count} 天前"
     }
+  },
+  "tags": {
+    "all": {
+      "Agent": "智能体",
+      "RAG": "RAG",
+      "Reasoning": "推理",
+      "Multimodal": "多模态",
+      "Vision": "视觉",
+      "Audio": "音频",
+      "Code": "代码",
+      "Robotics": "机器人",
+      "Embedding": "向量",
+      "Fine-tuning": "微调",
+      "Inference-opt": "推理优化",
+      "Alignment": "对齐",
+      "Safety": "安全",
+      "Interpretability": "可解释性",
+      "Benchmarking": "评测",
+      "Tools": "工具",
+      "Memory": "记忆",
+      "Product update": "产品更新",
+      "Research release": "发表成果",
+      "Funding": "融资",
+      "Policy": "政策",
+      "Open source": "开源",
+      "Safety/alignment": "安全/对齐",
+      "Incident": "事故",
+      "Partnership": "合作",
+      "Personnel": "人事",
+      "Benchmark": "评测",
+      "Commentary": "观点"
+    }
   }
 }

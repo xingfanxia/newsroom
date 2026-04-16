@@ -31,11 +31,15 @@ export type Story = {
   id: string;
   source: {
     publisher: string;
-    kindLabel: string; // "Research (发表成果·网页)" verbatim
+    /** Canonical source kind — UI translates via i18n (sources.kindFilter.*). */
+    kindCode: SourceKind;
+    /** Source content locale — UI translates via i18n (sources.localeFilter.*). */
+    localeCode: "en" | "zh" | "multi";
   };
   featured: boolean;
   title: string;
   summary: string;
+  /** Canonical English tag IDs — UI translates via i18n (tags.*). */
   tags: string[];
   importance: number;
   tier: "featured" | "all" | "p1" | "excluded";

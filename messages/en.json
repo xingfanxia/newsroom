@@ -168,5 +168,37 @@
       "hoursAgo": "{count} hour{count, plural, one {} other {s}} ago",
       "daysAgo": "{count} day{count, plural, one {} other {s}} ago"
     }
+  },
+  "tags": {
+    "all": {
+      "Agent": "Agent",
+      "RAG": "RAG",
+      "Reasoning": "Reasoning",
+      "Multimodal": "Multimodal",
+      "Vision": "Vision",
+      "Audio": "Audio",
+      "Code": "Code",
+      "Robotics": "Robotics",
+      "Embedding": "Embedding",
+      "Fine-tuning": "Fine-tuning",
+      "Inference-opt": "Inference-opt",
+      "Alignment": "Alignment",
+      "Safety": "Safety",
+      "Interpretability": "Interpretability",
+      "Benchmarking": "Benchmarking",
+      "Tools": "Tools",
+      "Memory": "Memory",
+      "Product update": "Product update",
+      "Research release": "Research release",
+      "Funding": "Funding",
+      "Policy": "Policy",
+      "Open source": "Open source",
+      "Safety/alignment": "Safety/alignment",
+      "Incident": "Incident",
+      "Partnership": "Partnership",
+      "Personnel": "Personnel",
+      "Benchmark": "Benchmark",
+      "Commentary": "Commentary"
+    }
   }
 }

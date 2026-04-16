@@ -218,6 +218,10 @@ export const items = pgTable(
       .notNull()
       .defaultNow(),
     // ── Enrichment (M2) ──
+    /** Bilingual titles — LLM-translated during enrichment. Old rows may be null,
+     *  UI falls back to the raw `title` field when missing. */
+    titleZh: text("title_zh"),
+    titleEn: text("title_en"),
     summaryZh: text("summary_zh"),
     summaryEn: text("summary_en"),
     importance: integer("importance"),

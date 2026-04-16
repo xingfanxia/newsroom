@@ -167,6 +167,8 @@ async function enrichOne(item: Item, policy: PolicyT): Promise<void> {
   await client
     .update(items)
     .set({
+      titleZh: enriched.titleZh,
+      titleEn: enriched.titleEn,
       summaryZh: enriched.summaryZh,
       summaryEn: enriched.summaryEn,
       tags: enriched.tags,

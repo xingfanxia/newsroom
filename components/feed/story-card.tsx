@@ -6,8 +6,29 @@ import { ScoreBadge } from "./score-badge";
 import { FeedbackControls } from "./feedback-controls";
 import { CrossSourceIndicator } from "./cross-source-indicator";
 
+/**
+ * Translate a canonical tag ID (English) through the i18n dict. Entity names
+ * like "Anthropic" / "ByteDance" aren't in the dict — next-intl throws on
+ * missing keys by default, so we catch and return the raw tag instead.
+ */
+function translateTag(
+  t: ReturnType<typeof useTranslations>,
+  tag: string,
+): string {
+  try {
+    return t(`all.${tag}`);
+  } catch {
+    return tag;
+  }
+}
+
 export function StoryCard({ story }: { story: Story }) {
   const t = useTranslations("story");
+  const tSource = useTranslations("sources");
+  const tTag = useTranslations("tags");
+  const kindLabel = tSource(`kindFilter.${story.source.kindCode}`);
+  const localeLabel = tSource(`localeFilter.${story.source.localeCode}`);
+
   return (
     <article className="surface-card relative group p-5 transition-colors hover:bg-white/[0.04]">
       {/* Header row: source meta + featured pill */}
@@ -17,7 +38,9 @@ export function StoryCard({ story }: { story: Story }) {
             {story.source.publisher}
           </span>
           <span className="text-[var(--color-fg-faint)]">·</span>
-          <span className="truncate">{story.source.kindLabel}</span>
+          <span className="truncate">
+            {kindLabel} · {localeLabel}
+          </span>
           {story.featured && (
             <Badge variant="cyan" size="sm" className="ml-1">
               {t("featured")}
@@ -48,10 +71,10 @@ export function StoryCard({ story }: { story: Story }) {
         {story.summary}
       </p>
 
-      {/* Tags */}
+      {/* Tags — translated via i18n tags dict, raw fallback for entities */}
       <div className="mt-3 flex flex-wrap items-center gap-1.5">
         {story.tags.map((tag) => (
-          <TagChip key={tag}>{tag}</TagChip>
+          <TagChip key={tag}>{translateTag(tTag, tag)}</TagChip>
         ))}
       </div>
 

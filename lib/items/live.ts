@@ -38,6 +38,8 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
     .select({
       id: items.id,
       title: items.title,
+      titleZh: items.titleZh,
+      titleEn: items.titleEn,
       summaryZh: items.summaryZh,
       summaryEn: items.summaryEn,
       url: items.url,
@@ -72,6 +74,7 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
       entities?: string[];
       topics?: string[];
     };
+    // Flatten for UI. Canonical English IDs stored in DB; UI localizes at render.
     const flatTags = [
       ...(tagBag.capabilities ?? []),
       ...(tagBag.entities ?? []),
@@ -80,13 +83,23 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
 
     const publisher =
       q.locale === "en" ? r.sourceNameEn : r.sourceNameZh;
-    const kindLabel = `${r.sourceKind.toUpperCase()} · ${(r.sourceLocale ?? "multi").toUpperCase()}`;
+
+    // Title fallback ladder: prefer LLM-translated locale match, fall back to
+    // the other locale, fall back to the raw source title.
+    const title =
+      q.locale === "en"
+        ? r.titleEn ?? r.titleZh ?? r.title
+        : r.titleZh ?? r.titleEn ?? r.title;
 
     return {
       id: String(r.id),
-      source: { publisher, kindLabel },
+      source: {
+        publisher,
+        kindCode: r.sourceKind as Story["source"]["kindCode"],
+        localeCode: (r.sourceLocale ?? "multi") as Story["source"]["localeCode"],
+      },
       featured: r.tier === "featured" || r.tier === "p1",
-      title: r.title,
+      title,
       summary:
         q.locale === "en"
           ? r.summaryEn ?? r.summaryZh ?? ""

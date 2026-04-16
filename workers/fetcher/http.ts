@@ -111,8 +111,10 @@ async function fetchOnce(
           // RSSHub-fronted feeds) silently 403 on obvious bot strings.
           "user-agent":
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 AIRadar/1.0 (+https://newsroom-orpin.vercel.app)",
-          accept:
-            "application/rss+xml, application/atom+xml, application/feed+json;q=0.95, application/xml;q=0.9, text/xml;q=0.8, text/html;q=0.7, */*;q=0.5",
+          // Permissive Accept — narrow values caused 406 on strict servers
+          // (e.g. GitHub trending .atom). We rely on Content-Type detection,
+          // not Accept negotiation, downstream.
+          accept: "*/*",
           "accept-language": "en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7",
           ...opts.headers,
         },

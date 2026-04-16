@@ -1,12 +1,14 @@
 import { z } from "zod";
 
 // ── Enrich (summary + tags) ─────────────────────────────────────
+// Canonical English-only enum IDs. The UI translates these via i18n dicts
+// (messages/{zh,en}.json → tags.capabilities / tags.topics) so a single
+// stored value renders correctly in both locales.
 
 export const CAPABILITIES = [
   "Agent",
   "RAG",
   "Reasoning",
-  "多模态",
   "Multimodal",
   "Vision",
   "Audio",
@@ -24,56 +26,57 @@ export const CAPABILITIES = [
 ] as const;
 
 export const TOPICS = [
-  "产品更新",
   "Product update",
-  "发表成果",
   "Research release",
-  "融资",
   "Funding",
-  "政策",
   "Policy",
-  "开源",
   "Open source",
-  "安全/对齐",
   "Safety/alignment",
-  "事故",
   "Incident",
-  "合作",
   "Partnership",
-  "人事",
   "Personnel",
-  "评测",
   "Benchmark",
-  "观点",
   "Commentary",
 ] as const;
 
 export const enrichSchema = z.object({
+  titleZh: z
+    .string()
+    .describe(
+      "Chinese version of the headline. If the input title is already Chinese, return it lightly cleaned (fix typos, strip surrounding quotes/brackets). If it's English, translate to natural Chinese — keep proper nouns (Anthropic/OpenAI/Claude/GPT/Qwen) in their original English form. NO marketing verbs (赋能/助力/引领/打造). Max 80 chars.",
+    ),
+  titleEn: z
+    .string()
+    .describe(
+      "English version of the headline. If the input title is already English, return it lightly cleaned. If Chinese, translate — keep Chinese proper nouns that have no English equivalent in pinyin or original form (e.g. 小米 → Xiaomi, 字节跳动 → ByteDance, 通义千问 → Qwen). Max 120 chars.",
+    ),
   summaryZh: z
     .string()
     .describe(
-      "2-3 sentence Chinese abstract, 120-220 chars. First sentence: what happened (subject+verb+object). Second: one concrete detail (number/mechanism/condition). Optional third: why it matters. NO marketing verbs (赋能/助力/引领), NO opener clichés (近日/近期).",
+      "2-3 sentence Chinese abstract, 120-220 chars. First sentence: what happened (subject+verb+object). Second: one concrete detail (number/mechanism/condition). Optional third: why it matters. NO marketing verbs, NO opener clichés (近日/近期).",
     ),
   summaryEn: z
     .string()
     .describe("2-3 sentence English abstract, 120-220 chars. Same facts."),
   tags: z.object({
     capabilities: z
-      .array(z.string())
+      .array(z.enum(CAPABILITIES))
       .max(3)
       .describe(
-        `Up to 3 capabilities from: ${CAPABILITIES.join(", ")}. Empty if none apply.`,
+        `Up to 3 canonical English capability IDs from: ${CAPABILITIES.join(", ")}. Empty array if none apply. Do NOT output Chinese translations — the UI localizes these for display.`,
       ),
     entities: z
       .array(z.string())
       .max(3)
       .describe(
-        "Up to 3 named organizations or people mentioned in the article (e.g. Anthropic, OpenAI, 小米, 字节, Dario Amodei).",
+        "Up to 3 named organizations or people mentioned. Use the most common English rendering when it exists (Anthropic / OpenAI / Xiaomi / ByteDance / Dario Amodei), otherwise original form.",
       ),
     topics: z
-      .array(z.string())
+      .array(z.enum(TOPICS))
       .max(3)
-      .describe(`Up to 3 topics from: ${TOPICS.join(", ")}.`),
+      .describe(
+        `Up to 3 canonical English topic IDs from: ${TOPICS.join(", ")}. Do NOT output Chinese — UI localizes.`,
+      ),
   }),
 });
 export type EnrichOutput = z.infer<typeof enrichSchema>;
