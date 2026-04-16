@@ -216,10 +216,7 @@ export function streamText(req: GenerateTextRequest) {
 
 // ── Embeddings ──────────────────────────────────────────────────
 
-function embeddingModelFor(
-  provider: LLMProvider,
-  dimensions?: number,
-) {
+function embeddingModelFor(provider: LLMProvider) {
   // Only Azure OpenAI's text-embedding-3-large path is wired.
   // Extend here when we add voyage / cohere via other providers.
   if (provider !== "azure-openai") {
@@ -235,22 +232,16 @@ function embeddingModelFor(
       "AZURE_OPENAI_EMBEDDING_DEPLOYMENT is not set",
     );
   }
-  const dims =
-    dimensions ??
-    (process.env.AZURE_OPENAI_EMBEDDING_DIMENSIONS
-      ? Number(process.env.AZURE_OPENAI_EMBEDDING_DIMENSIONS)
-      : undefined);
-
-  // `dimensions` on text-embedding-3-* uses Matryoshka truncation.
-  // Passing undefined returns the model's native dimension (3072 for large).
-  return azureClient().textEmbeddingModel(deployment, {
-    ...(dims ? { dimensions: dims } : {}),
-  });
+  // Returns native 3072-dim vectors for text-embedding-3-large. @ai-sdk/azure
+  // v3 doesn't accept a `dimensions` setting on textEmbeddingModel, so we
+  // store the full native width in pgvector `halfvec(3072)`, which supports
+  // HNSW indexing up to 4000 dims.
+  return azureClient().textEmbeddingModel(deployment);
 }
 
 export async function embed(req: EmbedRequest): Promise<EmbedResult> {
   const provider = resolveProvider(req.provider, "AIHOT_EMBED_PROVIDER");
-  const model = embeddingModelFor(provider, req.dimensions);
+  const model = embeddingModelFor(provider);
   try {
     const result = await aiEmbed({ model, value: req.value });
     return {
@@ -270,7 +261,7 @@ export async function embed(req: EmbedRequest): Promise<EmbedResult> {
 
 export async function embedMany(req: EmbedManyRequest): Promise<EmbedManyResult> {
   const provider = resolveProvider(req.provider, "AIHOT_EMBED_PROVIDER");
-  const model = embeddingModelFor(provider, req.dimensions);
+  const model = embeddingModelFor(provider);
   try {
     const result = await aiEmbedMany({ model, values: req.values });
     return {
