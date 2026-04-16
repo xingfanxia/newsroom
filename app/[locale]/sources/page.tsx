@@ -1,11 +1,21 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { Badge } from "@/components/ui/badge";
 import { LocaleSwitcher } from "@/components/layout/locale-switcher";
-import { sourcesByGroup } from "@/lib/sources/catalog";
-import type { Source } from "@/lib/types";
-import { ExternalLink, Rss } from "lucide-react";
+import { SourceRow } from "@/components/sources/source-row";
+import { getLiveSources, liveSourcesByGroup } from "@/lib/sources/live";
 
-type Locale = "zh" | "en";
+export const dynamic = "force-dynamic";
+
+const GROUP_ORDER = [
+  "vendor-official",
+  "media",
+  "newsletter",
+  "research",
+  "social",
+  "product",
+  "podcast",
+  "policy",
+  "market",
+] as const;
 
 export default async function SourcesPage({
   params,
@@ -18,18 +28,11 @@ export default async function SourcesPage({
   const tG = await getTranslations("sources.groups");
   const tC = await getTranslations("sources.cadence");
 
-  const byGroup = sourcesByGroup();
-  const groupOrder = [
-    "vendor-official",
-    "media",
-    "newsletter",
-    "research",
-    "social",
-    "product",
-    "podcast",
-    "policy",
-    "market",
-  ] as const;
+  const live = await getLiveSources();
+  const totalItems = live.reduce((a, b) => a + b.health.totalItemsCount, 0);
+  const okCount = live.filter((s) => s.health.status === "ok").length;
+  const errorCount = live.filter((s) => s.health.status === "error").length;
+  const byGroup = liveSourcesByGroup(live);
 
   return (
     <>
@@ -45,11 +48,32 @@ export default async function SourcesPage({
           </div>
           <LocaleSwitcher />
         </div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-4 font-mono text-[12px] tabular text-[var(--color-fg-muted)]">
+          <span>
+            <span className="text-[var(--color-fg)]">{live.length}</span> sources
+          </span>
+          <span className="text-[var(--color-fg-faint)]">·</span>
+          <span>
+            <span className="text-[var(--color-positive)]">{okCount}</span> ok
+          </span>
+          <span className="text-[var(--color-fg-faint)]">·</span>
+          <span>
+            <span className="text-[var(--color-negative)]">{errorCount}</span> error
+          </span>
+          <span className="text-[var(--color-fg-faint)]">·</span>
+          <span>
+            <span className="text-[var(--color-cyan)]">
+              {totalItems.toLocaleString(locale === "zh" ? "zh-CN" : "en-US")}
+            </span>{" "}
+            items collected
+          </span>
+        </div>
       </header>
 
       <div className="px-8 py-8">
         <div className="mx-auto flex max-w-[1200px] flex-col gap-10">
-          {groupOrder.map((g) => {
+          {GROUP_ORDER.map((g) => {
             const items = byGroup.get(g);
             if (!items || items.length === 0) return null;
             return (
@@ -70,6 +94,9 @@ export default async function SourcesPage({
                         <Th>{t("columns.kind")}</Th>
                         <Th>{t("columns.locale")}</Th>
                         <Th>{t("columns.cadence")}</Th>
+                        <Th className="text-right">
+                          {locale === "zh" ? "累计" : "Items"}
+                        </Th>
                         <Th className="text-right pr-6">
                           {t("columns.priority")}
                         </Th>
@@ -80,7 +107,7 @@ export default async function SourcesPage({
                         <SourceRow
                           key={s.id}
                           source={s}
-                          locale={locale as Locale}
+                          locale={locale as "zh" | "en"}
                           cadenceLabel={tC(s.cadence)}
                         />
                       ))}
@@ -109,67 +136,5 @@ function Th({
     >
       {children}
     </th>
-  );
-}
-
-function SourceRow({
-  source,
-  locale,
-  cadenceLabel,
-}: {
-  source: Source;
-  locale: Locale;
-  cadenceLabel: string;
-}) {
-  return (
-    <tr className="border-b border-[var(--color-border-subtle)] last:border-0 hover:bg-white/[0.02] transition-colors">
-      <td className="px-5 py-3">
-        <a
-          href={source.url.startsWith("internal://") ? "#" : source.url}
-          target="_blank"
-          rel="noreferrer"
-          className="group inline-flex items-center gap-2 font-[510] text-[var(--color-fg)] hover:text-[var(--color-cyan)] transition-colors"
-        >
-          <Rss
-            size={13}
-            className="text-[var(--color-fg-dim)] group-hover:text-[var(--color-cyan)] transition-colors"
-          />
-          <span>{source.name[locale === "zh" ? "zh" : "en"]}</span>
-          {!source.url.startsWith("internal://") && (
-            <ExternalLink
-              size={11}
-              className="text-[var(--color-fg-faint)] opacity-0 group-hover:opacity-100 transition-opacity"
-            />
-          )}
-        </a>
-        {source.notes && (
-          <div className="mt-1 text-[12px] text-[var(--color-fg-dim)]">
-            {source.notes}
-          </div>
-        )}
-      </td>
-      <td className="px-5 py-3 font-mono text-[12px] uppercase tabular text-[var(--color-fg-muted)]">
-        {source.kind}
-      </td>
-      <td className="px-5 py-3 text-[12px] text-[var(--color-fg-muted)]">
-        {source.locale}
-      </td>
-      <td className="px-5 py-3 text-[12px] text-[var(--color-fg-muted)]">
-        {cadenceLabel}
-      </td>
-      <td className="px-5 py-3 pr-6 text-right">
-        <Badge
-          variant={
-            source.priority === 1
-              ? "cyan"
-              : source.priority === 2
-                ? "default"
-                : "outline"
-          }
-        >
-          P{source.priority}
-        </Badge>
-      </td>
-    </tr>
   );
 }
