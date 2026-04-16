@@ -10,12 +10,41 @@ import {
   uniqueIndex,
   index,
   serial,
+  customType,
 } from "drizzle-orm/pg-core";
 import type {
   SourceKind as TSourceKind,
   SourceGroup as TSourceGroup,
   Cadence as TCadence,
 } from "@/lib/types";
+
+// ── Custom pgvector halfvec type ────────────────────────────────
+// pgvector 0.8+ supports halfvec (fp16) with HNSW indexes up to 4000 dims,
+// which lets us store text-embedding-3-large's native 3072-dim output
+// without Matryoshka truncation. Same storage as vector(1536) at 6144 bytes.
+
+export const halfvec = customType<{
+  data: number[];
+  driverData: string;
+  config: { dimensions: number };
+}>({
+  dataType(config) {
+    if (!config?.dimensions) {
+      throw new Error("halfvec requires `dimensions`");
+    }
+    return `halfvec(${config.dimensions})`;
+  },
+  fromDriver(value): number[] {
+    if (typeof value !== "string") return value as unknown as number[];
+    const trimmed = value.startsWith("[") && value.endsWith("]")
+      ? value.slice(1, -1)
+      : value;
+    return trimmed.split(",").map(Number);
+  },
+  toDriver(value: number[]): string {
+    return `[${value.join(",")}]`;
+  },
+});
 
 // ── Enums ───────────────────────────────────────────────────────
 export const sourceKindEnum = pgEnum("source_kind", [
@@ -56,11 +85,10 @@ export const healthStatusEnum = pgEnum("health_status", [
 
 // ── Tables ──────────────────────────────────────────────────────
 
-/** Source catalog — one row per configured feed. Seeded from lib/sources/catalog.ts */
 export const sources = pgTable(
   "sources",
   {
-    id: text("id").primaryKey(), // matches catalog.ts id
+    id: text("id").primaryKey(),
     nameEn: text("name_en").notNull(),
     nameZh: text("name_zh").notNull(),
     url: text("url").notNull(),
@@ -84,7 +112,6 @@ export const sources = pgTable(
   }),
 );
 
-/** Source health — one row per source, updated each fetch tick. */
 export const sourceHealth = pgTable("source_health", {
   sourceId: text("source_id")
     .primaryKey()
@@ -101,7 +128,6 @@ export const sourceHealth = pgTable("source_health", {
     .defaultNow(),
 });
 
-/** Raw items — untouched payloads from a fetch, pre-normalization. */
 export const rawItems = pgTable(
   "raw_items",
   {
@@ -109,7 +135,7 @@ export const rawItems = pgTable(
     sourceId: text("source_id")
       .notNull()
       .references(() => sources.id, { onDelete: "cascade" }),
-    externalId: text("external_id").notNull(), // GUID from feed, URL hash for scrape
+    externalId: text("external_id").notNull(),
     url: text("url"),
     title: text("title"),
     rawPayload: jsonb("raw_payload").notNull(),
@@ -130,7 +156,20 @@ export const rawItems = pgTable(
   }),
 );
 
-/** Normalized items — clean title/body/url, ready for enrichment. */
+/** Clusters — groups of near-duplicate items (cosine similarity > threshold). */
+export const clusters = pgTable("clusters", {
+  id: serial("id").primaryKey(),
+  /** Canonical lead item shown in the timeline. No FK constraint (circular dep). */
+  leadItemId: integer("lead_item_id").notNull(),
+  memberCount: integer("member_count").notNull().default(1),
+  firstSeenAt: timestamp("first_seen_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
 export const items = pgTable(
   "items",
   {
@@ -145,20 +184,29 @@ export const items = pgTable(
     body: text("body").notNull(),
     url: text("url").notNull(),
     canonicalUrl: text("canonical_url").notNull(),
-    contentHash: text("content_hash").notNull(), // sha256 over title+body
+    contentHash: text("content_hash").notNull(),
     author: text("author"),
     publishedAt: timestamp("published_at", { withTimezone: true }).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
-    // Enrichment fields — populated in M2
+    // ── Enrichment (M2) ──
     summaryZh: text("summary_zh"),
     summaryEn: text("summary_en"),
     importance: integer("importance"),
-    tier: text("tier"), // featured | all | p1 | excluded
-    tags: jsonb("tags"), // { capabilities, entities, topics }
+    /** featured | all | p1 | excluded */
+    tier: text("tier"),
+    /** { capabilities: string[], entities: string[], topics: string[] } */
+    tags: jsonb("tags"),
+    reasoning: text("reasoning"),
     enrichedAt: timestamp("enriched_at", { withTimezone: true }),
     policyVersion: text("policy_version"),
+    // ── Clustering (M2) ──
+    embedding: halfvec("embedding", { dimensions: 3072 }),
+    clusterId: integer("cluster_id").references(() => clusters.id, {
+      onDelete: "set null",
+    }),
+    clusteredAt: timestamp("clustered_at", { withTimezone: true }),
   },
   (t) => ({
     contentHashIdx: uniqueIndex("items_content_hash_idx").on(t.contentHash),
@@ -166,6 +214,13 @@ export const items = pgTable(
     publishedAtIdx: index("items_published_at_idx").on(t.publishedAt),
     sourceIdx: index("items_source_idx").on(t.sourceId, t.publishedAt),
     tierIdx: index("items_tier_idx").on(t.tier, t.publishedAt),
+    unenrichedIdx: index("items_unenriched_idx")
+      .on(t.enrichedAt)
+      .where(sql`${t.enrichedAt} IS NULL`),
+    unclusteredIdx: index("items_unclustered_idx")
+      .on(t.clusteredAt)
+      .where(sql`${t.clusteredAt} IS NULL AND ${t.embedding} IS NOT NULL`),
+    clusterIdx: index("items_cluster_idx").on(t.clusterId, t.publishedAt),
   }),
 );
 
@@ -178,6 +233,7 @@ export type RawItem = typeof rawItems.$inferSelect;
 export type NewRawItem = typeof rawItems.$inferInsert;
 export type Item = typeof items.$inferSelect;
 export type NewItem = typeof items.$inferInsert;
+export type Cluster = typeof clusters.$inferSelect;
+export type NewCluster = typeof clusters.$inferInsert;
 
-// Re-export convenience for other modules
 export type { TSourceKind, TSourceGroup, TCadence };

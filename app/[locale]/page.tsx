@@ -8,6 +8,7 @@ import {
   TimelineSection,
 } from "@/components/feed/timeline-rail";
 import { mockStories } from "@/lib/mock/stories";
+import { getFeaturedStories } from "@/lib/items/live";
 import { formatDateHeader } from "@/lib/utils";
 import type { Story } from "@/lib/types";
 import { HotNewsTabsClient } from "./_hot-news-tabs";
@@ -23,7 +24,21 @@ export default async function HotNewsPage({
   const t = await getTranslations("hotNews");
   const tabT = await getTranslations("hotNews.tabs");
 
-  const grouped = groupByDay(mockStories);
+  // Graceful fallback: use live DB until it has enriched rows, then mock.
+  // Once enrichment catches up, the live feed replaces mock automatically.
+  let stories: Story[] = [];
+  try {
+    stories = await getFeaturedStories({
+      tier: "featured",
+      locale: locale as "zh" | "en",
+      limit: 40,
+    });
+  } catch {
+    stories = [];
+  }
+  if (stories.length === 0) stories = mockStories;
+
+  const grouped = groupByDay(stories);
 
   return (
     <>

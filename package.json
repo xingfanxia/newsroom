@@ -14,6 +14,8 @@
     "db:studio": "drizzle-kit studio",
     "db:seed": "bun scripts/ops/seed-sources.ts",
     "db:ping": "bun scripts/ops/ping-db.ts",
+    "db:init-ext": "bun scripts/ops/db-init-extensions.ts",
+    "db:hnsw": "bun scripts/ops/db-create-hnsw.ts",
     "cron:hourly": "bun scripts/ops/run-cron.ts hourly",
     "cron:daily": "bun scripts/ops/run-cron.ts daily",
     "cron:normalize": "bun scripts/ops/run-cron.ts normalize"

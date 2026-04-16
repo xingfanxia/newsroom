@@ -4,6 +4,8 @@
     { "path": "/api/cron/fetch-hourly", "schedule": "17 * * * *" },
     { "path": "/api/cron/fetch-daily", "schedule": "23 4 * * *" },
     { "path": "/api/cron/fetch-weekly", "schedule": "43 5 * * 1" },
-    { "path": "/api/cron/normalize", "schedule": "37 */6 * * *" }
+    { "path": "/api/cron/normalize", "schedule": "37 */6 * * *" },
+    { "path": "/api/cron/enrich", "schedule": "*/15 * * * *" },
+    { "path": "/api/cron/cluster", "schedule": "*/30 * * * *" }
   ]
 }

@@ -9,6 +9,8 @@
 
 import { runFetchBucket } from "@/workers/fetcher";
 import { runNormalizer } from "@/workers/normalizer";
+import { runEnrichBatch } from "@/workers/enrich";
+import { runClusterBatch } from "@/workers/cluster";
 
 async function main() {
   const kind = process.argv[2];
@@ -38,6 +40,16 @@ async function main() {
   if (kind === "normalize") {
     const n = await runNormalizer();
     console.log(JSON.stringify({ normalize: n }, null, 2));
+    return;
+  }
+  if (kind === "enrich") {
+    const e = await runEnrichBatch();
+    console.log(JSON.stringify({ enrich: e }, null, 2));
+    return;
+  }
+  if (kind === "cluster") {
+    const c = await runClusterBatch();
+    console.log(JSON.stringify({ cluster: c }, null, 2));
     return;
   }
 
