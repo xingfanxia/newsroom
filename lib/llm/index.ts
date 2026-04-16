@@ -9,9 +9,11 @@ import {
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createAzure } from "@ai-sdk/azure";
+import { createOpenAI } from "@ai-sdk/openai";
 import { z } from "zod";
 import type {
   LLMProvider,
+  ReasoningEffort,
   GenerateTextRequest,
   GenerateTextResult,
   GenerateStructuredRequest,
@@ -25,6 +27,7 @@ import { LLMError } from "./types";
 
 export type {
   LLMProvider,
+  ReasoningEffort,
   GenerateTextRequest,
   GenerateTextResult,
   EmbedRequest,
@@ -70,46 +73,71 @@ function azureClient() {
       "AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT must be set",
     );
   }
-  // Our endpoint is the Azure AI Foundry / Cognitive Services multi-service URL
-  // (e.g. https://<res>.cognitiveservices.azure.com/), NOT the legacy
-  // <res>.openai.azure.com domain that @ai-sdk/azure defaults to. Override
-  // via `baseURL` which takes precedence over `resourceName`.
-  //
-  // useDeploymentBasedUrls: true forces the /openai/deployments/<name>/chat/completions
-  // path (with api-version as query), which is what our GPT-5 deployment accepts.
-  // Without it, the SDK defaults to the newer /responses API that our deployment
-  // does not yet support.
   const baseURL = endpoint.replace(/\/+$/, "") + "/openai";
   cachedAzure ??= createAzure({
     apiKey,
     baseURL,
     apiVersion,
     useDeploymentBasedUrls: true,
-    fetch: (url, init) => {
-      if (process.env.AIHOT_LLM_DEBUG) console.log("[azure] →", url);
-      return fetch(url, init);
-    },
   });
   return cachedAzure;
 }
 
+let cachedAzurePro: ReturnType<typeof createOpenAI> | null = null;
+function azureProClient() {
+  // The pro deployment lives on a separate Azure resource and uses Azure's
+  // OpenAI-compatible /v1/ endpoint — we access it via @ai-sdk/openai with
+  // a baseURL override (identical pattern to the `openai` npm package sample
+  // Azure publishes for this deployment).
+  const apiKey = process.env.AZURE_OPENAI_PRO_API_KEY;
+  const endpoint = process.env.AZURE_OPENAI_PRO_ENDPOINT; // "https://<res>.openai.azure.com/openai/v1/"
+  if (!apiKey || !endpoint) {
+    throw new LLMError(
+      "azure-openai-pro",
+      "AZURE_OPENAI_PRO_API_KEY and AZURE_OPENAI_PRO_ENDPOINT must be set",
+    );
+  }
+  cachedAzurePro ??= createOpenAI({
+    apiKey,
+    baseURL: endpoint,
+    // Azure's /v1/ endpoint uses the api-key header, not OpenAI's Bearer token
+    headers: { "api-key": apiKey },
+  });
+  return cachedAzurePro;
+}
+
 // ── Model resolvers ─────────────────────────────────────────────
 
-function modelFor(provider: LLMProvider): LanguageModel {
+function modelFor(
+  provider: LLMProvider,
+  opts?: { deployment?: string },
+): LanguageModel {
   switch (provider) {
     case "anthropic":
       return anthropicClient()(
-        process.env.ANTHROPIC_MODEL ?? "claude-opus-4-7",
+        opts?.deployment ??
+          process.env.ANTHROPIC_MODEL ??
+          "claude-opus-4-7",
       );
     case "gemini":
       return googleClient()(
-        process.env.GEMINI_MODEL ?? "gemini-3.1-pro-preview",
+        opts?.deployment ??
+          process.env.GEMINI_MODEL ??
+          "gemini-3.1-pro-preview",
       );
     case "azure-openai":
-      // .chat() forces the /chat/completions endpoint that our GPT-5
-      // deployment supports; default .responses() API is not yet available.
       return azureClient().chat(
-        process.env.AZURE_OPENAI_DEPLOYMENT ?? "gpt-5.4-standard",
+        opts?.deployment ??
+          process.env.AZURE_OPENAI_DEPLOYMENT ??
+          "gpt-5.4-standard",
+      );
+    case "azure-openai-pro":
+      // .responses() uses Azure's new Responses API — reasoning-native,
+      // what gpt-5.4-pro is designed for.
+      return azureProClient().responses(
+        opts?.deployment ??
+          process.env.AZURE_OPENAI_PRO_DEPLOYMENT ??
+          "gpt-5.4-pro-standard",
       );
     default:
       throw new LLMError(provider, `unknown provider: ${provider}`);
@@ -117,17 +145,26 @@ function modelFor(provider: LLMProvider): LanguageModel {
 }
 
 function modelId(model: LanguageModel): string {
-  // LanguageModel exposes modelId at runtime on each provider's impl
   return (model as { modelId?: string }).modelId ?? "unknown";
 }
 
 function resolveProvider(
   explicit?: LLMProvider,
-  envKey: "AIHOT_ENRICH_PROVIDER" | "AIHOT_SCORE_PROVIDER" | "AIHOT_EMBED_PROVIDER" = "AIHOT_ENRICH_PROVIDER",
+  envKey:
+    | "AIHOT_ENRICH_PROVIDER"
+    | "AIHOT_SCORE_PROVIDER"
+    | "AIHOT_EMBED_PROVIDER" = "AIHOT_ENRICH_PROVIDER",
 ): LLMProvider {
   if (explicit) return explicit;
   const env = process.env[envKey] as LLMProvider | undefined;
   return env ?? "anthropic";
+}
+
+function reasoningProviderOptions(effort?: ReasoningEffort) {
+  if (!effort) return undefined;
+  return {
+    openai: { reasoningEffort: effort },
+  } as const;
 }
 
 // ── Public API ──────────────────────────────────────────────────
@@ -136,15 +173,14 @@ export async function generateText(
   req: GenerateTextRequest,
 ): Promise<GenerateTextResult> {
   const provider = resolveProvider(req.provider);
-  const model = modelFor(provider);
+  const model = modelFor(provider, { deployment: req.deployment });
   try {
     const result = await aiGenerateText({
       model,
       system: req.system,
       messages: req.messages,
       maxOutputTokens: req.maxTokens ?? 2048,
-      // Reasoning-family models (Opus 4.7, GPT-5, Gemini 3 Pro) don't accept
-      // temperature — only pass it if the caller explicitly opts in.
+      providerOptions: reasoningProviderOptions(req.reasoningEffort),
       ...(req.temperature !== undefined
         ? { temperature: req.temperature }
         : {}),
@@ -170,7 +206,7 @@ export async function generateStructured<T extends z.ZodTypeAny>(
   req: GenerateStructuredRequest<T>,
 ): Promise<GenerateStructuredResult<T>> {
   const provider = resolveProvider(req.provider);
-  const model = modelFor(provider);
+  const model = modelFor(provider, { deployment: req.deployment });
   try {
     const result = await aiGenerateObject({
       model,
@@ -180,6 +216,7 @@ export async function generateStructured<T extends z.ZodTypeAny>(
       schemaName: req.schemaName,
       schemaDescription: req.schemaDescription,
       maxOutputTokens: req.maxTokens ?? 2048,
+      providerOptions: reasoningProviderOptions(req.reasoningEffort),
       ...(req.temperature !== undefined
         ? { temperature: req.temperature }
         : {}),
@@ -202,12 +239,13 @@ export async function generateStructured<T extends z.ZodTypeAny>(
 
 export function streamText(req: GenerateTextRequest) {
   const provider = resolveProvider(req.provider);
-  const model = modelFor(provider);
+  const model = modelFor(provider, { deployment: req.deployment });
   return aiStreamText({
     model,
     system: req.system,
     messages: req.messages,
     maxOutputTokens: req.maxTokens ?? 2048,
+    providerOptions: reasoningProviderOptions(req.reasoningEffort),
     ...(req.temperature !== undefined
       ? { temperature: req.temperature }
       : {}),
@@ -217,8 +255,6 @@ export function streamText(req: GenerateTextRequest) {
 // ── Embeddings ──────────────────────────────────────────────────
 
 function embeddingModelFor(provider: LLMProvider) {
-  // Only Azure OpenAI's text-embedding-3-large path is wired.
-  // Extend here when we add voyage / cohere via other providers.
   if (provider !== "azure-openai") {
     throw new LLMError(
       provider,
@@ -232,10 +268,6 @@ function embeddingModelFor(provider: LLMProvider) {
       "AZURE_OPENAI_EMBEDDING_DEPLOYMENT is not set",
     );
   }
-  // Returns native 3072-dim vectors for text-embedding-3-large. @ai-sdk/azure
-  // v3 doesn't accept a `dimensions` setting on textEmbeddingModel, so we
-  // store the full native width in pgvector `halfvec(3072)`, which supports
-  // HNSW indexing up to 4000 dims.
   return azureClient().textEmbeddingModel(deployment);
 }
 
@@ -259,7 +291,9 @@ export async function embed(req: EmbedRequest): Promise<EmbedResult> {
   }
 }
 
-export async function embedMany(req: EmbedManyRequest): Promise<EmbedManyResult> {
+export async function embedMany(
+  req: EmbedManyRequest,
+): Promise<EmbedManyResult> {
   const provider = resolveProvider(req.provider, "AIHOT_EMBED_PROVIDER");
   const model = embeddingModelFor(provider);
   try {
@@ -279,6 +313,33 @@ export async function embedMany(req: EmbedManyRequest): Promise<EmbedManyResult>
   }
 }
 
+// ── Task profiles ───────────────────────────────────────────────
+// Opinionated per-task model + reasoning presets — callers use these
+// instead of hand-wiring provider+deployment+effort each time.
+
+export const profiles = {
+  /** Deterministic summarization / tagging. Cheap + fast. */
+  enrich: {
+    provider: "azure-openai" as const,
+    reasoningEffort: "low" as const,
+  },
+  /** Editorial scoring. Reasoning-grade quality without pro's latency —
+   *  standard + high is ~3x faster than pro + medium at ~95% of the quality
+   *  on deterministic rubric tasks. */
+  score: {
+    provider: "azure-openai" as const,
+    reasoningEffort: "high" as const,
+  },
+  /** M4 policy-iteration agent. Deepest reasoning. */
+  agent: {
+    provider: "azure-openai-pro" as const,
+    reasoningEffort: "xhigh" as const,
+  },
+} satisfies Record<
+  string,
+  { provider: LLMProvider; reasoningEffort: ReasoningEffort }
+>;
+
 // ── Diagnostics ─────────────────────────────────────────────────
 
 export function availableProviders(): LLMProvider[] {
@@ -287,6 +348,12 @@ export function availableProviders(): LLMProvider[] {
   if (process.env.GEMINI_API_KEY) out.push("gemini");
   if (process.env.AZURE_OPENAI_API_KEY && process.env.AZURE_OPENAI_ENDPOINT) {
     out.push("azure-openai");
+  }
+  if (
+    process.env.AZURE_OPENAI_PRO_API_KEY &&
+    process.env.AZURE_OPENAI_PRO_ENDPOINT
+  ) {
+    out.push("azure-openai-pro");
   }
   return out;
 }

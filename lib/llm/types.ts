@@ -1,13 +1,28 @@
 import type { ModelMessage } from "ai";
 import type { z } from "zod";
 
-export type LLMProvider = "anthropic" | "gemini" | "azure-openai";
+export type LLMProvider =
+  | "anthropic"
+  | "gemini"
+  | "azure-openai"
+  | "azure-openai-pro";
+
+export type ReasoningEffort = "minimal" | "low" | "medium" | "high" | "xhigh";
 
 export type GenerateTextRequest = {
   provider?: LLMProvider;
+  /** Override the default deployment for this provider (mainly for Azure). */
+  deployment?: string;
+  /** GPT-5 family reasoning effort. Provider-specific allowed values:
+   *   - gpt-5.4-standard: minimal | low | medium | high
+   *   - gpt-5.4-pro:      medium | high | xhigh
+   */
+  reasoningEffort?: ReasoningEffort;
   system?: string;
   messages: ModelMessage[];
   maxTokens?: number;
+  /** Reasoning-family models (Opus 4.7, Gemini 3 Pro, GPT-5) reject temperature.
+   *  Only pass it when calling non-reasoning models. */
   temperature?: number;
 };
 
@@ -72,5 +87,4 @@ export class LLMError extends Error {
   }
 }
 
-// Re-export ModelMessage for callers that want to build messages inline.
 export type { ModelMessage } from "ai";
