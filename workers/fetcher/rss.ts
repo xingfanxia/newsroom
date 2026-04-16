@@ -8,12 +8,15 @@ export type FeedItem = {
   rawPayload: unknown;
 };
 
+// Hardened parser config: disable DTD + entity expansion, cap attributes.
 const parser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: "@_",
   textNodeName: "#text",
   parseAttributeValue: false,
   trimValues: true,
+  processEntities: false, // prevents XML entity expansion / billion-laughs
+  allowBooleanAttributes: false,
 });
 
 /**

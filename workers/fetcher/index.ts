@@ -1,24 +1,33 @@
 import pLimit from "p-limit";
-import { and, eq, inArray } from "drizzle-orm";
+import { sql, and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import { sources, rawItems, sourceHealth } from "@/db/schema";
 import type { Source } from "@/db/schema";
-import { fetchWithRetry } from "./http";
+import { fetchWithRetry, type FetchErrorCode } from "./http";
 import { parseFeed, type FeedItem } from "./rss";
 
 const CONCURRENCY = 8;
+
+// Kinds we can fetch in M1. Other kinds are kept in the catalog but skipped
+// (pending implementation) so they appear in source_health without polluting errors.
+const SUPPORTED_KINDS = ["rss", "atom", "rsshub"] as const;
+type SupportedKind = (typeof SUPPORTED_KINDS)[number];
+function isSupported(k: string): k is SupportedKind {
+  return (SUPPORTED_KINDS as readonly string[]).includes(k);
+}
 
 export type FetchReport = {
   cadence: string;
   total: number;
   ok: number;
+  pending: number;
   errored: number;
   newItems: number;
   durationMs: number;
-  errors: { sourceId: string; error: string }[];
+  errors: { sourceId: string; code: FetchErrorCode | "unknown" }[];
 };
 
-/** Fetch all enabled sources that match the given cadences, in parallel. */
+/** Fetch all enabled sources matching the given cadences, in parallel. */
 export async function runFetchBucket(
   cadences: ("live" | "hourly" | "daily" | "weekly")[],
 ): Promise<FetchReport> {
@@ -32,23 +41,28 @@ export async function runFetchBucket(
 
   const limit = pLimit(CONCURRENCY);
   let ok = 0;
+  let pending = 0;
   let errored = 0;
   let newItems = 0;
-  const errors: { sourceId: string; error: string }[] = [];
+  const errors: { sourceId: string; code: FetchErrorCode | "unknown" }[] = [];
 
   await Promise.allSettled(
     rows.map((source) =>
       limit(async () => {
         try {
-          const n = await fetchOneSource(source);
-          ok++;
-          newItems += n;
-        } catch (err) {
+          const outcome = await fetchOneSource(source);
+          if (outcome.kind === "ok") {
+            ok++;
+            newItems += outcome.newItems;
+          } else if (outcome.kind === "pending") {
+            pending++;
+          } else {
+            errored++;
+            errors.push({ sourceId: source.id, code: outcome.code });
+          }
+        } catch {
           errored++;
-          errors.push({
-            sourceId: source.id,
-            error: err instanceof Error ? err.message : String(err),
-          });
+          errors.push({ sourceId: source.id, code: "unknown" });
         }
       }),
     ),
@@ -58,6 +72,7 @@ export async function runFetchBucket(
     cadence: cadences.join(","),
     total: rows.length,
     ok,
+    pending,
     errored,
     newItems,
     durationMs: Date.now() - started,
@@ -65,55 +80,48 @@ export async function runFetchBucket(
   };
 }
 
-async function fetchOneSource(source: Source): Promise<number> {
+type Outcome =
+  | { kind: "ok"; newItems: number }
+  | { kind: "pending" }
+  | { kind: "error"; code: FetchErrorCode | "unknown"; detail: string };
+
+async function fetchOneSource(source: Source): Promise<Outcome> {
   const client = db();
 
-  // Route by kind — for now, rss/atom/rsshub all parse as XML feeds.
-  let feedItems: FeedItem[] = [];
-  let fetchError: string | null = null;
-
-  if (source.kind === "rss" || source.kind === "atom" || source.kind === "rsshub") {
-    const res = await fetchWithRetry<string>(source.url, {
-      headers: source.kind === "rsshub" ? { accept: "application/rss+xml" } : undefined,
-    });
-    if (!res.ok) {
-      fetchError = res.error;
-    } else {
-      try {
-        feedItems = parseFeed(res.data);
-      } catch (err) {
-        fetchError = err instanceof Error ? err.message : String(err);
-      }
-    }
-  } else if (source.kind === "scrape") {
-    // M1 stub — wire up to linkedom in next pass. For now, mark pending.
-    fetchError = "scrape kind not yet implemented";
-  } else if (source.kind === "api") {
-    // M1 stub — generic API fetchers are per-source and defer to M2.
-    fetchError = "api kind not yet implemented";
-  }
-
-  if (fetchError) {
+  // Short-circuit unsupported kinds: leave status="pending" so the admin
+  // can see which sources aren't yet implemented without triggering alerts.
+  if (!isSupported(source.kind)) {
     await client
       .insert(sourceHealth)
       .values({
         sourceId: source.id,
-        status: "error",
+        status: "pending",
         lastFetchedAt: new Date(),
-        lastError: fetchError,
-        consecutiveFailures: 1,
       })
       .onConflictDoUpdate({
         target: sourceHealth.sourceId,
         set: {
-          status: "error",
+          status: "pending",
           lastFetchedAt: new Date(),
-          lastError: fetchError,
-          consecutiveFailures: incrementFailures(),
           updatedAt: new Date(),
         },
       });
-    throw new Error(fetchError);
+    return { kind: "pending" };
+  }
+
+  // Supported kinds all parse as XML feeds for now.
+  const res = await fetchWithRetry<string>(source.url);
+  if (!res.ok) {
+    await markError(source.id, res.error, res.error);
+    return { kind: "error", code: res.error, detail: res.error };
+  }
+
+  let feedItems: FeedItem[];
+  try {
+    feedItems = parseFeed(res.data);
+  } catch {
+    await markError(source.id, "parse_error", "parse_error");
+    return { kind: "error", code: "parse_error", detail: "parse_error" };
   }
 
   // Insert raw rows (dedup by unique index on (source_id, external_id))
@@ -137,17 +145,27 @@ async function fetchOneSource(source: Source): Promise<number> {
     inserted = result.length;
   }
 
-  // Mark healthy
+  await markOk(source.id, feedItems.length, inserted);
+  return { kind: "ok", newItems: inserted };
+}
+
+async function markOk(
+  sourceId: string,
+  seenCount: number,
+  insertedCount: number,
+) {
+  const client = db();
   await client
     .insert(sourceHealth)
     .values({
-      sourceId: source.id,
+      sourceId,
       status: "ok",
       lastFetchedAt: new Date(),
       lastSuccessAt: new Date(),
       lastError: null,
       consecutiveFailures: 0,
-      lastItemsCount: feedItems.length,
+      lastItemsCount: seenCount,
+      totalItemsCount: insertedCount,
     })
     .onConflictDoUpdate({
       target: sourceHealth.sourceId,
@@ -157,20 +175,37 @@ async function fetchOneSource(source: Source): Promise<number> {
         lastSuccessAt: new Date(),
         lastError: null,
         consecutiveFailures: 0,
-        lastItemsCount: feedItems.length,
-        totalItemsCount: incrementTotal(inserted),
+        lastItemsCount: seenCount,
+        totalItemsCount: sql`${sourceHealth.totalItemsCount} + ${insertedCount}`,
         updatedAt: new Date(),
       },
     });
-
-  return inserted;
 }
 
-// drizzle SQL helpers for increment columns
-import { sql } from "drizzle-orm";
-function incrementFailures() {
-  return sql`${sourceHealth.consecutiveFailures} + 1`;
-}
-function incrementTotal(inserted: number) {
-  return sql`${sourceHealth.totalItemsCount} + ${inserted}`;
+async function markError(
+  sourceId: string,
+  errorCode: FetchErrorCode,
+  /** Detail is stored server-side but never returned from cron routes. */
+  detail: string,
+) {
+  const client = db();
+  await client
+    .insert(sourceHealth)
+    .values({
+      sourceId,
+      status: "error",
+      lastFetchedAt: new Date(),
+      lastError: `${errorCode}: ${detail}`,
+      consecutiveFailures: 1,
+    })
+    .onConflictDoUpdate({
+      target: sourceHealth.sourceId,
+      set: {
+        status: "error",
+        lastFetchedAt: new Date(),
+        lastError: `${errorCode}: ${detail}`,
+        consecutiveFailures: sql`${sourceHealth.consecutiveFailures} + 1`,
+        updatedAt: new Date(),
+      },
+    });
 }

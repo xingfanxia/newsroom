@@ -62,7 +62,8 @@ async function main() {
   console.log("seed complete ✓");
 }
 
-main().catch((err) => {
-  console.error("seed failed:", err);
+main().catch((err: unknown) => {
+  const msg = err instanceof Error ? err.message : String(err);
+  console.error("seed failed:", msg);
   process.exit(1);
 });

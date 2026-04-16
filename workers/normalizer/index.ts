@@ -1,4 +1,4 @@
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { rawItems, items } from "@/db/schema";
 import type { RawItem } from "@/db/schema";
@@ -11,6 +11,7 @@ export type NormalizeReport = {
   processed: number;
   created: number;
   dedupedByHash: number;
+  skipped: number; // raw rows with no valid url / body
   errored: number;
   errors: { rawItemId: number; error: string }[];
   durationMs: number;
@@ -18,9 +19,13 @@ export type NormalizeReport = {
 
 /**
  * Convert newly-fetched raw_items into clean, canonicalized items.
- * - Parses the raw payload (RSS/Atom description or content:encoded)
- * - Canonicalizes URL, computes content hash
- * - Dedupes against existing items via unique content_hash index
+ *
+ * Atomicity note: the "insert item → mark raw normalized" pair is NOT wrapped
+ * in a DB transaction (Neon HTTP driver doesn't support them). The pair is
+ * idempotent-on-replay because:
+ *   - item insert uses ON CONFLICT(content_hash) DO NOTHING
+ *   - mark-normalized is a conditional UPDATE (only where normalized_at IS NULL)
+ * Worst case after a crash: one duplicate insert attempt that is deduped.
  */
 export async function runNormalizer(): Promise<NormalizeReport> {
   const started = Date.now();
@@ -34,14 +39,16 @@ export async function runNormalizer(): Promise<NormalizeReport> {
 
   let created = 0;
   let dedupedByHash = 0;
+  let skipped = 0;
   let errored = 0;
   const errors: { rawItemId: number; error: string }[] = [];
 
   for (const raw of pending) {
     try {
-      const n = await normalizeOne(raw);
-      if (n === "created") created++;
-      else if (n === "deduped") dedupedByHash++;
+      const outcome = await normalizeOne(raw);
+      if (outcome === "created") created++;
+      else if (outcome === "deduped") dedupedByHash++;
+      else skipped++;
     } catch (err) {
       errored++;
       errors.push({
@@ -55,17 +62,28 @@ export async function runNormalizer(): Promise<NormalizeReport> {
     processed: pending.length,
     created,
     dedupedByHash,
+    skipped,
     errored,
     errors,
     durationMs: Date.now() - started,
   };
 }
 
-async function normalizeOne(raw: RawItem): Promise<"created" | "deduped"> {
+async function normalizeOne(
+  raw: RawItem,
+): Promise<"created" | "deduped" | "skipped"> {
   const client = db();
-  const payload = raw.rawPayload as Record<string, unknown>;
 
-  // Extract body from common RSS/Atom fields
+  // We require a valid URL to produce an item. If the raw row has no url,
+  // skip it — items.url is NOT NULL and using the empty string causes a
+  // pathological dedup (all url-less rows hash to the same content_hash).
+  const url = (raw.url ?? "").trim();
+  if (!url) {
+    await markNormalized(raw.id);
+    return "skipped";
+  }
+
+  const payload = raw.rawPayload as Record<string, unknown>;
   const body =
     extractFromPayload(payload, ["content:encoded"]) ||
     extractFromPayload(payload, ["content"]) ||
@@ -74,11 +92,12 @@ async function normalizeOne(raw: RawItem): Promise<"created" | "deduped"> {
     "";
   const bodyText = stripHtml(body);
 
-  const title = raw.title ?? "(untitled)";
-  const url = raw.url ?? "";
+  const title = (raw.title ?? "").trim() || "(untitled)";
   const canonical = canonicalizeUrl(url);
-  const hash = contentHash(title, bodyText || url);
-  const publishedAt = raw.publishedAt ?? new Date(); // fallback to fetch time
+  // Include canonical URL in the hash so two url-bearing items never collide,
+  // even if their (title, body) happen to coincide (e.g. "(untitled)" / "").
+  const hash = contentHash(`${canonical}\n\n${title}`, bodyText);
+  const publishedAt = raw.publishedAt ?? new Date();
 
   const inserted = await client
     .insert(items)
@@ -95,13 +114,16 @@ async function normalizeOne(raw: RawItem): Promise<"created" | "deduped"> {
     .onConflictDoNothing({ target: items.contentHash })
     .returning({ id: items.id });
 
-  // Mark raw row as processed either way
+  await markNormalized(raw.id);
+  return inserted.length > 0 ? "created" : "deduped";
+}
+
+async function markNormalized(rawId: number) {
+  const client = db();
   await client
     .update(rawItems)
     .set({ normalizedAt: new Date() })
-    .where(and(eq(rawItems.id, raw.id), isNull(rawItems.normalizedAt)));
-
-  return inserted.length > 0 ? "created" : "deduped";
+    .where(and(eq(rawItems.id, rawId), isNull(rawItems.normalizedAt)));
 }
 
 function extractFromPayload(
@@ -118,5 +140,3 @@ function extractFromPayload(
   }
   return "";
 }
-
-void sql; // keep import; used transitively via schema
