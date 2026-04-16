@@ -2,6 +2,8 @@ import {
   generateText as aiGenerateText,
   generateObject as aiGenerateObject,
   streamText as aiStreamText,
+  embed as aiEmbed,
+  embedMany as aiEmbedMany,
   type LanguageModel,
 } from "ai";
 import { createAnthropic } from "@ai-sdk/anthropic";
@@ -14,10 +16,22 @@ import type {
   GenerateTextResult,
   GenerateStructuredRequest,
   GenerateStructuredResult,
+  EmbedRequest,
+  EmbedManyRequest,
+  EmbedResult,
+  EmbedManyResult,
 } from "./types";
 import { LLMError } from "./types";
 
-export type { LLMProvider, GenerateTextRequest, GenerateTextResult } from "./types";
+export type {
+  LLMProvider,
+  GenerateTextRequest,
+  GenerateTextResult,
+  EmbedRequest,
+  EmbedManyRequest,
+  EmbedResult,
+  EmbedManyResult,
+} from "./types";
 export { LLMError } from "./types";
 
 // ── Provider clients (lazy, singleton per provider) ─────────────
@@ -107,9 +121,12 @@ function modelId(model: LanguageModel): string {
   return (model as { modelId?: string }).modelId ?? "unknown";
 }
 
-function resolveProvider(explicit?: LLMProvider): LLMProvider {
+function resolveProvider(
+  explicit?: LLMProvider,
+  envKey: "AIHOT_ENRICH_PROVIDER" | "AIHOT_SCORE_PROVIDER" | "AIHOT_EMBED_PROVIDER" = "AIHOT_ENRICH_PROVIDER",
+): LLMProvider {
   if (explicit) return explicit;
-  const env = process.env.AIHOT_ENRICH_PROVIDER as LLMProvider | undefined;
+  const env = process.env[envKey] as LLMProvider | undefined;
   return env ?? "anthropic";
 }
 
@@ -195,6 +212,80 @@ export function streamText(req: GenerateTextRequest) {
       ? { temperature: req.temperature }
       : {}),
   });
+}
+
+// ── Embeddings ──────────────────────────────────────────────────
+
+function embeddingModelFor(
+  provider: LLMProvider,
+  dimensions?: number,
+) {
+  // Only Azure OpenAI's text-embedding-3-large path is wired.
+  // Extend here when we add voyage / cohere via other providers.
+  if (provider !== "azure-openai") {
+    throw new LLMError(
+      provider,
+      `embedding not implemented for provider ${provider}`,
+    );
+  }
+  const deployment = process.env.AZURE_OPENAI_EMBEDDING_DEPLOYMENT;
+  if (!deployment) {
+    throw new LLMError(
+      "azure-openai",
+      "AZURE_OPENAI_EMBEDDING_DEPLOYMENT is not set",
+    );
+  }
+  const dims =
+    dimensions ??
+    (process.env.AZURE_OPENAI_EMBEDDING_DIMENSIONS
+      ? Number(process.env.AZURE_OPENAI_EMBEDDING_DIMENSIONS)
+      : undefined);
+
+  // `dimensions` on text-embedding-3-* uses Matryoshka truncation.
+  // Passing undefined returns the model's native dimension (3072 for large).
+  return azureClient().textEmbeddingModel(deployment, {
+    ...(dims ? { dimensions: dims } : {}),
+  });
+}
+
+export async function embed(req: EmbedRequest): Promise<EmbedResult> {
+  const provider = resolveProvider(req.provider, "AIHOT_EMBED_PROVIDER");
+  const model = embeddingModelFor(provider, req.dimensions);
+  try {
+    const result = await aiEmbed({ model, value: req.value });
+    return {
+      embedding: result.embedding,
+      provider,
+      model: modelId(model as unknown as LanguageModel),
+      tokens: result.usage?.tokens,
+    };
+  } catch (err) {
+    throw new LLMError(
+      provider,
+      err instanceof Error ? err.message : String(err),
+      err,
+    );
+  }
+}
+
+export async function embedMany(req: EmbedManyRequest): Promise<EmbedManyResult> {
+  const provider = resolveProvider(req.provider, "AIHOT_EMBED_PROVIDER");
+  const model = embeddingModelFor(provider, req.dimensions);
+  try {
+    const result = await aiEmbedMany({ model, values: req.values });
+    return {
+      embeddings: result.embeddings,
+      provider,
+      model: modelId(model as unknown as LanguageModel),
+      tokens: result.usage?.tokens,
+    };
+  } catch (err) {
+    throw new LLMError(
+      provider,
+      err instanceof Error ? err.message : String(err),
+      err,
+    );
+  }
 }
 
 // ── Diagnostics ─────────────────────────────────────────────────

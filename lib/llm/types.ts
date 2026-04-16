@@ -35,6 +35,32 @@ export type GenerateStructuredResult<T extends z.ZodTypeAny> = {
   outputTokens?: number;
 };
 
+export type EmbedRequest = {
+  provider?: LLMProvider;
+  value: string;
+  dimensions?: number;
+};
+
+export type EmbedManyRequest = {
+  provider?: LLMProvider;
+  values: string[];
+  dimensions?: number;
+};
+
+export type EmbedResult = {
+  embedding: number[];
+  provider: LLMProvider;
+  model: string;
+  tokens?: number;
+};
+
+export type EmbedManyResult = {
+  embeddings: number[][];
+  provider: LLMProvider;
+  model: string;
+  tokens?: number;
+};
+
 export class LLMError extends Error {
   constructor(
     public provider: LLMProvider,
