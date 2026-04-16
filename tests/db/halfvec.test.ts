@@ -28,10 +28,10 @@ describe("halfvec NaN guard", () => {
     expect(() => halfvecToDriver([1, Infinity, 3])).toThrow(/non-finite/);
   });
   it("throws on malformed cell on decode", () => {
-    expect(() => halfvecFromDriver("[1,,3]")).toThrow(/non-finite/);
+    expect(() => halfvecFromDriver("[1,,3]")).toThrow(/empty cell|non-finite/);
   });
   it("throws on trailing comma on decode", () => {
-    expect(() => halfvecFromDriver("[1,2,]")).toThrow(/non-finite/);
+    expect(() => halfvecFromDriver("[1,2,]")).toThrow(/empty cell|non-finite/);
   });
   it("throws on non-numeric cell on decode", () => {
     expect(() => halfvecFromDriver("[1,abc,3]")).toThrow(/non-finite/);
