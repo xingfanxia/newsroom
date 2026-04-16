@@ -1,24 +1,21 @@
-import { z } from "zod";
+import type { ModelMessage } from "ai";
+import type { z } from "zod";
 
 export type LLMProvider = "anthropic" | "gemini" | "azure-openai";
 
-export type LLMMessage = {
-  role: "system" | "user" | "assistant";
-  content: string;
-};
-
-export type GenerateTextOptions = {
+export type GenerateTextRequest = {
   provider?: LLMProvider;
   system?: string;
-  messages: LLMMessage[];
+  messages: ModelMessage[];
   maxTokens?: number;
   temperature?: number;
 };
 
-export type GenerateStructuredOptions<T extends z.ZodTypeAny> =
-  GenerateTextOptions & {
+export type GenerateStructuredRequest<T extends z.ZodTypeAny> =
+  GenerateTextRequest & {
     schema: T;
-    schemaName: string;
+    schemaName?: string;
+    schemaDescription?: string;
   };
 
 export type GenerateTextResult = {
@@ -27,13 +24,15 @@ export type GenerateTextResult = {
   model: string;
   inputTokens?: number;
   outputTokens?: number;
+  reasoningText?: string;
 };
 
 export type GenerateStructuredResult<T extends z.ZodTypeAny> = {
   data: z.infer<T>;
-  raw: string;
   provider: LLMProvider;
   model: string;
+  inputTokens?: number;
+  outputTokens?: number;
 };
 
 export class LLMError extends Error {
@@ -46,3 +45,6 @@ export class LLMError extends Error {
     this.name = "LLMError";
   }
 }
+
+// Re-export ModelMessage for callers that want to build messages inline.
+export type { ModelMessage } from "ai";
