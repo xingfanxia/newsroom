@@ -110,7 +110,8 @@ async function fetchOneSource(source: Source): Promise<Outcome> {
   }
 
   // Supported kinds all parse as XML feeds for now.
-  const res = await fetchWithRetry<string>(source.url);
+  const url = resolveSourceUrl(source);
+  const res = await fetchWithRetry<string>(url);
   if (!res.ok) {
     await markError(source.id, res.error, res.error);
     return { kind: "error", code: res.error, detail: res.error };
@@ -180,6 +181,31 @@ async function markOk(
         updatedAt: new Date(),
       },
     });
+}
+
+/**
+ * Resolves the URL to fetch, applying the RSSHub mirror if configured.
+ * The free rsshub.app instance rate-limits heavily; swap to a self-hosted
+ * or community mirror via RSSHUB_BASE_URL (e.g. https://rsshub.rssforever.com).
+ */
+function resolveSourceUrl(source: Source): string {
+  if (source.kind !== "rsshub") return source.url;
+  const base = process.env.RSSHUB_BASE_URL?.replace(/\/+$/, "");
+  if (!base) return source.url;
+  try {
+    const parsed = new URL(source.url);
+    const baseParsed = new URL(base);
+    parsed.protocol = baseParsed.protocol;
+    parsed.host = baseParsed.host;
+    parsed.port = baseParsed.port;
+    // Preserve path + query; allow base to include a path prefix.
+    if (baseParsed.pathname && baseParsed.pathname !== "/") {
+      parsed.pathname = baseParsed.pathname.replace(/\/+$/, "") + parsed.pathname;
+    }
+    return parsed.toString();
+  } catch {
+    return source.url;
+  }
 }
 
 async function markError(

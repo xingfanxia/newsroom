@@ -1,8 +1,25 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <rect width="64" height="64" rx="14" fill="#0a0d14"/>
-  <circle cx="32" cy="32" r="16" fill="none" stroke="#3ee6e6" stroke-width="3" opacity="0.7"/>
-  <circle cx="46" cy="32" r="4" fill="#3ee6e6">
-    <animateTransform attributeName="transform" type="rotate" from="0 32 32" to="360 32 32" dur="6s" repeatCount="indefinite"/>
+  <!-- Concentric rings (radar grid) -->
+  <circle cx="32" cy="32" r="22" fill="none" stroke="#3ee6e6" stroke-width="1" opacity="0.18"/>
+  <circle cx="32" cy="32" r="14" fill="none" stroke="#3ee6e6" stroke-width="1" opacity="0.28"/>
+  <circle cx="32" cy="32" r="6"  fill="none" stroke="#3ee6e6" stroke-width="1" opacity="0.45"/>
+  <!-- Sweep wedge -->
+  <g>
+    <path d="M32 32 L32 10 A22 22 0 0 1 54 32 Z" fill="url(#sweep)" opacity="0.55">
+      <animateTransform attributeName="transform" type="rotate" from="0 32 32" to="360 32 32" dur="4s" repeatCount="indefinite"/>
+    </path>
+  </g>
+  <!-- Detected blip -->
+  <circle cx="46" cy="26" r="2.2" fill="#5ef5f5">
+    <animate attributeName="opacity" values="0.2;1;0.2" dur="4s" repeatCount="indefinite"/>
   </circle>
-  <text x="32" y="58" text-anchor="middle" font-family="Inter, system-ui" font-size="8" font-weight="600" fill="#a8b4c2">AI·HOT</text>
+  <!-- Center pin -->
+  <circle cx="32" cy="32" r="1.8" fill="#3ee6e6"/>
+  <defs>
+    <linearGradient id="sweep" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#3ee6e6" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#3ee6e6" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
 </svg>

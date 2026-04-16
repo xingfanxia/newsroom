@@ -1,9 +1,10 @@
 @import "tailwindcss";
 
 /* ------------------------------------------------------------------
-   AI·HOT — Design Tokens
+   AX's AI RADAR — Design Tokens
    Source of truth: /DESIGN.md
-   Linear-inspired dark shell with a neon cyan accent.
+   Dark observatory shell with a neon cyan accent. Built for the radar
+   metaphor — sweep, ping, blip motifs carry the "active sensor" feel.
 ------------------------------------------------------------------ */
 
 @theme inline {
@@ -172,6 +173,36 @@ body::before {
   to { transform: rotate(360deg); }
 }
 .orbit { animation: orbit 12s linear infinite; transform-origin: center; }
+
+/* Radar sweep — a conic-gradient wedge that rotates. The sweep fades from
+   translucent cyan down to transparent so it reads as a sensor pulse, not
+   a windshield wiper. The blip flashes on the same cadence. */
+@keyframes radar-sweep {
+  to { transform: rotate(360deg); }
+}
+@keyframes radar-blip {
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 1; }
+}
+.radar-sweep {
+  background: conic-gradient(
+    from 0deg,
+    rgba(62, 230, 230, 0.55) 0deg,
+    rgba(62, 230, 230, 0) 80deg,
+    rgba(62, 230, 230, 0) 360deg
+  );
+  mask: radial-gradient(circle, #000 35%, transparent 100%);
+  -webkit-mask: radial-gradient(circle, #000 35%, transparent 100%);
+  animation: radar-sweep 4s linear infinite;
+}
+.radar-blip {
+  animation: radar-blip 4s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .radar-sweep, .radar-blip, .orbit, .pulse-cyan, .skeleton {
+    animation: none;
+  }
+}
 
 /* Skeleton */
 @keyframes skeleton-pulse {

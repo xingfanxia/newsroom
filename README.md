@@ -1,7 +1,7 @@
-# AI·HOT — AI Newsroom
+# AX's AI RADAR
 
-> **A bilingual AI-native news intelligence dashboard with a self-iterating editorial agent.**
-> Inspired by Linear's dark-mode-native architecture; cyan-neon accent; zh/en locale-first.
+> **A bilingual AI intelligence radar with a self-iterating editorial agent.** 50+ sources in, curated signal out.
+> Dark-mode-native observatory aesthetic; cyan-neon accent; zh/en locale-first.
 
 🌐 **Live**: [newsroom-orpin.vercel.app](https://newsroom-orpin.vercel.app) → redirects to `/zh`
 📦 **Repo**: [github.com/xingfanxia/newsroom](https://github.com/xingfanxia/newsroom)
@@ -14,7 +14,7 @@
 
 ### What it is
 
-AI·HOT is a dashboard for editors and analysts who cover the AI industry. It does four things:
+AX's AI RADAR is a dashboard for editors and analysts who cover the AI industry. It does four things:
 
 1. **Ingests** ~50 curated sources (RSS, Atom, RSSHub, APIs, scraping) — vendor blogs, media, newsletters, arXiv, social signal, podcasts.
 2. **Enriches** each story via LLM — Chinese / English summary, 0–100 importance score, multi-axis taxonomy (capability / entity / topic), cross-source clustering, and optional [Tavily](https://tavily.com/) web-context.
@@ -100,7 +100,7 @@ Full blueprint + deviations in [`docs/architecture/ingestion.md`](./docs/archite
 
 ### 它是什么
 
-AI·HOT 是一款面向 AI 行业编辑和分析师的情报工作台，由四个环节组成：
+AX 的 AI 雷达是一款面向 AI 行业编辑和分析师的情报工作台，由四个环节组成：
 
 1. **拉取**：大约 50 个精选信源（RSS / Atom / RSSHub / API / 网页抓取）——厂商博客、媒体、新闻信、arXiv、社交信号、播客。
 2. **加工**：每篇内容经 LLM 管线处理——中英文摘要、0–100 的 importance 分数、多轴标签（能力 / 实体 / 话题）、跨源聚类；可选 [Tavily](https://tavily.com/) 网页上下文补充。

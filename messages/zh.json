@@ -1,7 +1,8 @@
 {
   "brand": {
-    "name": "AI·HOT",
-    "tagline": "AI 行业新闻情报台"
+    "name": "AX 的 AI 雷达",
+    "shortName": "AI 雷达",
+    "tagline": "AI 情报雷达台"
   },
   "nav": {
     "hotNews": "热点资讯",
@@ -92,7 +93,7 @@
   },
   "sources": {
     "title": "信源",
-    "subtitle": "为 AI·HOT 提供内容输入的所有站点与接口",
+    "subtitle": "为雷达提供内容输入的所有站点与接口",
     "kindFilter": {
       "all": "全部类型",
       "rss": "RSS",

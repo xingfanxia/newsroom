@@ -107,10 +107,13 @@ async function fetchOnce(
     try {
       res = await fetch(currentUrl, {
         headers: {
+          // Browser-ish UA — many RSS endpoints (Meta, Google, DeepLearning.ai,
+          // RSSHub-fronted feeds) silently 403 on obvious bot strings.
           "user-agent":
-            "AI-HOT-fetcher/1.0 (+https://newsroom-orpin.vercel.app)",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 AIRadar/1.0 (+https://newsroom-orpin.vercel.app)",
           accept:
-            "application/rss+xml, application/atom+xml, application/xml;q=0.9, text/xml;q=0.8, */*;q=0.5",
+            "application/rss+xml, application/atom+xml, application/feed+json;q=0.95, application/xml;q=0.9, text/xml;q=0.8, text/html;q=0.7, */*;q=0.5",
+          "accept-language": "en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7",
           ...opts.headers,
         },
         signal: controller.signal,

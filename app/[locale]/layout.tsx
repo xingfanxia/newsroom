@@ -21,9 +21,9 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AI·HOT — AI newsroom",
+  title: "AX's AI RADAR — AI intelligence radar",
   description:
-    "AI-native bilingual news intelligence dashboard with self-iterating editorial agent.",
+    "Bilingual AI intelligence radar with a self-iterating editorial agent. Fifty-plus sources in, curated signal out.",
   icons: {
     icon: "/favicon.svg",
   },

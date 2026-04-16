@@ -5,7 +5,7 @@
 import { embed, embedMany } from "@/lib/llm";
 
 async function main() {
-  const single = await embed({ value: "hello from AI·HOT" });
+  const single = await embed({ value: "hello from AX's AI RADAR" });
   console.log(
     `embed: model=${single.model} dims=${single.embedding.length} tokens=${single.tokens} first5=[${single.embedding.slice(0, 5).map((n) => n.toFixed(4)).join(", ")}]`,
   );

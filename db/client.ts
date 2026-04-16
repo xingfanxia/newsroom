@@ -3,7 +3,7 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import * as schema from "./schema";
 
 /**
- * Postgres connection for AI·HOT.
+ * Postgres connection for AX's AI RADAR.
  *
  * Works with any Postgres + pgvector (Supabase / Railway / self-hosted).
  * On Supabase (via Vercel Marketplace), these env vars are auto-wired:

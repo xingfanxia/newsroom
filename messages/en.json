@@ -1,7 +1,8 @@
 {
   "brand": {
-    "name": "AI·HOT",
-    "tagline": "AI industry newsroom"
+    "name": "AX's AI RADAR",
+    "shortName": "AI RADAR",
+    "tagline": "AI intelligence radar"
   },
   "nav": {
     "hotNews": "Hot News",
@@ -92,7 +93,7 @@
   },
   "sources": {
     "title": "Sources",
-    "subtitle": "Every site and API that feeds content into AI·HOT",
+    "subtitle": "Every site and API that feeds content into the radar",
     "kindFilter": {
       "all": "All kinds",
       "rss": "RSS",

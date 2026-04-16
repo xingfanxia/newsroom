@@ -1,17 +1,17 @@
 <!-- Source: awesome-design-md / linear.app — https://github.com/VoltAgent/awesome-design-md -->
-<!-- Adapted for AI·HOT — cyan-neon palette replaces Linear's indigo. -->
+<!-- Adapted for AX's AI RADAR — cyan-neon palette + radar/sweep motion grammar replaces Linear's indigo and stillness. -->
 
-# AI·HOT — Design System
+# AX's AI RADAR — Design System
 
-> A dark-mode-native news intelligence dashboard. Linear's architecture, a cyan-neon accent, and a bilingual-first typography stack.
+> A dark-mode-native AI intelligence radar. Linear's architecture for the shell, a cyan-neon accent for the active sensor, and a bilingual-first typography stack.
 
 ---
 
 ## 1. Visual Theme & Atmosphere
 
-AI·HOT extends Linear's dark-first architecture into a slightly cooler, more aquatic palette. The canvas is a deep blue-black (`#0a0d14`) rather than Linear's warm near-black — this matches the observed screenshots and evokes *terminal + observatory* rather than *issue tracker*. Content emerges through luminance stepping (background opacity stacks from `0.02` → `0.05`) and is punctuated by a single brand accent: **neon cyan `#3ee6e6`**, reserved for primary actions, active navigation, score highlights, and the logo's orbiting dot. Every primary interactive element gets a soft cyan glow (`0 0 24px rgba(62,230,230,0.18)`) — the only chromatic illumination in the system.
+AX's AI RADAR extends Linear's dark-first architecture into a slightly cooler, more aquatic palette. The canvas is a deep blue-black (`#0a0d14`) rather than Linear's warm near-black — this evokes *observatory + sensor deck* rather than *issue tracker*. Content emerges through luminance stepping (background opacity stacks from `0.02` → `0.05`) and is punctuated by a single brand accent: **neon cyan `#3ee6e6`**, reserved for primary actions, active navigation, score highlights, the radar sweep, and detected blips. Every primary interactive element gets a soft cyan glow (`0 0 24px rgba(62,230,230,0.18)`) — the only chromatic illumination in the system. Motion grammar is **slow + mechanical**: a 4-second radar sweep, a 3-second pulse on featured cards, a 12-second orbit on the logo. Never flashy, always alive.
 
-Typography is Inter Variable with OpenType features `"cv01", "ss03"` enabled globally, at signature weight 510 for UI emphasis. Because AI·HOT is **bilingual-first (zh primary, en secondary)**, the CJK fallback chain is non-optional: `"PingFang SC", "Noto Sans SC", "Microsoft YaHei"`. Monospace uses JetBrains Mono (open-source alternative to Berkeley Mono) for the diff viewer, agent console, and numeric timestamps.
+Typography is Inter Variable with OpenType features `"cv01", "ss03"` enabled globally, at signature weight 510 for UI emphasis. Because the radar is **bilingual-first (zh primary, en secondary)**, the CJK fallback chain is non-optional: `"PingFang SC", "Noto Sans SC", "Microsoft YaHei"`. Monospace uses JetBrains Mono (open-source alternative to Berkeley Mono) for the diff viewer, agent console, and numeric timestamps.
 
 **Key Characteristics:**
 - Dark-mode-native: `#0a0d14` page canvas, `#0f1420` panel/sidebar, `#111a2b` elevated card.

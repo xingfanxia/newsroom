@@ -16,10 +16,11 @@ export function TimelineEntry({
           {formatTime(date)}
         </span>
       </div>
-      {/* rail dot */}
+      {/* rail dot — centered on rail at left-[80px] (dot: 9px wide, border 2px,
+          so left=76 → center=80.5 lines up with the 1px rail center) */}
       <div
         aria-hidden
-        className="pointer-events-none absolute left-[74px] top-[22px] h-[9px] w-[9px] rounded-full border-2 border-[var(--color-cyan-dim)] bg-[var(--color-canvas)]"
+        className="pointer-events-none absolute left-[76px] top-[22px] h-[9px] w-[9px] rounded-full border-2 border-[var(--color-cyan-dim)] bg-[var(--color-canvas)]"
       />
       {/* card */}
       <div>{children}</div>
