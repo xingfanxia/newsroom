@@ -41,6 +41,9 @@ const CONCURRENCY = hasValidKey ? 30 : 1;
 const ANON_DELAY_MS = 1200;
 const MAX_PER_RUN = hasValidKey ? 300 : 20;
 
+// Matches youtube.com, youtu.be, m.youtube.com, music.youtube.com — anything
+// that the youtube-transcript worker should own. Shorts URLs (youtube.com/
+// shorts/<id>) parse to youtube.com host, so this catches them naturally.
 const YT_HOST_RE = /(^|\.)youtube\.com$|(^|\.)youtu\.be$/i;
 
 export type ArticleBodyReport = {
@@ -73,7 +76,17 @@ export async function runArticleBodyFetch(): Promise<ArticleBodyReport> {
       url: items.url,
     })
     .from(items)
-    .where(and(isNull(items.bodyFetchedAt), isNotNull(items.canonicalUrl)))
+    .where(
+      and(
+        isNull(items.bodyFetchedAt),
+        isNotNull(items.canonicalUrl),
+        // YouTube URLs belong to workers/fetcher/youtube-transcript.ts
+        // which fetches captions instead of Jina-scraped page HTML.
+        sql`${items.canonicalUrl} NOT LIKE '%youtube.com/watch%'`,
+        sql`${items.canonicalUrl} NOT LIKE '%youtu.be/%'`,
+        sql`${items.canonicalUrl} NOT LIKE '%youtube.com/shorts/%'`,
+      ),
+    )
     .orderBy(tierRank, desc(items.publishedAt))
     .limit(MAX_PER_RUN);
 
@@ -99,11 +112,17 @@ export async function runArticleBodyFetch(): Promise<ArticleBodyReport> {
     pending.map((item) =>
       limit(async () => {
         const target = item.canonicalUrl || item.url;
-        if (!target || isYouTubeUrl(target)) {
+        if (!target) {
           await client
             .update(items)
             .set({ bodyFetchedAt: new Date() })
             .where(eq(items.id, item.id));
+          skipped++;
+          return;
+        }
+        if (isYouTubeUrl(target)) {
+          // Leave bodyFetchedAt NULL — the YouTube transcript worker
+          // (workers/fetcher/youtube-transcript.ts) owns these URLs.
           skipped++;
           return;
         }

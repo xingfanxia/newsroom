@@ -12,6 +12,7 @@ import { runNormalizer } from "@/workers/normalizer";
 import { runEnrichBatch } from "@/workers/enrich";
 import { runClusterBatch } from "@/workers/cluster";
 import { runArticleBodyFetch } from "@/workers/fetcher/article-body";
+import { runYoutubeTranscriptFetch } from "@/workers/fetcher/youtube-transcript";
 
 async function main() {
   const kind = process.argv[2];
@@ -51,6 +52,11 @@ async function main() {
   if (kind === "body") {
     const b = await runArticleBodyFetch();
     console.log(JSON.stringify({ body: b }, null, 2));
+    return;
+  }
+  if (kind === "yt") {
+    const y = await runYoutubeTranscriptFetch();
+    console.log(JSON.stringify({ youtube: y }, null, 2));
     return;
   }
   if (kind === "cluster") {
