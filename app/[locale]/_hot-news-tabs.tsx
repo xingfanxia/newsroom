@@ -1,22 +1,46 @@
 "use client";
-import { useState } from "react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { useTransition } from "react";
 import { PillTabs } from "@/components/ui/tabs";
+
+type Tier = "featured" | "all" | "p1";
 
 export function HotNewsTabsClient({
   labels,
+  tier,
 }: {
   labels: { featured: string; all: string; p1: string };
+  tier: Tier;
 }) {
-  const [value, setValue] = useState<"featured" | "all" | "p1">("featured");
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [pending, startTransition] = useTransition();
+
+  function setTier(next: Tier) {
+    const params = new URLSearchParams(searchParams);
+    if (next === "featured") {
+      params.delete("tier");
+    } else {
+      params.set("tier", next);
+    }
+    const qs = params.toString();
+    startTransition(() => {
+      router.push(qs ? `${pathname}?${qs}` : pathname);
+    });
+  }
+
   return (
-    <PillTabs
-      items={[
-        { value: "featured", label: labels.featured },
-        { value: "all", label: labels.all },
-        { value: "p1", label: labels.p1 },
-      ]}
-      value={value}
-      onValueChange={(v) => setValue(v)}
-    />
+    <div style={{ opacity: pending ? 0.6 : 1 }}>
+      <PillTabs
+        items={[
+          { value: "featured", label: labels.featured },
+          { value: "all", label: labels.all },
+          { value: "p1", label: labels.p1 },
+        ]}
+        value={tier}
+        onValueChange={(v) => setTier(v)}
+      />
+    </div>
   );
 }

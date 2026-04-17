@@ -43,7 +43,9 @@
   --color-border: rgba(255, 255, 255, 0.08);
   --color-border-subtle: rgba(255, 255, 255, 0.05);
   --color-border-cyan: rgba(62, 230, 230, 0.3);
-  --color-rail: rgba(255, 255, 255, 0.06);
+  /* Timeline rail — subtle cyan tint so the connective spine reads clearly on
+     the dark canvas without competing with card borders. */
+  --color-rail: rgba(62, 230, 230, 0.14);
 }
 
 /* Base */

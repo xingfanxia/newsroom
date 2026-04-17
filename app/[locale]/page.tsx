@@ -19,27 +19,35 @@ import { LocaleSwitcher } from "@/components/layout/locale-switcher";
 // on the home page by ~99%.
 export const revalidate = 60;
 
+type Tier = "featured" | "all" | "p1";
+
+function coerceTier(v: string | undefined): Tier {
+  return v === "all" || v === "p1" ? v : "featured";
+}
+
 export default async function HotNewsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string }>;
+  searchParams: Promise<{ tier?: string }>;
 }) {
-  const { locale } = await params;
+  const [{ locale }, sp] = await Promise.all([params, searchParams]);
   setRequestLocale(locale);
   const t = await getTranslations("hotNews");
   const tabT = await getTranslations("hotNews.tabs");
+  const tier = coerceTier(sp.tier);
 
-  // Single-query fallback ladder: try featured+p1, widen to `all` if empty,
-  // fall back to mock only when DB has nothing. Drops the separate
-  // hasLiveStories probe that was adding a cross-region roundtrip.
+  // Fall back to mock only if DB has nothing for the selected tier AND the
+  // broadest tier (all) is also empty — means enrichment hasn't run yet.
   let stories: Story[] = [];
   try {
     stories = await getFeaturedStories({
-      tier: "featured",
+      tier,
       locale: locale as "zh" | "en",
       limit: 40,
     });
-    if (stories.length === 0) {
+    if (stories.length === 0 && tier !== "all") {
       stories = await getFeaturedStories({
         tier: "all",
         locale: locale as "zh" | "en",
@@ -69,6 +77,7 @@ export default async function HotNewsPage({
 
             <div className="flex items-center gap-3 shrink-0">
               <HotNewsTabsClient
+                tier={tier}
                 labels={{
                   featured: tabT("featured"),
                   all: tabT("all"),
@@ -89,7 +98,7 @@ export default async function HotNewsPage({
             </div>
           </div>
 
-          <div className="mt-5 flex items-center gap-3">
+          <div className="mt-5 flex items-center gap-3 opacity-40 pointer-events-none" title="Coming soon">
             <div className="relative flex-1 max-w-[680px]">
               <Search
                 size={15}
@@ -99,9 +108,10 @@ export default async function HotNewsPage({
                 placeholder={t("search")}
                 className="h-10 pl-9"
                 aria-label={t("search")}
+                disabled
               />
             </div>
-            <Button variant="primary" size="md">
+            <Button variant="primary" size="md" disabled>
               <SlidersHorizontal size={14} />
               <span>{t("filter")}</span>
             </Button>
