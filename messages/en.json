@@ -43,6 +43,7 @@
     "crossSource": "{count} other source{count, plural, one {} other {s}} also reported this",
     "editorNote": "Editor's take",
     "featuredReason": "Why featured",
+    "podcastDeepTake": "Deep take + transcript",
     "hkr": {
       "h": "H · Happy — opens a curiosity gap worth clicking",
       "k": "K · Knowledge — a new mechanism, number, or testable claim",
@@ -150,6 +151,16 @@
       "withTranscript": "Transcript",
       "noTranscript": "No transcript",
       "runtime": "Length"
+    },
+    "detail": {
+      "backToList": "Back to podcasts",
+      "featured": "Featured",
+      "editorTake": "Editor's take",
+      "deepTake": "Deep take",
+      "listenAtSource": "Open at source",
+      "transcript": "Transcript",
+      "transcriptLen": "{chars, number} chars",
+      "noTranscript": "Transcript isn't available yet — YouTube didn't expose captions for this episode, or Jina Reader hasn't picked it up."
     }
   },
   "lowFollower": {

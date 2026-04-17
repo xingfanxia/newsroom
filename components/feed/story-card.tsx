@@ -1,4 +1,6 @@
 import { useLocale, useTranslations } from "next-intl";
+import { ArrowRight } from "lucide-react";
+import { Link } from "@/i18n/navigation";
 import type { Story } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { TagChip } from "./tag-chip";
@@ -101,6 +103,18 @@ export function StoryCard({ story }: { story: Story }) {
           <TagChip key={tag}>{translateTag(tTag, tag)}</TagChip>
         ))}
       </div>
+
+      {/* Deep-take link — only for podcasts, where the full editor_analysis
+          and the captioned transcript make a dedicated page worth the click. */}
+      {story.source.groupCode === "podcast" ? (
+        <Link
+          href={`/podcasts/${story.id}` as "/"}
+          className="mt-3 inline-flex items-center gap-1 text-[12.5px] font-[510] text-[var(--color-cyan)]/90 transition-colors hover:text-[var(--color-cyan)]"
+        >
+          {t("podcastDeepTake")}
+          <ArrowRight size={12} />
+        </Link>
+      ) : null}
 
       {story.crossSourceCount ? (
         <CrossSourceIndicator count={story.crossSourceCount} />
