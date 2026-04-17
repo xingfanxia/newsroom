@@ -43,6 +43,7 @@
     "crossSource": "另有 {count} 个源也报道了此事件",
     "editorNote": "编辑点评",
     "featuredReason": "精选理由",
+    "podcastDeepTake": "深度解读 + 字幕",
     "hkr": {
       "h": "H · 有趣 — 足够吸引人点开",
       "k": "K · 有料 — 读者能学到具体机制/数字",
@@ -154,6 +155,16 @@
       "withTranscript": "已抓字幕",
       "noTranscript": "无字幕",
       "runtime": "长度"
+    },
+    "detail": {
+      "backToList": "返回播客列表",
+      "featured": "精选",
+      "editorTake": "编辑一句话",
+      "deepTake": "深度解读",
+      "listenAtSource": "前往原始链接",
+      "transcript": "完整字幕",
+      "transcriptLen": "共 {chars, number} 字",
+      "noTranscript": "暂无字幕 — 这期 YouTube 没有开放 caption，或 Jina Reader 还没抓到原文。"
     }
   },
   "xMonitor": {
