@@ -233,7 +233,11 @@ export const items = pgTable(
     /** HKR rubric: { h: boolean, k: boolean, r: boolean }. Stored per-item so
      *  the UI can render per-axis chips and the agent can trend it over time. */
     hkr: jsonb("hkr"),
+    /** Legacy single-lang reasoning (pre-bilingual). Kept as a fallback for
+     *  older rows that haven't been re-scored yet. */
     reasoning: text("reasoning"),
+    reasoningZh: text("reasoning_zh"),
+    reasoningEn: text("reasoning_en"),
     enrichedAt: timestamp("enriched_at", { withTimezone: true }),
     policyVersion: text("policy_version"),
     // ── Editorial commentary (R7) — only populated for tier in (featured, p1) ──

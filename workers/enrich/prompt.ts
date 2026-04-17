@@ -169,11 +169,17 @@ export const scoreSchema = z.object({
     .describe(
       "HKR rubric — booleans for each of the three axes. Featured requires >=2; p1 requires all 3.",
     ),
-  reasoning: z
+  reasoningZh: z
     .string()
     .max(280)
     .describe(
-      "1-2 short sentences explaining the score. Reference rubric NAMES (HKR-H / HKR-K / HKR-R / hard-exclusion-<rule>). Never quote policy verbatim. Max 280 chars.",
+      "中文评分理由（1-2 句，≤280 字符）。引用评分维度名称（HKR-H / HKR-K / HKR-R / 命中某个硬排除规则），但不要原文照抄政策。",
+    ),
+  reasoningEn: z
+    .string()
+    .max(280)
+    .describe(
+      "English score reasoning (1-2 sentences, ≤280 chars). Reference rubric names (HKR-H / HKR-K / HKR-R / hard-exclusion-<rule>). Never quote the policy verbatim.",
     ),
 });
 export type ScoreOutput = z.infer<typeof scoreSchema>;

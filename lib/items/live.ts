@@ -47,6 +47,8 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
       editorAnalysisZh: items.editorAnalysisZh,
       editorAnalysisEn: items.editorAnalysisEn,
       reasoning: items.reasoning,
+      reasoningZh: items.reasoningZh,
+      reasoningEn: items.reasoningEn,
       hkr: items.hkr,
       url: items.url,
       importance: items.importance,
@@ -131,7 +133,10 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
       locale: (r.sourceLocale ?? "multi") as Story["locale"],
       editorNote: editorNote ?? undefined,
       editorAnalysis: editorAnalysis ?? undefined,
-      reasoning: r.reasoning ?? undefined,
+      reasoning:
+        q.locale === "en"
+          ? r.reasoningEn ?? r.reasoningZh ?? r.reasoning ?? undefined
+          : r.reasoningZh ?? r.reasoningEn ?? r.reasoning ?? undefined,
       hkr: (r.hkr as Story["hkr"]) ?? undefined,
     };
   });

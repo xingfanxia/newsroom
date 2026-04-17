@@ -35,13 +35,15 @@ export async function runScoreBackfill(): Promise<ScoreBackfillReport> {
   const started = Date.now();
   const client = db();
 
+  // Pick items that either lack HKR (pre-rubric rows) or lack the bilingual
+  // reasoning pair (pre-bilingual rows). Either signals a stale score row.
   const pending = await client
     .select()
     .from(items)
     .where(
       and(
         isNotNull(items.enrichedAt),
-        sql`${items.hkr} IS NULL`,
+        sql`(${items.hkr} IS NULL OR ${items.reasoningZh} IS NULL OR ${items.reasoningEn} IS NULL)`,
       ),
     )
     .limit(MAX_PER_RUN);
@@ -103,7 +105,8 @@ export async function runScoreBackfill(): Promise<ScoreBackfillReport> {
               importance: s.importance,
               tier: s.tier,
               hkr: s.hkr,
-              reasoning: s.reasoning,
+              reasoningZh: s.reasoningZh,
+              reasoningEn: s.reasoningEn,
               policyVersion: policy.version,
             })
             .where(eq(items.id, item.id));
