@@ -1,5 +1,5 @@
 import pLimit from "p-limit";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items } from "@/db/schema";
 import type { Item } from "@/db/schema";
@@ -40,10 +40,26 @@ export async function runEnrichBatch(): Promise<EnrichReport> {
   const started = Date.now();
   const client = db();
 
+  // Priority order:
+  //   1. items that were previously tiered non-excluded (featured/p1/all)
+  //      and are now unenriched — these are the curated cards readers see
+  //      AND we usually reset them deliberately to re-run with new prompts.
+  //   2. items that have bodyMd (Jina already fetched) — they'll benefit
+  //      from a richer enrichment than a title-only item.
+  //   3. most-recent-first by publishedAt.
   const pending = await client
     .select()
     .from(items)
     .where(isNull(items.enrichedAt))
+    .orderBy(
+      sql`CASE
+        WHEN ${items.tier} IN ('featured','p1','all') THEN 0
+        WHEN ${items.bodyMd} IS NOT NULL THEN 1
+        WHEN ${items.tier} = 'excluded' THEN 3
+        ELSE 2
+      END`,
+      desc(items.publishedAt),
+    )
     .limit(MAX_PER_RUN);
 
   if (pending.length === 0) {
@@ -117,6 +133,7 @@ async function enrichOne(item: Item, policy: PolicyT): Promise<void> {
           content: enrichUserPrompt({
             title: item.title,
             body: item.body,
+            bodyMd: item.bodyMd,
             url: item.url,
             source: item.sourceId,
           }),
@@ -159,6 +176,7 @@ async function enrichOne(item: Item, policy: PolicyT): Promise<void> {
             url: item.url,
             source: item.sourceId,
             publishedAt: item.publishedAt.toISOString(),
+            bodyMd: item.bodyMd,
           }),
         },
       ],
@@ -187,6 +205,7 @@ async function enrichOne(item: Item, policy: PolicyT): Promise<void> {
             content: commentaryUserPrompt({
               title: item.title,
               body: item.body,
+              bodyMd: item.bodyMd,
               summaryZh: enriched.summaryZh,
               summaryEn: enriched.summaryEn,
               tier: scored.tier,

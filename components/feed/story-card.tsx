@@ -1,4 +1,4 @@
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import type { Story } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { TagChip } from "./tag-chip";
@@ -22,6 +22,7 @@ export function StoryCard({ story }: { story: Story }) {
   const t = useTranslations("story");
   const tSource = useTranslations("sources");
   const tTag = useTranslations("tags");
+  const locale = useLocale();
   const kindLabel = tSource(`kindFilter.${story.source.kindCode}`);
   const localeLabel = tSource(`localeFilter.${story.source.localeCode}`);
 
@@ -45,7 +46,7 @@ export function StoryCard({ story }: { story: Story }) {
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
-          {story.hkr && <HKRBadges hkr={story.hkr} t={t} />}
+          {story.hkr && <HKRBadges hkr={story.hkr} t={t} locale={locale} />}
           <ScoreBadge score={story.importance} />
           <FeedbackControls />
         </div>
@@ -109,18 +110,24 @@ export function StoryCard({ story }: { story: Story }) {
 }
 
 /**
- * HKR rubric chips. Each axis (H = Happy / Knowledge / Resonance) shows as
- * either a solid cyan pill when the scorer decided the story hits it, or a
- * dim outline pill when it misses. All three chips render even when dim so
- * the viewer sees WHY an item did or didn't make featured/p1 at a glance.
+ * HKR rubric chips. Each axis (H = Happy / K = Knowledge / R = Resonance)
+ * shows as either a solid cyan pill (axis hit) or a dim outline pill (miss).
+ * Tooltip shows the per-axis rationale from the scorer (reasonsZh/En), so
+ * a reader can see not just WHETHER the axis hit but WHY it did or didn't.
+ * Falls back to the generic axis label for older rows that don't have
+ * reasons populated yet.
  */
 function HKRBadges({
   hkr,
   t,
+  locale,
 }: {
-  hkr: { h: boolean; k: boolean; r: boolean };
+  hkr: NonNullable<Story["hkr"]>;
   t: ReturnType<typeof useTranslations>;
+  locale: string;
 }) {
+  const reasons =
+    locale === "en" ? hkr.reasonsEn ?? hkr.reasonsZh : hkr.reasonsZh ?? hkr.reasonsEn;
   const axes: Array<{ key: "h" | "k" | "r"; pass: boolean }> = [
     { key: "h", pass: hkr.h },
     { key: "k", pass: hkr.k },
@@ -131,19 +138,24 @@ function HKRBadges({
       className="flex items-center gap-[3px]"
       aria-label={`HKR ${hkr.h ? "H" : "-"}${hkr.k ? "K" : "-"}${hkr.r ? "R" : "-"}`}
     >
-      {axes.map((a) => (
-        <span
-          key={a.key}
-          title={t(`hkr.${a.key}`)}
-          className={
-            a.pass
-              ? "inline-flex h-4 min-w-4 items-center justify-center rounded-sm px-1 text-[10px] font-[590] leading-none bg-[rgba(62,230,230,0.18)] text-[var(--color-cyan)] shadow-[inset_0_0_0_1px_rgba(62,230,230,0.35)]"
-              : "inline-flex h-4 min-w-4 items-center justify-center rounded-sm px-1 text-[10px] font-[510] leading-none text-[var(--color-fg-faint)] border border-[var(--color-border-subtle)]"
-          }
-        >
-          {a.key.toUpperCase()}
-        </span>
-      ))}
+      {axes.map((a) => {
+        const axisLabel = t(`hkr.${a.key}`);
+        const reason = reasons?.[a.key];
+        const title = reason ? `${axisLabel} — ${reason}` : axisLabel;
+        return (
+          <span
+            key={a.key}
+            title={title}
+            className={
+              a.pass
+                ? "inline-flex h-4 min-w-4 items-center justify-center rounded-sm px-1 text-[10px] font-[590] leading-none bg-[rgba(62,230,230,0.18)] text-[var(--color-cyan)] shadow-[inset_0_0_0_1px_rgba(62,230,230,0.35)]"
+                : "inline-flex h-4 min-w-4 items-center justify-center rounded-sm px-1 text-[10px] font-[510] leading-none text-[var(--color-fg-faint)] border border-[var(--color-border-subtle)]"
+            }
+          >
+            {a.key.toUpperCase()}
+          </span>
+        );
+      })}
     </div>
   );
 }

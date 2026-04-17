@@ -81,6 +81,7 @@ export async function runCommentaryBackfill(): Promise<CommentaryBackfillReport>
                 content: commentaryUserPrompt({
                   title: item.title,
                   body: item.body,
+                  bodyMd: item.bodyMd,
                   summaryZh: item.summaryZh ?? "",
                   summaryEn: item.summaryEn ?? "",
                   tier: item.tier as "featured" | "p1" | "all",

@@ -53,8 +53,17 @@ export type Story = {
   editorAnalysis?: string;
   /** LLM's reason for the tier/importance it assigned — shown as 精选理由 on featured cards. */
   reasoning?: string;
-  /** HKR rubric — booleans for Happy / Knowledge / Resonance. */
-  hkr?: { h: boolean; k: boolean; r: boolean };
+  /** HKR rubric — booleans for Happy / Knowledge / Resonance. Optional
+   *  per-axis bilingual reasons populate chip tooltips + reasoning panel.
+   *  Older rows (pre-reasons) omit reasonsZh/reasonsEn; UI falls back
+   *  to the generic axis label. */
+  hkr?: {
+    h: boolean;
+    k: boolean;
+    r: boolean;
+    reasonsZh?: { h: string; k: string; r: string };
+    reasonsEn?: { h: string; k: string; r: string };
+  };
 };
 
 export type FeedbackEntry = {
