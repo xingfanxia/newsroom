@@ -67,7 +67,8 @@
     },
     "recent": {
       "title": "Recent feedback",
-      "count": "{count} item{count, plural, one {} other {s}}"
+      "count": "{count} item{count, plural, one {} other {s}}",
+      "empty": "No feedback yet — 👍 / 👎 a story from the feed to populate this panel."
     },
     "console": {
       "title": "Iteration console",

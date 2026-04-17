@@ -67,7 +67,8 @@
     },
     "recent": {
       "title": "最近反馈",
-      "count": "{count} 条"
+      "count": "{count} 条",
+      "empty": "还没有反馈——在首页给一篇文章点 👍 或 👎,这里就会出现。"
     },
     "console": {
       "title": "迭代控制台",

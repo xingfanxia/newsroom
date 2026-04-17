@@ -4,6 +4,7 @@ import { JetBrains_Mono } from "next/font/google";
 import { NextIntlClientProvider, hasLocale } from "next-intl";
 import { notFound } from "next/navigation";
 import { getMessages, setRequestLocale } from "next-intl/server";
+import { Toaster } from "sonner";
 import { routing } from "@/i18n/routing";
 import { Sidebar } from "@/components/layout/sidebar";
 import "../globals.css";
@@ -61,6 +62,18 @@ export default async function LocaleLayout({
             <Sidebar />
             <main className="flex min-h-dvh flex-1 flex-col">{children}</main>
           </div>
+          <Toaster
+            theme="dark"
+            position="bottom-right"
+            toastOptions={{
+              classNames: {
+                toast:
+                  "!bg-[var(--color-panel)] !border !border-[var(--color-border)] !text-[var(--color-fg)]",
+                actionButton:
+                  "!bg-[var(--color-cyan)] !text-[var(--color-canvas)]",
+              },
+            }}
+          />
         </NextIntlClientProvider>
       </body>
     </html>
