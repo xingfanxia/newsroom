@@ -536,6 +536,22 @@ export const sourceCatalog: Source[] = [
     notes: "P0 per user — deep technical commentary, rare signal",
   },
   {
+    id: "yage-share",
+    name: {
+      en: "Computing Life · Share (鸭哥 research reports)",
+      zh: "Computing Life · Share · 鸭哥调研",
+    },
+    url: "https://yage.ai/share/feed.xml",
+    kind: "rss",
+    group: "research",
+    locale: "zh",
+    cadence: "daily",
+    priority: 1,
+    tags: ["research", "深度分析", "ai-generated"],
+    enabled: true,
+    notes: "P0 per user — 鸭哥's research-report feed (self-described 100% AI-generated)",
+  },
+  {
     id: "ruanyifeng-blog",
     name: { en: "Ruan YiFeng's Weblog", zh: "阮一峰的网络日志" },
     url: "https://feeds.feedburner.com/ruanyifeng",
