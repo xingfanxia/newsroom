@@ -1,4 +1,3 @@
-import "server-only";
 import { eq, sql } from "drizzle-orm";
 import { db, schema } from "@/db/client";
 import { createSupabaseServer } from "./supabase/server";
