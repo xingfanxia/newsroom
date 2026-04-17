@@ -11,6 +11,7 @@ import { runFetchBucket } from "@/workers/fetcher";
 import { runNormalizer } from "@/workers/normalizer";
 import { runEnrichBatch } from "@/workers/enrich";
 import { runClusterBatch } from "@/workers/cluster";
+import { runArticleBodyFetch } from "@/workers/fetcher/article-body";
 
 async function main() {
   const kind = process.argv[2];
@@ -45,6 +46,11 @@ async function main() {
   if (kind === "enrich") {
     const e = await runEnrichBatch();
     console.log(JSON.stringify({ enrich: e }, null, 2));
+    return;
+  }
+  if (kind === "body") {
+    const b = await runArticleBodyFetch();
+    console.log(JSON.stringify({ body: b }, null, 2));
     return;
   }
   if (kind === "cluster") {

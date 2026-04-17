@@ -209,7 +209,16 @@ export const items = pgTable(
       .notNull()
       .references(() => rawItems.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
+    /** RSS-derived body — often just the description snippet. Kept as the
+     *  fallback when full-article fetch fails or is paywalled. */
     body: text("body").notNull(),
+    /** Full article markdown from Jina Reader (r.jina.ai). Populated after
+     *  normalize, before enrich. Null while pending fetch or if fetch failed.
+     *  Truncate reads to ~8K chars before passing to the LLM. */
+    bodyMd: text("body_md"),
+    /** Last time we attempted to fetch bodyMd (success or failure).
+     *  Used to avoid re-fetching in a tight loop. */
+    bodyFetchedAt: timestamp("body_fetched_at", { withTimezone: true }),
     url: text("url").notNull(),
     canonicalUrl: text("canonical_url").notNull(),
     contentHash: text("content_hash").notNull(),
@@ -264,6 +273,9 @@ export const items = pgTable(
     unenrichedIdx: index("items_unenriched_idx")
       .on(t.enrichedAt)
       .where(sql`${t.enrichedAt} IS NULL`),
+    unfetchedBodyIdx: index("items_unfetched_body_idx")
+      .on(t.bodyFetchedAt)
+      .where(sql`${t.bodyFetchedAt} IS NULL`),
     unclusteredIdx: index("items_unclustered_idx")
       .on(t.clusteredAt)
       .where(sql`${t.clusteredAt} IS NULL AND ${t.embedding} IS NOT NULL`),
