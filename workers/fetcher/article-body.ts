@@ -37,9 +37,9 @@ const hasValidKey = (() => {
   const k = process.env.JINA_API_KEY?.trim();
   return !!(k && k.startsWith("jina_") && k.length === 65);
 })();
-const CONCURRENCY = hasValidKey ? 12 : 1;
+const CONCURRENCY = hasValidKey ? 30 : 1;
 const ANON_DELAY_MS = 1200;
-const MAX_PER_RUN = hasValidKey ? 150 : 20;
+const MAX_PER_RUN = hasValidKey ? 300 : 20;
 
 const YT_HOST_RE = /(^|\.)youtube\.com$|(^|\.)youtu\.be$/i;
 

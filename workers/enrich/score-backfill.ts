@@ -20,8 +20,8 @@ import {
 } from "./prompt";
 import { loadPolicy } from "./policy";
 
-const CONCURRENCY = 10;
-const MAX_PER_RUN = 200;
+const CONCURRENCY = 30;
+const MAX_PER_RUN = 300;
 
 export type ScoreBackfillReport = {
   candidates: number;

@@ -34,11 +34,11 @@ export function db() {
     cachedSql = postgres(resolveRuntimeUrl(), {
       // PgBouncer transaction mode — no prepared statements across tx boundaries.
       prepare: false,
-      // Allow parallel queries per invocation. With max:1 a Promise.all of
-      // 6 stats queries deadlocked and hit statement_timeout (the admin/system
-      // page). PgBouncer handles fan-in on its side; each query grabs a
-      // short-lived pooler connection and releases on tx end.
-      max: 10,
+      // Allow parallel queries per invocation. Backfill workers fan out
+      // 30-50 concurrent LLM calls that each finish with a DB UPDATE, so
+      // the pool needs headroom above that to avoid queueing updates behind
+      // each other. PgBouncer handles fan-in on its side.
+      max: 40,
       // Quick idle release so hot invocations don't hoard connections.
       idle_timeout: 20,
       // Connection timeout in seconds.

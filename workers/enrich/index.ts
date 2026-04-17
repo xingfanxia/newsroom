@@ -12,21 +12,27 @@ import {
 import {
   enrichSchema,
   scoreSchema,
-  commentarySchema,
   ENRICH_SYSTEM,
-  COMMENTARY_SYSTEM,
   enrichUserPrompt,
   scoreSystem,
   scoreUserPrompt,
-  commentaryUserPrompt,
   type EnrichOutput,
   type ScoreOutput,
-  type CommentaryOutput,
 } from "./prompt";
 import { loadPolicy } from "./policy";
 
-const CONCURRENCY = 4;
-const MAX_PER_RUN = 50;
+// Enrich does stages 1-3 (summary + tags → embed → score). Commentary used
+// to be stage 4 here but was failing silently with Azure's "No object
+// generated" on the long-form prompt, AND blocking enrich's throughput
+// because each worker waited on a 20-40s commentary call. It's now a
+// separate worker (workers/enrich/commentary.ts) that runs in parallel
+// at its own concurrency, and retries independently.
+// Azure standard tier is at 10M TPM / 100K RPM — well above anything we
+// generate. Bottleneck is per-item wall-clock (score stage is ~30s w/ high
+// reasoning); fan out widely so one cron tick drains the backlog instead
+// of dripping 4 items at a time.
+const CONCURRENCY = 40;
+const MAX_PER_RUN = 200;
 
 export type EnrichReport = {
   processed: number;
@@ -189,50 +195,7 @@ async function enrichOne(item: Item, policy: PolicyT): Promise<void> {
     throw tag(err, "score");
   }
 
-  // ── Stage 4: commentary (all non-excluded items — user wants notes on
-  //   everything that makes it into the curated feed) ──
-  let commentary: CommentaryOutput | null = null;
-  if (scored.tier !== "excluded") {
-    try {
-      const result = await generateStructured({
-        ...profiles.score, // standard + high reasoning — upgrade to profiles.agent for pro+xhigh
-        task: "commentary",
-        itemId: item.id,
-        system: COMMENTARY_SYSTEM,
-        messages: [
-          {
-            role: "user",
-            content: commentaryUserPrompt({
-              title: item.title,
-              body: item.body,
-              bodyMd: item.bodyMd,
-              summaryZh: enriched.summaryZh,
-              summaryEn: enriched.summaryEn,
-              tier: scored.tier,
-              importance: scored.importance,
-              tags: enriched.tags,
-              url: item.url,
-              source: item.sourceId,
-              publishedAt: item.publishedAt.toISOString(),
-            }),
-          },
-        ],
-        schema: commentarySchema,
-        schemaName: "EditorCommentary",
-        maxTokens: 3072,
-      });
-      commentary = result.data;
-    } catch (err) {
-      // Commentary failure is non-fatal — story still gets enriched/scored.
-      // Record it as a soft warning but continue to persist.
-      const msg = err instanceof Error ? err.message : String(err);
-      console.warn(
-        `[enrich] commentary stage failed for item ${item.id}: ${msg}`,
-      );
-    }
-  }
-
-  // ── Stage 5: persist ──
+  // ── Stage 4: persist (commentary runs in a separate worker) ──
   await client
     .update(items)
     .set({
@@ -249,15 +212,6 @@ async function enrichOne(item: Item, policy: PolicyT): Promise<void> {
       embedding,
       enrichedAt: new Date(),
       policyVersion: policy.version,
-      ...(commentary
-        ? {
-            editorNoteZh: commentary.editorNoteZh,
-            editorNoteEn: commentary.editorNoteEn,
-            editorAnalysisZh: commentary.editorAnalysisZh,
-            editorAnalysisEn: commentary.editorAnalysisEn,
-            commentaryAt: new Date(),
-          }
-        : {}),
     })
     .where(and(eq(items.id, item.id), isNull(items.enrichedAt)));
 }

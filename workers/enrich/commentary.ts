@@ -21,8 +21,13 @@ import {
 type Capability = (typeof CAPABILITIES)[number];
 type Topic = (typeof TOPICS)[number];
 
-const CONCURRENCY = 6;
-const MAX_PER_RUN = 60;
+// Commentary is creative writing, not reasoning — profiles.enrich (standard
+// + low reasoning) produces reliable long-form output in one shot. High
+// reasoning burned too many reasoning tokens on the new 晚点-style prompt
+// and triggered Azure's "No object generated" on ~all items. Low effort is
+// also 3-5x faster, letting us fan out wider.
+const CONCURRENCY = 30;
+const MAX_PER_RUN = 200;
 
 export type CommentaryBackfillReport = {
   candidates: number;
@@ -71,7 +76,7 @@ export async function runCommentaryBackfill(): Promise<CommentaryBackfillReport>
             topics?: string[];
           };
           const result = await generateStructured({
-            ...profiles.score,
+            ...profiles.enrich,
             task: "commentary",
             itemId: item.id,
             system: COMMENTARY_SYSTEM,
