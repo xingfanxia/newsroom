@@ -1,6 +1,6 @@
-# AX's AI RADAR — Session Handoff (2026-04-17, Session 3)
+# AX's AI RADAR — Session Handoff (2026-04-17, Session 4)
 
-> Read this first before resuming. M0–M2 from session 1, feature expansion + rebrand from session 2, perf + UX fixes from session 3. **M3 + M4 still pending.**
+> Read this first before resuming. Session 1 = M0–M2 shell/ingest/enrich. Session 2 = RSS + commentary + newsletter + i18n + cost. Session 3 = perf + HKR + bilingual reasoning. **Session 4 (today) = Jina body fetch + 晚点-tone prompts + HKR axis explanations + concurrency fan-out.** M3 + M4 still pending.
 
 ---
 
@@ -9,8 +9,72 @@
 - **Live**: https://newsroom-orpin.vercel.app (also `news.ax0x.ai`)
 - **Repo**: https://github.com/xingfanxia/newsroom
 - **Brand**: AX's AI RADAR / AX 的 AI 雷达 (cyan on dark observatory)
-- **Done**: M0 shell · M1 ingest · M2 enrich/cluster · session-2 (RSS/commentary/newsletter/i18n/cost) · session-3 (perf/HKR/bilingual reasoning)
-- **Pending**: **M3 auth + feedback** (`/big-task`) · **M4 editorial agent** (`/mtc`) · video/podcast transcripts · article markdown
+- **Done through s4**: M0 shell · M1 ingest · M2 enrich/cluster · RSS/commentary/newsletter/i18n/cost · perf/HKR/bilingual reasoning · **full article bodies via Jina · 晚点-tone editorial voice · per-axis HKR tooltips · 10-20x concurrency**
+- **Pending**: **M3 auth + feedback** (`/big-task`) · **M4 editorial agent** (`/mtc`) · video/podcast transcripts · article markdown surface (body_md already stored)
+
+---
+
+## Session 4 shipped (2026-04-17 — 3 commits)
+
+### Full article body via Jina Reader (`c090b4a`)
+
+**Root cause fixed**: ~40% of curated items had summaries that literally said "已知信息仅来源于标题 / info only from title". RSS payloads usually only give `description` — 1-2 sentences. The LLM had nothing to work with.
+
+**Fix**: `items.body_md` column + new worker `workers/fetcher/article-body.ts` using Jina Reader (`https://r.jina.ai/{URL}`). Cron order is now **normalize → article-body → enrich → score → commentary**. Tier-priority ordering (featured/p1/all first) ensures readers see the improvement on the 38 cards they actually browse before the 2000+ unseen rows.
+
+- Jina paid tier: `JINA_API_KEY` 65-char `jina_…` Bearer, concurrency 30
+- 402/429 → retry next tick (don't mark fetch done)
+- 4xx/5xx terminal → mark done, fall back to RSS body
+- YouTube URLs skipped (task #34 handles those via transcripts)
+- `scripts/ops/run-cron.ts body` — local trigger for testing
+
+### 晚点-tone prompt rewrite + per-axis HKR reasons (`c0d4eaa`)
+
+**Root cause fixed**: Commentary, editor notes, and 精选理由 all read as AI-generated — abstract, banned phrases (然而/此外/值得注意的是/随着AI发展, revolutionize/paradigm shift), no concrete data hooks.
+
+**Fix**: Rewrote `ENRICH_SYSTEM` / `scoreSystem` / `COMMENTARY_SYSTEM` in `workers/enrich/prompt.ts` using blog/CLAUDE.md's 晚点骨架+builder声音 guide + khazix-writer's L1 禁用词 scan:
+
+| Rule | Applied |
+|---|---|
+| ZH banned phrases | 然而 · 此外 · 值得注意的是 · 综上所述 · 本质上 · 意味着什么 · 说白了 · 随着AI的快速发展 · 想象一下 · 细思极恐 · 赋能/助力/引领/打造 |
+| EN banned phrases | revolutionize · unlock · empower · paradigm shift · it is worth noting · what this means is · in a rapidly evolving landscape · cutting-edge · seamlessly |
+| Positives | 数据先行 · 冷叙述热判断 · 15-25 字短句 · 判断式小标题 · 具体名字 · 承认不确定 · 同侪口吻 |
+| Commentary structure | 3-5 paragraph analysis · 判断式 ## headings (not "影响分析"/"背景") · lateral comparison to past 3 months if available · concrete 30-day signal-to-watch |
+| Gap honesty | If body is thin, the prompt requires saying "正文未披露 X / the post does not disclose Y" — no hallucination |
+
+**HKR per-axis reasons** — `hkr.reasonsZh` and `hkr.reasonsEn` added to `scoreSchema`. Each axis gets a 1-sentence rationale explaining WHY H/K/R passes or fails. UI chip tooltips now show `{axisLabel} — {reason}` instead of just the axis name.
+
+Sample output (item #10 Qwen3.6-35B-A3B):
+
+> **Editor note**: Qwen 把 Qwen3.6-35B-A3B 开源了，35B 总参仅 3B 激活，并把 Terminal-Bench 2.0 拉到 51.5。真正要盯的不是"开放"，而是这类 3B 激活 MoE 已经能正面打 27B-31B 稠密编码模型。
+>
+> **Analysis**: `## 3B 激活参数，已经打到一线开源编码带宽` / `## 提升最硬的一段，在代理式编码而不在通用知识` / `## 评测条件给得够细，但也埋了两处口径风险`
+>
+> — with specific benchmark deltas (51.5 vs 41.6, 73.4 vs 70.0, 49.5 vs 44.6) and explicit methodology caveats (200K context, 3hr timeout, 5-run average).
+
+### Concurrency fan-out + commentary decoupled (`ec43419`)
+
+**Root cause fixed**: The expanded prompt broke Azure's "No object generated" on every commentary call when using `reasoning_effort: high`. Also: commentary-in-enrich-loop bottlenecked the whole pipeline — each worker stalled 20-40s on commentary before starting the next item.
+
+**Fix**:
+- Split commentary out of `enrichOne`. It now runs in `workers/enrich/commentary.ts` using `profiles.enrich` (standard + low reasoning), which is 3-5x faster AND more reliable on long-form prompts.
+- Fan out concurrency to match Azure paid tier headroom (10M TPM / 100K RPM):
+
+| Worker | Before | After |
+|---|---|---|
+| enrich | 4 / 50 per run | **40 / 200** |
+| commentary | 6 / 60 | **30 / 200** |
+| score-backfill | 10 / 200 | **30 / 300** |
+| article-body | 12 / 150 | **30 / 300** |
+| db pool max | 10 | **40** |
+
+Enrich + commentary now drain in parallel each cron tick instead of dripping 4 items at a time.
+
+### Ops helpers
+- `scripts/ops/reset-curated-for-backfill.ts` — scoped reset for the 38 non-excluded items (~$2)
+- `scripts/ops/reset-for-body-and-tone.ts` — full reset (all 2308 items, ~$7)
+- `scripts/ops/run-cron.ts body` — Jina body fetcher
+- `scripts/ops/run-cron.ts enrich` — enrich pipeline (stages 1-3)
 
 ---
 
