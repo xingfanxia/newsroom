@@ -74,7 +74,25 @@ Enrich + commentary now drain in parallel each cron tick instead of dripping 4 i
 - `scripts/ops/reset-curated-for-backfill.ts` — scoped reset for the 38 non-excluded items (~$2)
 - `scripts/ops/reset-for-body-and-tone.ts` — full reset (all 2308 items, ~$7)
 - `scripts/ops/run-cron.ts body` — Jina body fetcher
+- `scripts/ops/run-cron.ts yt` — YouTube transcript fetcher
 - `scripts/ops/run-cron.ts enrich` — enrich pipeline (stages 1-3)
+
+### YouTube transcripts (`5313301`)
+
+Added `workers/fetcher/youtube-transcript.ts` — the YouTube-URL counterpart to the Jina article-body worker. Long-form AI interviews (Dwarkesh Patel, 硅谷101, Lex Fridman, BestPartners) have 1-3 hours of dense content that RSS gives us nothing about.
+
+Uses `youtube-transcript` npm package (no key). Cycles through zh-Hans → zh-CN → zh → en → en-US → default — first match wins. On "disabled" → mark done. On network error → retry next tick. Long transcripts (>12K chars) get head+tail extraction (first 6K + last 5K).
+
+Three new podcast/video sources added:
+- **dwarkesh-yt** (en, priority 1) — UCXl4i9dYBrFOabk0xGmbkRA — Dario, Jeff Dean, Jensen, Michael Nielsen
+- **thevalley101-yt** (zh, priority 1) — UChnNjLyx_5rk_iDPQ2BQDQA — 中文深度访谈
+- **bestpartners-yt** (zh, priority 1) — UCGWYKICLOE8Wxy7q3eYXmPA — AI/Agent 中文深度视频
+
+45 videos ingested, ~35 with transcripts (disabled rate by channel: Lex ~7%, BestPartners ~7%, TheValley101 ~60%, Dwarkesh ~50% — many Shorts disabled).
+
+Cron: `article-body` + `youtube-transcript` run in parallel before `enrich` (different upstream rate-limits, no contention). `article-body` SQL-excludes YouTube URLs.
+
+**Total source count: 65** (was 62, added 3).
 
 ---
 
