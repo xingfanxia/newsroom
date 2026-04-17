@@ -41,7 +41,7 @@ export default async function ForbiddenPage({
         </p>
 
         <Link
-          href={"/" as "/"}
+          href={"/" as const}
           className="mt-5 inline-flex h-9 items-center gap-2 rounded-md border border-[var(--color-border)] bg-white/[0.02] px-4 text-[13.5px] font-[510] text-[var(--color-fg)] transition-colors hover:bg-white/[0.04]"
         >
           {t("backHome")}
