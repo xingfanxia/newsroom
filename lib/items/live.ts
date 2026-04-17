@@ -10,6 +10,11 @@ export type FeedQuery = {
   tier?: Tier;
   locale?: Locale;
   limit?: number;
+  /** Filter by source.group — e.g. "podcast" for the /podcasts page. */
+  sourceGroup?: string;
+  /** Include the story's source-group so UI can show format badges
+   *  (podcast/vendor-official/media/…). Defaults to false for home feed. */
+  includeSourceGroup?: boolean;
 };
 
 /**
@@ -33,6 +38,10 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
   // Cluster dedup: only return the item that's its cluster's lead.
   // Unclustered-but-enriched items are surfaced as-is (no cluster yet).
   const dedupFilter = sql`(${items.clusterId} IS NULL OR ${clusters.leadItemId} = ${items.id})`;
+
+  const groupFilter = q.sourceGroup
+    ? sql`${sources.group} = ${q.sourceGroup}`
+    : sql`TRUE`;
 
   const rows = await client
     .select({
@@ -60,6 +69,7 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
       sourceNameEn: sources.nameEn,
       sourceLocale: sources.locale,
       sourceKind: sources.kind,
+      sourceGroup: sources.group,
       clusterMemberCount: clusters.memberCount,
     })
     .from(items)
@@ -71,6 +81,7 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
         isNotNull(items.importance),
         tierFilter,
         dedupFilter,
+        groupFilter,
       ),
     )
     .orderBy(desc(items.publishedAt))
@@ -114,6 +125,9 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
         publisher,
         kindCode: r.sourceKind as Story["source"]["kindCode"],
         localeCode: (r.sourceLocale ?? "multi") as Story["source"]["localeCode"],
+        groupCode: q.includeSourceGroup
+          ? (r.sourceGroup as Story["source"]["groupCode"])
+          : undefined,
       },
       featured: r.tier === "featured" || r.tier === "p1",
       title,

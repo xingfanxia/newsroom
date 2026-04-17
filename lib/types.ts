@@ -35,6 +35,9 @@ export type Story = {
     kindCode: SourceKind;
     /** Source content locale — UI translates via i18n (sources.localeFilter.*). */
     localeCode: "en" | "zh" | "multi";
+    /** Source group — podcast/vendor-official/media/... Optional because
+     *  only some pages (podcasts) care about it. */
+    groupCode?: SourceGroup;
   };
   featured: boolean;
   title: string;

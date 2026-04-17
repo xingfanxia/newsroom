@@ -6,6 +6,7 @@
   },
   "nav": {
     "hotNews": "热点资讯",
+    "podcasts": "播客 / 视频",
     "lowFollower": "低粉爆文",
     "xMonitor": "X 监控",
     "saved": "收藏",
@@ -143,6 +144,16 @@
   "lowFollower": {
     "title": "低粉爆文",
     "subtitle": "低关注量账号发出的高互动内容 — 先找到 Alpha，再看它是否值得上热点"
+  },
+  "podcasts": {
+    "title": "播客 / 视频",
+    "subtitle": "长播客与 YouTube 深度访谈 — {count} 条已抓字幕，配上 AI 编辑视角",
+    "empty": "暂无播客内容 — 最新字幕正在抓取，稍等下一轮 cron",
+    "badges": {
+      "withTranscript": "已抓字幕",
+      "noTranscript": "无字幕",
+      "runtime": "长度"
+    }
   },
   "xMonitor": {
     "title": "X 监控",

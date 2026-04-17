@@ -2,6 +2,7 @@
 import { useTranslations } from "next-intl";
 import {
   Flame,
+  Headphones,
   Rocket,
   Radio,
   Bookmark,
@@ -25,6 +26,7 @@ type NavItem = {
 
 const primary: NavItem[] = [
   { href: "/", icon: Flame, translationKey: "hotNews" },
+  { href: "/podcasts", icon: Headphones, translationKey: "podcasts" },
   { href: "/low-follower", icon: Rocket, translationKey: "lowFollower" },
   { href: "/x-monitor", icon: Radio, translationKey: "xMonitor" },
   { href: "/saved", icon: Bookmark, translationKey: "saved" },

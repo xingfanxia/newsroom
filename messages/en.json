@@ -6,6 +6,7 @@
   },
   "nav": {
     "hotNews": "Hot News",
+    "podcasts": "Podcasts / Video",
     "lowFollower": "Low-follower Viral",
     "xMonitor": "X Monitor",
     "saved": "Saved",
@@ -138,6 +139,16 @@
       "hourly": "Hourly",
       "daily": "Daily",
       "weekly": "Weekly"
+    }
+  },
+  "podcasts": {
+    "title": "Podcasts / Video",
+    "subtitle": "Long-form podcast + YouTube interviews — {count} items with transcripts + editor commentary",
+    "empty": "No podcast items yet — transcripts are being fetched, check back after the next cron tick",
+    "badges": {
+      "withTranscript": "Transcript",
+      "noTranscript": "No transcript",
+      "runtime": "Length"
     }
   },
   "lowFollower": {
