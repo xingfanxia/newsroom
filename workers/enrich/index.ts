@@ -171,9 +171,10 @@ async function enrichOne(item: Item, policy: PolicyT): Promise<void> {
     throw tag(err, "score");
   }
 
-  // ── Stage 4: commentary (featured + p1 only — reasoning-expensive) ──
+  // ── Stage 4: commentary (all non-excluded items — user wants notes on
+  //   everything that makes it into the curated feed) ──
   let commentary: CommentaryOutput | null = null;
-  if (scored.tier === "featured" || scored.tier === "p1") {
+  if (scored.tier !== "excluded") {
     try {
       const result = await generateStructured({
         ...profiles.score, // standard + high reasoning — upgrade to profiles.agent for pro+xhigh
@@ -223,6 +224,7 @@ async function enrichOne(item: Item, policy: PolicyT): Promise<void> {
       tags: enriched.tags,
       importance: scored.importance,
       tier: scored.tier,
+      hkr: scored.hkr,
       reasoning: scored.reasoning,
       embedding,
       enrichedAt: new Date(),

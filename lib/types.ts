@@ -53,6 +53,8 @@ export type Story = {
   editorAnalysis?: string;
   /** LLM's reason for the tier/importance it assigned — shown as 精选理由 on featured cards. */
   reasoning?: string;
+  /** HKR rubric — booleans for Happy / Knowledge / Resonance. */
+  hkr?: { h: boolean; k: boolean; r: boolean };
 };
 
 export type FeedbackEntry = {

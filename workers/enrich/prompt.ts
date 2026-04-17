@@ -148,11 +148,32 @@ export const scoreSchema = z.object({
     .describe(
       "featured = >=72 and passes HKR. all = interesting but not featured. p1 = >=85 and all three HKR. excluded = hard-exclusion rule triggered OR <40.",
     ),
+  hkr: z
+    .object({
+      h: z
+        .boolean()
+        .describe(
+          "H (Happy / 有趣): does the headline/angle make the reader want to click? Suspense, novelty, unexpected turn. Marketing speak does NOT count.",
+        ),
+      k: z
+        .boolean()
+        .describe(
+          "K (Knowledge / 有料): will an industry-literate reader learn something new? A new number, mechanism, or testable claim.",
+        ),
+      r: z
+        .boolean()
+        .describe(
+          "R (Resonance / 有共鸣): does it hit an emotional or identity nerve for the AI-practitioner audience? Will they want to talk about it?",
+        ),
+    })
+    .describe(
+      "HKR rubric — booleans for each of the three axes. Featured requires >=2; p1 requires all 3.",
+    ),
   reasoning: z
     .string()
     .max(280)
     .describe(
-      "1-2 short sentences explaining the score, referencing rubric NAMES not verbatim policy text (e.g. 'HKR-K low, H medium' or 'hard-exclusion: technical-accessibility'). Max 280 chars. Never quote the policy verbatim.",
+      "1-2 short sentences explaining the score. Reference rubric NAMES (HKR-H / HKR-K / HKR-R / hard-exclusion-<rule>). Never quote policy verbatim. Max 280 chars.",
     ),
 });
 export type ScoreOutput = z.infer<typeof scoreSchema>;

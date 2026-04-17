@@ -45,6 +45,7 @@ export function StoryCard({ story }: { story: Story }) {
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
+          {story.hkr && <HKRBadges hkr={story.hkr} t={t} />}
           <ScoreBadge score={story.importance} />
           <FeedbackControls />
         </div>
@@ -104,5 +105,45 @@ export function StoryCard({ story }: { story: Story }) {
         <CrossSourceIndicator count={story.crossSourceCount} />
       ) : null}
     </article>
+  );
+}
+
+/**
+ * HKR rubric chips. Each axis (H = Happy / Knowledge / Resonance) shows as
+ * either a solid cyan pill when the scorer decided the story hits it, or a
+ * dim outline pill when it misses. All three chips render even when dim so
+ * the viewer sees WHY an item did or didn't make featured/p1 at a glance.
+ */
+function HKRBadges({
+  hkr,
+  t,
+}: {
+  hkr: { h: boolean; k: boolean; r: boolean };
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const axes: Array<{ key: "h" | "k" | "r"; pass: boolean }> = [
+    { key: "h", pass: hkr.h },
+    { key: "k", pass: hkr.k },
+    { key: "r", pass: hkr.r },
+  ];
+  return (
+    <div
+      className="flex items-center gap-[3px]"
+      aria-label={`HKR ${hkr.h ? "H" : "-"}${hkr.k ? "K" : "-"}${hkr.r ? "R" : "-"}`}
+    >
+      {axes.map((a) => (
+        <span
+          key={a.key}
+          title={t(`hkr.${a.key}`)}
+          className={
+            a.pass
+              ? "inline-flex h-4 min-w-4 items-center justify-center rounded-sm px-1 text-[10px] font-[590] leading-none bg-[rgba(62,230,230,0.18)] text-[var(--color-cyan)] shadow-[inset_0_0_0_1px_rgba(62,230,230,0.35)]"
+              : "inline-flex h-4 min-w-4 items-center justify-center rounded-sm px-1 text-[10px] font-[510] leading-none text-[var(--color-fg-faint)] border border-[var(--color-border-subtle)]"
+          }
+        >
+          {a.key.toUpperCase()}
+        </span>
+      ))}
+    </div>
   );
 }

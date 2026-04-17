@@ -41,7 +41,12 @@
     "bookmark": "Save",
     "crossSource": "{count} other source{count, plural, one {} other {s}} also reported this",
     "editorNote": "Editor's take",
-    "featuredReason": "Why featured"
+    "featuredReason": "Why featured",
+    "hkr": {
+      "h": "H · Happy — opens a curiosity gap worth clicking",
+      "k": "K · Knowledge — a new mechanism, number, or testable claim",
+      "r": "R · Resonance — hits identity / sparks conversation"
+    }
   },
   "iteration": {
     "title": "Policy Iterations",

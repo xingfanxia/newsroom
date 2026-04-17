@@ -47,6 +47,7 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
       editorAnalysisZh: items.editorAnalysisZh,
       editorAnalysisEn: items.editorAnalysisEn,
       reasoning: items.reasoning,
+      hkr: items.hkr,
       url: items.url,
       importance: items.importance,
       tier: items.tier,
@@ -131,6 +132,7 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
       editorNote: editorNote ?? undefined,
       editorAnalysis: editorAnalysis ?? undefined,
       reasoning: r.reasoning ?? undefined,
+      hkr: (r.hkr as Story["hkr"]) ?? undefined,
     };
   });
 }

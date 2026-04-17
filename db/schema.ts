@@ -230,6 +230,9 @@ export const items = pgTable(
     tier: text("tier"),
     /** { capabilities: string[], entities: string[], topics: string[] } */
     tags: jsonb("tags"),
+    /** HKR rubric: { h: boolean, k: boolean, r: boolean }. Stored per-item so
+     *  the UI can render per-axis chips and the agent can trend it over time. */
+    hkr: jsonb("hkr"),
     reasoning: text("reasoning"),
     enrichedAt: timestamp("enriched_at", { withTimezone: true }),
     policyVersion: text("policy_version"),

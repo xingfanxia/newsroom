@@ -1,38 +1,37 @@
 /**
- * Commentary backfill — picks items where tier ∈ (featured, p1) AND
- * commentary_at IS NULL, runs the Stage-4 commentary call, persists.
- * Runs after the main enrich batch so transient failures get retried
- * on the next tick instead of leaving holes.
+ * Score-only backfill — re-runs Stage-3 scoring on items that were enriched
+ * before HKR was part of the schema. Picks items with `hkr IS NULL AND
+ * enriched_at IS NOT NULL`, calls the scorer, persists hkr + importance +
+ * tier + reasoning. Does NOT touch enrichment (title/summary/tags) or
+ * embedding — those stay as-is.
+ *
+ * Cost: ~$0.008/item × ~150 items = ~$1.20 one-time sweep.
  */
 import pLimit from "p-limit";
-import { and, eq, isNull, inArray } from "drizzle-orm";
+import { and, eq, isNull, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items } from "@/db/schema";
 import { generateStructured, profiles } from "@/lib/llm";
 import {
-  commentarySchema,
-  COMMENTARY_SYSTEM,
-  commentaryUserPrompt,
-  type CommentaryOutput,
-  type CAPABILITIES,
-  type TOPICS,
+  scoreSchema,
+  scoreSystem,
+  scoreUserPrompt,
+  type ScoreOutput,
 } from "./prompt";
+import { loadPolicy } from "./policy";
 
-type Capability = (typeof CAPABILITIES)[number];
-type Topic = (typeof TOPICS)[number];
+const CONCURRENCY = 3;
+const MAX_PER_RUN = 40;
 
-const CONCURRENCY = 2;
-const MAX_PER_RUN = 25;
-
-export type CommentaryBackfillReport = {
+export type ScoreBackfillReport = {
   candidates: number;
-  generated: number;
+  rescored: number;
   errored: number;
   durationMs: number;
   errors: { itemId: number; reason: string }[];
 };
 
-export async function runCommentaryBackfill(): Promise<CommentaryBackfillReport> {
+export async function runScoreBackfill(): Promise<ScoreBackfillReport> {
   const started = Date.now();
   const client = db();
 
@@ -41,8 +40,8 @@ export async function runCommentaryBackfill(): Promise<CommentaryBackfillReport>
     .from(items)
     .where(
       and(
-        inArray(items.tier, ["featured", "p1", "all"]),
-        isNull(items.commentaryAt),
+        isNotNull(items.enrichedAt),
+        sql`${items.hkr} IS NULL`,
       ),
     )
     .limit(MAX_PER_RUN);
@@ -50,16 +49,17 @@ export async function runCommentaryBackfill(): Promise<CommentaryBackfillReport>
   if (pending.length === 0) {
     return {
       candidates: 0,
-      generated: 0,
+      rescored: 0,
       errored: 0,
       durationMs: Date.now() - started,
       errors: [],
     };
   }
 
+  const policy = await loadPolicy();
   const limit = pLimit(CONCURRENCY);
   const errors: { itemId: number; reason: string }[] = [];
-  let generated = 0;
+  let rescored = 0;
 
   await Promise.allSettled(
     pending.map((item) =>
@@ -72,23 +72,19 @@ export async function runCommentaryBackfill(): Promise<CommentaryBackfillReport>
           };
           const result = await generateStructured({
             ...profiles.score,
-            task: "commentary",
+            task: "score",
             itemId: item.id,
-            system: COMMENTARY_SYSTEM,
+            system: scoreSystem(policy.content),
             messages: [
               {
                 role: "user",
-                content: commentaryUserPrompt({
+                content: scoreUserPrompt({
                   title: item.title,
-                  body: item.body,
-                  summaryZh: item.summaryZh ?? "",
-                  summaryEn: item.summaryEn ?? "",
-                  tier: item.tier as "featured" | "p1" | "all",
-                  importance: item.importance ?? 0,
+                  summaryZh: item.summaryZh ?? item.title,
                   tags: {
-                    capabilities: (tagBag.capabilities ?? []) as Capability[],
+                    capabilities: (tagBag.capabilities ?? []) as [],
                     entities: tagBag.entities ?? [],
-                    topics: (tagBag.topics ?? []) as Topic[],
+                    topics: (tagBag.topics ?? []) as [],
                   },
                   url: item.url,
                   source: item.sourceId,
@@ -96,22 +92,22 @@ export async function runCommentaryBackfill(): Promise<CommentaryBackfillReport>
                 }),
               },
             ],
-            schema: commentarySchema,
-            schemaName: "EditorCommentary",
-            maxTokens: 3072,
+            schema: scoreSchema,
+            schemaName: "EditorialScore",
+            maxTokens: 2048,
           });
-          const c: CommentaryOutput = result.data;
+          const s: ScoreOutput = result.data;
           await client
             .update(items)
             .set({
-              editorNoteZh: c.editorNoteZh,
-              editorNoteEn: c.editorNoteEn,
-              editorAnalysisZh: c.editorAnalysisZh,
-              editorAnalysisEn: c.editorAnalysisEn,
-              commentaryAt: new Date(),
+              importance: s.importance,
+              tier: s.tier,
+              hkr: s.hkr,
+              reasoning: s.reasoning,
+              policyVersion: policy.version,
             })
             .where(eq(items.id, item.id));
-          generated++;
+          rescored++;
         } catch (err) {
           errors.push({
             itemId: item.id,
@@ -124,7 +120,7 @@ export async function runCommentaryBackfill(): Promise<CommentaryBackfillReport>
 
   return {
     candidates: pending.length,
-    generated,
+    rescored,
     errored: errors.length,
     durationMs: Date.now() - started,
     errors,

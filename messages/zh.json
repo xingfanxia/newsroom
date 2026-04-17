@@ -41,7 +41,12 @@
     "bookmark": "收藏",
     "crossSource": "另有 {count} 个源也报道了此事件",
     "editorNote": "编辑点评",
-    "featuredReason": "精选理由"
+    "featuredReason": "精选理由",
+    "hkr": {
+      "h": "H · 有趣 — 足够吸引人点开",
+      "k": "K · 有料 — 读者能学到具体机制/数字",
+      "r": "R · 有共鸣 — 能引发讨论、触及身份认同"
+    }
   },
   "iteration": {
     "title": "策略迭代",

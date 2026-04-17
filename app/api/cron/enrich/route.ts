@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { runEnrichBatch } from "@/workers/enrich";
 import { runCommentaryBackfill } from "@/workers/enrich/commentary";
+import { runScoreBackfill } from "@/workers/enrich/score-backfill";
 import { verifyCron } from "../_auth";
 
 export const maxDuration = 800;
@@ -12,13 +13,15 @@ export async function GET(req: Request) {
   if (deny) return deny;
 
   const enrich = await runEnrichBatch();
-  // Sweep for featured/p1 items whose Stage-4 commentary failed on their
-  // enrich pass so they don't permanently display without the editor note.
+  // Score backfill first — populates hkr for pre-schema items so commentary
+  // backfill then picks them up under the new tier gate (non-excluded).
+  const score = await runScoreBackfill();
   const commentary = await runCommentaryBackfill();
   return NextResponse.json({
     kind: "enrich",
     at: new Date().toISOString(),
     enrich,
+    score,
     commentary,
   });
 }
