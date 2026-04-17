@@ -9,11 +9,14 @@ import { DiffViewer } from "@/components/admin/diff-viewer";
 import { VersionPill } from "@/components/admin/version-pill";
 import { LocaleSwitcher } from "@/components/layout/locale-switcher";
 import {
-  mockFeedback,
   mockConsoleLines,
   mockDiffLines,
   mockVersionHistory,
 } from "@/lib/mock/iterations";
+import {
+  getFeedbackCounts,
+  getRecentFeedback,
+} from "@/lib/feedback/metrics";
 import { ChevronDown } from "lucide-react";
 
 export default async function IterationsPage({
@@ -26,9 +29,11 @@ export default async function IterationsPage({
   const t = await getTranslations("iteration");
   const trm = await getTranslations("iteration.metrics");
 
-  const total = mockFeedback.length;
-  const agreed = mockFeedback.filter((f) => f.verdict === "up").length;
-  const disagreed = mockFeedback.filter((f) => f.verdict === "down").length;
+  const [counts, recent] = await Promise.all([
+    getFeedbackCounts(),
+    getRecentFeedback(locale === "en" ? "en" : "zh", 10),
+  ]);
+  const { total, agreed, disagreed } = counts;
 
   const currentVersion = mockVersionHistory[0];
   const committedDate = new Date(currentVersion.committedAt).toLocaleDateString(
@@ -117,13 +122,19 @@ export default async function IterationsPage({
               </span>
             </header>
             <div className="mt-3 flex flex-col">
-              {mockFeedback.map((f) => (
-                <FeedbackItem
-                  key={f.id}
-                  entry={f}
-                  locale={locale as "zh" | "en"}
-                />
-              ))}
+              {recent.length === 0 ? (
+                <p className="py-8 text-center text-[13px] text-[var(--color-fg-dim)]">
+                  {t("recent.empty")}
+                </p>
+              ) : (
+                recent.map((f) => (
+                  <FeedbackItem
+                    key={f.id}
+                    entry={f}
+                    locale={locale as "zh" | "en"}
+                  />
+                ))
+              )}
             </div>
           </section>
 

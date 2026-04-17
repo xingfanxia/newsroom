@@ -111,6 +111,14 @@ export const healthStatusEnum = pgEnum("health_status", [
   "pending",
 ]);
 
+/** App-level role. `admin` sees /admin/*, `editor` reserved for future authoring
+ *  tools, `reader` is the default for anyone who signs in. */
+export const userRoleEnum = pgEnum("user_role", ["admin", "editor", "reader"]);
+
+/** Feedback vote kind. `up` / `down` are mutually exclusive per (item, user);
+ *  `save` is an independent bookmark slot that can coexist with either. */
+export const feedbackVoteEnum = pgEnum("feedback_vote", ["up", "down", "save"]);
+
 // ── Tables ──────────────────────────────────────────────────────
 
 export const sources = pgTable(
@@ -362,6 +370,69 @@ export const llmUsage = pgTable(
   }),
 );
 
+/**
+ * users — mirrors Supabase `auth.users` on (id, email). Populated lazily on
+ * first authenticated request (upsert on id from JWT `sub`). `role` drives
+ * in-app authorization; admin gate additionally checks ALLOWED_ADMIN_EMAILS.
+ *
+ * No FK to auth.users because that lives in a different Postgres schema that
+ * drizzle doesn't model. The upsert-on-sign-in keeps these two in sync.
+ */
+export const users = pgTable(
+  "users",
+  {
+    id: text("id").primaryKey(),
+    email: text("email").notNull(),
+    role: userRoleEnum("role").notNull().default("reader"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    emailIdx: uniqueIndex("users_email_idx").on(t.email),
+  }),
+);
+
+/**
+ * feedback — one row per (item, user, vote). Acts as a toggle store: the
+ * presence of a row means the user has that vote active; deleting the row
+ * clears it. The API layer enforces up/down mutual exclusion (saving 'down'
+ * clears any existing 'up' for the same item+user). `save` is independent
+ * of the up/down axis so a user can upvote AND bookmark the same story.
+ */
+export const feedback = pgTable(
+  "feedback",
+  {
+    id: serial("id").primaryKey(),
+    itemId: integer("item_id")
+      .notNull()
+      .references(() => items.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    vote: feedbackVoteEnum("vote").notNull(),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    uniqVote: uniqueIndex("feedback_item_user_vote_idx").on(
+      t.itemId,
+      t.userId,
+      t.vote,
+    ),
+    userRecentIdx: index("feedback_user_recent_idx").on(
+      t.userId,
+      t.createdAt,
+    ),
+    itemIdx: index("feedback_item_idx").on(t.itemId, t.createdAt),
+  }),
+);
+
 // ── Types ───────────────────────────────────────────────────────
 export type Source = typeof sources.$inferSelect;
 export type NewSource = typeof sources.$inferInsert;
@@ -377,5 +448,9 @@ export type LlmUsage = typeof llmUsage.$inferSelect;
 export type NewLlmUsage = typeof llmUsage.$inferInsert;
 export type Newsletter = typeof newsletters.$inferSelect;
 export type NewNewsletter = typeof newsletters.$inferInsert;
+export type User = typeof users.$inferSelect;
+export type NewUser = typeof users.$inferInsert;
+export type Feedback = typeof feedback.$inferSelect;
+export type NewFeedback = typeof feedback.$inferInsert;
 
 export type { TSourceKind, TSourceGroup, TCadence };

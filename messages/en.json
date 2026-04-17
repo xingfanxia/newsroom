@@ -67,7 +67,8 @@
     },
     "recent": {
       "title": "Recent feedback",
-      "count": "{count} item{count, plural, one {} other {s}}"
+      "count": "{count} item{count, plural, one {} other {s}}",
+      "empty": "No feedback yet — 👍 / 👎 a story from the feed to populate this panel."
     },
     "console": {
       "title": "Iteration console",
@@ -162,6 +163,31 @@
   "saved": {
     "title": "Saved",
     "subtitle": "Stories you starred."
+  },
+  "login": {
+    "title": "Sign in to AX's AI RADAR",
+    "subtitle": "Drop your email — we'll send a one-time sign-in link. Admins in the allowlist get into the backoffice the same way.",
+    "emailLabel": "Email",
+    "emailPlaceholder": "you@example.com",
+    "submit": "Send magic link",
+    "sent": {
+      "title": "Check your inbox",
+      "body": "We sent a sign-in link to {email}. Open it on this device to complete sign-in."
+    },
+    "error": "Couldn't send link",
+    "errors": {
+      "missing_code": "The sign-in link is incomplete — please open it from the original email.",
+      "callback_failed": "That sign-in link has expired or already been used — request a new one.",
+      "fallback": "Something went wrong signing you in — please try again."
+    }
+  },
+  "feedback": {
+    "signInPrompt": "Sign in to vote"
+  },
+  "forbidden": {
+    "title": "Not authorised",
+    "body": "You're signed in, but {email} isn't on the admin allowlist. If you maintain this site, check the ALLOWED_ADMIN_EMAILS env var.",
+    "backHome": "Back to home"
   },
   "admin": {
     "system": {

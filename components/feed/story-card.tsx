@@ -48,7 +48,7 @@ export function StoryCard({ story }: { story: Story }) {
         <div className="flex shrink-0 items-center gap-2">
           {story.hkr && <HKRBadges hkr={story.hkr} t={t} locale={locale} />}
           <ScoreBadge score={story.importance} />
-          <FeedbackControls />
+          <FeedbackControls storyId={story.id} />
         </div>
       </div>
 
