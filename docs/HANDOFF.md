@@ -1,98 +1,80 @@
-# AX's AI RADAR — Session Handoff (2026-04-16, Session 2)
+# AX's AI RADAR — Session Handoff (2026-04-17, Session 3)
 
-> Read this first before resuming. Covers M0-M2 from session 1 + the large feature expansion + rebrand shipped in session 2.
+> Read this first before resuming. M0–M2 from session 1, feature expansion + rebrand from session 2, perf + UX fixes from session 3. **M3 + M4 still pending.**
 
 ---
 
-## TL;DR (updated)
+## TL;DR
 
-- **Live**: https://newsroom-orpin.vercel.app — auto-deploys from `main`
+- **Live**: https://newsroom-orpin.vercel.app (also `news.ax0x.ai`)
 - **Repo**: https://github.com/xingfanxia/newsroom
-- **Brand**: renamed AI·HOT → **AX's AI RADAR** / **AX 的 AI 雷达** (session 2)
-- **Milestones done**: M0 shell · M1 ingestion · M2 enrich/cluster · + session-2 extensions
-- **Milestones pending**: **M3 auth/feedback** (use `/big-task`) · **M4 editorial agent** (use `/mtc`)
-
-## Session 2 shipped (13 commits on main)
-
-All 8 of the user's session-2 asks landed + 3 new features:
-
-| # | Ask | Status | Commit |
-|---|-----|--------|--------|
-| 1 | Timeline dot alignment | ✅ | 8066a15 |
-| 2 | Locale toggle content parity | ✅ bilingual titles + canonical tags | 60535bf |
-| 3 | Token + cost tracking (cached + input + output + LiteLLM pricing) | ✅ incl. cached-input extraction | 7af9231 |
-| 4 | YT/podcast transcripts | ⏸ deferred to next session | — |
-| 5 | Source health (19 ok → 22 ok + 20 new working sources) | ✅ | 438b05b |
-| 6 | Rebrand to "AX's AI RADAR" + aesthetic polish | ✅ radar sweep motion grammar | 8066a15 |
-| 7 | Expand source catalog from ref lists | ✅ | 438b05b |
-| 8 | yage.ai (鸭哥) P0 | ✅ | 438b05b |
-| 9 | Public RSS export | ✅ `/api/feed/{locale}/rss.xml` | 3305a45 |
-| 10 | Full article markdown | ⏸ deferred to next session | — |
-| 11 | AI editor commentary per item | ✅ short note + long analysis | fab73a3 |
-| 12 | Daily + monthly newsletter + RSS | ✅ | _latest_ |
-
-### Key files added/changed in session 2
-
-**Rebrand + motion:**
-- `components/layout/logo.tsx` — "AX" + radar-sweep glyph + "RADAR" with conic-gradient sweep
-- `public/favicon.svg` — radar grid + sweep wedge + pulsing blip
-- `app/globals.css` — `.radar-sweep` + `.radar-blip` keyframes + `prefers-reduced-motion` opt-out
-- `messages/{zh,en}.json` — brand renamed, tags dict added
-
-**Schema additions (drizzle):**
-- `items`: `title_zh`, `title_en`, `editor_note_zh`, `editor_note_en`,
-  `editor_analysis_zh`, `editor_analysis_en`, `commentary_at`
-- `llm_usage` (new): per-call token + cost ledger with cached/reasoning split
-- `newsletters` (new): daily + monthly digests (kind, locale, period_start uniq)
-
-**New workers:**
-- `workers/newsletter/index.ts` — `runNewsletterBatch('daily' | 'monthly')`
-- `workers/enrich/index.ts` — added stage 4 commentary (non-fatal for featured/p1)
-
-**LLM observability:**
-- `lib/llm/pricing.ts` — LiteLLM JSON fetcher + cost computation (+ hardcoded fallback)
-- `lib/llm/usage.ts` — fire-and-forget `recordUsage` + cached/reasoning extractors
-- `lib/llm/stats.ts` — aggregation queries for the admin dashboard
-- `app/[locale]/admin/system/page.tsx` — spend cards + task/model breakdown + recent calls
-
-**RSS surface:**
-- `/api/feed/{locale}/rss.xml` — items with `<content:encoded>` (note + summary + analysis)
-- `/api/feed/newsletter/{locale}/rss.xml` — daily + monthly digest feed
-
-**Cron schedule (now 8 jobs):**
-- Added: `newsletter-daily` at 09:11 UTC daily, `newsletter-monthly` at 09:37 UTC on 1st
-
-**Source catalog — 61 sources (was 41):**
-- P0: `yage-computing-life` (鸭哥's Computing Life)
-- Wechat2RSS bridges for 机器之心 / 新智元 / 量子位 / 腾讯技术工程 / 阿里技术
-- Direct-feed alternatives: `36kr-direct`, `sspai-direct`, `huxiu-feedx`
-- Macro/geopolitics: `sinocism`, `bloomberg-tech`, `ft-technology`, `rest-of-world`, `thepaper-feedx`, `nytimes-cn-feedx`, `jiemoren-macro-w2r`
-- Research: `arxiv-cs-lg`, `hf-papers-takara`
-- Personal blogs: `ruanyifeng-blog`, `coolshell-cn`
-
-**RSSHUB_BASE_URL** env — new; when set, rewrites `rsshub.app` → mirror at fetch time. The legacy `rsshub.app`-based catalog entries still fail (free instance 403s) but have working alternatives above. User can deploy self-hosted RSSHub on Vercel to revive them.
+- **Brand**: AX's AI RADAR / AX 的 AI 雷达 (cyan on dark observatory)
+- **Done**: M0 shell · M1 ingest · M2 enrich/cluster · session-2 (RSS/commentary/newsletter/i18n/cost) · session-3 (perf/HKR/bilingual reasoning)
+- **Pending**: **M3 auth + feedback** (`/big-task`) · **M4 editorial agent** (`/mtc`) · video/podcast transcripts · article markdown
 
 ---
 
-## LLM cost profile (observed on 50-item batch + one newsletter)
+## Session 3 shipped (2026-04-17 — 7 commits)
 
-| Task | Calls | Cost | Per-item |
-|---|---|---|---|
-| enrich (stage 1) | 50 | $0.23 | $0.0045 |
-| embed (stage 2) | 50 | $0.0006 | $0.00001 |
-| score (stage 3) | 50 | $0.40 | $0.008 |
-| commentary (stage 4, featured/p1 only) | 2 | $0.05 | $0.024 |
-| newsletter (daily) | 2 | $0.07 | — |
+### Perf pack (f0e33b2 + 5cf904f)
 
-Estimated per 1000 fully-processed items: **~$12.60** ($6K/y on Azure free credits at steady state = effectively free).
+16s TTFB on prod dropped to **84–200ms cached / 642ms cold**. Root causes:
+
+| Issue | Fix |
+|---|---|
+| Functions in `iad1`, Supabase in `us-west-1` → ~70ms cross-country per DB roundtrip | `"regions": ["sfo1"]` in `vercel.json` |
+| `force-dynamic` on LocaleLayout disabled ALL CDN caching (`x-vercel-cache: MISS` forever) | Removed from layout; `revalidate = 60` on home page; `generateStaticParams` prerenders `/zh` + `/en` at build |
+| `hasLiveStories()` probe added an extra roundtrip | Dropped — fall back to mock only when DB returns nothing |
+| 100+ `console.error` per SSR from next-intl missing-key logging | `onError: () => {}` + `getMessageFallback` in `i18n/request.ts` |
+| `/admin/system` hung 60–120s → statement_timeout | `max:1` pool deadlocked on `Promise.all(6)` under PgBouncer; raised to `max:10` in `db/client.ts` |
+| Admin totals showed `$0` with rows in the table below | `drizzle.execute()` returns array-like `[0]` not `{rows:[0]}`; added `asRows()` helper in `lib/llm/stats.ts` |
+
+### UX fixes (a8e40da + c52deed + 4fc2da1)
+
+- **Tab filter** — `/zh?tier=featured|all|p1` now actually re-SSRs with the chosen tier instead of just changing client state; each variant ISR-cached separately.
+- **Timeline dot + rail** — dot was at `left-[80px]` overlapping timestamp's right edge. Moved to `left-[92px]` in a widened 24px gap lane, 7px clearance both sides.
+- **Rail visibility** — `--color-rail` bumped from 6% white to 14% cyan.
+- **Tier fallback bug** — P1 tab silently widened to `all` when empty; both tabs showed identical 39 items. Now only falls back on default `featured` tab when DB is cold.
+- **Disabled search + filter UI** — dimmed with "Coming soon" until M3 wires real filtering.
+
+### HKR + bilingual reasoning (3d34ed4 + 3c05c66 + 88421a6)
+
+- **HKR rubric stored per-item**: new `items.hkr` jsonb column `{h, k, r: boolean}`. Three small pill chips render inline with the score — solid cyan = axis hit, dim outline = miss.
+- **精选理由 shown** on every `featured`/`p1` card via existing `items.reasoning` (now `reasoning_zh` + `reasoning_en` — bilingual).
+- **Commentary widened** from featured/p1 → all non-excluded. Now 38 curated stories all have editor note + analysis.
+- **Backfill workers**:
+  - `workers/enrich/score-backfill.ts` — rescores items missing `hkr` or `reasoning_{zh,en}`; 150 items in ~3 min at concurrency=10.
+  - `workers/enrich/commentary.ts` — fills missing `commentary_at` for non-excluded items; concurrency=6.
+  - Both wired into `/api/cron/enrich` so next tick handles stragglers automatically.
+- **Trigger helper**: `scripts/ops/trigger-backfill.ts` — manual one-shot run if needed.
+
+### Current data state (2026-04-17)
+
+| Tier | Count | HKR | Commentary | Reasoning_zh | Reasoning_en |
+|---|---|---|---|---|---|
+| featured | 8 | ✓ | ✓ | 145/150 total | 145/150 total |
+| p1 | 1 | ✓ | ✓ | | |
+| all | 29 | ✓ | ✓ | | |
+| excluded | 112 | ✓ | — | | |
+
+HKR axis distribution across 150 scored items: **H=42 K=8 R=32 all-3=2**. K (knowledge) is the rarest — ~5% of items genuinely teach something new. Why p1 stays rare.
+
+### Source catalog
+
+**62 sources** — unchanged from session 2. Plus **2 pending additions blocked on transcript fetching**:
+- `https://www.youtube.com/@TheValley101` (zh long-form AI interviews)
+- `https://www.youtube.com/@DwarkeshPatel` (en long-form AI research interviews)
+
+YouTube RSS only gives title + description; the transcript is the valuable part for 1-3hr content. Don't add these until task #34 (transcripts) is done — otherwise they become noise in the feed.
 
 ---
 
 ## What M3 should look like (use `/big-task`)
 
-Goal: feedback persistence + editor auth → real metrics on the 策略迭代 page.
+**Goal**: feedback persistence + editor auth → real metrics on the 策略迭代 page + admin routes gated to `xingfanxia@gmail.com`.
 
-Schema additions:
+### Schema
+
 ```sql
 CREATE TABLE users (
   id UUID PRIMARY KEY,                     -- mirrors auth.users.id
@@ -113,49 +95,112 @@ CREATE TABLE feedback (
 );
 ```
 
-Auth: `@supabase/ssr` + Supabase Auth magic-link. Middleware-gated admin routes.
-Endpoints: `POST /api/feedback`, `DELETE /api/feedback/:id`, `GET /api/admin/feedback?since=…`.
-UI wiring: `components/feed/feedback-controls.tsx` already has optimistic state — just wire the POST. `app/[locale]/admin/iterations/page.tsx` stops using mock data.
+### Auth
+
+- `@supabase/ssr` for cookie-based sessions
+- Supabase Auth magic-link login page at `/[locale]/login`
+- **Middleware enforces admin-only access to `/admin/*`** (task #45):
+  - Read Supabase session cookie
+  - Check `user.email` against `ALLOWED_ADMIN_EMAILS` env var (default: `xingfanxia@gmail.com`)
+  - Non-authorized → `NextResponse.redirect` to `/` (or render `/403`)
+  - Hide `后台` / Admin nav section in sidebar for non-admin users
+- Regular users can still use feedback controls (👍/👎/⭐) after magic-link login
+
+### Endpoints
+
+- `POST /api/feedback` — `{itemId, verdict, note?}`, upserts on `(user_id, item_id, verdict)`
+- `DELETE /api/feedback/:id`
+- `GET /api/admin/feedback?since=…` — gated to admin
+
+### UI wiring
+
+- `components/feed/feedback-controls.tsx` already has optimistic state → wire the POST
+- `app/[locale]/admin/iterations/page.tsx` stops using mock; reads from `feedback` table + groups by `policy_version`
+- `app/[locale]/login/page.tsx` — new magic-link form
 
 ## What M4 should look like (use `/mtc`)
 
-Goal: Claude/Azure-pro agent loop that reads feedback + diffs `editorial.skill.md`.
+**Goal**: Claude/Azure-pro agent loop that reads feedback + diffs `editorial.skill.md`.
 
-- Use `profiles.agent` (azure-openai-pro + xhigh)
+- Use `profiles.agent` (Azure Pro + `xhigh` reasoning)
 - Stream reasoning to the iteration console
-- Editor approves the diff → ships as v-next
-- Worker picks up new policy at next enrich pass (`loadPolicy()` already hash-versioned)
+- Editor (xingfanxia) approves the diff → commits as `v-next`
+- Worker picks up new policy at next enrich pass (`loadPolicy()` is already SHA-versioned)
+
+Blocked by M3 (no feedback data → no training signal).
 
 ---
 
-## Known followups (defer to next session or later)
+## Task list (from TaskList)
 
-- **Article markdown persistence** (task #41) — add `items.body_md`; upgrade normalizer to produce markdown (turndown); include in detail view + RSS
-- **YT/podcast transcripts** (task #34) — `youtube-transcript` lib for YT channel feeds; Podcast 2.0 `<podcast:transcript>` tag parsing; feed transcript into `body` before enrich
-- **Detail view per story** — doesn't exist yet; editor analysis + full body would live there
-- **Commentary via pro profile** — currently uses `profiles.score` (standard+high); can upgrade to `profiles.agent` if quality demands, cost ~$0.12/item
-- **Policy versioning** — currently just first-8-chars sha256; M4 should introduce `policy_versions` table with lineage
-- **Legacy RSSHub sources** — 12 still failing; self-host RSSHub on Vercel + set `RSSHUB_BASE_URL` to unblock
+### Pending
+- **#36** M3 big-task (feedback + Supabase Auth + admin gate) ← **start here**
+- **#37** M4 /mtc (editorial agent)
+- **#45** Admin-route auth gate (xingfanxia@gmail.com) — blocked by #36
+- **#41** Persist article as markdown (`items.body_md`)
+- **#34** YouTube + podcast transcripts (seed: TheValley101, Dwarkesh)
+- **#46** Podcast/Video dedicated UI section — blocked by #34
+- **#47** Add TheValley101 + DwarkeshPatel sources — blocked by #34
+
+### Completed in session 3 (today)
+- **#44** Perf fix pack (region + ISR + cache)
+- Plus ~5 reactive bug fixes not tracked as tasks (stats $0, pool deadlock, tier fallback, timeline overlap, HKR + bilingual reasoning, commentary widening)
+
+### Recommended order
+1. **`/big-task` #36 + #45** — unblocks feedback data for M4
+2. **`/mtc` #37** — depends on #36 data
+3. **#34 transcripts** — opens up the long-form video/podcast channel (highest-signal content type)
+4. **#46 + #47** — consume #34's work
+5. **#41** markdown persistence — quality-of-life for detail view
+
+---
 
 ## How to resume next session
 
 ```bash
-cd /Users/xingfanxia/projects/portfolio/newsroom
-
-# verify
+cd ~/projects/portfolio/newsroom
 vercel env pull .env.local --yes
 bun install && bun test && bun run build
 bun run db:ping
-bun scripts/ops/run-cron.ts daily    # confirm 22+ sources ok
 
-# then
-/big-task  # → M3 feedback + auth
-/mtc       # → M4 editorial agent
+# verify live data
+curl -s "https://newsroom-orpin.vercel.app/api/feed/zh/rss.xml" | head -40
+
+/big-task   # → M3 (feedback + Supabase Auth + admin-email gate)
 ```
 
-## Environment (unchanged from session 1)
+## Environment (unchanged from session 2)
 
-See `.env.example` for the full template. Newly added:
-- `RSSHUB_BASE_URL` — optional mirror for rsshub.app (blank = keep rsshub.app)
+See `.env.example`. Key vars:
+- `POSTGRES_URL` / `POSTGRES_URL_NON_POOLING` (Supabase, us-west-1)
+- `AZURE_OPENAI_*` (standard + pro deployments)
+- `ANTHROPIC_API_KEY`
+- `GOOGLE_GENERATIVE_AI_API_KEY`
+- `CRON_SECRET`
+- `RSSHUB_BASE_URL` (optional mirror)
 
-Live env synced to `.env.local` + all 3 Vercel envs. Keys in git history should be rotated when M3 verified.
+New for M3:
+- `NEXT_PUBLIC_SUPABASE_URL` (already present)
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` (already present)
+- `ALLOWED_ADMIN_EMAILS` — default `xingfanxia@gmail.com`
+
+## Gotchas / known state
+
+- **Azure Pro** (xhigh reasoning) timed out on the newsletter prompt; commentary + newsletter currently run on `profiles.score` (standard + high). Upgrade once Azure quota is stable.
+- **Legacy rsshub.app sources** (~12) still fail; self-host RSSHub on Vercel + set `RSSHUB_BASE_URL` to revive. Working alternatives already in catalog.
+- **5 items failed rescore** with "No object generated" — next enrich cron retries them; no data loss.
+- **Keys still in chat history** from session 2 — rotate once M3 is verified.
+- **`scripts/ops/trigger-backfill.ts`** was committed — safe to keep as a manual trigger or delete if unused.
+
+## Key file index (session-3 additions)
+
+- `workers/enrich/score-backfill.ts` — score-only backfill
+- `workers/enrich/commentary.ts` — commentary backfill (now all non-excluded)
+- `workers/enrich/prompt.ts` — scoreSchema has `hkr`, `reasoningZh`, `reasoningEn`
+- `db/schema.ts` — `items.hkr`, `items.reasoning_zh`, `items.reasoning_en` added
+- `components/feed/timeline-rail.tsx` — rail + dot at x=92 in widened gap
+- `components/feed/story-card.tsx` — HKRBadges component + 精选理由 block
+- `lib/llm/stats.ts` — `asRows()` helper fixing aggregate parsing
+- `app/[locale]/_hot-news-tabs.tsx` — client tabs via URL searchParams
+- `i18n/request.ts` — silent `onError` + `getMessageFallback`
+- `vercel.json` — `"regions": ["sfo1"]`
