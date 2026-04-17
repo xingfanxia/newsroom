@@ -133,10 +133,3 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
   });
 }
 
-export async function hasLiveStories(): Promise<boolean> {
-  const client = db();
-  const result = await client.execute(
-    sql`SELECT 1 FROM items WHERE enriched_at IS NOT NULL LIMIT 1`,
-  );
-  return ((result as { rows?: unknown[] }).rows?.length ?? 0) > 0;
-}

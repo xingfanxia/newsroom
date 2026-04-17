@@ -8,11 +8,16 @@ import {
   TimelineSection,
 } from "@/components/feed/timeline-rail";
 import { mockStories } from "@/lib/mock/stories";
-import { getFeaturedStories, hasLiveStories } from "@/lib/items/live";
+import { getFeaturedStories } from "@/lib/items/live";
 import { formatDateHeader } from "@/lib/utils";
 import type { Story } from "@/lib/types";
 import { HotNewsTabsClient } from "./_hot-news-tabs";
 import { LocaleSwitcher } from "@/components/layout/locale-switcher";
+
+// ISR: serve from CDN cache, regenerate at most once per minute. Enrich cron
+// runs every 15 min so 60s staleness is imperceptible and drops DB roundtrips
+// on the home page by ~99%.
+export const revalidate = 60;
 
 export default async function HotNewsPage({
   params,
@@ -24,34 +29,27 @@ export default async function HotNewsPage({
   const t = await getTranslations("hotNews");
   const tabT = await getTranslations("hotNews.tabs");
 
-  // Graceful fallback ladder:
-  //   1. Any featured stories live in DB? → show them
-  //   2. DB has ANY enriched stories? → widen to `all` tier so slow news days
-  //      don't silently revert to mock. This prevents mock leaking back in
-  //      once enrichment has kicked off at least once.
-  //   3. DB has nothing enriched yet → mock (first deploy / cold start only)
+  // Single-query fallback ladder: try featured+p1, widen to `all` if empty,
+  // fall back to mock only when DB has nothing. Drops the separate
+  // hasLiveStories probe that was adding a cross-region roundtrip.
   let stories: Story[] = [];
-  let live = false;
   try {
-    live = await hasLiveStories();
-    if (live) {
+    stories = await getFeaturedStories({
+      tier: "featured",
+      locale: locale as "zh" | "en",
+      limit: 40,
+    });
+    if (stories.length === 0) {
       stories = await getFeaturedStories({
-        tier: "featured",
+        tier: "all",
         locale: locale as "zh" | "en",
         limit: 40,
       });
-      if (stories.length === 0) {
-        stories = await getFeaturedStories({
-          tier: "all",
-          locale: locale as "zh" | "en",
-          limit: 40,
-        });
-      }
     }
   } catch {
-    live = false;
+    stories = [];
   }
-  if (!live) stories = mockStories;
+  if (stories.length === 0) stories = mockStories;
 
   const grouped = groupByDay(stories);
 

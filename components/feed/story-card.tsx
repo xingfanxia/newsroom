@@ -7,19 +7,15 @@ import { FeedbackControls } from "./feedback-controls";
 import { CrossSourceIndicator } from "./cross-source-indicator";
 
 /**
- * Translate a canonical tag ID (English) through the i18n dict. Entity names
- * like "Anthropic" / "ByteDance" aren't in the dict — next-intl throws on
- * missing keys by default, so we catch and return the raw tag instead.
+ * Translate a canonical tag ID through the i18n dict. Entity names
+ * (OpenAI / Anthropic / ByteDance) aren't in the dict; getMessageFallback
+ * in i18n/request.ts returns the raw key silently.
  */
 function translateTag(
   t: ReturnType<typeof useTranslations>,
   tag: string,
 ): string {
-  try {
-    return t(`all.${tag}`);
-  } catch {
-    return tag;
-  }
+  return t(`all.${tag}`);
 }
 
 export function StoryCard({ story }: { story: Story }) {

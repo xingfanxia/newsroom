@@ -37,8 +37,9 @@ export const metadata: Metadata = {
   },
 };
 
-// Dashboard — render on-demand, skip static prerender
-export const dynamic = "force-dynamic";
+export function generateStaticParams() {
+  return routing.locales.map((locale) => ({ locale }));
+}
 
 export default async function LocaleLayout({
   children,
