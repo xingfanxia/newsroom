@@ -1,7 +1,5 @@
 /**
  * Aggregation queries over llm_usage for the admin dashboard.
- * Each function is its own DB call so the page can render incrementally
- * and so individual queries can be memoized/cached independently later.
  */
 import { db } from "@/db/client";
 import { sql, desc } from "drizzle-orm";
@@ -22,6 +20,20 @@ function windowClause(w: WindowKey) {
   }
 }
 
+/**
+ * drizzle-orm's `.execute(sql)` with postgres-js returns an array-like result
+ * indexed by numeric keys (res[0], res[1], ...), NOT a {rows: [...]} wrapper
+ * that pg/node-postgres uses. Earlier code assumed `.rows` and silently read
+ * 0 for every aggregate. Normalize to a plain Record array here.
+ */
+function asRows(result: unknown): Record<string, unknown>[] {
+  const r = result as unknown as
+    | Record<string, unknown>[]
+    | { rows?: Record<string, unknown>[] };
+  if (Array.isArray(r)) return r;
+  return r.rows ?? [];
+}
+
 export type WindowTotals = {
   window: WindowKey;
   calls: number;
@@ -36,7 +48,7 @@ export async function totalsByWindow(
   w: WindowKey = "today",
 ): Promise<WindowTotals> {
   const client = db();
-  const rows = await client.execute(sql`
+  const result = await client.execute(sql`
     SELECT
       count(*)::int AS calls,
       coalesce(sum(input_tokens), 0)::int AS input_tokens,
@@ -46,7 +58,7 @@ export async function totalsByWindow(
       coalesce(sum(cost_usd), 0)::float AS cost_usd
     FROM llm_usage WHERE ${windowClause(w)}
   `);
-  const r = (rows as { rows?: Record<string, unknown>[] }).rows?.[0] ?? {};
+  const r = asRows(result)[0] ?? {};
   return {
     window: w,
     calls: Number(r.calls ?? 0),
@@ -70,7 +82,7 @@ export async function breakdownByTask(
   w: WindowKey = "week",
 ): Promise<TaskBreakdown[]> {
   const client = db();
-  const rows = await client.execute(sql`
+  const result = await client.execute(sql`
     SELECT
       task,
       count(*)::int AS calls,
@@ -81,8 +93,7 @@ export async function breakdownByTask(
     GROUP BY task
     ORDER BY cost_usd DESC
   `);
-  const results = (rows as { rows?: Record<string, unknown>[] }).rows ?? [];
-  return results.map((r) => ({
+  return asRows(result).map((r) => ({
     task: (r.task as string | null) ?? null,
     calls: Number(r.calls ?? 0),
     inputTokens: Number(r.input_tokens ?? 0),
@@ -102,7 +113,7 @@ export async function breakdownByModel(
   w: WindowKey = "week",
 ): Promise<ModelBreakdown[]> {
   const client = db();
-  const rows = await client.execute(sql`
+  const result = await client.execute(sql`
     SELECT
       provider, model,
       count(*)::int AS calls,
@@ -111,8 +122,7 @@ export async function breakdownByModel(
     GROUP BY provider, model
     ORDER BY cost_usd DESC
   `);
-  const results = (rows as { rows?: Record<string, unknown>[] }).rows ?? [];
-  return results.map((r) => ({
+  return asRows(result).map((r) => ({
     provider: String(r.provider),
     model: String(r.model),
     calls: Number(r.calls ?? 0),

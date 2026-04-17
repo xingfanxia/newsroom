@@ -38,8 +38,11 @@ export default async function HotNewsPage({
   const tabT = await getTranslations("hotNews.tabs");
   const tier = coerceTier(sp.tier);
 
-  // Fall back to mock only if DB has nothing for the selected tier AND the
-  // broadest tier (all) is also empty — means enrichment hasn't run yet.
+  // Return exactly what the user asked for. Don't silently widen a tier that
+  // came up empty — that would collapse P1 into All when the scorer hasn't
+  // produced any p1-tier items (the user would see identical lists).
+  // Only fall back to mock when tier=featured AND there's no featured content
+  // at all, which signals a cold start before the first enrich pass.
   let stories: Story[] = [];
   try {
     stories = await getFeaturedStories({
@@ -47,17 +50,21 @@ export default async function HotNewsPage({
       locale: locale as "zh" | "en",
       limit: 40,
     });
-    if (stories.length === 0 && tier !== "all") {
-      stories = await getFeaturedStories({
-        tier: "all",
-        locale: locale as "zh" | "en",
-        limit: 40,
-      });
-    }
   } catch {
     stories = [];
   }
-  if (stories.length === 0) stories = mockStories;
+  if (stories.length === 0 && tier === "featured") {
+    try {
+      const probe = await getFeaturedStories({
+        tier: "all",
+        locale: locale as "zh" | "en",
+        limit: 1,
+      });
+      if (probe.length === 0) stories = mockStories;
+    } catch {
+      stories = mockStories;
+    }
+  }
 
   const grouped = groupByDay(stories);
 

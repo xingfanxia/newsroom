@@ -51,6 +51,8 @@ export type Story = {
   editorNote?: string;
   /** Optional long-form analysis (markdown). */
   editorAnalysis?: string;
+  /** LLM's reason for the tier/importance it assigned — shown as 精选理由 on featured cards. */
+  reasoning?: string;
 };
 
 export type FeedbackEntry = {
