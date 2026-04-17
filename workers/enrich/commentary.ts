@@ -21,8 +21,8 @@ import {
 type Capability = (typeof CAPABILITIES)[number];
 type Topic = (typeof TOPICS)[number];
 
-const CONCURRENCY = 2;
-const MAX_PER_RUN = 25;
+const CONCURRENCY = 6;
+const MAX_PER_RUN = 60;
 
 export type CommentaryBackfillReport = {
   candidates: number;
