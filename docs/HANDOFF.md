@@ -1,16 +1,17 @@
-# AX's AI RADAR — Session Handoff (2026-04-17, Session 4)
+# AX's AI RADAR — Session Handoff (2026-04-17, Session 4 complete)
 
-> Read this first before resuming. Session 1 = M0–M2 shell/ingest/enrich. Session 2 = RSS + commentary + newsletter + i18n + cost. Session 3 = perf + HKR + bilingual reasoning. **Session 4 (today) = Jina body fetch + 晚点-tone prompts + HKR axis explanations + concurrency fan-out.** M3 + M4 still pending.
+> Read this first before resuming. Session 1 = M0–M2 shell/ingest/enrich. Session 2 = RSS + commentary + newsletter + i18n + cost. Session 3 = perf + HKR + bilingual reasoning. **Session 4 (today) = Jina body fetch + 晚点-tone prompts + per-axis HKR + concurrency fan-out + YouTube transcripts + /podcasts UI.** M3 + M4 pending.
 
 ---
 
 ## TL;DR
 
-- **Live**: https://newsroom-orpin.vercel.app (also `news.ax0x.ai`)
+- **Live**: https://newsroom-orpin.vercel.app (also `news.ax0x.ai`) · **new**: `/podcasts` page
 - **Repo**: https://github.com/xingfanxia/newsroom
 - **Brand**: AX's AI RADAR / AX 的 AI 雷达 (cyan on dark observatory)
-- **Done through s4**: M0 shell · M1 ingest · M2 enrich/cluster · RSS/commentary/newsletter/i18n/cost · perf/HKR/bilingual reasoning · **full article bodies via Jina · 晚点-tone editorial voice · per-axis HKR tooltips · 10-20x concurrency**
-- **Pending**: **M3 auth + feedback** (`/big-task`) · **M4 editorial agent** (`/mtc`) · video/podcast transcripts · article markdown surface (body_md already stored)
+- **Done through s4**: M0 shell · M1 ingest · M2 enrich/cluster · RSS/commentary/newsletter/i18n/cost · perf/HKR/bilingual reasoning · **full article bodies via Jina · YouTube transcripts · 晚点-tone editorial voice · per-axis HKR tooltips · 10-20x concurrency · /podcasts page · 65 sources**
+- **Pending**: **M3 auth + feedback** (`/big-task`) · **M4 editorial agent** (`/mtc`) · auth-gated admin (#45)
+- **Data state end of s4**: 199/2822 items enriched · 39 curated (featured 16 + p1 13 + all 10) · 160 excluded · 101 podcast items queued (14 enriched, rest draining via cron over next ~7h)
 
 ---
 
@@ -93,6 +94,55 @@ Three new podcast/video sources added:
 Cron: `article-body` + `youtube-transcript` run in parallel before `enrich` (different upstream rate-limits, no contention). `article-body` SQL-excludes YouTube URLs.
 
 **Total source count: 65** (was 62, added 3).
+
+### Podcasts UI page (`5c522af`)
+
+New page at `/[locale]/podcasts` — shows everything from `source.group = 'podcast'` regardless of tier. Long-form interviews (1-3 hr) are rare enough (~101 items total across all channels) that aggressive curation would empty the page.
+
+- `app/[locale]/podcasts/page.tsx` — reuses `StoryCard` + `TimelineEntry` from home feed; empty state with Headphones icon
+- Sidebar `/podcasts` nav item between hotNews and lowFollower
+- `lib/items/live.ts` extended with `sourceGroup` + `includeSourceGroup` options
+- `lib/types.ts` — `Story.source.groupCode` optional
+- i18n: `nav.podcasts` + `podcasts.{title,subtitle,empty,badges}` in both locales
+
+**101 podcast items total** (15 × 6 channels = 90 + existing 11), **14 enriched so far** — rest drain via cron over ~5-7 hours.
+
+---
+
+## Session 4 commits summary
+
+| SHA | What |
+|---|---|
+| `c090b4a` | Jina Reader body fetch + items.body_md |
+| `c0d4eaa` | 晚点-tone prompts + per-axis HKR reasons |
+| `ec43419` | Concurrency fan-out 4-10 → 30-40 + commentary decoupled |
+| `ae2aa52` | HANDOFF doc session-4 recap |
+| `5313301` | YouTube transcript worker + 3 channels |
+| `c210583` | HANDOFF YT addition |
+| `5c522af` | /podcasts page + sidebar nav + group filter |
+
+Total: **7 commits, all deployed to prod main.**
+
+---
+
+## How to resume in Session 5 (M3 time)
+
+```bash
+cd ~/projects/portfolio/newsroom
+vercel env pull .env.local --yes
+bun install && bun test && bun run build
+bun run db:ping
+
+# verify live + podcasts
+curl -s "https://news.ax0x.ai/zh/podcasts" | head -5
+
+/big-task   # → M3: Supabase Auth + feedback + admin-email gate
+```
+
+**M3 plan (unchanged from s3 + s4 — see below in session-3 notes for schema)**. Key additions from session 4:
+- `JINA_API_KEY` is in env (already paid + working); no action needed
+- `ALLOWED_ADMIN_EMAILS` env var not yet set; default to `xingfanxia@gmail.com` in middleware
+- When M3 lands, **rotate all keys** still in chat history (ANTHROPIC, GEMINI, AZURE, JINA)
 
 ---
 
