@@ -88,9 +88,11 @@ See [`.env.example`](./.env.example) for the complete template. On Vercel, most 
 | **M0 — Shell** | Next.js i18n app + UI from screenshots + mock data | ✅ shipped |
 | **M1 — Read-only ingestion** | 41 RSS/Atom/RSSHub sources + fetcher + normalizer + live Sources page | ✅ shipped |
 | **M2 — Enrich + Score + Cluster** | Azure LLM summary + tags + 0-100 score + halfvec embeddings + pgvector dedup + live Hot News feed | ✅ shipped |
-| **M3 — Feedback + Auth** | `feedback` table + Supabase Auth + real metrics on 策略迭代 page | ⏳ next |
-| **M4 — Editorial agent** | Claude/Azure agent reads feedback, diffs `editorial.skill.md`, streams to console | planned |
-| **M5 — X monitor + Low-follower + cluster UI** | X watchlist, viral detector, "also reported by N sources" chips | planned |
+| **M3 — Feedback + Auth** | `feedback` table + admin gate + real metrics on 策略迭代 page (Supabase Auth → password gate in s6) | ✅ shipped |
+| **M4 — Editorial agent** | Azure Pro agent reads feedback, diffs `editorial.skill.md`, streams to console | ✅ shipped |
+| **X ingestion** | 7 watched X accounts via API v2 pay-per-tweet, since_id cursor, retweets/replies filtered | ✅ shipped (s6) |
+| **Content backfill** | Fill 2026 historical items from RSS archives / Wayback / vendor archive pages | ⏳ next |
+| **M5 — Low-follower viral + cluster UI** | Low-follower viral detector, "also reported by N sources" chips | planned |
 
 Full blueprint + deviations in [`docs/architecture/ingestion.md`](./docs/architecture/ingestion.md). Handoff notes in [`docs/HANDOFF.md`](./docs/HANDOFF.md).
 
@@ -145,9 +147,11 @@ bun run dev
 | **M0 — 骨架** | 双语 UI + mock 数据 | ✅ 已发布 |
 | **M1 — 只读接入** | 41 个信源 + fetcher + normalizer + 实时 /sources | ✅ 已发布 |
 | **M2 — 加工评分聚类** | Azure 摘要 / 标签 / 0-100 分 / 向量嵌入 / 去重 / 实时热点 | ✅ 已发布 |
-| **M3 — 反馈 + 鉴权** | feedback 表 + Supabase Auth + 真实指标 | ⏳ 下一步 |
-| **M4 — 编辑 agent** | Agent 读反馈、改策略、审核 diff | 计划中 |
-| **M5 — X 监控 / 低粉爆文 / 聚类 UI** | 监控列表、高互动筛选、跨源展示 | 计划中 |
+| **M3 — 反馈 + 鉴权** | feedback 表 + 管理员鉴权（s6 由 Supabase 改为密码门）+ 策略迭代真实指标 | ✅ 已上线 |
+| **M4 — 编辑 agent** | Agent 读反馈、改策略、审核 diff、提交 v-next | ✅ 已上线 |
+| **X 采集** | 7 个重点账号 via X API v2，since_id 增量、转推/回复已过滤 | ✅ 已上线 (s6) |
+| **内容回填** | 用 Wayback Machine / 存档页补齐 2026 年的历史内容 | ⏳ 下一步 |
+| **M5 — 低粉爆文 / 聚类 UI** | 高互动筛选、跨源展示 | 计划中 |
 
 完整蓝图与偏差记录见 [`docs/architecture/ingestion.md`](./docs/architecture/ingestion.md)。会话交接记录见 [`docs/HANDOFF.md`](./docs/HANDOFF.md)。
 

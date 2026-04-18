@@ -12,7 +12,8 @@ export const sourceCatalog: Source[] = [
     cadence: "daily",
     priority: 1,
     tags: ["Anthropic", "product", "research"],
-    enabled: true,
+    enabled: false,
+    notes: "Disabled 2026-04-18 — kind='scrape' not implemented in the fetcher.",
   },
   {
     id: "openai-news",
@@ -36,7 +37,8 @@ export const sourceCatalog: Source[] = [
     cadence: "weekly",
     priority: 1,
     tags: ["DeepMind", "research"],
-    enabled: true,
+    enabled: false,
+    notes: "Disabled 2026-04-18 — URL 302→404. DeepMind moved posts to blog.google; no clean public RSS. Revisit when we find one.",
   },
   {
     id: "google-research",
@@ -60,7 +62,8 @@ export const sourceCatalog: Source[] = [
     cadence: "weekly",
     priority: 2,
     tags: ["Meta", "research"],
-    enabled: true,
+    enabled: false,
+    notes: "Disabled 2026-04-18 — URL 404. Meta dropped RSS; no replacement found.",
   },
   {
     id: "microsoft-ai",
@@ -72,7 +75,8 @@ export const sourceCatalog: Source[] = [
     cadence: "weekly",
     priority: 2,
     tags: ["Microsoft"],
-    enabled: true,
+    enabled: false,
+    notes: "Disabled 2026-04-18 — RSS returns 200 but no new items since 2022. Feed abandoned. Check if Microsoft moved AI posts elsewhere.",
   },
   {
     id: "nvidia-blog",
@@ -108,7 +112,8 @@ export const sourceCatalog: Source[] = [
     cadence: "weekly",
     priority: 1,
     tags: ["小米", "model"],
-    enabled: true,
+    enabled: false,
+    notes: "Disabled 2026-04-18 — rsshub.app free mirror returns 403 to our User-Agent.",
   },
   {
     id: "deepseek-hf",
@@ -120,7 +125,8 @@ export const sourceCatalog: Source[] = [
     cadence: "daily",
     priority: 1,
     tags: ["DeepSeek", "open-source"],
-    enabled: true,
+    enabled: false,
+    notes: "Disabled 2026-04-18 — kind='scrape' not implemented.",
   },
   {
     id: "qwen-hf",
@@ -132,7 +138,8 @@ export const sourceCatalog: Source[] = [
     cadence: "daily",
     priority: 1,
     tags: ["Alibaba", "open-source"],
-    enabled: true,
+    enabled: false,
+    notes: "Disabled 2026-04-18 — kind='scrape' not implemented.",
   },
 
   // ── Media ────────────────────────────────────────────────────────
@@ -194,7 +201,8 @@ export const sourceCatalog: Source[] = [
     cadence: "daily",
     priority: 1,
     tags: ["news", "中文"],
-    enabled: true,
+    enabled: false,
+    notes: "Disabled 2026-04-18 — rsshub.app 403-blocks us. See 36kr-w2r (feedx) alt.",
   },
   {
     id: "huxiu-ai",
@@ -206,7 +214,8 @@ export const sourceCatalog: Source[] = [
     cadence: "daily",
     priority: 2,
     tags: ["中文"],
-    enabled: true,
+    enabled: false,
+    notes: "Disabled 2026-04-18 — rsshub.app 403-blocks us.",
   },
   {
     id: "sspai-matrix",
@@ -218,7 +227,8 @@ export const sourceCatalog: Source[] = [
     cadence: "daily",
     priority: 2,
     tags: ["中文"],
-    enabled: true,
+    enabled: false,
+    notes: "Disabled 2026-04-18 — rsshub.app 403-blocks us. See sspai-direct alt.",
   },
   {
     id: "jiqizhixin",
@@ -230,7 +240,8 @@ export const sourceCatalog: Source[] = [
     cadence: "daily",
     priority: 1,
     tags: ["中文", "research"],
-    enabled: true,
+    enabled: false,
+    notes: "Disabled 2026-04-18 — rsshub.app 403-blocks us. See jiqizhixin-w2r alt.",
   },
   {
     id: "qbitai",
@@ -242,7 +253,8 @@ export const sourceCatalog: Source[] = [
     cadence: "daily",
     priority: 1,
     tags: ["中文"],
-    enabled: true,
+    enabled: false,
+    notes: "Disabled 2026-04-18 — rsshub.app 403-blocks us. See qbitai-w2r alt.",
   },
 
   // ── Newsletter ──────────────────────────────────────────────────
@@ -268,7 +280,8 @@ export const sourceCatalog: Source[] = [
     cadence: "weekly",
     priority: 2,
     tags: ["newsletter"],
-    enabled: true,
+    enabled: false,
+    notes: "Disabled 2026-04-18 — deeplearning.ai/the-batch/feed/ returns 404.",
   },
   {
     id: "importai",
@@ -318,7 +331,8 @@ export const sourceCatalog: Source[] = [
     cadence: "daily",
     priority: 2,
     tags: ["paper", "digest"],
-    enabled: true,
+    enabled: false,
+    notes: "Disabled 2026-04-18 — kind='scrape' not implemented.",
   },
   {
     id: "paperswithcode",
@@ -465,7 +479,8 @@ export const sourceCatalog: Source[] = [
     cadence: "hourly",
     priority: 2,
     tags: ["知乎"],
-    enabled: true,
+    enabled: false,
+    notes: "Disabled 2026-04-18 — rsshub.app 403-blocks us. No clean alt.",
   },
   {
     id: "wechat-jiqizhixin-mp",
@@ -477,8 +492,8 @@ export const sourceCatalog: Source[] = [
     cadence: "daily",
     priority: 2,
     tags: ["微信", "中文"],
-    enabled: true,
-    notes: "Cookie rotation required",
+    enabled: false,
+    notes: "Disabled 2026-04-18 — rsshub.app 403-blocks us. Used to need cookie rotation too. See jiqizhixin-w2r alt.",
   },
 
   // ── Product ──────────────────────────────────────────────────────
@@ -504,7 +519,8 @@ export const sourceCatalog: Source[] = [
     cadence: "daily",
     priority: 2,
     tags: ["github"],
-    enabled: true,
+    enabled: false,
+    notes: "Disabled 2026-04-18 — GitHub no longer serves .atom; bot-walled HTML returned.",
   },
   {
     id: "hf-trending-models",
@@ -516,7 +532,8 @@ export const sourceCatalog: Source[] = [
     cadence: "daily",
     priority: 2,
     tags: ["model"],
-    enabled: true,
+    enabled: false,
+    notes: "Disabled 2026-04-18 — kind='api' not implemented (HF trending API adapter TBD).",
   },
 
   // ── Podcast ──────────────────────────────────────────────────────
@@ -696,7 +713,8 @@ export const sourceCatalog: Source[] = [
     cadence: "weekly",
     priority: 2,
     tags: ["systems", "architecture"],
-    enabled: true,
+    enabled: false,
+    notes: "Disabled 2026-04-18 — site frozen in memoriam; no posts since May 2023.",
   },
 
   // ── Chinese AI media via WeChat2RSS (bypass of rsshub.app) ──────
@@ -787,8 +805,8 @@ export const sourceCatalog: Source[] = [
     cadence: "daily",
     priority: 1,
     tags: ["business", "analysis", "中文"],
-    enabled: true,
-    notes: "Working alternative to broken huxiu-ai rsshub",
+    enabled: false,
+    notes: "Disabled 2026-04-18 — feedx mirror stopped updating Aug 2024 (was the 'working alternative' for huxiu-ai rsshub, now also dead).",
   },
   {
     id: "sspai-direct",
@@ -827,7 +845,8 @@ export const sourceCatalog: Source[] = [
     cadence: "daily",
     priority: 2,
     tags: ["policy", "regulation", "中文"],
-    enabled: true,
+    enabled: false,
+    notes: "Disabled 2026-04-18 — feedx mirror stale 4 months. Revisit if needed.",
   },
   {
     id: "jiemoren-macro-w2r",
@@ -842,7 +861,8 @@ export const sourceCatalog: Source[] = [
     cadence: "daily",
     priority: 2,
     tags: ["macro", "policy", "economics"],
-    enabled: true,
+    enabled: false,
+    notes: "Disabled 2026-04-18 — WeChat2RSS account defunct since Jan 2025.",
   },
   {
     id: "bloomberg-tech",
@@ -891,7 +911,8 @@ export const sourceCatalog: Source[] = [
     cadence: "weekly",
     priority: 2,
     tags: ["global-tech", "non-us", "policy"],
-    enabled: true,
+    enabled: false,
+    notes: "Disabled 2026-04-18 — /feed/rss/ redirects to /lander JS challenge.",
   },
 
   // ── Additional research feeds ───────────────────────────────────
