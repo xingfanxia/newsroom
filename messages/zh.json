@@ -215,28 +215,18 @@
   },
   "login": {
     "title": "登录 AX 的 AI 雷达",
-    "subtitle": "输入邮箱，我们会发一个一次性登录链接给你。只要邮箱在管理员白名单里，点进链接就能进入后台。",
-    "emailLabel": "邮箱",
-    "emailPlaceholder": "you@example.com",
-    "submit": "发送登录链接",
-    "sent": {
-      "title": "请查收邮箱",
-      "body": "登录链接已发送至 {email}。在同一台设备打开即可登录。"
-    },
-    "error": "发送失败",
+    "subtitle": "输入管理员密码进入后台，以及为文章投票。",
+    "passwordLabel": "管理员密码",
+    "passwordPlaceholder": "密码",
+    "submit": "登录",
     "errors": {
-      "missing_code": "登录链接不完整,请重新从邮件打开。",
-      "callback_failed": "这个登录链接已过期或已使用,请重新获取。",
-      "fallback": "登录时出了点问题,请再试一次。"
+      "invalid": "密码不对。",
+      "server": "出了点问题，请稍后重试。",
+      "fallback": "出了点问题，请再试一次。"
     }
   },
   "feedback": {
     "signInPrompt": "请先登录再投票"
-  },
-  "forbidden": {
-    "title": "无访问权限",
-    "body": "你已登录,但此账号 ({email}) 不在管理员白名单里。如果你是维护者,请检查 ALLOWED_ADMIN_EMAILS 环境变量。",
-    "backHome": "返回首页"
   },
   "admin": {
     "system": {

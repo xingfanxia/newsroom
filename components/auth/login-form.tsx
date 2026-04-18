@@ -1,63 +1,55 @@
 "use client";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { Mail, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { createSupabaseBrowser } from "@/lib/auth/supabase/client";
 
-type Status = "idle" | "sending" | "sent" | "error";
+type Status = "idle" | "sending" | "error";
 
 /**
- * Magic-link login form. Hands off to Supabase `signInWithOtp` and shows a
- * "check your inbox" state on success. The caller injects the next-path so
- * we can round-trip back to the page that triggered the prompt.
+ * Password-gate login form. POSTs to /api/admin/auth with the submitted
+ * password; on success the server sets an httpOnly signed session cookie
+ * and the client navigates to `next`. Errors render inline — we never
+ * echo the password back or surface server-side stack traces.
  */
 export function LoginForm({ next }: { next: string }) {
   const t = useTranslations("login");
-  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [status, setStatus] = useState<Status>("idle");
-  const [errorCode, setErrorCode] = useState<string | null>(null);
+  const [errorKey, setErrorKey] = useState<"invalid" | "server" | null>(null);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!email.trim()) return;
+    if (!password) return;
     setStatus("sending");
-    setErrorCode(null);
+    setErrorKey(null);
 
-    const origin = window.location.origin;
-    const redirectTo = `${origin}/api/auth/callback?next=${encodeURIComponent(next)}`;
-
-    const supabase = createSupabaseBrowser();
-    const { error } = await supabase.auth.signInWithOtp({
-      email: email.trim(),
-      options: { emailRedirectTo: redirectTo },
-    });
-
-    if (error) {
-      setErrorCode(error.message);
+    try {
+      const res = await fetch("/api/admin/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password, next }),
+      });
+      if (res.status === 401) {
+        setStatus("error");
+        setErrorKey("invalid");
+        return;
+      }
+      if (!res.ok) {
+        setStatus("error");
+        setErrorKey("server");
+        return;
+      }
+      const body = (await res.json().catch(() => ({}))) as { next?: string };
+      const target = body.next || next;
+      // Full reload rather than router.push so the freshly-set cookie is
+      // seen by the proxy before the admin page renders.
+      window.location.assign(target);
+    } catch {
       setStatus("error");
-      return;
+      setErrorKey("server");
     }
-    setStatus("sent");
-  }
-
-  if (status === "sent") {
-    return (
-      <div className="flex flex-col gap-3 rounded-lg border border-[var(--color-border)] bg-white/[0.02] p-6 text-center">
-        <Mail
-          size={28}
-          className="mx-auto text-[var(--color-cyan)]"
-          aria-hidden
-        />
-        <h2 className="text-[17px] font-[590] text-[var(--color-fg)]">
-          {t("sent.title")}
-        </h2>
-        <p className="text-[13.5px] leading-relaxed text-[var(--color-fg-muted)]">
-          {t("sent.body", { email })}
-        </p>
-      </div>
-    );
   }
 
   return (
@@ -66,35 +58,35 @@ export function LoginForm({ next }: { next: string }) {
       className="flex flex-col gap-3"
       aria-busy={status === "sending"}
     >
-      <label htmlFor="login-email" className="sr-only">
-        {t("emailLabel")}
+      <label htmlFor="login-password" className="sr-only">
+        {t("passwordLabel")}
       </label>
       <Input
-        id="login-email"
-        type="email"
+        id="login-password"
+        type="password"
         required
-        value={email}
-        autoComplete="email"
-        onChange={(e) => setEmail(e.target.value)}
-        placeholder={t("emailPlaceholder")}
+        value={password}
+        autoComplete="current-password"
+        onChange={(e) => setPassword(e.target.value)}
+        placeholder={t("passwordPlaceholder")}
       />
       <Button
         type="submit"
         variant="primary"
         size="md"
-        disabled={status === "sending" || !email.trim()}
+        disabled={status === "sending" || !password}
       >
         {status === "sending" ? (
           <Loader2 size={14} className="animate-spin" aria-hidden />
         ) : null}
         {t("submit")}
       </Button>
-      {status === "error" ? (
+      {status === "error" && errorKey ? (
         <p
           role="alert"
           className="text-[12.5px] text-[var(--color-negative)]"
         >
-          {t("error")} {errorCode ? `— ${errorCode}` : null}
+          {t(errorKey === "invalid" ? "errors.invalid" : "errors.server")}
         </p>
       ) : null}
     </form>
