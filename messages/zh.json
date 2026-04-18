@@ -75,6 +75,7 @@
       "title": "迭代控制台",
       "subtitle": "Agent 会读取反馈并生成 Skill 改进草稿；没有反馈时不允许空跑",
       "start": "开始生成新草稿",
+      "running": "生成中……",
       "lines": {
         "boot": "启动 Claude Agent...",
         "loadFeedback": "加载反馈数据...",
@@ -86,19 +87,41 @@
         "working": "Agent 工作中...",
         "finishing": "Agent 执行完毕，生成结果...",
         "done": "迭代完成",
-        "versioned": "策略已更新为 {version}"
+        "versioned": "策略已更新为 v{version}",
+        "idle": "就绪，基于当前 v{version}",
+        "awaitingReview": "草稿已生成，请审核下方变更",
+        "applied": "已应用为 v{version}",
+        "rejected": "草稿已拒绝",
+        "failedLine": "Agent 失败：{detail}",
+        "refused": "反馈不足，拒绝迭代 ({count}/{min})"
       }
     },
     "diff": {
       "title": "变更预览",
       "apply": "确认应用",
       "cancel": "取消",
-      "toast": "策略已更新为 {version}, Worker 下次 enrich 将使用新策略。",
+      "applying": "应用中……",
+      "rejecting": "拒绝中……",
+      "empty": "暂无草稿。点击「开始生成新草稿」让 Agent 读取反馈并提议新版本。",
+      "toast": "策略已更新为 v{version}, Worker 下次 enrich 将使用新策略。",
       "close": "关闭"
+    },
+    "narrative": {
+      "changes": "具体修改",
+      "heldBack": "未做的事（刻意保持克制）"
+    },
+    "errors": {
+      "insufficientFeedback": "反馈不足（{count}/{min}），暂不能迭代",
+      "agentFailed": "Agent 执行失败",
+      "applyFailed": "应用失败",
+      "rejectFailed": "拒绝失败",
+      "generic": "操作失败，请稍后重试"
     },
     "versionHistory": {
       "title": "版本历史",
-      "count": "{count} 个版本"
+      "count": "{count} 个版本",
+      "empty": "尚无已提交版本",
+      "committedBy": "由 {who} 提交"
     }
   },
   "sources": {

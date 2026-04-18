@@ -1,24 +1,9 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { LocaleSwitcher } from "@/components/layout/locale-switcher";
 import { VersionPill } from "@/components/admin/version-pill";
-import { readFile } from "node:fs/promises";
-import path from "node:path";
+import { getActiveSkill } from "@/lib/policy/skill";
 
 export const dynamic = "force-dynamic";
-
-async function loadPolicy() {
-  try {
-    return await readFile(
-      path.join(
-        process.cwd(),
-        "modules/feed/runtime/policy/skills/editorial.skill.md",
-      ),
-      "utf8",
-    );
-  } catch {
-    return "editorial.skill.md not found.";
-  }
-}
 
 export default async function PolicyPage({
   params,
@@ -28,7 +13,14 @@ export default async function PolicyPage({
   const { locale } = await params;
   setRequestLocale(locale);
   const t = await getTranslations("admin.policy");
-  const policyBody = await loadPolicy();
+
+  let skill: Awaited<ReturnType<typeof getActiveSkill>> | null = null;
+  let error: string | null = null;
+  try {
+    skill = await getActiveSkill("editorial");
+  } catch (err) {
+    error = err instanceof Error ? err.message : String(err);
+  }
 
   return (
     <>
@@ -47,10 +39,10 @@ export default async function PolicyPage({
                 {t("subtitle")}
               </p>
             </div>
-            <VersionPill version="v3" />
+            {skill ? <VersionPill version={`v${skill.version}`} /> : null}
           </div>
           <pre className="surface-elevated overflow-x-auto p-6 font-mono text-[13px] leading-[1.7] text-[var(--color-fg-muted)] whitespace-pre-wrap">
-            {policyBody}
+            {skill?.content ?? error ?? "editorial.skill.md not found."}
           </pre>
         </div>
       </div>

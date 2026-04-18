@@ -89,8 +89,3 @@ export type DiffLine =
   | { kind: "context"; content: string }
   | { kind: "meta"; content: string };
 
-export type PolicyVersion = {
-  version: string; // v1, v2, v3
-  committedAt: string;
-  feedbackCount: number;
-};

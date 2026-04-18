@@ -75,6 +75,7 @@
       "title": "Iteration console",
       "subtitle": "The agent reads feedback and drafts a Skill update. It refuses to run when there is no feedback.",
       "start": "Start new draft",
+      "running": "Generating…",
       "lines": {
         "boot": "Booting Claude Agent…",
         "loadFeedback": "Loading feedback…",
@@ -86,19 +87,41 @@
         "working": "Agent working…",
         "finishing": "Agent finished, rendering result…",
         "done": "Iteration complete",
-        "versioned": "Policy updated to {version}"
+        "versioned": "Policy updated to v{version}",
+        "idle": "Ready, based on current v{version}",
+        "awaitingReview": "Draft ready — review the change preview below",
+        "applied": "Applied as v{version}",
+        "rejected": "Draft rejected",
+        "failedLine": "Agent failed: {detail}",
+        "refused": "Not enough feedback, refusing to iterate ({count}/{min})"
       }
     },
     "diff": {
       "title": "Change preview",
       "apply": "Apply",
-      "cancel": "Cancel",
-      "toast": "Policy updated to {version}. Next enrichment pass will use the new policy.",
+      "cancel": "Reject",
+      "applying": "Applying…",
+      "rejecting": "Rejecting…",
+      "empty": "No draft yet. Click \"Start new draft\" to have the agent read feedback and propose a new version.",
+      "toast": "Policy updated to v{version}. Next enrichment pass will use it.",
       "close": "Close"
+    },
+    "narrative": {
+      "changes": "What changed",
+      "heldBack": "What I held back (on purpose)"
+    },
+    "errors": {
+      "insufficientFeedback": "Not enough feedback ({count}/{min}) to iterate",
+      "agentFailed": "Agent run failed",
+      "applyFailed": "Failed to apply",
+      "rejectFailed": "Failed to reject",
+      "generic": "Operation failed, try again"
     },
     "versionHistory": {
       "title": "Version history",
-      "count": "{count} version{count, plural, one {} other {s}}"
+      "count": "{count} version{count, plural, one {} other {s}}",
+      "empty": "No committed versions yet",
+      "committedBy": "committed by {who}"
     }
   },
   "sources": {
