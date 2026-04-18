@@ -6,6 +6,7 @@
   },
   "nav": {
     "hotNews": "热点资讯",
+    "allPosts": "全部",
     "podcasts": "播客 / 视频",
     "lowFollower": "低粉爆文",
     "xMonitor": "X 监控",
@@ -23,6 +24,11 @@
     "zh": "中文",
     "en": "English"
   },
+  "allPosts": {
+    "title": "全部资讯",
+    "subtitle": "所有已评分的内容 · 本页 {count} 条",
+    "empty": "暂无匹配内容"
+  },
   "hotNews": {
     "title": "热点资讯",
     "subtitle": "精选 · AI 自动挑选的高价值内容 · 本页 {count} 条",
@@ -30,7 +36,6 @@
     "filter": "筛选",
     "tabs": {
       "featured": "精选",
-      "all": "全部",
       "p1": "P1"
     },
     "sourceFilter": {

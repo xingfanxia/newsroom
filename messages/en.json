@@ -6,6 +6,7 @@
   },
   "nav": {
     "hotNews": "Hot News",
+    "allPosts": "All",
     "podcasts": "Podcasts / Video",
     "lowFollower": "Low-follower Viral",
     "xMonitor": "X Monitor",
@@ -23,6 +24,11 @@
     "zh": "中文",
     "en": "English"
   },
+  "allPosts": {
+    "title": "All Posts",
+    "subtitle": "Every scored item — {count} on this page",
+    "empty": "No matching stories"
+  },
   "hotNews": {
     "title": "Hot News",
     "subtitle": "Featured · AI-curated high-value stories · {count} on this page",
@@ -30,7 +36,6 @@
     "filter": "Filter",
     "tabs": {
       "featured": "Featured",
-      "all": "All",
       "p1": "P1"
     },
     "sourceFilter": {
