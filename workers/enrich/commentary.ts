@@ -104,7 +104,11 @@ export async function runCommentaryBackfill(): Promise<CommentaryBackfillReport>
             ],
             schema: commentarySchema,
             schemaName: "EditorCommentary",
-            maxTokens: 3072,
+            // Strong material targets 800-1400 zh + 600-1100 en + 2 notes.
+            // Rough: 1400 zh ≈ 1500 tok, 1100 en ≈ 1400 tok, notes ≈ 200,
+            // plus JSON + reasoning overhead. Give headroom so the schema
+            // parser doesn't truncate mid-paragraph.
+            maxTokens: 6144,
           });
           const c: CommentaryOutput = result.data;
           await client
