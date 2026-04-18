@@ -149,68 +149,100 @@ export function IterationRunner(props: Props) {
 
   return (
     <>
-      <section className="surface-elevated p-6">
-        <header className="mb-3 flex items-center justify-between gap-3">
-          <div>
-            <h3 className="text-[18px] font-[590] tracking-tight text-[var(--color-fg)]">
-              {t("console.title")}
-            </h3>
-            <p className="mt-1 text-[13px] text-[var(--color-fg-dim)]">
-              {t("console.subtitle")}
-            </p>
-          </div>
-          <Button
-            variant="primary"
-            size="md"
+      <section className="panel">
+        <div className="hd">
+          <span className="t">{t("console.title")}</span>
+          <button
+            type="button"
+            className="act-btn primary"
             onClick={handleStart}
             disabled={!canStart || pending}
+            style={{ cursor: !canStart || pending ? "not-allowed" : "pointer" }}
           >
+            <span>{status === "running" || pending ? "◐" : "▶"}</span>
             {status === "running" || pending
               ? t("console.running")
               : t("console.start")}
-          </Button>
-        </header>
-        <AgentConsole lines={consoleLines} />
-        {props.reasoningSummary ? (
-          <p className="mt-4 whitespace-pre-wrap text-[13.5px] leading-[1.9] text-[var(--color-fg-muted)]">
-            {props.reasoningSummary}
+          </button>
+        </div>
+        <div className="bd" style={{ padding: 16 }}>
+          <p
+            style={{
+              fontSize: 11.5,
+              color: "var(--fg-3)",
+              marginBottom: 12,
+              lineHeight: 1.6,
+            }}
+          >
+            {t("console.subtitle")}
           </p>
-        ) : null}
+          <AgentConsole lines={consoleLines} />
+          {props.reasoningSummary && (
+            <p
+              style={{
+                marginTop: 14,
+                padding: 12,
+                background: "var(--bg-2)",
+                border: "1px solid var(--border-1)",
+                borderRadius: 2,
+                whiteSpace: "pre-wrap",
+                fontSize: 12.5,
+                lineHeight: 1.75,
+                color: "var(--fg-1)",
+              }}
+            >
+              {props.reasoningSummary}
+            </p>
+          )}
+        </div>
       </section>
 
-      <section className="surface-elevated p-6">
-        <header className="mb-3 flex items-center justify-between gap-3">
-          <h3 className="text-[18px] font-[590] tracking-tight text-[var(--color-fg)]">
-            {t("diff.title")}
-          </h3>
-          {showDiffSection ? (
-            <div className="flex gap-2">
-              <Button
-                variant="primary"
-                size="sm"
+      <section className="panel">
+        <div className="hd">
+          <span className="t">{t("diff.title")}</span>
+          {showDiffSection && (
+            <div style={{ display: "flex", gap: 6 }}>
+              <button
+                type="button"
+                className="act-btn primary"
                 onClick={handleApply}
                 disabled={pending}
+                style={{ cursor: pending ? "not-allowed" : "pointer" }}
               >
+                <span>✓</span>
                 {pending ? t("diff.applying") : t("diff.apply")}
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
+              </button>
+              <button
+                type="button"
+                className="act-btn"
                 onClick={handleReject}
                 disabled={pending}
+                style={{ cursor: pending ? "not-allowed" : "pointer" }}
               >
+                <span>✕</span>
                 {pending ? t("diff.rejecting") : t("diff.cancel")}
-              </Button>
+              </button>
             </div>
-          ) : null}
-        </header>
-        {showDiffSection && props.diff ? (
-          <DiffViewer lines={props.diff} />
-        ) : (
-          <p className="rounded-lg border border-[var(--color-border-subtle)] bg-black/20 px-5 py-6 text-[13px] text-[var(--color-fg-dim)]">
-            {t("diff.empty")}
-          </p>
-        )}
+          )}
+        </div>
+        <div className="bd" style={{ padding: 16 }}>
+          {showDiffSection && props.diff ? (
+            <DiffViewer lines={props.diff} />
+          ) : (
+            <p
+              style={{
+                padding: "22px 16px",
+                fontSize: 12.5,
+                color: "var(--fg-3)",
+                border: "1px dashed var(--border-1)",
+                borderRadius: 2,
+                textAlign: "center",
+              }}
+            >
+              {t("diff.empty")}
+            </p>
+          )}
+        </div>
       </section>
     </>
   );
