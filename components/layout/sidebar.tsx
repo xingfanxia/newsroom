@@ -82,6 +82,14 @@ export function Sidebar() {
       <div className="mt-auto">
         <button
           type="button"
+          onClick={async () => {
+            try {
+              await fetch("/api/admin/logout", { method: "POST" });
+            } finally {
+              // Hard reload so the proxy re-reads the (now-cleared) cookie.
+              window.location.assign("/");
+            }
+          }}
           className="flex h-9 w-full items-center gap-[10px] rounded-md px-3 text-[14px] font-[510] text-[var(--color-fg-muted)] hover:bg-white/[0.04] hover:text-[var(--color-fg)] transition-all"
         >
           <LogOut size={16} />
