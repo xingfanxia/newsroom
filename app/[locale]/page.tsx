@@ -1,7 +1,6 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { Search, SlidersHorizontal, Rss } from "lucide-react";
+import { Search, Rss } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { StoryCard } from "@/components/feed/story-card";
 import {
   TimelineEntry,
@@ -12,6 +11,10 @@ import { getFeaturedStories } from "@/lib/items/live";
 import { formatDateHeader } from "@/lib/utils";
 import type { Story } from "@/lib/types";
 import { HotNewsTabsClient } from "./_hot-news-tabs";
+import {
+  SourceFilterClient,
+  type SourcePreset,
+} from "./_source-filter";
 import { LocaleSwitcher } from "@/components/layout/locale-switcher";
 
 // ISR: serve from CDN cache, regenerate at most once per minute. Enrich cron
@@ -25,18 +28,58 @@ function coerceTier(v: string | undefined): Tier {
   return v === "all" || v === "p1" ? v : "featured";
 }
 
+const SOURCE_PRESETS = new Set<SourcePreset>([
+  "all",
+  "official",
+  "newsletter",
+  "media",
+  "x",
+  "research",
+]);
+
+function coerceSource(v: string | undefined): SourcePreset {
+  return v && SOURCE_PRESETS.has(v as SourcePreset)
+    ? (v as SourcePreset)
+    : "all";
+}
+
+/** Preset → (group, kind) filter. Presets are UX labels; the DB schema has
+ *  a richer (group × kind) space we don't expose directly. */
+function presetToFilter(
+  preset: SourcePreset,
+): { sourceGroup?: string; sourceKind?: string } {
+  switch (preset) {
+    case "official":
+      return { sourceGroup: "vendor-official" };
+    case "newsletter":
+      return { sourceGroup: "newsletter" };
+    case "media":
+      return { sourceGroup: "media" };
+    case "research":
+      return { sourceGroup: "research" };
+    case "x":
+      return { sourceKind: "x-api" };
+    case "all":
+    default:
+      return {};
+  }
+}
+
 export default async function HotNewsPage({
   params,
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ tier?: string }>;
+  searchParams: Promise<{ tier?: string; source?: string }>;
 }) {
   const [{ locale }, sp] = await Promise.all([params, searchParams]);
   setRequestLocale(locale);
   const t = await getTranslations("hotNews");
   const tabT = await getTranslations("hotNews.tabs");
+  const srcT = await getTranslations("hotNews.sourceFilter");
   const tier = coerceTier(sp.tier);
+  const sourcePreset = coerceSource(sp.source);
+  const sourceFilter = presetToFilter(sourcePreset);
 
   // Return exactly what the user asked for. Don't silently widen a tier that
   // came up empty — that would collapse P1 into All when the scorer hasn't
@@ -49,11 +92,20 @@ export default async function HotNewsPage({
       tier,
       locale: locale as "zh" | "en",
       limit: 40,
+      ...sourceFilter,
     });
   } catch {
     stories = [];
   }
-  if (stories.length === 0 && tier === "featured") {
+  // Fallback to mock ONLY when the user didn't apply a source filter AND the
+  // default (featured) view is completely empty — signals a cold start.
+  // When a filter is on, empty is the correct answer (don't show mock stories
+  // under e.g. ?source=x when the real X feed hasn't ingested yet).
+  if (
+    stories.length === 0 &&
+    tier === "featured" &&
+    sourcePreset === "all"
+  ) {
     try {
       const probe = await getFeaturedStories({
         tier: "all",
@@ -105,8 +157,11 @@ export default async function HotNewsPage({
             </div>
           </div>
 
-          <div className="mt-5 flex items-center gap-3 opacity-40 pointer-events-none" title="Coming soon">
-            <div className="relative flex-1 max-w-[680px]">
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            <div
+              className="relative flex-1 max-w-[680px] opacity-40 pointer-events-none"
+              title="Coming soon"
+            >
               <Search
                 size={15}
                 className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-fg-dim)]"
@@ -118,10 +173,17 @@ export default async function HotNewsPage({
                 disabled
               />
             </div>
-            <Button variant="primary" size="md" disabled>
-              <SlidersHorizontal size={14} />
-              <span>{t("filter")}</span>
-            </Button>
+            <SourceFilterClient
+              value={sourcePreset}
+              labels={{
+                all: srcT("all"),
+                official: srcT("official"),
+                newsletter: srcT("newsletter"),
+                media: srcT("media"),
+                x: srcT("x"),
+                research: srcT("research"),
+              }}
+            />
           </div>
         </div>
       </header>

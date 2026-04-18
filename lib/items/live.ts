@@ -12,6 +12,8 @@ export type FeedQuery = {
   limit?: number;
   /** Filter by source.group — e.g. "podcast" for the /podcasts page. */
   sourceGroup?: string;
+  /** Filter by source.kind — e.g. "x-api" for the /x-monitor page. */
+  sourceKind?: string;
   /** Include the story's source-group so UI can show format badges
    *  (podcast/vendor-official/media/…). Defaults to false for home feed. */
   includeSourceGroup?: boolean;
@@ -41,6 +43,9 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
 
   const groupFilter = q.sourceGroup
     ? sql`${sources.group} = ${q.sourceGroup}`
+    : sql`TRUE`;
+  const kindFilter = q.sourceKind
+    ? sql`${sources.kind} = ${q.sourceKind}`
     : sql`TRUE`;
 
   const rows = await client
@@ -82,6 +87,7 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
         tierFilter,
         dedupFilter,
         groupFilter,
+        kindFilter,
       ),
     )
     .orderBy(desc(items.publishedAt))
