@@ -33,6 +33,15 @@
       "all": "全部",
       "p1": "P1"
     },
+    "sourceFilter": {
+      "label": "来源",
+      "all": "全部来源",
+      "official": "官网",
+      "newsletter": "公众号",
+      "media": "媒体",
+      "x": "X",
+      "research": "研究"
+    },
     "empty": "暂无匹配结果"
   },
   "story": {
@@ -192,7 +201,8 @@
   },
   "xMonitor": {
     "title": "X 监控",
-    "subtitle": "追踪指定账号的实时发言 — 实验室、研究员、趋势捕手"
+    "subtitle": "追踪指定 X 账号的实时原文，共 {count} 条（已过滤转推/回复）",
+    "empty": "暂无 X 内容 — 下一轮 hourly cron 会拉取 7 个监控账号的最新发言"
   },
   "saved": {
     "title": "收藏",

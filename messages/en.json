@@ -33,6 +33,15 @@
       "all": "All",
       "p1": "P1"
     },
+    "sourceFilter": {
+      "label": "Source",
+      "all": "All sources",
+      "official": "Official",
+      "newsletter": "Newsletter",
+      "media": "Media",
+      "x": "X",
+      "research": "Research"
+    },
     "empty": "No matching stories"
   },
   "story": {
@@ -192,7 +201,8 @@
   },
   "xMonitor": {
     "title": "X Monitor",
-    "subtitle": "Realtime watchlist of labs, researchers, and trend spotters on X/Twitter."
+    "subtitle": "Original posts from watched X accounts — {count} on this page (retweets + replies filtered)",
+    "empty": "No X content yet — the next hourly cron tick will pull from the 7 watched accounts"
   },
   "saved": {
     "title": "Saved",
