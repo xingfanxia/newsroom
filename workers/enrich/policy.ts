@@ -1,29 +1,19 @@
-import { readFile } from "node:fs/promises";
-import path from "node:path";
-import { createHash } from "node:crypto";
-
-const POLICY_PATH = "modules/feed/runtime/policy/skills/editorial.skill.md";
+import { getActiveSkill } from "@/lib/policy/skill";
 
 type Policy = { content: string; version: string };
 
 let cached: Policy | null = null;
 
 /**
- * Load the editorial policy and compute a short version hash for cache keys.
- * The first 8 chars of SHA-256 are plenty to detect policy updates; collisions
- * here would just cause one unnecessary re-enrichment, not a correctness bug.
+ * Load the editorial policy for the scoring worker. Returns content plus an
+ * 8-char content hash used as the `items.policy_version` cache key — when the
+ * hash changes, workers re-enrich. Backed by `policy_versions` in the DB with
+ * a filesystem seed on first boot; see `lib/policy/skill.ts`.
  */
 export async function loadPolicy(): Promise<Policy> {
   if (cached) return cached;
-  const content = await readFile(
-    path.join(process.cwd(), POLICY_PATH),
-    "utf8",
-  );
-  const version = createHash("sha256")
-    .update(content)
-    .digest("hex")
-    .slice(0, 8);
-  cached = { content, version };
+  const skill = await getActiveSkill("editorial");
+  cached = { content: skill.content, version: skill.hash };
   return cached;
 }
 

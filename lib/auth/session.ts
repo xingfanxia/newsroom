@@ -41,9 +41,27 @@ export class UnauthorizedError extends Error {
   }
 }
 
+export class ForbiddenError extends Error {
+  constructor(message = "admin required") {
+    super(message);
+    this.name = "ForbiddenError";
+  }
+}
+
 export async function requireUser(): Promise<SessionUser> {
   const user = await getSessionUser();
   if (!user) throw new UnauthorizedError();
+  return user;
+}
+
+/**
+ * Require a signed-in admin. Throws UnauthorizedError when no session,
+ * ForbiddenError when the email isn't on ALLOWED_ADMIN_EMAILS. Both are
+ * intended to be caught at the route handler boundary and mapped to 401/403.
+ */
+export async function requireAdmin(): Promise<SessionUser> {
+  const user = await requireUser();
+  if (!user.isAdmin) throw new ForbiddenError();
   return user;
 }
 

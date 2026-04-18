@@ -119,6 +119,14 @@ export const userRoleEnum = pgEnum("user_role", ["admin", "editor", "reader"]);
  *  `save` is an independent bookmark slot that can coexist with either. */
 export const feedbackVoteEnum = pgEnum("feedback_vote", ["up", "down", "save"]);
 
+export const iterationStatusEnum = pgEnum("iteration_status", [
+  "running",
+  "proposed",
+  "applied",
+  "rejected",
+  "failed",
+]);
+
 // ── Tables ──────────────────────────────────────────────────────
 
 export const sources = pgTable(
@@ -433,6 +441,85 @@ export const feedback = pgTable(
   }),
 );
 
+/**
+ * policy_versions — committed history of each agent-maintained skill file
+ * (editorial, and whatever we add later). `version` is monotonic per skill.
+ * v1 is seeded from `modules/feed/runtime/policy/skills/<name>.skill.md`
+ * on first boot so workers never see an empty table. Subsequent versions
+ * come from the M4 iteration agent.
+ *
+ * Runtime reads the latest row via lib/policy/skill.ts.
+ */
+export const policyVersions = pgTable(
+  "policy_versions",
+  {
+    id: serial("id").primaryKey(),
+    skillName: text("skill_name").notNull(),
+    version: integer("version").notNull(),
+    content: text("content").notNull(),
+    /** Agent's reasoning summary for this revision; null for the v1 seed. */
+    reasoning: text("reasoning"),
+    /** Array of {id, verdict, title, note, createdAt} the agent saw. */
+    feedbackSample: jsonb("feedback_sample"),
+    feedbackCount: integer("feedback_count").notNull().default(0),
+    /** Admin email, or 'system' for the v1 seed. */
+    committedBy: text("committed_by"),
+    committedAt: timestamp("committed_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    uniqVersion: uniqueIndex("policy_versions_skill_version_idx").on(
+      t.skillName,
+      t.version,
+    ),
+    latestIdx: index("policy_versions_latest_idx").on(
+      t.skillName,
+      t.committedAt,
+    ),
+  }),
+);
+
+/**
+ * iteration_runs — agent proposals in flight or awaiting admin decision.
+ * `proposed` = waiting for admin apply/reject; `applied` = merged into
+ * policy_versions; `rejected` / `failed` = terminal, kept for audit.
+ *
+ * Only ONE run per skill should be `proposed` at a time (the UI enforces
+ * this at the API layer; no DB constraint because retries/historical
+ * rejects also sit here).
+ */
+export const iterationRuns = pgTable(
+  "iteration_runs",
+  {
+    id: serial("id").primaryKey(),
+    skillName: text("skill_name").notNull(),
+    status: iterationStatusEnum("status").notNull(),
+    /** Version this iteration was based on (the one in production when
+     *  the agent started). Null means no prior version existed. */
+    baseVersion: integer("base_version"),
+    /** Full proposed skill content. Null while status='running' or failed. */
+    proposedContent: text("proposed_content"),
+    /** Short ≤2000-char summary of what the agent changed and why. */
+    reasoningSummary: text("reasoning_summary"),
+    /** Raw structured agent output (full reasoning, didNotChange notes). */
+    agentOutput: jsonb("agent_output"),
+    feedbackSample: jsonb("feedback_sample"),
+    feedbackCount: integer("feedback_count").notNull().default(0),
+    error: text("error"),
+    /** Admin email that kicked this off. */
+    requestedBy: text("requested_by").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (t) => ({
+    statusIdx: index("iteration_runs_status_idx").on(t.skillName, t.status),
+    recentIdx: index("iteration_runs_recent_idx").on(t.createdAt),
+  }),
+);
+
 // ── Types ───────────────────────────────────────────────────────
 export type Source = typeof sources.$inferSelect;
 export type NewSource = typeof sources.$inferInsert;
@@ -452,5 +539,9 @@ export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Feedback = typeof feedback.$inferSelect;
 export type NewFeedback = typeof feedback.$inferInsert;
+export type PolicyVersion = typeof policyVersions.$inferSelect;
+export type NewPolicyVersion = typeof policyVersions.$inferInsert;
+export type IterationRun = typeof iterationRuns.$inferSelect;
+export type NewIterationRun = typeof iterationRuns.$inferInsert;
 
 export type { TSourceKind, TSourceGroup, TCadence };
