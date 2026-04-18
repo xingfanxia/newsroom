@@ -45,6 +45,9 @@ const MAX_PER_RUN = hasValidKey ? 300 : 20;
 // that the youtube-transcript worker should own. Shorts URLs (youtube.com/
 // shorts/<id>) parse to youtube.com host, so this catches them naturally.
 const YT_HOST_RE = /(^|\.)youtube\.com$|(^|\.)youtu\.be$/i;
+// X.com / twitter.com tweets are skipped via SQL LIKE in the pending query —
+// the x-api adapter already writes full tweet text to items.body, so Jina
+// would be both redundant and futile (X blocks unauthed scrapers).
 
 export type ArticleBodyReport = {
   candidates: number;
@@ -85,6 +88,10 @@ export async function runArticleBodyFetch(): Promise<ArticleBodyReport> {
         sql`${items.canonicalUrl} NOT LIKE '%youtube.com/watch%'`,
         sql`${items.canonicalUrl} NOT LIKE '%youtu.be/%'`,
         sql`${items.canonicalUrl} NOT LIKE '%youtube.com/shorts/%'`,
+        // Tweets: the x-api adapter ingests full tweet text directly into
+        // items.body, and Jina can't scrape X anyway (auth wall). Skip.
+        sql`${items.canonicalUrl} NOT LIKE '%x.com/%/status/%'`,
+        sql`${items.canonicalUrl} NOT LIKE '%twitter.com/%/status/%'`,
       ),
     )
     .orderBy(tierRank, desc(items.publishedAt))

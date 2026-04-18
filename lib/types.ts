@@ -1,6 +1,12 @@
 export type Locale = "zh" | "en";
 
-export type SourceKind = "rss" | "atom" | "api" | "rsshub" | "scrape";
+export type SourceKind =
+  | "rss"
+  | "atom"
+  | "api"
+  | "rsshub"
+  | "scrape"
+  | "x-api";
 export type SourceGroup =
   | "vendor-official"
   | "media"

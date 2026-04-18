@@ -81,6 +81,7 @@ export const sourceKindEnum = pgEnum("source_kind", [
   "api",
   "rsshub",
   "scrape",
+  "x-api",
 ]);
 
 export const sourceGroupEnum = pgEnum("source_group", [
@@ -167,6 +168,11 @@ export const sourceHealth = pgTable("source_health", {
   consecutiveFailures: integer("consecutive_failures").notNull().default(0),
   lastItemsCount: integer("last_items_count").notNull().default(0),
   totalItemsCount: integer("total_items_count").notNull().default(0),
+  /** Newest external ID we've seen for this source (e.g. tweet ID). Used by
+   *  the x-api adapter as `since_id` so each cron tick only pays for fresh
+   *  tweets. Other adapters (RSS/atom/scrape) ignore this — their dedup runs
+   *  via raw_items unique(source, external). */
+  lastExternalId: text("last_external_id"),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

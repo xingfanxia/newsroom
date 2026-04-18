@@ -5,12 +5,17 @@ import { sources, rawItems, sourceHealth } from "@/db/schema";
 import type { Source } from "@/db/schema";
 import { fetchWithRetry, type FetchErrorCode } from "./http";
 import { parseFeed, type FeedItem } from "./rss";
+import {
+  fetchTimelineForHandle,
+  handleFromUrl,
+  XApiError,
+} from "./x-api";
 
 const CONCURRENCY = 8;
 
-// Kinds we can fetch in M1. Other kinds are kept in the catalog but skipped
+// Kinds we can fetch. Other kinds are kept in the catalog but skipped
 // (pending implementation) so they appear in source_health without polluting errors.
-const SUPPORTED_KINDS = ["rss", "atom", "rsshub"] as const;
+const SUPPORTED_KINDS = ["rss", "atom", "rsshub", "x-api"] as const;
 type SupportedKind = (typeof SUPPORTED_KINDS)[number];
 function isSupported(k: string): k is SupportedKind {
   return (SUPPORTED_KINDS as readonly string[]).includes(k);
@@ -109,20 +114,69 @@ async function fetchOneSource(source: Source): Promise<Outcome> {
     return { kind: "pending" };
   }
 
-  // Supported kinds all parse as XML feeds for now.
-  const url = resolveSourceUrl(source);
-  const res = await fetchWithRetry<string>(url);
-  if (!res.ok) {
-    await markError(source.id, res.error, res.error);
-    return { kind: "error", code: res.error, detail: res.error };
-  }
-
   let feedItems: FeedItem[];
-  try {
-    feedItems = parseFeed(res.data);
-  } catch {
-    await markError(source.id, "parse_error", "parse_error");
-    return { kind: "error", code: "parse_error", detail: "parse_error" };
+  let newestExternalId: string | null = null;
+
+  if (source.kind === "x-api") {
+    // Twitter path — Bearer-auth, JSON, cursor-based incremental via since_id.
+    let handle: string;
+    try {
+      handle = handleFromUrl(source.url);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      await markError(source.id, "parse_error", msg);
+      return { kind: "error", code: "parse_error", detail: msg };
+    }
+    const existingHealth = await client
+      .select({ lastExternalId: sourceHealth.lastExternalId })
+      .from(sourceHealth)
+      .where(eq(sourceHealth.sourceId, source.id))
+      .limit(1);
+    const sinceId = existingHealth[0]?.lastExternalId ?? null;
+
+    try {
+      const timeline = await fetchTimelineForHandle({
+        handle,
+        sinceId,
+        maxResults: 20,
+      });
+      feedItems = timeline.items;
+      newestExternalId = timeline.newestId;
+    } catch (err) {
+      if (err instanceof XApiError) {
+        // Map XApiError → FetchErrorCode. We squash 401/403/404/429 all into
+        // http_4xx because source_health only cares about severity, not status.
+        const code: FetchErrorCode =
+          err.code === "auth" ||
+          err.code === "not_found" ||
+          err.code === "rate_limited"
+            ? "http_4xx"
+            : err.code === "network"
+              ? "network"
+              : err.code === "parse_error"
+                ? "parse_error"
+                : "http_5xx";
+        await markError(source.id, code, err.message);
+        return { kind: "error", code, detail: err.message };
+      }
+      const msg = err instanceof Error ? err.message : String(err);
+      await markError(source.id, "network", msg);
+      return { kind: "error", code: "network", detail: msg };
+    }
+  } else {
+    // Feed kinds (rss / atom / rsshub) — fetch XML, parse into FeedItems.
+    const url = resolveSourceUrl(source);
+    const res = await fetchWithRetry<string>(url);
+    if (!res.ok) {
+      await markError(source.id, res.error, res.error);
+      return { kind: "error", code: res.error, detail: res.error };
+    }
+    try {
+      feedItems = parseFeed(res.data);
+    } catch {
+      await markError(source.id, "parse_error", "parse_error");
+      return { kind: "error", code: "parse_error", detail: "parse_error" };
+    }
   }
 
   // Insert raw rows (dedup by unique index on (source_id, external_id))
@@ -146,7 +200,7 @@ async function fetchOneSource(source: Source): Promise<Outcome> {
     inserted = result.length;
   }
 
-  await markOk(source.id, feedItems.length, inserted);
+  await markOk(source.id, feedItems.length, inserted, newestExternalId);
   return { kind: "ok", newItems: inserted };
 }
 
@@ -154,31 +208,40 @@ async function markOk(
   sourceId: string,
   seenCount: number,
   insertedCount: number,
+  newestExternalId: string | null = null,
 ) {
   const client = db();
+  const now = new Date();
+  // Only bump lastExternalId when the adapter actually observed newer items.
+  // An empty tick (since_id caught up) leaves the cursor alone.
+  const cursorUpdate = newestExternalId
+    ? { lastExternalId: newestExternalId }
+    : {};
   await client
     .insert(sourceHealth)
     .values({
       sourceId,
       status: "ok",
-      lastFetchedAt: new Date(),
-      lastSuccessAt: new Date(),
+      lastFetchedAt: now,
+      lastSuccessAt: now,
       lastError: null,
       consecutiveFailures: 0,
       lastItemsCount: seenCount,
       totalItemsCount: insertedCount,
+      lastExternalId: newestExternalId,
     })
     .onConflictDoUpdate({
       target: sourceHealth.sourceId,
       set: {
         status: "ok",
-        lastFetchedAt: new Date(),
-        lastSuccessAt: new Date(),
+        lastFetchedAt: now,
+        lastSuccessAt: now,
         lastError: null,
         consecutiveFailures: 0,
         lastItemsCount: seenCount,
         totalItemsCount: sql`${sourceHealth.totalItemsCount} + ${insertedCount}`,
-        updatedAt: new Date(),
+        updatedAt: now,
+        ...cursorUpdate,
       },
     });
 }
