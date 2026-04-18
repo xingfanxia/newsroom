@@ -3,13 +3,15 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
 import { PillTabs } from "@/components/ui/tabs";
 
-type Tier = "featured" | "all" | "p1";
+/** Hot News' tier filter. "all" is now its own sidebar route (/all) — this
+ *  view focuses on the curated subsets. */
+type Tier = "featured" | "p1";
 
 export function HotNewsTabsClient({
   labels,
   tier,
 }: {
-  labels: { featured: string; all: string; p1: string };
+  labels: { featured: string; p1: string };
   tier: Tier;
 }) {
   const router = useRouter();
@@ -35,7 +37,6 @@ export function HotNewsTabsClient({
       <PillTabs
         items={[
           { value: "featured", label: labels.featured },
-          { value: "all", label: labels.all },
           { value: "p1", label: labels.p1 },
         ]}
         value={tier}

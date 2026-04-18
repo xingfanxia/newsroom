@@ -1,5 +1,4 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { redirect } from "next/navigation";
 import { Search, Rss } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { StoryCard } from "@/components/feed/story-card";
@@ -7,27 +6,18 @@ import {
   TimelineEntry,
   TimelineSection,
 } from "@/components/feed/timeline-rail";
-import { mockStories } from "@/lib/mock/stories";
 import { getFeaturedStories } from "@/lib/items/live";
 import { formatDateHeader } from "@/lib/utils";
 import type { Story } from "@/lib/types";
-import { HotNewsTabsClient } from "./_hot-news-tabs";
 import {
   SourceFilterClient,
   type SourcePreset,
-} from "./_source-filter";
+} from "../_source-filter";
 import { LocaleSwitcher } from "@/components/layout/locale-switcher";
 
-// ISR: serve from CDN cache, regenerate at most once per minute. Enrich cron
-// runs every 15 min so 60s staleness is imperceptible and drops DB roundtrips
-// on the home page by ~99%.
+// Same revalidation as Hot News — both views read from the same enriched pool
+// and the enrich cron runs every 15 min.
 export const revalidate = 60;
-
-type Tier = "featured" | "p1";
-
-function coerceTier(v: string | undefined): Tier {
-  return v === "p1" ? v : "featured";
-}
 
 const SOURCE_PRESETS = new Set<SourcePreset>([
   "all",
@@ -44,8 +34,6 @@ function coerceSource(v: string | undefined): SourcePreset {
     : "all";
 }
 
-/** Preset → (group, kind) filter. Presets are UX labels; the DB schema has
- *  a richer (group × kind) space we don't expose directly. */
 function presetToFilter(
   preset: SourcePreset,
 ): { sourceGroup?: string; sourceKind?: string } {
@@ -66,65 +54,31 @@ function presetToFilter(
   }
 }
 
-export default async function HotNewsPage({
+export default async function AllPostsPage({
   params,
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ tier?: string; source?: string }>;
+  searchParams: Promise<{ source?: string }>;
 }) {
   const [{ locale }, sp] = await Promise.all([params, searchParams]);
-  // Legacy bookmarks: `/?tier=all` used to be the All Posts view. Now it's
-  // its own sidebar route — 307 so old links keep working.
-  if (sp.tier === "all") {
-    const qs = new URLSearchParams();
-    if (sp.source) qs.set("source", sp.source);
-    const search = qs.toString();
-    redirect(`/${locale}/all${search ? `?${search}` : ""}`);
-  }
   setRequestLocale(locale);
-  const t = await getTranslations("hotNews");
-  const tabT = await getTranslations("hotNews.tabs");
+  const t = await getTranslations("allPosts");
   const srcT = await getTranslations("hotNews.sourceFilter");
-  const tier = coerceTier(sp.tier);
+  const searchT = await getTranslations("hotNews");
   const sourcePreset = coerceSource(sp.source);
   const sourceFilter = presetToFilter(sourcePreset);
 
-  // Return exactly what the user asked for. Don't silently widen a tier that
-  // came up empty — that would collapse P1 into All when the scorer hasn't
-  // produced any p1-tier items (the user would see identical lists).
-  // Only fall back to mock when tier=featured AND there's no featured content
-  // at all, which signals a cold start before the first enrich pass.
   let stories: Story[] = [];
   try {
     stories = await getFeaturedStories({
-      tier,
+      tier: "all",
       locale: locale as "zh" | "en",
-      limit: 40,
+      limit: 80,
       ...sourceFilter,
     });
   } catch {
     stories = [];
-  }
-  // Fallback to mock ONLY when the user didn't apply a source filter AND the
-  // default (featured) view is completely empty — signals a cold start.
-  // When a filter is on, empty is the correct answer (don't show mock stories
-  // under e.g. ?source=x when the real X feed hasn't ingested yet).
-  if (
-    stories.length === 0 &&
-    tier === "featured" &&
-    sourcePreset === "all"
-  ) {
-    try {
-      const probe = await getFeaturedStories({
-        tier: "all",
-        locale: locale as "zh" | "en",
-        limit: 1,
-      });
-      if (probe.length === 0) stories = mockStories;
-    } catch {
-      stories = mockStories;
-    }
   }
 
   const grouped = groupByDay(stories);
@@ -144,13 +98,6 @@ export default async function HotNewsPage({
             </div>
 
             <div className="flex items-center gap-3 shrink-0">
-              <HotNewsTabsClient
-                tier={tier}
-                labels={{
-                  featured: tabT("featured"),
-                  p1: tabT("p1"),
-                }}
-              />
               <a
                 href={`/api/feed/${locale}/rss.xml`}
                 title="Subscribe via RSS"
@@ -175,9 +122,9 @@ export default async function HotNewsPage({
                 className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-fg-dim)]"
               />
               <Input
-                placeholder={t("search")}
+                placeholder={searchT("search")}
                 className="h-10 pl-9"
-                aria-label={t("search")}
+                aria-label={searchT("search")}
                 disabled
               />
             </div>
@@ -198,28 +145,34 @@ export default async function HotNewsPage({
 
       <div className="px-8 py-10">
         <div className="mx-auto flex max-w-[1200px] flex-col gap-12">
-          {Object.entries(grouped).map(([dayKey, stories]) => {
-            const day = new Date(dayKey);
-            return (
-              <TimelineSection
-                key={dayKey}
-                label={formatDateHeader(day, locale as "zh" | "en")}
-              >
-                {stories.map((s) => (
-                  <TimelineEntry key={s.id} date={new Date(s.publishedAt)}>
-                    <StoryCard story={s} />
-                  </TimelineEntry>
-                ))}
-              </TimelineSection>
-            );
-          })}
+          {stories.length === 0 ? (
+            <p className="py-16 text-center text-[14px] text-[var(--color-fg-dim)]">
+              {t("empty")}
+            </p>
+          ) : (
+            Object.entries(grouped).map(([dayKey, list]) => {
+              const day = new Date(dayKey);
+              return (
+                <TimelineSection
+                  key={dayKey}
+                  label={formatDateHeader(day, locale as "zh" | "en")}
+                >
+                  {list.map((s) => (
+                    <TimelineEntry key={s.id} date={new Date(s.publishedAt)}>
+                      <StoryCard story={s} />
+                    </TimelineEntry>
+                  ))}
+                </TimelineSection>
+              );
+            })
+          )}
         </div>
       </div>
     </>
   );
 }
 
-function groupByDay(stories: Story[]) {
+function groupByDay(stories: Story[]): Record<string, Story[]> {
   const sorted = [...stories].sort(
     (a, b) =>
       new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
