@@ -1,17 +1,121 @@
-# AX's AI RADAR — Session Handoff (2026-04-17, Session 4 complete)
+# AX's AI RADAR — Session Handoff (2026-04-18, Session 5 complete)
 
-> Read this first before resuming. Session 1 = M0–M2 shell/ingest/enrich. Session 2 = RSS + commentary + newsletter + i18n + cost. Session 3 = perf + HKR + bilingual reasoning. **Session 4 (today) = Jina body fetch + 晚点-tone prompts + per-axis HKR + concurrency fan-out + YouTube transcripts + /podcasts UI.** M3 + M4 pending.
+> Read this first before resuming. Sessions 1-3 = M0-M2 + RSS/commentary/newsletter/i18n/cost/perf/HKR/bilingual. **Session 4** = Jina body fetch + 晚点 prompts + per-axis HKR + concurrency fan-out + YouTube transcripts + `/podcasts` UI. **Session 5 (today) = M3 auth+feedback+admin-gate MERGED · podcast detail page with transcript+deep-take MERGED · Vercel cron UNBRICKED (CRON_SECRET was never set, crons 500-ing since M1) · commentary prompt rewritten twice for depth · 160 curated items regenerated.** Only M4 pending.
 
 ---
 
 ## TL;DR
 
-- **Live**: https://newsroom-orpin.vercel.app (also `news.ax0x.ai`) · **new**: `/podcasts` page
-- **Repo**: https://github.com/xingfanxia/newsroom
+- **Live**: https://news.ax0x.ai · **new**: `/[locale]/podcasts/[id]` detail pages with YouTube embed + deep take + transcript
+- **Repo**: https://github.com/xingfanxia/newsroom — **4 PRs merged in s5** (#1 M3 · #2 podcast-detail · #3 commentary-tone-v1 · #4 commentary-depth-v2)
 - **Brand**: AX's AI RADAR / AX 的 AI 雷达 (cyan on dark observatory)
-- **Done through s4**: M0 shell · M1 ingest · M2 enrich/cluster · RSS/commentary/newsletter/i18n/cost · perf/HKR/bilingual reasoning · **full article bodies via Jina · YouTube transcripts · 晚点-tone editorial voice · per-axis HKR tooltips · 10-20x concurrency · /podcasts page · 65 sources**
-- **Pending**: **M3 auth + feedback** (`/big-task`) · **M4 editorial agent** (`/mtc`) · auth-gated admin (#45)
-- **Data state end of s4**: 199/2822 items enriched · 39 curated (featured 16 + p1 13 + all 10) · 160 excluded · 101 podcast items queued (14 enriched, rest draining via cron over next ~7h)
+- **Done through s5**: everything above + **Supabase Auth + feedback capture + admin gate + podcast detail + react-markdown renderer + cron actually running for the first time ever + commentary has judgment+outside-context+pushback (not just fact-recap)**
+- **Pending**: **M4 editorial agent** (`/mtc`, task #37) · key rotation (OpenAI/Anthropic/Gemini/Azure/JINA from ss3-4)
+- **Data state end of s5**: ~300/2822 enriched (cron draining at ~280/hr — scheduled cron was 0/hr before the CRON_SECRET fix; all prior drain was local scripts) · **160 curated items with depth-rewrite commentary** · 5 podcasts with full transcripts+analyses on `/[locale]/podcasts/[id]`
+
+---
+
+## Session 5 shipped (2026-04-17→18 — 4 PRs + 1 ops fix)
+
+### PR #1 — M3: feedback + Supabase auth + admin gate (merged via squash)
+
+5-phase tier-4 big-task. Closes #36 + #45.
+
+**Schema:** `users` + `feedback` tables + `user_role` / `feedback_vote` enums; unique `(item, user, vote)` toggle index; FK cascades. Applied via `db:push --force` + HNSW rebuild.
+
+**Auth:** `@supabase/ssr@0.10.2` + `@supabase/supabase-js@2.103.3`. `lib/auth/{config,session}.ts` + `lib/auth/supabase/{server,client,proxy}.ts`. `/login` magic-link + `/api/auth/callback` with sanitised `?next=` (blocks open-redirect via `//` or `/api`).
+
+**Feedback API:** `POST /api/feedback` with zod body (itemId, vote, on, optional note), 401 when unauth, upserts app-user row on first vote. `lib/feedback/toggle.ts` transaction-safe up/down mutual exclusion; save independent.
+
+**UI wiring:** `components/feed/feedback-controls.tsx` rewritten — optimistic toggle mirrors server mutual-exclusion, rollback on error, sonner toast on 401 with "Sign in to vote" action routing to `/login?next=<current>`. `layout.tsx` mounts `<Toaster />`.
+
+**Admin metrics:** `lib/feedback/metrics.ts` → `getFeedbackCounts()` (up/down/save GROUP BY) + `getRecentFeedback(locale)` (items join for locale-aware titles). `/admin/iterations` drops `mockFeedback` entirely.
+
+**Admin gate:** `lib/auth/admin-gate.ts` pure `decideAdminGate({pathname, user})` returns `allow | redirect` — unit-testable. `proxy.ts` composed with next-intl: `/[locale]/admin/*` pre-filtered via regex, only then hits Supabase (keeps public feed fast). Cookie rotation merged into both redirect + pass-through. `/403` page surfaces signed-in email. `ALLOWED_ADMIN_EMAILS` fails closed to `xingfanxia@gmail.com`.
+
+**Tests:** 36 new (82 total, 0 failing).
+
+### PR #2 — podcast detail page
+
+Shareable `/[locale]/podcasts/[id]`. Rebased onto M3 main (package.json + bun.lock conflicts resolved, both dep sets kept).
+
+- `lib/items/detail.ts` — `getItemDetail(id, locale)` one-item join with `body_md` + `body_fetched_at`
+- `components/markdown/prose.tsx` — single `<Prose>` wrapping `react-markdown@10` with design-system tokens (reusable for M4 newsletter + agent output)
+- `components/podcasts/transcript.tsx` — client-side collapsible (default closed, max-h 640 scroll)
+- `components/podcasts/youtube-embed.tsx` + `extractYouTubeId` — handles `/watch?v=`, `youtu.be/`, `/shorts/`, `/embed/`, `m.youtube.com`. **10 unit tests.**
+- `story-card.tsx` +9 lines: conditional "深度解读 + 字幕 →" link only when `source.group === 'podcast'`
+- Deps: `react-markdown@10.1.0` + `remark-gfm@4.0.1` (~45KB gzipped, detail route only)
+
+### Ops fix — Vercel CRON_SECRET (direct to main, `1e05077`)
+
+**Root cause:** `app/api/cron/_auth.ts` returns 500 `{"error":"cron_secret_unset"}` when `CRON_SECRET` is unset in non-dev. That env var was **never added** to any Vercel environment. **All scheduled crons have been 500-ing silently since M1 shipped (commit `2b68eea`, Dec 2025.)** Every "backfill progress" attributed to cron was actually interactive `bun scripts/ops/run-cron.ts` runs from local shell.
+
+**Fix:** `openssl rand -hex 32` → `vercel env add CRON_SECRET {production,preview,development}` → empty commit to trigger redeploy (Vercel bakes env at deploy time). No code change.
+
+**Confirmed:** `/api/cron/normalize` → 200; 888 LLM calls + 47 items enriched in 10 min; sustained ~280/hr matching original estimate.
+
+**Memory:** `feedback_cron_secret_gotcha.md` added.
+
+### PR #3 — commentary tone v1 (drop structural prescriptions)
+
+**Problem:** session 4's "晚点-tone rewrite" turned structural rules into new clichés — `真正值得盯的是 X` / `真正 X 是 Y, 不是 Z` / `接下来 30 天先盯` / `过去 3 个月` / mandatory `## 判断式小标题` / numbered signal endings appeared in every output.
+
+**Fix:** banned those 10+ phrases, dropped mandatory section headings, added inline zh `<before>/<after>` example, default 300-600 字, first-person allowed.
+
+**Result:** regenerated 142 items in 104 s, 0 errors. Templates gone. **But shallow** — model read "tell a friend what you noticed" as "recite the article's facts".
+
+### PR #4 — commentary tone v2 (demand depth)
+
+**Problem:** v1 output was 400-600 字 of fact-paraphrase with no thesis, no outside context, no pushback.
+
+**Fix — three mandatory moves for strong material:**
+1. **First paragraph = judgment**, not recap. Prompt contrasts `"Anthropic 发布 X, 价格维持 Y..."` (bad) with `"Anthropic 这次很克制..."` (good).
+2. **One outside-article comparison** from training knowledge — specific competitors / prior launches / historical parallels / prior earnings commentary / related research papers. With uncertainty hedges (`"I'm not 100% sure but..."`); never invent.
+3. **One pushback** against the article/narrative/source. `"正文没给 X"` is stenography, not pushback — demand `"I have doubts because..."`.
+
+Plus:
+- Length 800-1400 zh / 600-1000 en default — `"length follows depth, material 撑得住就写长"`
+- `editorNote` ≤200 chars with explicit "must have a stance"
+- Full `<before>/<after>` example at 1100+ 字, with annotations under `<after>` calling out exactly what made it work
+- `commentary.ts` `maxTokens: 3072 → 6144` (schema truncation fix)
+
+**Regenerated all 160 curated items in 378 s, 0 errors.** Huang Moat sample (1300 字): opens `"我最买账的一半是供给控制，最不买账的一半是电子到token那套诗意包装"`, cites AMD MI300 / Google TPU / AWS Trainium / Cursor rules from training, pushes back with `"只有 Nvidia 能做这句我不买"`.
+
+**Memory:** `feedback_prompt_prescription_vs_demonstration.md` added — **the `<before>/<after>` block in `workers/enrich/prompt.ts` is load-bearing**. Don't cut it in future refactors without replacing with equivalent demonstration.
+
+---
+
+## Session 6 resume guide
+
+Only **one** task pending: `/mtc` for M4 editorial agent (task #37).
+
+**The agent should:**
+- Read feedback rows (`lib/feedback/metrics.ts` has `getFeedbackCounts()` + `getRecentFeedback(locale)` already)
+- Load current `editorial.skill.md` (the curation policy read by the scorer)
+- Propose a new version via structured LLM call (profiles.agent — pro + xhigh)
+- Show diff + version history on `/admin/iterations` (agent-console + diff-viewer UI components already exist, currently wired to mocks)
+- Commit new version atomically; old version recoverable via git
+
+Everything else is shipped:
+- M3 auth + feedback + admin gate — live
+- Podcast detail + transcripts — live
+- Cron is actually running — backlog draining at ~280/hr (should fully clear in ~9h)
+- Commentary has depth, outside context, pushback
+
+**Before session 6 ends:** rotate OpenAI / Anthropic / Gemini / Azure / JINA keys. Still in chat history from sessions 3-4.
+
+**Pre-flight:**
+```
+cd ~/projects/portfolio/newsroom
+vercel env pull .env.local --yes
+bun install && bun test && bun run build
+bun run db:ping
+```
+
+**Watch-outs:**
+- **Commentary regression?** Check the `<before>/<after>` example in `workers/enrich/prompt.ts`. That's the load-bearing piece. Don't cut in refactors.
+- **Cron seems broken?** Query `llm_usage` for last 15 min first; cron IS working now, the first instinct shouldn't be "it broke again".
+- **Azure reasoning throttle** (high ≈ 6-7/min) still binds — see `feedback_azure_reasoning_throttle.md`.
 
 ---
 
