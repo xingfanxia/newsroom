@@ -1,7 +1,9 @@
-import { getTranslations, setRequestLocale } from "next-intl/server";
-import { LocaleSwitcher } from "@/components/layout/locale-switcher";
+import { setRequestLocale } from "next-intl/server";
+import { ViewShell } from "@/components/shell/view-shell";
+import { PageHead } from "@/components/shell/page-head";
 import { VersionPill } from "@/components/admin/version-pill";
 import { getActiveSkill } from "@/lib/policy/skill";
+import { getRadarStats } from "@/lib/shell/dashboard-stats";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +14,6 @@ export default async function PolicyPage({
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
-  const t = await getTranslations("admin.policy");
 
   let skill: Awaited<ReturnType<typeof getActiveSkill>> | null = null;
   let error: string | null = null;
@@ -21,31 +22,43 @@ export default async function PolicyPage({
   } catch (err) {
     error = err instanceof Error ? err.message : String(err);
   }
+  const stats = await getRadarStats().catch(() => ({
+    items_today: 0,
+    items_p1: 0,
+    items_featured: 0,
+    tracked_sources: 0,
+  }));
 
   return (
-    <>
-      <header className="sticky top-0 z-20 flex items-center justify-between gap-4 border-b border-[var(--color-border-subtle)] bg-[var(--color-canvas)]/80 px-8 py-3.5 backdrop-blur-md">
-        <h1 className="text-[15px] font-[510]">{t("title")}</h1>
-        <LocaleSwitcher />
-      </header>
-      <div className="px-8 py-8">
-        <div className="mx-auto flex max-w-[1200px] flex-col gap-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-[24px] font-[590] tracking-[-0.288px] text-[var(--color-fg)]">
-                {t("title")}
-              </h2>
-              <p className="mt-1 text-[14px] text-[var(--color-fg-muted)]">
-                {t("subtitle")}
-              </p>
-            </div>
-            {skill ? <VersionPill version={`v${skill.version}`} /> : null}
-          </div>
-          <pre className="surface-elevated overflow-x-auto p-6 font-mono text-[13px] leading-[1.7] text-[var(--color-fg-muted)] whitespace-pre-wrap">
-            {skill?.content ?? error ?? "editorial.skill.md not found."}
-          </pre>
-        </div>
-      </div>
-    </>
+    <ViewShell
+      locale={locale as "en" | "zh"}
+      stats={{ tracked_sources: stats.tracked_sources, signal_ratio: 0.72 }}
+      crumb="~/admin/policy"
+      cmd="cat editorial.skill.md"
+    >
+      <main className="main">
+        <PageHead
+          en="curation policy"
+          cjk="精选策略"
+          extra={skill ? <VersionPill version={`v${skill.version}`} /> : null}
+        />
+        <pre
+          style={{
+            background: "var(--bg-1)",
+            border: "1px solid var(--border-1)",
+            padding: 24,
+            fontFamily: "var(--font-mono)",
+            fontSize: 12.5,
+            lineHeight: 1.7,
+            color: "var(--fg-1)",
+            whiteSpace: "pre-wrap",
+            overflowX: "auto",
+            marginTop: 14,
+          }}
+        >
+          {skill?.content ?? error ?? "editorial.skill.md not found."}
+        </pre>
+      </main>
+    </ViewShell>
   );
 }

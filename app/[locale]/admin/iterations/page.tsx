@@ -5,7 +5,9 @@ import { FeedbackItem } from "@/components/admin/feedback-item";
 import { VersionPill } from "@/components/admin/version-pill";
 import { IterationRunner } from "@/components/admin/iteration-runner";
 import type { RunnerStatus } from "@/components/admin/iteration-runner";
-import { LocaleSwitcher } from "@/components/layout/locale-switcher";
+import { ViewShell } from "@/components/shell/view-shell";
+import { PageHead } from "@/components/shell/page-head";
+import { getRadarStats } from "@/lib/shell/dashboard-stats";
 import { getFeedbackCounts, getRecentFeedback } from "@/lib/feedback/metrics";
 import {
   getActiveSkill,
@@ -51,12 +53,15 @@ export default async function IterationsPage({
   const t = await getTranslations("iteration");
   const trm = await getTranslations("iteration.metrics");
 
-  const [counts, recent, skill, history, latestRun] = await Promise.all([
+  const [counts, recent, skill, history, latestRun, stats] = await Promise.all([
     getFeedbackCounts(),
     getRecentFeedback(locale === "en" ? "en" : "zh", 10),
     getActiveSkill(SKILL_NAME),
     listSkillVersions(SKILL_NAME),
     getLatestIterationRun(SKILL_NAME),
+    getRadarStats().catch(() => ({
+      items_today: 0, items_p1: 0, items_featured: 0, tracked_sources: 0,
+    })),
   ]);
 
   const { total, agreed, disagreed } = counts;
@@ -82,16 +87,26 @@ export default async function IterationsPage({
     : "";
 
   return (
-    <>
-      <header className="sticky top-0 z-20 flex items-center justify-between gap-4 border-b border-[var(--color-border-subtle)] bg-[var(--color-canvas)]/80 px-8 py-3.5 backdrop-blur-md">
-        <h1 className="text-[15px] font-[510] text-[var(--color-fg)]">
-          {t("title")}
-        </h1>
-        <LocaleSwitcher />
-      </header>
-
-      <div className="px-8 py-8">
-        <div className="mx-auto flex max-w-[1200px] flex-col gap-6">
+    <ViewShell
+      locale={locale as "en" | "zh"}
+      stats={{ tracked_sources: stats.tracked_sources, signal_ratio: 0.72 }}
+      crumb="~/admin/iterations"
+      cmd="git log --oneline editorial.skill.md"
+    >
+      <main className="main">
+        <PageHead
+          en="iterations"
+          cjk="策略迭代"
+          extra={
+            currentVersion ? (
+              <span>
+                <VersionPill version={`v${currentVersion.version}`} />{" "}
+                <span style={{ color: "var(--fg-3)" }}>{committedDate}</span>
+              </span>
+            ) : null
+          }
+        />
+        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
           {/* Hero card + readiness panel */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_352px]">
             <section className="surface-featured px-8 py-7">
@@ -235,7 +250,7 @@ export default async function IterationsPage({
             </div>
           </section>
         </div>
-      </div>
-    </>
+      </main>
+    </ViewShell>
   );
 }

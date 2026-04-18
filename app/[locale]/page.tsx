@@ -1,33 +1,23 @@
-import { getTranslations, setRequestLocale } from "next-intl/server";
 import { redirect } from "next/navigation";
-import { Search, Rss } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { StoryCard } from "@/components/feed/story-card";
-import {
-  TimelineEntry,
-  TimelineSection,
-} from "@/components/feed/timeline-rail";
-import { mockStories } from "@/lib/mock/stories";
+import { setRequestLocale } from "next-intl/server";
+import { ViewShell } from "@/components/shell/view-shell";
+import { PageHead } from "@/components/shell/page-head";
+import { Ticker } from "@/components/feed/ticker";
+import { Item } from "@/components/feed/item";
+import { RightRail } from "@/components/feed/right-rail";
+import { DayBreak } from "./_day-break";
+import { HomeFilters, type HomeTier, type SourcePreset } from "./_home-filters";
 import { getFeaturedStories } from "@/lib/items/live";
-import { formatDateHeader } from "@/lib/utils";
-import type { Story } from "@/lib/types";
-import { HotNewsTabsClient } from "./_hot-news-tabs";
 import {
-  SourceFilterClient,
-  type SourcePreset,
-} from "./_source-filter";
-import { LocaleSwitcher } from "@/components/layout/locale-switcher";
+  getPolicySummary,
+  getPulseData,
+  getRadarStats,
+  getTopTopics,
+} from "@/lib/shell/dashboard-stats";
+import { mockStories } from "@/lib/mock/stories";
+import type { Story } from "@/lib/types";
 
-// ISR: serve from CDN cache, regenerate at most once per minute. Enrich cron
-// runs every 15 min so 60s staleness is imperceptible and drops DB roundtrips
-// on the home page by ~99%.
 export const revalidate = 60;
-
-type Tier = "featured" | "p1";
-
-function coerceTier(v: string | undefined): Tier {
-  return v === "p1" ? v : "featured";
-}
 
 const SOURCE_PRESETS = new Set<SourcePreset>([
   "all",
@@ -38,33 +28,44 @@ const SOURCE_PRESETS = new Set<SourcePreset>([
   "research",
 ]);
 
+function coerceTier(v: string | undefined): HomeTier {
+  return v === "p1" ? "p1" : "featured";
+}
 function coerceSource(v: string | undefined): SourcePreset {
   return v && SOURCE_PRESETS.has(v as SourcePreset)
     ? (v as SourcePreset)
     : "all";
 }
 
-/** Preset → (group, kind) filter. Presets are UX labels; the DB schema has
- *  a richer (group × kind) space we don't expose directly. */
 function presetToFilter(
   preset: SourcePreset,
 ): { sourceGroup?: string; sourceKind?: string } {
   switch (preset) {
-    case "official":
-      return { sourceGroup: "vendor-official" };
-    case "newsletter":
-      return { sourceGroup: "newsletter" };
-    case "media":
-      return { sourceGroup: "media" };
-    case "research":
-      return { sourceGroup: "research" };
-    case "x":
-      return { sourceKind: "x-api" };
-    case "all":
-    default:
-      return {};
+    case "official":   return { sourceGroup: "vendor-official" };
+    case "newsletter": return { sourceGroup: "newsletter" };
+    case "media":      return { sourceGroup: "media" };
+    case "research":   return { sourceGroup: "research" };
+    case "x":          return { sourceKind: "x-api" };
+    default:           return {};
   }
 }
+
+const DEMO_TICKER = [
+  { lab: "OPUS 4.7", val: "$5/$25", kind: "up" as const, extra: "+SWE-Pro 11" },
+  { lab: "CURSOR", val: "in-talks", kind: "hot" as const, extra: "$50B val" },
+  { lab: "CEREBRAS", val: "IPO · refiled" },
+  { lab: "RECURSIVE", val: "$500M", kind: "up" as const, extra: "seed" },
+  { lab: "QWEN3.6-35B", val: "SWE-v 73.4", kind: "hot" as const, extra: "OSS" },
+  { lab: "CODEX", val: "3M wau", kind: "up" as const, extra: "+desktop" },
+  { lab: "FIGMA", val: "Krieger exits", kind: "down" as const, extra: "board" },
+];
+
+const DEMO_WATCHLIST = [
+  { q: "gpt-6", hits: 24, delta: 8 },
+  { q: "agentic IDE", hits: 17, delta: 5 },
+  { q: "humanoid robot", hits: 9, delta: 2 },
+  { q: "MoE-72B", hits: 14, delta: 0 },
+];
 
 export default async function HotNewsPage({
   params,
@@ -74,8 +75,6 @@ export default async function HotNewsPage({
   searchParams: Promise<{ tier?: string; source?: string }>;
 }) {
   const [{ locale }, sp] = await Promise.all([params, searchParams]);
-  // Legacy bookmarks: `/?tier=all` used to be the All Posts view. Now it's
-  // its own sidebar route — 307 so old links keep working.
   if (sp.tier === "all") {
     const qs = new URLSearchParams();
     if (sp.source) qs.set("source", sp.source);
@@ -83,18 +82,10 @@ export default async function HotNewsPage({
     redirect(`/${locale}/all${search ? `?${search}` : ""}`);
   }
   setRequestLocale(locale);
-  const t = await getTranslations("hotNews");
-  const tabT = await getTranslations("hotNews.tabs");
-  const srcT = await getTranslations("hotNews.sourceFilter");
   const tier = coerceTier(sp.tier);
   const sourcePreset = coerceSource(sp.source);
   const sourceFilter = presetToFilter(sourcePreset);
 
-  // Return exactly what the user asked for. Don't silently widen a tier that
-  // came up empty — that would collapse P1 into All when the scorer hasn't
-  // produced any p1-tier items (the user would see identical lists).
-  // Only fall back to mock when tier=featured AND there's no featured content
-  // at all, which signals a cold start before the first enrich pass.
   let stories: Story[] = [];
   try {
     stories = await getFeaturedStories({
@@ -106,15 +97,10 @@ export default async function HotNewsPage({
   } catch {
     stories = [];
   }
-  // Fallback to mock ONLY when the user didn't apply a source filter AND the
-  // default (featured) view is completely empty — signals a cold start.
-  // When a filter is on, empty is the correct answer (don't show mock stories
-  // under e.g. ?source=x when the real X feed hasn't ingested yet).
-  if (
-    stories.length === 0 &&
-    tier === "featured" &&
-    sourcePreset === "all"
-  ) {
+
+  // Cold-start fallback: if there's literally no enriched content, show mock
+  // so the shell renders something sensible.
+  if (stories.length === 0 && tier === "featured" && sourcePreset === "all") {
     try {
       const probe = await getFeaturedStories({
         tier: "all",
@@ -127,95 +113,69 @@ export default async function HotNewsPage({
     }
   }
 
+  const [radarStats, pulse, topics, policy] = await Promise.all([
+    getRadarStats().catch(() => ({
+      items_today: 0,
+      items_p1: 0,
+      items_featured: 0,
+      tracked_sources: 0,
+    })),
+    getPulseData().catch(() => []),
+    getTopTopics().catch(() => []),
+    getPolicySummary().catch(() => ({ version: "v1", lastIterAt: null })),
+  ]);
+
   const grouped = groupByDay(stories);
 
   return (
-    <>
-      <header className="sticky top-0 z-20 border-b border-[var(--color-border-subtle)] bg-[var(--color-canvas)]/80 backdrop-blur-md">
-        <div className="px-8 pt-6 pb-5">
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <h1 className="text-[28px] font-[590] tracking-[-0.56px] leading-tight text-[var(--color-fg)]">
-                {t("title")}
-              </h1>
-              <p className="mt-1 text-[14px] leading-relaxed text-[var(--color-fg-muted)]">
-                {t("subtitle", { count: stories.length })}
-              </p>
+    <ViewShell
+      locale={locale as "en" | "zh"}
+      stats={{
+        tracked_sources: radarStats.tracked_sources,
+        signal_ratio:
+          radarStats.items_today > 0
+            ? (radarStats.items_p1 + radarStats.items_featured) /
+              radarStats.items_today
+            : 0.72,
+      }}
+      pulse={pulse}
+      crumb="~/feed"
+      cmd="tail -f signal.log"
+    >
+      <main className="main">
+        <PageHead
+          en="hot feed"
+          cjk="热点资讯"
+          count={stories.length}
+          live={<>live · {radarStats.items_today} today</>}
+          policyLabel={`policy ${policy.version}`}
+        />
+        <Ticker items={DEMO_TICKER} />
+        <HomeFilters tier={tier} source={sourcePreset} />
+        <div className="feed">
+          {Object.entries(grouped).map(([dayKey, stories]) => (
+            <div key={dayKey}>
+              <DayBreak date={new Date(dayKey)} />
+              {stories.map((s) => (
+                <Item key={s.id} story={s} locale={locale as "en" | "zh"} />
+              ))}
             </div>
-
-            <div className="flex items-center gap-3 shrink-0">
-              <HotNewsTabsClient
-                tier={tier}
-                labels={{
-                  featured: tabT("featured"),
-                  p1: tabT("p1"),
-                }}
-              />
-              <a
-                href={`/api/feed/${locale}/rss.xml`}
-                title="Subscribe via RSS"
-                aria-label="RSS feed"
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--color-fg-dim)] transition-all hover:bg-white/[0.04] hover:text-[var(--color-cyan)]"
-                target="_blank"
-                rel="noreferrer"
-              >
-                <Rss size={14} />
-              </a>
-              <LocaleSwitcher />
+          ))}
+          {stories.length === 0 && (
+            <div style={{ padding: 60, color: "var(--fg-3)", textAlign: "center" }}>
+              no items match — try widening filters
             </div>
-          </div>
-
-          <div className="mt-5 flex flex-wrap items-center gap-3">
-            <div
-              className="relative flex-1 max-w-[680px] opacity-40 pointer-events-none"
-              title="Coming soon"
-            >
-              <Search
-                size={15}
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-fg-dim)]"
-              />
-              <Input
-                placeholder={t("search")}
-                className="h-10 pl-9"
-                aria-label={t("search")}
-                disabled
-              />
-            </div>
-            <SourceFilterClient
-              value={sourcePreset}
-              labels={{
-                all: srcT("all"),
-                official: srcT("official"),
-                newsletter: srcT("newsletter"),
-                media: srcT("media"),
-                x: srcT("x"),
-                research: srcT("research"),
-              }}
-            />
-          </div>
+          )}
         </div>
-      </header>
-
-      <div className="px-8 py-10">
-        <div className="mx-auto flex max-w-[1200px] flex-col gap-12">
-          {Object.entries(grouped).map(([dayKey, stories]) => {
-            const day = new Date(dayKey);
-            return (
-              <TimelineSection
-                key={dayKey}
-                label={formatDateHeader(day, locale as "zh" | "en")}
-              >
-                {stories.map((s) => (
-                  <TimelineEntry key={s.id} date={new Date(s.publishedAt)}>
-                    <StoryCard story={s} />
-                  </TimelineEntry>
-                ))}
-              </TimelineSection>
-            );
-          })}
-        </div>
-      </div>
-    </>
+      </main>
+      <RightRail
+        stats={radarStats}
+        watchlist={DEMO_WATCHLIST}
+        topics={topics}
+        policyVersion={policy.version}
+        lastIterAt={policy.lastIterAt ?? undefined}
+      />
+    </ViewShell>
   );
 }
 

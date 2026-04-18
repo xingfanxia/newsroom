@@ -1,33 +1,38 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
-import { JetBrains_Mono } from "next/font/google";
+import { JetBrains_Mono, Noto_Sans_SC, Noto_Serif_SC } from "next/font/google";
 import { NextIntlClientProvider, hasLocale } from "next-intl";
 import { notFound } from "next/navigation";
 import { getMessages, setRequestLocale } from "next-intl/server";
 import { Toaster } from "sonner";
 import { routing } from "@/i18n/routing";
-import { Sidebar } from "@/components/layout/sidebar";
 import "../globals.css";
+import "../terminal.css";
 
-const inter = Inter({
+const jetbrains = JetBrains_Mono({
   subsets: ["latin"],
-  variable: "--font-inter",
+  variable: "--font-jetbrains",
   display: "swap",
 });
 
-const jetbrainsMono = JetBrains_Mono({
+const notoSans = Noto_Sans_SC({
   subsets: ["latin"],
-  variable: "--font-jetbrains-mono",
+  weight: ["400", "500", "700"],
+  variable: "--font-noto-sans",
+  display: "swap",
+});
+
+const notoSerif = Noto_Serif_SC({
+  subsets: ["latin"],
+  weight: ["400", "700"],
+  variable: "--font-noto-serif",
   display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "AX's AI RADAR — AI intelligence radar",
+  title: "ax radar — AI intelligence",
   description:
-    "Bilingual AI intelligence radar with a self-iterating editorial agent. Fifty-plus sources in, curated signal out.",
-  icons: {
-    icon: "/favicon.svg",
-  },
+    "Terminal-forward AI intelligence radar. Fifty-plus sources in, curated signal out. Bilingual.",
+  icons: { icon: "/favicon.svg" },
   alternates: {
     types: {
       "application/rss+xml": [
@@ -54,23 +59,37 @@ export default async function LocaleLayout({
   setRequestLocale(locale);
   const messages = await getMessages();
 
+  // Default tweak state is echoed onto body data-* attributes so SSR paints the
+  // right palette on first byte. The Tweaks client later mutates these.
   return (
-    <html lang={locale} className={`${inter.variable} ${jetbrainsMono.variable}`}>
-      <body>
+    <html
+      lang={locale}
+      className={`${jetbrains.variable} ${notoSans.variable} ${notoSerif.variable}`}
+    >
+      <body
+        data-theme="midnight"
+        data-accent="green"
+        data-mono="jetbrains"
+        data-cjk="notoSerif"
+        data-radius="sharp"
+        data-chrome="terminal"
+        data-score="ring"
+        data-density="compact"
+        data-linenum="off"
+        data-mutedmeta="on"
+        data-lang={locale}
+      >
         <NextIntlClientProvider locale={locale} messages={messages}>
-          <div className="relative z-[1] flex min-h-dvh">
-            <Sidebar />
-            <main className="flex min-h-dvh flex-1 flex-col">{children}</main>
-          </div>
+          {children}
           <Toaster
             theme="dark"
             position="bottom-right"
             toastOptions={{
               classNames: {
                 toast:
-                  "!bg-[var(--color-panel)] !border !border-[var(--color-border)] !text-[var(--color-fg)]",
+                  "!bg-[var(--bg-1)] !border !border-[var(--border-1)] !text-[var(--fg-0)]",
                 actionButton:
-                  "!bg-[var(--color-cyan)] !text-[var(--color-canvas)]",
+                  "!bg-[var(--accent-green)] !text-[var(--bg-0)]",
               },
             }}
           />

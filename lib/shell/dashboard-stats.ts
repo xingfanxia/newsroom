@@ -1,0 +1,110 @@
+import { and, eq, gte, isNotNull, sql } from "drizzle-orm";
+import { db } from "@/db/client";
+import { items, sources, policyVersions } from "@/db/schema";
+import type { RadarStats } from "@/components/feed/radar-widget";
+import type { PulsePoint } from "@/components/shell/pulse-box";
+import type { TopicEntry } from "@/components/feed/right-rail";
+
+/** Items-today / P1 / featured / tracked-source counts for the radar widget. */
+export async function getRadarStats(): Promise<RadarStats> {
+  const client = db();
+  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+  const [itemsRow] = await client
+    .select({
+      today: sql<number>`count(*) filter (where ${items.createdAt} >= ${oneDayAgo})::int`,
+      p1: sql<number>`count(*) filter (where ${items.tier} = 'p1')::int`,
+      featured: sql<number>`count(*) filter (where ${items.tier} = 'featured')::int`,
+    })
+    .from(items);
+
+  const [srcRow] = await client
+    .select({
+      n: sql<number>`count(*) filter (where ${sources.enabled})::int`,
+    })
+    .from(sources);
+
+  return {
+    items_today: itemsRow?.today ?? 0,
+    items_p1: itemsRow?.p1 ?? 0,
+    items_featured: itemsRow?.featured ?? 0,
+    tracked_sources: srcRow?.n ?? 0,
+  };
+}
+
+/** 24 hourly buckets over the past day. Each bucket.c = items normalized in that UTC hour. */
+export async function getPulseData(): Promise<PulsePoint[]> {
+  const client = db();
+  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const rows = await client
+    .select({
+      hour: sql<number>`extract(hour from ${items.createdAt})::int`,
+      n: sql<number>`count(*)::int`,
+    })
+    .from(items)
+    .where(gte(items.createdAt, oneDayAgo))
+    .groupBy(sql`extract(hour from ${items.createdAt})`);
+
+  const byHour = Object.fromEntries(rows.map((r) => [r.hour, r.n]));
+  return Array.from({ length: 24 }, (_, h) => ({ h, c: byHour[h] ?? 0 }));
+}
+
+/** Top tags across enriched items over the last 7 days. */
+export async function getTopTopics(limit = 16): Promise<TopicEntry[]> {
+  const client = db();
+  const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const rows = await client.execute(sql`
+    SELECT t AS tag, count(*)::int AS n
+    FROM ${items},
+      LATERAL jsonb_array_elements_text(
+        coalesce(${items.tags}->'capabilities', '[]'::jsonb)
+        || coalesce(${items.tags}->'entities',     '[]'::jsonb)
+        || coalesce(${items.tags}->'topics',       '[]'::jsonb)
+      ) AS t
+    WHERE ${items.createdAt} >= ${cutoff}
+      AND ${items.enrichedAt} IS NOT NULL
+    GROUP BY t
+    ORDER BY n DESC
+    LIMIT ${limit}
+  `);
+  const peak = rows[0]?.n ?? 1;
+  return rows.map((r) => {
+    const tag = String(r.tag);
+    const n = Number(r.n);
+    return {
+      tag,
+      count: n,
+      hot: n >= Number(peak) * 0.6,
+    };
+  });
+}
+
+/** Latest committed policy version label + when last iteration landed. */
+export async function getPolicySummary(): Promise<{
+  version: string;
+  lastIterAt: string | null;
+}> {
+  const client = db();
+  const row = await client
+    .select({
+      version: policyVersions.version,
+      committedAt: policyVersions.committedAt,
+    })
+    .from(policyVersions)
+    .where(eq(policyVersions.skillName, "editorial"))
+    .orderBy(sql`${policyVersions.version} desc`)
+    .limit(1);
+
+  if (row.length === 0) {
+    return { version: "v1", lastIterAt: null };
+  }
+  const ageMs = Date.now() - row[0].committedAt.getTime();
+  const ageH = Math.round(ageMs / 3_600_000);
+  const ageD = Math.round(ageH / 24);
+  const ago = ageH < 1 ? "just now" : ageH < 24 ? `${ageH} hrs ago` : `${ageD} d ago`;
+  return { version: `v${row[0].version}`, lastIterAt: ago };
+}
+
+// Avoid unused import warning — `and` / `isNotNull` kept for future composed filters.
+void and;
+void isNotNull;
