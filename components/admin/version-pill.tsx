@@ -1,5 +1,7 @@
-import { cn } from "@/lib/utils";
-
+/**
+ * Version tag — green-tinted terminal pill for policy versions (v1, v2…).
+ * Matches the `.tier-f` chip style used in feed item meta rows.
+ */
 export function VersionPill({
   version,
   className,
@@ -9,11 +11,21 @@ export function VersionPill({
 }) {
   return (
     <span
-      className={cn(
-        "inline-flex items-center rounded bg-[rgba(34,197,94,0.14)] px-[10px] py-[3px]",
-        "font-mono text-[12px] font-[510] tabular text-[var(--color-positive)]",
-        className,
-      )}
+      className={className}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        color: "var(--accent-green)",
+        background: "rgba(63,185,80,0.08)",
+        border: "1px solid rgba(63,185,80,0.3)",
+        padding: "2px 8px",
+        borderRadius: 2,
+        fontSize: 11,
+        fontFamily: "var(--font-mono)",
+        fontVariantNumeric: "tabular-nums",
+        letterSpacing: "0.04em",
+        fontWeight: 700,
+      }}
     >
       {version}
     </span>

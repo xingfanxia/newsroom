@@ -1,14 +1,12 @@
 import { notFound } from "next/navigation";
-import { getTranslations, setRequestLocale } from "next-intl/server";
-import { ArrowLeft, ExternalLink } from "lucide-react";
-import { Link } from "@/i18n/navigation";
-import { getItemDetail } from "@/lib/items/detail";
+import { setRequestLocale } from "next-intl/server";
+import Link from "next/link";
 import { Prose } from "@/components/markdown/prose";
 import { Transcript } from "@/components/podcasts/transcript";
 import { YouTubeEmbed, extractYouTubeId } from "@/components/podcasts/youtube-embed";
-import { LocaleSwitcher } from "@/components/layout/locale-switcher";
-import { Badge } from "@/components/ui/badge";
-import { formatDateHeader } from "@/lib/utils";
+import { ViewShell } from "@/components/shell/view-shell";
+import { getItemDetail } from "@/lib/items/detail";
+import { getRadarStats } from "@/lib/shell/dashboard-stats";
 
 // Re-render every 5 min — commentary + transcript only change via background
 // jobs, so there's no need to hit the DB on every navigation.
@@ -21,105 +19,161 @@ export default async function PodcastDetailPage({
 }) {
   const { locale, id: idRaw } = await params;
   setRequestLocale(locale);
-  const t = await getTranslations("podcasts.detail");
 
   const id = Number.parseInt(idRaw, 10);
   if (!Number.isInteger(id) || id <= 0) notFound();
 
-  const detail = await getItemDetail(id, locale === "en" ? "en" : "zh");
+  const [detail, stats] = await Promise.all([
+    getItemDetail(id, locale === "en" ? "en" : "zh"),
+    getRadarStats().catch(() => ({
+      items_today: 0, items_p1: 0, items_featured: 0, tracked_sources: 0,
+    })),
+  ]);
   if (!detail) notFound();
 
   const { story, bodyMd } = detail;
-  const publishedDate = formatDateHeader(
-    new Date(story.publishedAt),
-    locale as "zh" | "en",
-  );
+  const publishedDate = new Date(story.publishedAt).toISOString().slice(0, 10);
   const isYouTube = extractYouTubeId(story.url) !== null;
 
   return (
-    <>
-      <header className="sticky top-0 z-20 flex items-center justify-between gap-4 border-b border-[var(--color-border-subtle)] bg-[var(--color-canvas)]/80 px-8 py-3.5 backdrop-blur-md">
+    <ViewShell
+      locale={locale as "en" | "zh"}
+      stats={{ tracked_sources: stats.tracked_sources, signal_ratio: 0.72 }}
+      crumb={`~/podcasts/${id}`}
+      cmd={`cat ${id}.transcript.md`}
+    >
+      <main className="main" style={{ maxWidth: 860 }}>
         <Link
-          href={"/podcasts" as const}
-          className="inline-flex items-center gap-2 text-[13.5px] font-[510] text-[var(--color-fg-muted)] transition-colors hover:text-[var(--color-fg)]"
+          href={`/${locale}/podcasts`}
+          className="nav-it"
+          style={{
+            width: "fit-content",
+            fontSize: 11,
+            padding: "4px 8px",
+            marginBottom: 18,
+            color: "var(--fg-3)",
+            textDecoration: "none",
+            border: "0",
+          }}
         >
-          <ArrowLeft size={14} />
-          {t("backToList")}
+          <span className="dot-marker" /> ← back to podcasts
         </Link>
-        <LocaleSwitcher />
-      </header>
 
-      <article className="mx-auto max-w-[860px] px-8 py-10">
-        {/* Meta row */}
-        <div className="flex flex-wrap items-center gap-2 text-[13px] text-[var(--color-fg-dim)]">
-          <span className="font-[510] text-[var(--color-fg-muted)]">
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: 8,
+            fontSize: 11.5,
+            color: "var(--fg-2)",
+            marginBottom: 10,
+          }}
+        >
+          {story.featured ? <span className="tier-f">FEATURED</span> : null}
+          <span className="src" style={{ color: "var(--fg-1)", fontWeight: 500 }}>
             {story.source.publisher}
           </span>
-          <span className="text-[var(--color-fg-faint)]">·</span>
-          <span>{publishedDate}</span>
-          {story.featured ? (
-            <Badge variant="cyan" size="sm" className="ml-1">
-              {t("featured")}
-            </Badge>
-          ) : null}
+          <span style={{ color: "var(--border-2)" }}>·</span>
+          <span style={{ fontVariantNumeric: "tabular-nums" }}>
+            {publishedDate}
+          </span>
         </div>
 
-        {/* Title */}
-        <h1 className="mt-3 text-[30px] font-[590] tracking-[-0.6px] leading-[1.2] text-[var(--color-fg)]">
+        <h1
+          style={{
+            fontFamily:
+              locale === "zh" ? "var(--font-sans-cjk)" : "var(--font-mono)",
+            fontSize: 28,
+            lineHeight: 1.25,
+            letterSpacing: "-0.01em",
+            color: "var(--fg-0)",
+            marginTop: 4,
+          }}
+        >
           {story.title}
         </h1>
 
-        {/* Summary */}
-        {story.summary ? (
-          <p className="mt-4 text-[16px] leading-[1.7] text-[var(--color-fg-muted)]">
+        {story.summary && (
+          <p
+            style={{
+              marginTop: 16,
+              fontSize: 14.5,
+              lineHeight: 1.75,
+              color: "var(--fg-1)",
+              maxWidth: 720,
+            }}
+          >
             {story.summary}
           </p>
-        ) : null}
+        )}
 
-        {/* Source link + YouTube embed */}
-        <div className="mt-6 flex flex-col gap-4">
-          {isYouTube ? (
-            <YouTubeEmbed url={story.url} title={story.title} />
-          ) : null}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 24 }}>
+          {isYouTube && <YouTubeEmbed url={story.url} title={story.title} />}
           <a
             href={story.url}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex w-fit items-center gap-1.5 text-[13px] text-[var(--color-cyan)] underline decoration-[var(--color-cyan)]/40 underline-offset-4 transition-colors hover:decoration-[var(--color-cyan)]"
+            className="act-btn primary"
+            style={{ width: "fit-content" }}
           >
-            {t("listenAtSource")}
-            <ExternalLink size={12} />
+            <span>→</span> listen at source
           </a>
         </div>
 
-        {/* Editor's take — short + long */}
-        {story.editorNote ? (
-          <section className="mt-10 rounded-xl border-l-2 border-[var(--color-cyan)]/50 bg-[rgba(62,230,230,0.04)] px-5 py-4">
-            <div className="mb-1 text-[11px] uppercase tracking-[0.14em] text-[var(--color-cyan)]/80">
-              {t("editorTake")}
+        {story.editorNote && (
+          <section
+            style={{
+              marginTop: 40,
+              padding: "14px 16px",
+              background: "var(--bg-1)",
+              border: "1px solid var(--border-1)",
+              borderLeft: "2px solid var(--accent-blue)",
+              borderRadius: 4,
+            }}
+          >
+            <div
+              style={{
+                fontSize: 10,
+                textTransform: "uppercase",
+                letterSpacing: "0.14em",
+                color: "var(--accent-blue)",
+                marginBottom: 6,
+              }}
+            >
+              {locale === "zh" ? "编辑点评" : "editor note"}
             </div>
-            <p className="text-[15px] leading-[1.65] text-[var(--color-fg)]">
+            <p style={{ fontSize: 14, lineHeight: 1.7, color: "var(--fg-0)" }}>
               {story.editorNote}
             </p>
           </section>
-        ) : null}
+        )}
 
-        {story.editorAnalysis ? (
-          <section className="mt-8">
-            <h2 className="mb-1 text-[11px] uppercase tracking-[0.14em] text-[var(--color-cyan)]/80">
-              {t("deepTake")}
+        {story.editorAnalysis && (
+          <section style={{ marginTop: 32 }}>
+            <h2
+              style={{
+                fontSize: 10,
+                textTransform: "uppercase",
+                letterSpacing: "0.14em",
+                color: "var(--accent-blue)",
+                marginBottom: 12,
+                paddingBottom: 8,
+                borderBottom: "1px dashed var(--border-1)",
+              }}
+            >
+              {locale === "zh" ? "深度解读" : "deep take"}
             </h2>
-            <div className="border-t border-[var(--color-border-subtle)] pt-3">
+            <div style={{ color: "var(--fg-1)", fontSize: 14, lineHeight: 1.75 }}>
               <Prose>{story.editorAnalysis}</Prose>
             </div>
           </section>
-        ) : null}
+        )}
 
-        {/* Transcript */}
-        <section className="mt-10">
+        <section style={{ marginTop: 40 }}>
           <Transcript bodyMd={bodyMd} />
         </section>
-      </article>
-    </>
+      </main>
+    </ViewShell>
   );
 }

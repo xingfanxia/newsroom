@@ -1,8 +1,11 @@
-import { ThumbsUp, ThumbsDown } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { FeedbackEntry } from "@/lib/types";
 import { formatRelative } from "@/lib/utils";
 
+/**
+ * Single feedback row — up/down verdict as a colored dot (mirrors the
+ * `.radar-dot` + `.watch-row` style), title, optional note, relative time.
+ */
 export function FeedbackItem({
   entry,
   locale,
@@ -21,26 +24,68 @@ export function FeedbackItem({
           ? t("hoursAgo", { count: rel.value! })
           : t("daysAgo", { count: rel.value! });
 
+  const positive = entry.verdict === "up";
+
   return (
-    <div className="flex gap-4 py-3 border-b border-[var(--color-border-subtle)] last:border-b-0">
-      <div className="pt-0.5">
-        {entry.verdict === "up" ? (
-          <ThumbsUp size={16} className="text-[var(--color-positive)]" />
-        ) : (
-          <ThumbsDown size={16} className="text-[var(--color-negative)]" />
-        )}
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="text-[14.5px] font-[510] text-[var(--color-fg)] leading-snug">
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "16px 1fr auto",
+        gap: 12,
+        alignItems: "start",
+        padding: "10px 0",
+        borderBottom: "1px dashed var(--border-1)",
+      }}
+    >
+      <span
+        aria-label={positive ? "up" : "down"}
+        style={{
+          display: "inline-block",
+          width: 8,
+          height: 8,
+          borderRadius: "50%",
+          marginTop: 6,
+          background: positive ? "var(--accent-green)" : "var(--accent-red)",
+          boxShadow: positive
+            ? "0 0 6px rgba(63,185,80,0.5)"
+            : "0 0 6px rgba(248,81,73,0.5)",
+        }}
+      />
+      <div style={{ minWidth: 0 }}>
+        <div
+          style={{
+            fontSize: 13.5,
+            lineHeight: 1.45,
+            color: "var(--fg-0)",
+            fontWeight: 500,
+            fontFamily: "var(--font-mono)",
+          }}
+        >
           {entry.title}
         </div>
-        {entry.note ? (
-          <div className="mt-1 text-[13px] text-[var(--color-fg-dim)] leading-relaxed">
+        {entry.note && (
+          <div
+            style={{
+              marginTop: 4,
+              fontSize: 12.5,
+              lineHeight: 1.55,
+              color: "var(--fg-2)",
+            }}
+          >
             {entry.note}
           </div>
-        ) : null}
+        )}
       </div>
-      <div className="shrink-0 pt-0.5 text-[12px] font-mono tabular text-[var(--color-fg-dim)]">
+      <div
+        style={{
+          fontSize: 10.5,
+          fontFamily: "var(--font-mono)",
+          fontVariantNumeric: "tabular-nums",
+          color: "var(--fg-3)",
+          whiteSpace: "nowrap",
+          paddingTop: 2,
+        }}
+      >
         {relLabel}
       </div>
     </div>

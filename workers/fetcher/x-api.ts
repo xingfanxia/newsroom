@@ -169,11 +169,17 @@ export type FetchTimelineOptions = {
   sinceId?: string | null;
   /** 5-100. Default 20. */
   maxResults?: number;
+  /** ISO-8601 (e.g. "2026-04-01T00:00:00Z"). When set, caps the window. */
+  startTime?: string;
+  endTime?: string;
+  /** Page token from a prior call's meta.next_token. */
+  paginationToken?: string;
 };
 
 export type TimelineResult = {
   tweets: XTweet[];
   newestId: string | null;
+  nextToken: string | null;
 };
 
 /** Pull a user's recent original posts, excluding retweets + replies. */
@@ -188,6 +194,9 @@ export async function fetchUserTimeline(
     "id,text,created_at,lang,public_metrics,referenced_tweets,note_tweet,entities,attachments",
   );
   if (opts.sinceId) params.set("since_id", opts.sinceId);
+  if (opts.startTime) params.set("start_time", opts.startTime);
+  if (opts.endTime) params.set("end_time", opts.endTime);
+  if (opts.paginationToken) params.set("pagination_token", opts.paginationToken);
 
   const body = await xFetch<XApiResponse<XTweet[]>>(
     `/users/${encodeURIComponent(opts.userId)}/tweets`,
@@ -197,7 +206,53 @@ export async function fetchUserTimeline(
   return {
     tweets,
     newestId: body.meta?.newest_id ?? null,
+    nextToken: body.meta?.next_token ?? null,
   };
+}
+
+/**
+ * Page through a handle's tweets inside an explicit time window.
+ *
+ * Cost: each page = one API call returning up to `pageSize` tweets.
+ * Cost is billed per tweet returned, not per page. For steady-state
+ * ingestion stick to `fetchTimelineForHandle` with since_id — this
+ * helper is intended for one-shot historical backfill.
+ */
+export async function fetchHistoricalForHandle(input: {
+  handle: string;
+  startTime: Date;
+  endTime: Date;
+  /** Hard cap on total tweets to pull. Protects against runaway spend. */
+  maxTweets?: number;
+  pageSize?: number;
+}): Promise<{ items: FeedItem[]; pages: number }> {
+  const userId = await resolveUserId(input.handle);
+  const pageSize = Math.min(Math.max(input.pageSize ?? 100, 5), 100);
+  const cap = input.maxTweets ?? 500;
+
+  const items: FeedItem[] = [];
+  let token: string | undefined;
+  let pages = 0;
+  while (items.length < cap) {
+    pages++;
+    const page = await fetchUserTimeline({
+      userId,
+      maxResults: pageSize,
+      startTime: input.startTime.toISOString(),
+      endTime: input.endTime.toISOString(),
+      paginationToken: token,
+    });
+    for (const tweet of page.tweets) {
+      const fi = tweetToFeedItem(tweet, input.handle);
+      if (fi) items.push(fi);
+      if (items.length >= cap) break;
+    }
+    if (!page.nextToken || page.tweets.length === 0) break;
+    token = page.nextToken;
+    // X API rate-limit friendliness — small delay between pages
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  return { items, pages };
 }
 
 /**

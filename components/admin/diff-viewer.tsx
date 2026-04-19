@@ -1,26 +1,54 @@
 import type { DiffLine } from "@/lib/types";
 
+const KIND_STYLES: Record<DiffLine["kind"], React.CSSProperties> = {
+  add: {
+    background: "rgba(63,185,80,0.06)",
+    borderLeft: "2px solid var(--accent-green)",
+    color: "var(--accent-green)",
+  },
+  remove: {
+    background: "rgba(248,81,73,0.06)",
+    borderLeft: "2px solid var(--accent-red)",
+    color: "var(--accent-red)",
+  },
+  meta: {
+    color: "var(--accent-blue)",
+    borderLeft: "2px solid transparent",
+    fontWeight: 500,
+  },
+  context: {
+    color: "var(--fg-3)",
+    borderLeft: "2px solid transparent",
+  },
+};
+
+/** Narrative diff preview — +/- prefixed lines, no line numbers. */
 export function DiffViewer({ lines }: { lines: DiffLine[] }) {
   return (
-    <div className="overflow-x-auto rounded-lg border border-[var(--color-border-subtle)] bg-black/30 py-2">
+    <div
+      style={{
+        background: "var(--bg-0)",
+        border: "1px solid var(--border-1)",
+        borderRadius: 2,
+        padding: "6px 0",
+        overflowX: "auto",
+        fontFamily: "var(--font-mono)",
+        fontSize: 12.5,
+        lineHeight: 1.75,
+      }}
+    >
       {lines.map((line, i) => {
-        const cls =
-          line.kind === "add"
-            ? "diff-line diff-line-add"
-            : line.kind === "remove"
-              ? "diff-line diff-line-remove"
-              : line.kind === "meta"
-                ? "diff-line diff-line-meta"
-                : "diff-line diff-line-context";
-        const prefix =
-          line.kind === "add"
-            ? "+ "
-            : line.kind === "remove"
-              ? "- "
-              : "  ";
+        const prefix = line.kind === "add" ? "+ " : line.kind === "remove" ? "- " : "  ";
         return (
-          <div key={i} className={cls}>
-            <span aria-hidden className="inline-block w-[14px] opacity-60">
+          <div
+            key={i}
+            style={{
+              padding: "1px 12px 1px 14px",
+              whiteSpace: "pre-wrap",
+              ...KIND_STYLES[line.kind],
+            }}
+          >
+            <span aria-hidden style={{ display: "inline-block", width: 14, opacity: 0.6 }}>
               {prefix}
             </span>
             {line.content}

@@ -1,5 +1,7 @@
-import { getTranslations, setRequestLocale } from "next-intl/server";
-import { LocaleSwitcher } from "@/components/layout/locale-switcher";
+import { setRequestLocale } from "next-intl/server";
+import { ViewShell } from "@/components/shell/view-shell";
+import { PageHead } from "@/components/shell/page-head";
+import { getRadarStats } from "@/lib/shell/dashboard-stats";
 import {
   totalsByWindow,
   breakdownByTask,
@@ -16,31 +18,33 @@ export default async function SystemPage({
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
-  const t = await getTranslations("admin.system");
 
-  const [today, week, month, taskWeek, modelWeek, recent] = await Promise.all([
+  const [today, week, month, taskWeek, modelWeek, recent, stats] = await Promise.all([
     totalsByWindow("today"),
     totalsByWindow("week"),
     totalsByWindow("month"),
     breakdownByTask("week"),
     breakdownByModel("week"),
     recentCalls(20),
+    getRadarStats().catch(() => ({
+      items_today: 0, items_p1: 0, items_featured: 0, tracked_sources: 0,
+    })),
   ]);
 
   return (
-    <>
-      <header className="sticky top-0 z-20 flex items-center justify-between gap-4 border-b border-[var(--color-border-subtle)] bg-[var(--color-canvas)]/80 px-8 py-3.5 backdrop-blur-md">
-        <div>
-          <h1 className="text-[15px] font-[510]">{t("title")}</h1>
-          <p className="text-[12px] text-[var(--color-fg-dim)]">
-            {t("subtitle")}
-          </p>
-        </div>
-        <LocaleSwitcher />
-      </header>
-
-      <div className="px-8 py-8">
-        <div className="mx-auto flex max-w-[1100px] flex-col gap-8">
+    <ViewShell
+      locale={locale as "en" | "zh"}
+      stats={{ tracked_sources: stats.tracked_sources, signal_ratio: 0.72 }}
+      crumb="~/admin/system"
+      cmd="sar -u 1 3 | tail"
+    >
+      <main className="main">
+        <PageHead
+          en="system"
+          cjk="系统"
+          extra={<span>LLM cost + recent calls · hourly cron metrics</span>}
+        />
+        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
           {/* Spend cards */}
           <section className="grid grid-cols-3 gap-4">
             <SpendCard label="Today" totals={today} />
@@ -70,8 +74,8 @@ export default async function SystemPage({
             <RecentTable rows={recent} locale={locale} />
           </section>
         </div>
-      </div>
-    </>
+      </main>
+    </ViewShell>
   );
 }
 

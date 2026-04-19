@@ -1,6 +1,8 @@
-import { getTranslations, setRequestLocale } from "next-intl/server";
-import { ComingSoon } from "@/components/layout/coming-soon";
-import { LocaleSwitcher } from "@/components/layout/locale-switcher";
+import { setRequestLocale } from "next-intl/server";
+import { ViewShell } from "@/components/shell/view-shell";
+import { PageHead } from "@/components/shell/page-head";
+import { ComingSoonPanel } from "@/components/shell/coming-soon-panel";
+import { getPulseData, getRadarStats } from "@/lib/shell/dashboard-stats";
 
 export default async function LowFollowerPage({
   params,
@@ -9,14 +11,32 @@ export default async function LowFollowerPage({
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
-  const t = await getTranslations("lowFollower");
+
+  const [stats, pulse] = await Promise.all([
+    getRadarStats().catch(() => ({
+      items_today: 0,
+      items_p1: 0,
+      items_featured: 0,
+      tracked_sources: 0,
+    })),
+    getPulseData().catch(() => []),
+  ]);
+
   return (
-    <>
-      <header className="sticky top-0 z-20 flex items-center justify-between gap-4 border-b border-[var(--color-border-subtle)] bg-[var(--color-canvas)]/80 px-8 py-3.5 backdrop-blur-md">
-        <h1 className="text-[15px] font-[510]">{t("title")}</h1>
-        <LocaleSwitcher />
-      </header>
-      <ComingSoon title={t("title")} subtitle={t("subtitle")} />
-    </>
+    <ViewShell
+      locale={locale as "en" | "zh"}
+      stats={{
+        tracked_sources: stats.tracked_sources,
+        signal_ratio: 0.72,
+      }}
+      pulse={pulse}
+      crumb="~/viral"
+      cmd="awk '$followers < 5000 && $engagement > 0.2'"
+    >
+      <main className="main">
+        <PageHead en="viral" cjk="低粉爆文" />
+        <ComingSoonPanel en="low-follower viral posts" cjk="低粉爆文" />
+      </main>
+    </ViewShell>
   );
 }
