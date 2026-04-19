@@ -11,15 +11,18 @@ import type { Story } from "@/lib/types";
 
 export const revalidate = 60;
 
+type PodTier = "featured" | "all";
+
 export default async function PodcastsPage({
   params,
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ source?: string }>;
+  searchParams: Promise<{ source?: string; tier?: string }>;
 }) {
   const [{ locale }, sp] = await Promise.all([params, searchParams]);
   setRequestLocale(locale);
+  const activeTier: PodTier = sp.tier === "all" ? "all" : "featured";
 
   const [channels, stats, pulse] = await Promise.all([
     getPodcastChannels().catch(() => []),
@@ -32,15 +35,15 @@ export default async function PodcastsPage({
   const activeChannel =
     sp.source && channels.some((c) => c.id === sp.source) ? sp.source : null;
 
-  // For a specific channel, pull a larger set then narrow client-side since
-  // getFeaturedStories doesn't expose a per-source filter yet. Cost is small
-  // because podcasts fan out to ~5 sources total.
+  // `tier='all'` surfaces excluded episodes too — lets the user catch low-
+  // score YT videos (usually off-topic history/crypto stuff) that score
+  // filters out of the default featured view.
   const stories = await getFeaturedStories({
-    tier: "all",
+    tier: activeTier,
     locale: locale as "zh" | "en",
     sourceGroup: "podcast",
     includeSourceGroup: true,
-    limit: activeChannel ? 200 : 60,
+    limit: activeChannel ? 300 : 120,
   }).catch((): Story[] => []);
 
   const filtered = activeChannel
@@ -88,6 +91,12 @@ export default async function PodcastsPage({
           <PodcastChannelPills channels={channels} activeId={activeChannel} />
         </div>
 
+        <TierPills
+          activeTier={activeTier}
+          activeChannel={activeChannel}
+          locale={locale as "en" | "zh"}
+        />
+
         <div
           style={{
             display: "flex",
@@ -128,6 +137,77 @@ export default async function PodcastsPage({
         </div>
       </main>
     </ViewShell>
+  );
+}
+
+function TierPills({
+  activeTier,
+  activeChannel,
+  locale,
+}: {
+  activeTier: PodTier;
+  activeChannel: string | null;
+  locale: "en" | "zh";
+}) {
+  const zh = locale === "zh";
+  const build = (tier: PodTier) => {
+    const qs = new URLSearchParams();
+    if (activeChannel) qs.set("source", activeChannel);
+    if (tier === "all") qs.set("tier", "all");
+    const s = qs.toString();
+    return `/${locale}/podcasts${s ? `?${s}` : ""}`;
+  };
+  return (
+    <div
+      style={{
+        display: "flex",
+        gap: 6,
+        margin: "8px 0 10px",
+        alignItems: "center",
+      }}
+    >
+      <span
+        style={{
+          fontSize: 10,
+          color: "var(--fg-3)",
+          letterSpacing: "0.1em",
+          textTransform: "uppercase",
+          marginRight: 4,
+        }}
+      >
+        {zh ? "筛选" : "tier"}
+      </span>
+      <a
+        href={build("featured")}
+        className="day-pill"
+        data-active={activeTier === "featured" ? "true" : "false"}
+      >
+        <span className="d">{zh ? "精选" : "featured"}</span>
+      </a>
+      <a
+        href={build("all")}
+        className="day-pill"
+        data-active={activeTier === "all" ? "true" : "false"}
+      >
+        <span className="d">{zh ? "全部" : "all"}</span>
+      </a>
+      <span
+        style={{
+          marginLeft: 8,
+          fontSize: 10,
+          color: "var(--fg-4)",
+          fontStyle: "italic",
+        }}
+      >
+        {zh
+          ? activeTier === "all"
+            ? "含低分剧集"
+            : "仅精选"
+          : activeTier === "all"
+            ? "includes low-score"
+            : "curated only"}
+      </span>
+    </div>
   );
 }
 
