@@ -8,11 +8,14 @@ import type { TopicEntry } from "@/components/feed/right-rail";
 /** Items-today / P1 / featured / tracked-source counts for the radar widget. */
 export async function getRadarStats(): Promise<RadarStats> {
   const client = db();
-  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  // Cast the Date param inline to `::timestamptz`: drizzle otherwise drops the
+  // `items.` table prefix when mixing column refs with typed params and the
+  // postgres driver rejects the resulting ambiguous statement.
+  const oneDayAgoIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
   const [itemsRow] = await client
     .select({
-      today: sql<number>`count(*) filter (where ${items.createdAt} >= ${oneDayAgo})::int`,
+      today: sql<number>`count(*) filter (where ${items.createdAt} >= ${oneDayAgoIso}::timestamptz)::int`,
       p1: sql<number>`count(*) filter (where ${items.tier} = 'p1')::int`,
       featured: sql<number>`count(*) filter (where ${items.tier} = 'featured')::int`,
     })
@@ -36,6 +39,8 @@ export async function getRadarStats(): Promise<RadarStats> {
 export async function getPulseData(): Promise<PulsePoint[]> {
   const client = db();
   const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  // `gte(items.createdAt, Date)` keeps the table-qualified column name in the
+  // WHERE clause, avoiding the same ambiguous-param issue as getRadarStats.
   const rows = await client
     .select({
       hour: sql<number>`extract(hour from ${items.createdAt})::int`,
@@ -52,7 +57,10 @@ export async function getPulseData(): Promise<PulsePoint[]> {
 /** Top tags across enriched items over the last 7 days. */
 export async function getTopTopics(limit = 16): Promise<TopicEntry[]> {
   const client = db();
-  const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const cutoffIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  // `::timestamptz` cast is load-bearing: postgres driver rejects ambiguous
+  // statements when a Date param mixes with qualified column refs. Same fix
+  // as getRadarStats.
   const rows = await client.execute(sql`
     SELECT t AS tag, count(*)::int AS n
     FROM ${items},
@@ -61,7 +69,7 @@ export async function getTopTopics(limit = 16): Promise<TopicEntry[]> {
         || coalesce(${items.tags}->'entities',     '[]'::jsonb)
         || coalesce(${items.tags}->'topics',       '[]'::jsonb)
       ) AS t
-    WHERE ${items.createdAt} >= ${cutoff}
+    WHERE ${items.createdAt} >= ${cutoffIso}::timestamptz
       AND ${items.enrichedAt} IS NOT NULL
     GROUP BY t
     ORDER BY n DESC
@@ -77,6 +85,31 @@ export async function getTopTopics(limit = 16): Promise<TopicEntry[]> {
       hot: n >= Number(peak) * 0.6,
     };
   });
+}
+
+/**
+ * Items-per-day counts for the /all day-picker. Returns the most recent `days`
+ * buckets newest-first, each with its ISO date key and item count.
+ *
+ * Counts match getFeaturedStories tier='all' filters: enriched + importance
+ * set + non-excluded, so UI counts don't over-promise items that won't render.
+ */
+export type DayBucket = { date: string; count: number };
+export async function getDayCounts(days = 30): Promise<DayBucket[]> {
+  const client = db();
+  const rows = await client.execute(sql`
+    SELECT to_char(date_trunc('day', ${items.publishedAt}), 'YYYY-MM-DD') AS d,
+           count(*)::int AS n
+    FROM ${items}
+    WHERE ${items.enrichedAt} IS NOT NULL
+      AND ${items.importance} IS NOT NULL
+      AND coalesce(${items.tier}, 'all') <> 'excluded'
+      AND ${items.publishedAt} >= now() - (${days} * interval '1 day')
+    GROUP BY 1
+    ORDER BY 1 DESC
+    LIMIT ${days}
+  `);
+  return rows.map((r) => ({ date: String(r.d), count: Number(r.n) }));
 }
 
 /** Latest committed policy version label + when last iteration landed. */

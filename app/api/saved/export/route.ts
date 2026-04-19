@@ -75,6 +75,16 @@ export async function GET(req: Request) {
       lines.push("");
       lines.push(`> **${locale === "zh" ? "编辑点评" : "Editor note"}**: ${s.editorNote}`);
     }
+    if (s.editorAnalysis && s.editorAnalysis !== s.editorNote) {
+      lines.push("");
+      lines.push(`**${locale === "zh" ? "深度解读" : "Editor analysis"}**`);
+      lines.push("");
+      lines.push(s.editorAnalysis);
+    }
+    if (s.reasoning) {
+      lines.push("");
+      lines.push(`_${locale === "zh" ? "精选理由" : "Why featured"}: ${s.reasoning}_`);
+    }
     lines.push("");
     lines.push("---");
     lines.push("");

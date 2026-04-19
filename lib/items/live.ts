@@ -10,10 +10,15 @@ export type FeedQuery = {
   tier?: Tier;
   locale?: Locale;
   limit?: number;
+  /** Skip the first N items — for pagination. Defaults to 0. */
+  offset?: number;
   /** Filter by source.group — e.g. "podcast" for the /podcasts page. */
   sourceGroup?: string;
   /** Filter by source.kind — e.g. "x-api" for the /x-monitor page. */
   sourceKind?: string;
+  /** Restrict to items whose published_at falls on this calendar day
+   *  (UTC, YYYY-MM-DD). Used by the /all day-picker. */
+  date?: string;
   /** Include the story's source-group so UI can show format badges
    *  (podcast/vendor-official/media/…). Defaults to false for home feed. */
   includeSourceGroup?: boolean;
@@ -27,6 +32,7 @@ export type FeedQuery = {
 export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
   const tier: Tier = q.tier ?? "featured";
   const limit = q.limit ?? 40;
+  const offset = q.offset ?? 0;
   const client = db();
 
   // Tiers are inclusive: "featured" shows featured+p1; "all" shows everything non-excluded.
@@ -46,6 +52,12 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
     : sql`TRUE`;
   const kindFilter = q.sourceKind
     ? sql`${sources.kind} = ${q.sourceKind}`
+    : sql`TRUE`;
+  // Day filter: published_at falls within [date 00:00 UTC, date+1 00:00 UTC).
+  // Explicit ::timestamptz on both ends so postgres doesn't reject the param
+  // binding (same pattern as dashboard-stats).
+  const dateFilter = q.date
+    ? sql`${items.publishedAt} >= ${`${q.date}T00:00:00Z`}::timestamptz AND ${items.publishedAt} < ${`${q.date}T00:00:00Z`}::timestamptz + interval '1 day'`
     : sql`TRUE`;
 
   const rows = await client
@@ -88,10 +100,12 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
         dedupFilter,
         groupFilter,
         kindFilter,
+        dateFilter,
       ),
     )
     .orderBy(desc(items.publishedAt))
-    .limit(limit);
+    .limit(limit)
+    .offset(offset);
 
   return rows.map((r): Story => {
     const tagBag = (r.tags ?? {}) as {

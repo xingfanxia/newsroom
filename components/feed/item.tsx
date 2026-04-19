@@ -27,6 +27,8 @@ function formatTime(iso: string): { hh: string; date: string; ago: string } {
  */
 export function Item({ story, locale }: Props) {
   const [open, setOpen] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
   const { tweaks } = useTweaks();
   const lang = tweaks.language;
   const showZh = lang === "zh";
@@ -41,8 +43,37 @@ export function Item({ story, locale }: Props) {
     ) : null;
 
   const reason = story.reasoning;
-  const editor = story.editorNote || story.editorAnalysis;
+  // Render note + analysis separately so the one-liner stance doesn't mask
+  // the multi-paragraph deep dive. Previously `note || analysis` meant a
+  // present note always hid the long-form analysis behind it.
+  const editorNote = story.editorNote;
+  const editorAnalysis = story.editorAnalysis;
   const hkrPass = story.hkr;
+
+  async function toggleSave(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (saving) return;
+    setSaving(true);
+    const next = !saved;
+    setSaved(next); // optimistic
+    try {
+      const res = await fetch("/api/feedback", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          itemId: Number(story.id),
+          vote: "save",
+          on: next,
+        }),
+      });
+      if (!res.ok) setSaved(!next); // rollback
+    } catch {
+      setSaved(!next);
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <article
@@ -89,11 +120,22 @@ export function Item({ story, locale }: Props) {
               <div className="v">{reason}</div>
             </div>
           )}
-          {editor && (
+          {editorNote && (
             <div className="kv">
               <div className="k e">{showZh ? "编辑点评" : "editor note"}</div>
               <div className="v" style={{ color: "var(--fg-0)" }}>
-                {editor}
+                {editorNote}
+              </div>
+            </div>
+          )}
+          {editorAnalysis && editorAnalysis !== editorNote && (
+            <div className="kv">
+              <div className="k e">{showZh ? "深度解读" : "editor analysis"}</div>
+              <div
+                className="v"
+                style={{ color: "var(--fg-1)", whiteSpace: "pre-wrap", lineHeight: 1.75 }}
+              >
+                {editorAnalysis}
               </div>
             </div>
           )}
@@ -163,9 +205,22 @@ export function Item({ story, locale }: Props) {
             <button
               type="button"
               className="act-btn"
-              onClick={(e) => e.stopPropagation()}
+              onClick={toggleSave}
+              disabled={saving}
+              style={{
+                color: saved ? "var(--accent-green)" : undefined,
+                borderColor: saved ? "var(--accent-green)" : undefined,
+                opacity: saving ? 0.6 : 1,
+              }}
             >
-              <span>★</span> {showZh ? "收藏" : "save"}
+              <span>{saved ? "✓" : "★"}</span>{" "}
+              {saved
+                ? showZh
+                  ? "已收藏"
+                  : "saved"
+                : showZh
+                  ? "收藏"
+                  : "save"}
             </button>
             <button
               type="button"

@@ -36,18 +36,20 @@ export function RadarWidget({
         <span className="more">{moreLabel ?? "live"}</span>
       </div>
       <div className="radar">
-        <svg viewBox="0 0 100 100">
+        {/* viewBox extended to -8..108 so axis labels (y=4, y=99) don't clip
+            against the SVG edge when browsers apply tight overflow. */}
+        <svg viewBox="-8 -8 116 116">
           <circle className="radar-ring" cx="50" cy="50" r="44" fill="none" />
           <circle className="radar-ring mid" cx="50" cy="50" r="32" fill="none" />
           <circle className="radar-ring mid" cx="50" cy="50" r="20" fill="none" />
           <circle className="radar-ring" cx="50" cy="50" r="8" fill="none" />
           <line x1="50" y1="6" x2="50" y2="94" stroke="var(--border-1)" strokeWidth="0.4" />
           <line x1="6" y1="50" x2="94" y2="50" stroke="var(--border-1)" strokeWidth="0.4" />
-          <text x="50" y="4" fontSize="3" fill="var(--fg-3)" textAnchor="middle">HOOK</text>
-          <text x="96" y="52" fontSize="3" fill="var(--fg-3)" textAnchor="middle">RES</text>
-          <text x="50" y="99" fontSize="3" fill="var(--fg-3)" textAnchor="middle">DENSITY</text>
-          <text x="4" y="52" fontSize="3" fill="var(--fg-3)" textAnchor="middle">AUTH</text>
-          <g className="radar-sweep" style={{ transformOrigin: "50% 50%" }}>
+          <text x="50" y="2" fontSize="4" fill="var(--fg-3)" textAnchor="middle">HOOK</text>
+          <text x="98" y="52" fontSize="4" fill="var(--fg-3)" textAnchor="middle">RES</text>
+          <text x="50" y="105" fontSize="4" fill="var(--fg-3)" textAnchor="middle">DENSITY</text>
+          <text x="2" y="52" fontSize="4" fill="var(--fg-3)" textAnchor="middle">AUTH</text>
+          <g className="radar-sweep">
             <defs>
               <linearGradient id="sweepG" x1="50%" y1="50%" x2="100%" y2="50%">
                 <stop offset="0%" stopColor="var(--accent-green)" stopOpacity="0.4" />

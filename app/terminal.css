@@ -540,13 +540,18 @@
 .radar {
   position: relative;
   aspect-ratio: 1;
-  padding: 14px;
+  padding: 10px 10px 14px 10px;
 }
-.radar svg { width: 100%; height: 100%; display: block; }
+.radar svg { width: 100%; height: 100%; display: block; overflow: visible; }
 .radar-ring { stroke: var(--border-1); fill: none; }
 .radar-ring.mid { stroke: var(--border-2); stroke-dasharray: 2 3; }
 .radar-sweep {
-  transform-origin: center;
+  /* transform-box: fill-box + 50% 50% is the correct spell for SVG <g>
+     rotation — plain `transform-origin: center` or `50%` is interpreted in
+     element-box coords (0, 0) in most browsers and pins rotation to the
+     SVG origin instead of the radar center. */
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
   animation: sweep 6s linear infinite;
 }
 @keyframes sweep { to { transform: rotate(360deg); } }
@@ -589,6 +594,34 @@
 }
 .topic.hot { color: var(--accent-orange); border-color: rgba(255,166,87,0.25); background: rgba(255,166,87,0.04); }
 .topic.hot .n { color: var(--accent-orange); opacity: 0.8; }
+
+/* day picker (horizontal pill strip, /all page) */
+.day-picker { scrollbar-color: var(--border-2) transparent; }
+.day-picker::-webkit-scrollbar { height: 4px; }
+.day-picker::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 2px; }
+.day-pill {
+  flex-shrink: 0;
+  display: inline-flex; align-items: baseline; gap: 6px;
+  padding: 4px 10px;
+  background: var(--bg-1);
+  border: 1px dashed var(--border-1);
+  color: var(--fg-2);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  text-decoration: none;
+  border-radius: 2px;
+  transition: all var(--dur-fast) var(--ease);
+  font-variant-numeric: tabular-nums;
+}
+.day-pill:hover { color: var(--fg-0); border-color: var(--border-2); }
+.day-pill .n { color: var(--fg-3); font-size: 10px; }
+.day-pill[data-active="true"] {
+  color: var(--accent-green);
+  border-color: var(--accent-green);
+  border-style: solid;
+  background: var(--tint-green-08, rgba(63,185,80,0.08));
+}
+.day-pill[data-active="true"] .n { color: var(--accent-green); opacity: 0.7; }
 
 /* watchlist */
 .watch-row {

@@ -2,16 +2,20 @@ import { setRequestLocale } from "next-intl/server";
 import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
 import { Item } from "@/components/feed/item";
+import { DayPicker } from "@/components/feed/day-picker";
 import { DayBreak } from "../_day-break";
 import { HomeFilters, type SourcePreset } from "../_home-filters";
 import { getFeaturedStories } from "@/lib/items/live";
 import {
+  getDayCounts,
   getPulseData,
   getRadarStats,
 } from "@/lib/shell/dashboard-stats";
 import type { Story } from "@/lib/types";
 
 export const revalidate = 60;
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 const SOURCE_PRESETS = new Set<SourcePreset>([
   "all",
@@ -46,26 +50,31 @@ export default async function AllPostsPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ source?: string }>;
+  searchParams: Promise<{ source?: string; date?: string }>;
 }) {
   const [{ locale }, sp] = await Promise.all([params, searchParams]);
   setRequestLocale(locale);
   const sourcePreset = coerceSource(sp.source);
   const sourceFilter = presetToFilter(sourcePreset);
+  const activeDate = sp.date && DATE_RE.test(sp.date) ? sp.date : undefined;
+  // When a day is picked, show everything from that day; otherwise show the
+  // latest 120 across all days. 80 was too tight once backfill landed.
+  const limit = activeDate ? 500 : 120;
 
   let stories: Story[] = [];
   try {
     stories = await getFeaturedStories({
       tier: "all",
       locale: locale as "zh" | "en",
-      limit: 80,
+      limit,
+      date: activeDate,
       ...sourceFilter,
     });
   } catch {
     stories = [];
   }
 
-  const [stats, pulse] = await Promise.all([
+  const [stats, pulse, days] = await Promise.all([
     getRadarStats().catch(() => ({
       items_today: 0,
       items_p1: 0,
@@ -73,6 +82,7 @@ export default async function AllPostsPage({
       tracked_sources: 0,
     })),
     getPulseData().catch(() => []),
+    getDayCounts(30).catch(() => []),
   ]);
 
   const grouped = groupByDay(stories);
@@ -90,8 +100,8 @@ export default async function AllPostsPage({
     >
       <main className="main">
         <PageHead
-          en="all posts"
-          cjk="全部"
+          en={activeDate ? `posts · ${activeDate}` : "all posts"}
+          cjk={activeDate ? `全部 · ${activeDate}` : "全部"}
           count={stories.length}
           countLabel="items"
         />
@@ -99,6 +109,13 @@ export default async function AllPostsPage({
             — users get here via /all which itself IS tier=all on the server. We still
             want the source-filter pills. */}
         <HomeFilters tier="featured" source={sourcePreset} />
+        <DayPicker
+          days={days}
+          active={activeDate}
+          basePath={`/${locale}/all`}
+          preserveSource={sourcePreset}
+          locale={locale as "en" | "zh"}
+        />
         <div className="feed">
           {Object.entries(grouped).map(([dayKey, list]) => (
             <div key={dayKey}>

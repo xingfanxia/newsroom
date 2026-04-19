@@ -56,12 +56,11 @@ const FALLBACK_TICKER = [
   { lab: "AX-RADAR", val: "ingest pipeline healthy", kind: "hot" as const, extra: "ok" },
 ];
 
-const DEMO_WATCHLIST = [
-  { q: "gpt-6", hits: 24, delta: 8 },
-  { q: "agentic IDE", hits: 17, delta: 5 },
-  { q: "humanoid robot", hits: 9, delta: 2 },
-  { q: "MoE-72B", hits: 14, delta: 0 },
-];
+// Empty default — WatchlistPanel fetches the user's own terms from
+// `/api/tweaks` on mount. If they've never added any, the panel renders the
+// "no terms yet" empty state with an inline add control. No more demo
+// placeholder queries leaking into production.
+const DEFAULT_WATCHLIST: { q: string; hits: number; delta: number }[] = [];
 
 export default async function HotNewsPage({
   params,
@@ -168,7 +167,7 @@ export default async function HotNewsPage({
       </main>
       <RightRail
         stats={radarStats}
-        watchlist={DEMO_WATCHLIST}
+        watchlist={DEFAULT_WATCHLIST}
         topics={topics}
         policyVersion={policy.version}
         lastIterAt={policy.lastIterAt ?? undefined}
