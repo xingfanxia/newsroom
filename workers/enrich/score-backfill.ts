@@ -108,11 +108,16 @@ export async function runScoreBackfill(): Promise<ScoreBackfillReport> {
             maxTokens: 2048,
           });
           const s: ScoreOutput = result.data;
+          // Mirror enrichOne: YT sources never go to 'excluded' — floor at
+          // 'all' so the backfill can't drop hand-picked podcasts off the feed.
+          const isYoutube = item.sourceId.endsWith("-yt");
+          const finalTier =
+            isYoutube && s.tier === "excluded" ? "all" : s.tier;
           await client
             .update(items)
             .set({
               importance: s.importance,
-              tier: s.tier,
+              tier: finalTier,
               hkr: s.hkr,
               reasoningZh: s.reasoningZh,
               reasoningEn: s.reasoningEn,

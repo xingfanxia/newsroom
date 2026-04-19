@@ -195,6 +195,16 @@ async function enrichOne(item: Item, policy: PolicyT): Promise<void> {
     throw tag(err, "score");
   }
 
+  // YouTube channels are hand-picked long-form interviews; even off-topic
+  // episodes (Dwarkesh x Sarah Paine on USSR history, thevalley101 on
+  // restaurant export) are interesting to the operator by virtue of being
+  // on the allow-list at all. Floor the scorer's tier at "all" so nothing
+  // gets dropped to excluded — low importance is still preserved so they
+  // sort below curated AI content, they just stay browseable.
+  const isYoutube = item.sourceId.endsWith("-yt");
+  const finalTier =
+    isYoutube && scored.tier === "excluded" ? "all" : scored.tier;
+
   // ── Stage 4: persist (commentary runs in a separate worker) ──
   await client
     .update(items)
@@ -205,7 +215,7 @@ async function enrichOne(item: Item, policy: PolicyT): Promise<void> {
       summaryEn: enriched.summaryEn,
       tags: enriched.tags,
       importance: scored.importance,
-      tier: scored.tier,
+      tier: finalTier,
       hkr: scored.hkr,
       reasoningZh: scored.reasoningZh,
       reasoningEn: scored.reasoningEn,
