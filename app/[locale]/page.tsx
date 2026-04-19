@@ -5,10 +5,12 @@ import { PageHead } from "@/components/shell/page-head";
 import { Ticker } from "@/components/feed/ticker";
 import { Item } from "@/components/feed/item";
 import { RightRail } from "@/components/feed/right-rail";
+import { CalendarGrid } from "@/components/feed/calendar-grid";
 import { DayBreak } from "./_day-break";
 import { HomeFilters, type HomeTier, type SourcePreset } from "./_home-filters";
 import { getFeaturedStories } from "@/lib/items/live";
 import {
+  getDayCounts,
   getPolicySummary,
   getPulseData,
   getRadarStats,
@@ -17,6 +19,8 @@ import {
 import { getRecentTickerItems } from "@/lib/shell/ticker";
 import { mockStories } from "@/lib/mock/stories";
 import type { Story } from "@/lib/types";
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export const revalidate = 60;
 
@@ -67,12 +71,13 @@ export default async function HotNewsPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ tier?: string; source?: string }>;
+  searchParams: Promise<{ tier?: string; source?: string; date?: string }>;
 }) {
   const [{ locale }, sp] = await Promise.all([params, searchParams]);
   if (sp.tier === "all") {
     const qs = new URLSearchParams();
     if (sp.source) qs.set("source", sp.source);
+    if (sp.date) qs.set("date", sp.date);
     const search = qs.toString();
     redirect(`/${locale}/all${search ? `?${search}` : ""}`);
   }
@@ -80,13 +85,18 @@ export default async function HotNewsPage({
   const tier = coerceTier(sp.tier);
   const sourcePreset = coerceSource(sp.source);
   const sourceFilter = presetToFilter(sourcePreset);
+  const activeDate = sp.date && DATE_RE.test(sp.date) ? sp.date : undefined;
+  // Day picked → show everything curated that day. Unfiltered top-featured
+  // view bumps to 120 (was 40 and people kept asking where the rest went).
+  const limit = activeDate ? 500 : 120;
 
   let stories: Story[] = [];
   try {
     stories = await getFeaturedStories({
       tier,
       locale: locale as "zh" | "en",
-      limit: 40,
+      limit,
+      date: activeDate,
       ...sourceFilter,
     });
   } catch {
@@ -95,7 +105,7 @@ export default async function HotNewsPage({
 
   // Cold-start fallback: if there's literally no enriched content, show mock
   // so the shell renders something sensible.
-  if (stories.length === 0 && tier === "featured" && sourcePreset === "all") {
+  if (stories.length === 0 && tier === "featured" && sourcePreset === "all" && !activeDate) {
     try {
       const probe = await getFeaturedStories({
         tier: "all",
@@ -108,7 +118,7 @@ export default async function HotNewsPage({
     }
   }
 
-  const [radarStats, pulse, topics, policy, tickerItems] = await Promise.all([
+  const [radarStats, pulse, topics, policy, tickerItems, days] = await Promise.all([
     getRadarStats().catch(() => ({
       items_today: 0,
       items_p1: 0,
@@ -119,6 +129,7 @@ export default async function HotNewsPage({
     getTopTopics().catch(() => []),
     getPolicySummary().catch(() => ({ version: "v1", lastIterAt: null })),
     getRecentTickerItems(locale as "zh" | "en").catch(() => []),
+    getDayCounts(60).catch(() => []),
   ]);
   const ticker = tickerItems.length > 0 ? tickerItems : FALLBACK_TICKER;
 
@@ -141,14 +152,22 @@ export default async function HotNewsPage({
     >
       <main className="main">
         <PageHead
-          en="hot feed"
-          cjk="热点资讯"
+          en={activeDate ? `hot feed · ${activeDate}` : "hot feed"}
+          cjk={activeDate ? `热点资讯 · ${activeDate}` : "热点资讯"}
           count={stories.length}
           live={<>live · {radarStats.items_today} today</>}
           policyLabel={`policy ${policy.version}`}
         />
         <Ticker items={ticker} />
         <HomeFilters tier={tier} source={sourcePreset} />
+        <CalendarGrid
+          days={days}
+          active={activeDate}
+          basePath={`/${locale}`}
+          preserveSource={sourcePreset}
+          locale={locale as "en" | "zh"}
+          monthsBack={2}
+        />
         <div className="feed">
           {Object.entries(grouped).map(([dayKey, stories]) => (
             <div key={dayKey}>

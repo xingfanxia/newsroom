@@ -595,10 +595,123 @@
 .topic.hot { color: var(--accent-orange); border-color: rgba(255,166,87,0.25); background: rgba(255,166,87,0.04); }
 .topic.hot .n { color: var(--accent-orange); opacity: 0.8; }
 
-/* day picker (horizontal pill strip, /all page) */
-.day-picker { scrollbar-color: var(--border-2) transparent; }
-.day-picker::-webkit-scrollbar { height: 4px; }
-.day-picker::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 2px; }
+/* calendar grid — month view with activity-scaled cells (/all + home) */
+.calendar-wrap {
+  border: 1px solid var(--border-1);
+  background: var(--bg-1);
+  margin: 12px 0;
+}
+.calendar-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border-1);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+  background: var(--bg-0);
+}
+.calendar-head .t { color: var(--fg-1); font-weight: 500; }
+.calendar-head .meta {
+  color: var(--fg-3);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  font-size: 10.5px;
+}
+.calendar-head .clear {
+  color: var(--accent-red);
+  text-decoration: none;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  font-size: 10.5px;
+}
+.calendar-head .clear:hover { color: var(--fg-0); }
+
+.calendar-months {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 0;
+}
+.calendar-month {
+  padding: 10px 14px 14px;
+  border-right: 1px dashed var(--border-1);
+}
+.calendar-month:last-child { border-right: 0; }
+.calendar-month-hd {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-0);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.calendar-dow {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  font-size: 9px;
+  color: var(--fg-3);
+  letter-spacing: 0.08em;
+  margin-bottom: 4px;
+}
+.calendar-dow span {
+  text-align: center;
+  padding: 2px 0;
+  font-family: var(--font-mono);
+}
+.calendar-cells {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+.calendar-cell {
+  aspect-ratio: 1.1 / 1;
+  min-height: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  border: 1px solid transparent;
+  background: var(--bg-2);
+  color: var(--fg-3);
+  font-family: var(--font-mono);
+  text-decoration: none;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  transition: border 0.12s ease, transform 0.12s ease;
+}
+.calendar-cell.empty { background: transparent; visibility: hidden; }
+.calendar-cell.future { background: var(--bg-1); color: var(--fg-4); cursor: default; opacity: 0.4; }
+.calendar-cell:hover:not(.future):not(.empty) {
+  border-color: var(--accent-green);
+  transform: translateY(-1px);
+}
+.calendar-cell[data-active="true"] {
+  border-color: var(--accent-green);
+  box-shadow: 0 0 8px rgba(63, 185, 80, 0.35);
+}
+.calendar-cell[data-empty="true"] {
+  background: var(--bg-0);
+  color: var(--fg-4);
+}
+.calendar-cell .d { font-size: 12px; font-weight: 500; line-height: 1; }
+.calendar-cell .n {
+  font-size: 8.5px;
+  opacity: 0.8;
+  color: inherit;
+  line-height: 1;
+}
+
+@media (max-width: 720px) {
+  .calendar-months { grid-template-columns: 1fr; }
+  .calendar-month { border-right: 0; border-bottom: 1px dashed var(--border-1); }
+  .calendar-cell { min-height: 36px; }
+}
+
+/* day pills — still used by the admin/usage range switcher even though the
+   horizontal day-picker strip was retired in favor of the calendar grid. */
 .day-pill {
   flex-shrink: 0;
   display: inline-flex; align-items: baseline; gap: 6px;

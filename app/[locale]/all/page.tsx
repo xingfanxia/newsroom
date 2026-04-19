@@ -2,7 +2,7 @@ import { setRequestLocale } from "next-intl/server";
 import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
 import { Item } from "@/components/feed/item";
-import { DayPicker } from "@/components/feed/day-picker";
+import { CalendarGrid } from "@/components/feed/calendar-grid";
 import { DayBreak } from "../_day-break";
 import { HomeFilters, type SourcePreset } from "../_home-filters";
 import { getFeaturedStories } from "@/lib/items/live";
@@ -82,7 +82,7 @@ export default async function AllPostsPage({
       tracked_sources: 0,
     })),
     getPulseData().catch(() => []),
-    getDayCounts(30).catch(() => []),
+    getDayCounts(60).catch(() => []),
   ]);
 
   const grouped = groupByDay(stories);
@@ -109,12 +109,13 @@ export default async function AllPostsPage({
             — users get here via /all which itself IS tier=all on the server. We still
             want the source-filter pills. */}
         <HomeFilters tier="featured" source={sourcePreset} />
-        <DayPicker
+        <CalendarGrid
           days={days}
           active={activeDate}
           basePath={`/${locale}/all`}
           preserveSource={sourcePreset}
           locale={locale as "en" | "zh"}
+          monthsBack={3}
         />
         <div className="feed">
           {Object.entries(grouped).map(([dayKey, list]) => (
