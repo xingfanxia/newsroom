@@ -2,15 +2,24 @@ import { setRequestLocale } from "next-intl/server";
 import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
 import { getRadarStats } from "@/lib/shell/dashboard-stats";
-import {
-  totalsByWindow,
-  breakdownByTask,
-  breakdownByModel,
-  recentCalls,
-} from "@/lib/llm/stats";
+import { getSystemSnapshot } from "@/lib/shell/system-stats";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * /admin/system — infrastructure observability view matching the design
+ * demo. Renders:
+ *
+ *  - 4-tile hero (services up / queue depth / p95 / errors 24h)
+ *  - banner when any enabled source is in error status
+ *  - service grid from `source_health` (one card per enabled source)
+ *  - pipeline queues (normalize / enrich / commentary / score depths)
+ *  - cron schedule mirrored from `vercel.json`
+ *  - 24h error log from `source_health.last_error`
+ *
+ * Spend tables moved to /admin/usage in s8 — if you're looking for LLM
+ * cost, that's the dedicated view now.
+ */
 export default async function SystemPage({
   params,
 }: {
@@ -18,300 +27,404 @@ export default async function SystemPage({
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
+  const zh = locale === "zh";
 
-  const [today, week, month, taskWeek, modelWeek, recent, stats] = await Promise.all([
-    totalsByWindow("today"),
-    totalsByWindow("week"),
-    totalsByWindow("month"),
-    breakdownByTask("week"),
-    breakdownByModel("week"),
-    recentCalls(20),
+  const [snap, stats] = await Promise.all([
+    getSystemSnapshot(),
     getRadarStats().catch(() => ({
-      items_today: 0, items_p1: 0, items_featured: 0, tracked_sources: 0,
+      items_today: 0,
+      items_p1: 0,
+      items_featured: 0,
+      tracked_sources: 0,
     })),
   ]);
+
+  const totalSvc = snap.services.length;
+  const healthy = snap.counts.healthy;
+  const degraded = snap.counts.degraded;
+  const errorCount = snap.counts.error;
+  const queueDepthTotal = snap.queues.reduce((a, q) => a + q.depth, 0);
+  const recentErrors24h = snap.errors.length;
 
   return (
     <ViewShell
       locale={locale as "en" | "zh"}
       stats={{ tracked_sources: stats.tracked_sources, signal_ratio: 0.72 }}
       crumb="~/admin/system"
-      cmd="sar -u 1 3 | tail"
+      cmd="htop -u ax-radar && tail -f /var/log/ax/*.log"
     >
       <main className="main">
         <PageHead
           en="system"
           cjk="系统"
-          extra={<span>LLM cost + recent calls · hourly cron metrics</span>}
+          live={`${healthy}/${totalSvc} healthy`}
+          extra={
+            <span>
+              {zh ? "worker 队列、调度与错误日志" : "worker queues · schedules · error log"}
+            </span>
+          }
+          policyLabel={`${errorCount ? "⚠ " : ""}${errorCount} err`}
         />
-        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-          {/* Spend cards */}
-          <section className="grid grid-cols-3 gap-4">
-            <SpendCard label="Today" totals={today} />
-            <SpendCard label="Past 7 days" totals={week} />
-            <SpendCard label="Past 30 days" totals={month} />
-          </section>
 
-          {/* Breakdowns */}
-          <section className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <div className="surface-card p-5">
-              <h2 className="mb-3 text-[14px] font-[590]">
-                Spend by task (7d)
-              </h2>
-              <TaskTable rows={taskWeek} />
-            </div>
-            <div className="surface-card p-5">
-              <h2 className="mb-3 text-[14px] font-[590]">
-                Spend by model (7d)
-              </h2>
-              <ModelTable rows={modelWeek} />
-            </div>
-          </section>
+        {(errorCount > 0 || degraded > 0) && (
+          <div className="banner warn">
+            <span className="ic">WARN</span>
+            <span className="msg">
+              <b>
+                {errorCount} {zh ? "个信源报错" : "source(s) errored"}
+              </b>
+              {degraded > 0 && (
+                <>
+                  {" · "}
+                  {degraded} {zh ? "降级中" : "degraded"}
+                </>
+              )}
+              {zh
+                ? " — 查看下方服务网格与错误日志排查。"
+                : " — see the service grid + error log below to triage."}
+            </span>
+          </div>
+        )}
 
-          {/* Recent calls */}
-          <section className="surface-card p-5">
-            <h2 className="mb-3 text-[14px] font-[590]">Recent LLM calls</h2>
-            <RecentTable rows={recent} locale={locale} />
-          </section>
+        {/* hero tiles */}
+        <div className="tiles">
+          <div className="tile">
+            <div className="t-lbl">
+              <span>
+                services up<span className="cn">服务在线</span>
+              </span>
+            </div>
+            <div
+              className="t-val"
+              style={{
+                color: errorCount > 0 ? "var(--accent-red)" : "var(--fg-0)",
+              }}
+            >
+              {healthy}/{totalSvc}
+            </div>
+            <div className="t-sub">
+              <span className="up">● healthy</span>
+              {degraded > 0 && <span className="down">{degraded} degraded</span>}
+              {errorCount > 0 && <span className="down">{errorCount} error</span>}
+            </div>
+          </div>
+          <div className="tile">
+            <div className="t-lbl">
+              <span>
+                queue depth<span className="cn">队列深度</span>
+              </span>
+            </div>
+            <div className="t-val">{queueDepthTotal}</div>
+            <div className="t-sub">
+              <span>
+                {zh ? "跨" : "across"} {snap.queues.length}{" "}
+                {zh ? "条队列" : "queues"}
+              </span>
+            </div>
+          </div>
+          <div className="tile">
+            <div className="t-lbl">
+              <span>
+                errors · 24h<span className="cn">24h 错误</span>
+              </span>
+            </div>
+            <div
+              className="t-val"
+              style={{
+                color:
+                  recentErrors24h > 5
+                    ? "var(--accent-red)"
+                    : recentErrors24h > 0
+                      ? "var(--accent-orange)"
+                      : "var(--accent-green)",
+              }}
+            >
+              {recentErrors24h}
+            </div>
+            <div className="t-sub">
+              <span>{zh ? "来自启用的信源" : "from enabled sources"}</span>
+            </div>
+          </div>
+          <div className="tile">
+            <div className="t-lbl">
+              <span>
+                cron jobs<span className="cn">定时</span>
+              </span>
+            </div>
+            <div className="t-val">{snap.cron.length}</div>
+            <div className="t-sub">
+              <span>vercel.json</span>
+            </div>
+          </div>
+        </div>
+
+        {/* services grid */}
+        <SectionHeader
+          title={zh ? "服务 · services" : "services · 服务"}
+          meta={`${totalSvc}`}
+        />
+        <div className="svc-grid">
+          {snap.services.map((s) => (
+            <div key={s.id} className={`svc-card ${s.status}`}>
+              <div className="name">
+                <span className={`sd ${s.status}`} />
+                {s.name}
+              </div>
+              <div className="ver">{s.version}</div>
+              <div className="meta">
+                <span>up {s.uptime}</span>
+              </div>
+              {s.note && <div className="note">⚠ {s.note}</div>}
+            </div>
+          ))}
+        </div>
+
+        {/* queues + cron + errors */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: 18,
+            marginTop: 18,
+          }}
+        >
+          <div>
+            <SectionHeader title={zh ? "队列 · queues" : "queues · 队列"} />
+            <div
+              style={{
+                background: "var(--bg-1)",
+                border: "1px solid var(--border-1)",
+              }}
+            >
+              <table className="dt">
+                <thead>
+                  <tr>
+                    <th>{zh ? "队列" : "queue"}</th>
+                    <th className="right">{zh ? "深度" : "depth"}</th>
+                    <th className="right">{zh ? "速率" : "rate"}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {snap.queues.map((q) => (
+                    <tr key={q.name}>
+                      <td
+                        style={{
+                          color: "var(--fg-0)",
+                          fontFamily: "var(--font-mono)",
+                        }}
+                      >
+                        {q.name}
+                      </td>
+                      <td
+                        className="right"
+                        style={{
+                          color:
+                            q.depth > 500
+                              ? "var(--accent-orange)"
+                              : "var(--fg-1)",
+                          fontWeight: 500,
+                        }}
+                      >
+                        {q.depth.toLocaleString()}
+                      </td>
+                      <td className="right">
+                        <span className="muted">{q.rate}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <SectionHeader
+              title={zh ? "定时 · cron" : "cron · 定时"}
+              extraStyle={{ marginTop: 16 }}
+            />
+            <div
+              style={{
+                background: "var(--bg-1)",
+                border: "1px solid var(--border-1)",
+              }}
+            >
+              <table className="dt">
+                <thead>
+                  <tr>
+                    <th>{zh ? "任务" : "job"}</th>
+                    <th>{zh ? "调度" : "schedule"}</th>
+                    <th>{zh ? "节奏" : "cadence"}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {snap.cron.map((c) => (
+                    <tr key={c.name}>
+                      <td
+                        style={{
+                          color: "var(--fg-0)",
+                          fontFamily: "var(--font-mono)",
+                        }}
+                      >
+                        <span className="sd healthy" />
+                        {c.name}
+                      </td>
+                      <td>
+                        <code
+                          style={{
+                            color: "var(--accent-blue)",
+                            fontSize: 10.5,
+                            fontFamily: "var(--font-mono)",
+                          }}
+                        >
+                          {c.schedule}
+                        </code>
+                      </td>
+                      <td>
+                        <span className="muted">{c.next}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div>
+            <SectionHeader
+              title={zh ? "24h 错误" : "errors · 24h"}
+              meta={
+                snap.errors.length > 0
+                  ? `${snap.errors.filter((e) => e.level === "error").length} err · ${snap.errors.filter((e) => e.level === "warn").length} warn`
+                  : "—"
+              }
+              metaColor={
+                snap.errors.length > 0 ? "var(--accent-red)" : "var(--fg-3)"
+              }
+            />
+            <div
+              style={{
+                background: "var(--bg-0)",
+                border: "1px solid var(--border-1)",
+                fontFamily: "var(--font-mono)",
+                fontSize: 11,
+                maxHeight: 420,
+                overflow: "auto",
+              }}
+            >
+              {snap.errors.length === 0 ? (
+                <div
+                  style={{
+                    padding: 18,
+                    color: "var(--fg-3)",
+                    fontSize: 11,
+                    textAlign: "center",
+                  }}
+                >
+                  {zh ? "无错误 · 全部启用信源正常" : "no errors — all enabled sources green"}
+                </div>
+              ) : (
+                snap.errors.map((e, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      padding: "8px 12px",
+                      borderBottom: "1px dashed var(--border-1)",
+                      display: "grid",
+                      gridTemplateColumns: "auto auto 1fr",
+                      gap: 10,
+                      alignItems: "baseline",
+                    }}
+                  >
+                    <span style={{ color: "var(--fg-3)", fontSize: 10.5 }}>
+                      {e.t}
+                    </span>
+                    <span
+                      style={{
+                        color:
+                          e.level === "error"
+                            ? "var(--accent-red)"
+                            : e.level === "warn"
+                              ? "var(--accent-orange)"
+                              : "var(--accent-blue)",
+                        fontSize: 10,
+                        letterSpacing: "0.08em",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      [{e.level}]
+                    </span>
+                    <span style={{ color: "var(--fg-1)" }}>
+                      <span style={{ color: "var(--accent-blue)" }}>
+                        {e.svc}
+                      </span>{" "}
+                      <span style={{ color: "var(--fg-3)" }}>{e.code}</span> —{" "}
+                      {e.msg}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+            <div
+              style={{
+                padding: 10,
+                fontSize: 10.5,
+                color: "var(--fg-3)",
+                display: "flex",
+                gap: 12,
+                alignItems: "center",
+              }}
+            >
+              <span style={{ color: "var(--accent-green)" }}>
+                ● {zh ? "实时监控 source_health" : "tailing source_health"}
+              </span>
+              <span style={{ marginLeft: "auto" }}>
+                <a
+                  style={{
+                    color: "var(--accent-blue)",
+                    textDecoration: "none",
+                  }}
+                  href={`/${locale}/admin/usage`}
+                >
+                  {zh ? "→ 用量仪表盘" : "→ usage dashboard"}
+                </a>
+              </span>
+            </div>
+          </div>
         </div>
       </main>
     </ViewShell>
   );
 }
 
-function SpendCard({
-  label,
-  totals,
+function SectionHeader({
+  title,
+  meta,
+  metaColor,
+  extraStyle,
 }: {
-  label: string;
-  totals: {
-    calls: number;
-    inputTokens: number;
-    cachedInputTokens: number;
-    outputTokens: number;
-    reasoningTokens: number;
-    costUsd: number;
-  };
+  title: string;
+  meta?: string;
+  metaColor?: string;
+  extraStyle?: React.CSSProperties;
 }) {
   return (
-    <div className="surface-card p-5">
-      <div className="text-[12px] uppercase tracking-wider text-[var(--color-fg-dim)]">
-        {label}
-      </div>
-      <div className="mt-2 font-mono text-[28px] font-[510] tabular text-[var(--color-cyan)]">
-        ${totals.costUsd.toFixed(4)}
-      </div>
-      <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[12px] text-[var(--color-fg-dim)]">
-        <span>Calls</span>
-        <span className="text-right tabular">{totals.calls}</span>
-        <span>Input tok.</span>
-        <span className="text-right tabular">
-          {formatTokens(totals.inputTokens)}
+    <h3
+      style={{
+        fontSize: 11,
+        color: "var(--fg-3)",
+        letterSpacing: "0.1em",
+        textTransform: "uppercase",
+        margin: "16px 0 8px",
+        fontWeight: 500,
+        display: "flex",
+        justifyContent: "space-between",
+        ...extraStyle,
+      }}
+    >
+      <span>{title}</span>
+      {meta && (
+        <span style={{ color: metaColor ?? "var(--fg-0)", fontWeight: 500 }}>
+          {meta}
         </span>
-        <span>Cached input</span>
-        <span className="text-right tabular">
-          {formatTokens(totals.cachedInputTokens)}
-        </span>
-        <span>Output tok.</span>
-        <span className="text-right tabular">
-          {formatTokens(totals.outputTokens)}
-        </span>
-        {totals.reasoningTokens > 0 && (
-          <>
-            <span>Reasoning</span>
-            <span className="text-right tabular">
-              {formatTokens(totals.reasoningTokens)}
-            </span>
-          </>
-        )}
-      </div>
-    </div>
+      )}
+    </h3>
   );
-}
-
-function TaskTable({
-  rows,
-}: {
-  rows: {
-    task: string | null;
-    calls: number;
-    inputTokens: number;
-    outputTokens: number;
-    costUsd: number;
-  }[];
-}) {
-  if (rows.length === 0) {
-    return (
-      <p className="text-[13px] text-[var(--color-fg-dim)]">
-        No activity in the last 7 days.
-      </p>
-    );
-  }
-  return (
-    <table className="w-full text-[13px]">
-      <thead className="text-[11px] uppercase tracking-wider text-[var(--color-fg-dim)]">
-        <tr>
-          <th className="py-1 text-left">Task</th>
-          <th className="py-1 text-right">Calls</th>
-          <th className="py-1 text-right">Input</th>
-          <th className="py-1 text-right">Output</th>
-          <th className="py-1 text-right">Cost</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((r) => (
-          <tr
-            key={r.task ?? "untagged"}
-            className="border-t border-[var(--color-border-subtle)]"
-          >
-            <td className="py-1 font-[510] text-[var(--color-fg-muted)]">
-              {r.task ?? "untagged"}
-            </td>
-            <td className="py-1 text-right tabular">{r.calls}</td>
-            <td className="py-1 text-right tabular">
-              {formatTokens(r.inputTokens)}
-            </td>
-            <td className="py-1 text-right tabular">
-              {formatTokens(r.outputTokens)}
-            </td>
-            <td className="py-1 text-right font-mono tabular text-[var(--color-cyan)]">
-              ${r.costUsd.toFixed(4)}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
-
-function ModelTable({
-  rows,
-}: {
-  rows: { provider: string; model: string; calls: number; costUsd: number }[];
-}) {
-  if (rows.length === 0) {
-    return (
-      <p className="text-[13px] text-[var(--color-fg-dim)]">
-        No activity in the last 7 days.
-      </p>
-    );
-  }
-  return (
-    <table className="w-full text-[13px]">
-      <thead className="text-[11px] uppercase tracking-wider text-[var(--color-fg-dim)]">
-        <tr>
-          <th className="py-1 text-left">Model</th>
-          <th className="py-1 text-right">Calls</th>
-          <th className="py-1 text-right">Cost</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((r) => (
-          <tr
-            key={`${r.provider}/${r.model}`}
-            className="border-t border-[var(--color-border-subtle)]"
-          >
-            <td className="py-1 font-[510] text-[var(--color-fg-muted)]">
-              <div>{r.model}</div>
-              <div className="text-[11px] text-[var(--color-fg-dim)]">
-                {r.provider}
-              </div>
-            </td>
-            <td className="py-1 text-right tabular">{r.calls}</td>
-            <td className="py-1 text-right font-mono tabular text-[var(--color-cyan)]">
-              ${r.costUsd.toFixed(4)}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
-
-function RecentTable({
-  rows,
-  locale,
-}: {
-  rows: {
-    id: number;
-    task: string | null;
-    model: string;
-    inputTokens: number;
-    cachedInputTokens: number;
-    outputTokens: number;
-    reasoningTokens: number;
-    costUsd: number | null;
-    durationMs: number | null;
-    createdAt: Date;
-  }[];
-  locale: string;
-}) {
-  if (rows.length === 0) {
-    return (
-      <p className="text-[13px] text-[var(--color-fg-dim)]">
-        No calls recorded yet. Usage rows populate as workers run.
-      </p>
-    );
-  }
-  const timeFmt = new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-  return (
-    <table className="w-full text-[13px]">
-      <thead className="text-[11px] uppercase tracking-wider text-[var(--color-fg-dim)]">
-        <tr>
-          <th className="py-1 text-left">Time</th>
-          <th className="py-1 text-left">Task</th>
-          <th className="py-1 text-left">Model</th>
-          <th className="py-1 text-right">In</th>
-          <th className="py-1 text-right">Cached</th>
-          <th className="py-1 text-right">Out</th>
-          <th className="py-1 text-right">Reasoning</th>
-          <th className="py-1 text-right">Dur</th>
-          <th className="py-1 text-right">Cost</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((r) => (
-          <tr
-            key={r.id}
-            className="border-t border-[var(--color-border-subtle)]"
-          >
-            <td className="py-1 font-mono text-[12px] text-[var(--color-fg-dim)]">
-              {timeFmt.format(r.createdAt)}
-            </td>
-            <td className="py-1 text-[var(--color-fg-muted)]">
-              {r.task ?? "—"}
-            </td>
-            <td className="py-1 font-mono text-[12px] text-[var(--color-fg-muted)]">
-              {r.model}
-            </td>
-            <td className="py-1 text-right tabular">{r.inputTokens}</td>
-            <td className="py-1 text-right tabular">
-              {r.cachedInputTokens || "—"}
-            </td>
-            <td className="py-1 text-right tabular">{r.outputTokens}</td>
-            <td className="py-1 text-right tabular">
-              {r.reasoningTokens || "—"}
-            </td>
-            <td className="py-1 text-right tabular text-[var(--color-fg-dim)]">
-              {r.durationMs ? `${(r.durationMs / 1000).toFixed(1)}s` : "—"}
-            </td>
-            <td className="py-1 text-right font-mono tabular text-[var(--color-cyan)]">
-              {r.costUsd !== null ? `$${r.costUsd.toFixed(6)}` : "—"}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
-
-function formatTokens(n: number): string {
-  if (n < 1000) return n.toString();
-  if (n < 1_000_000) return `${(n / 1000).toFixed(1)}K`;
-  return `${(n / 1_000_000).toFixed(2)}M`;
 }

@@ -144,6 +144,38 @@ export type RecentCall = {
   createdAt: Date;
 };
 
+/** Daily-spend series for the usage page sparkline. Returns last `days`
+ *  buckets newest-first-by-default, each with its ISO date + spend. Zeroes
+ *  fill gaps so the bar chart keeps a stable width. */
+export type DailySpendPoint = { date: string; spend: number; calls: number };
+export async function dailySpend(days = 30): Promise<DailySpendPoint[]> {
+  const client = db();
+  const result = await client.execute(sql`
+    WITH series AS (
+      SELECT to_char(d::date, 'YYYY-MM-DD') AS date
+      FROM generate_series(
+        (now() - (${days - 1} * interval '1 day'))::date,
+        now()::date,
+        interval '1 day'
+      ) AS d
+    )
+    SELECT
+      s.date,
+      coalesce(sum(u.cost_usd), 0)::float AS spend,
+      coalesce(count(u.id), 0)::int AS calls
+    FROM series s
+    LEFT JOIN llm_usage u
+      ON to_char(date_trunc('day', u.created_at), 'YYYY-MM-DD') = s.date
+    GROUP BY s.date
+    ORDER BY s.date ASC
+  `);
+  return asRows(result).map((r) => ({
+    date: String(r.date),
+    spend: Number(r.spend ?? 0),
+    calls: Number(r.calls ?? 0),
+  }));
+}
+
 export async function recentCalls(limit = 25): Promise<RecentCall[]> {
   const client = db();
   const rows = await client
