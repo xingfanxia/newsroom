@@ -152,6 +152,14 @@ export default async function SavedPage({
               <span style={{ color: "var(--fg-3)", fontSize: 10.5 }}>
                 {stories.length} {locale === "zh" ? "条" : "saved"}
               </span>
+              <span style={{ flex: 1 }} />
+              <a
+                href={`/api/saved/export?collection=${activeId}&locale=${locale}`}
+                className="act-btn"
+                style={{ fontSize: 10.5, padding: "4px 10px" }}
+              >
+                <span>⇓</span> {locale === "zh" ? "导出 MD" : "export MD"}
+              </a>
             </div>
 
             {stories.length === 0 ? (
