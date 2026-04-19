@@ -398,6 +398,12 @@ export const users = pgTable(
     id: text("id").primaryKey(),
     email: text("email").notNull(),
     role: userRoleEnum("role").notNull().default("reader"),
+    /** User-side display preferences (theme/accent/density/language/etc). Shape
+     *  mirrors `Tweaks` in hooks/use-tweaks.tsx. Null = not yet saved server-side,
+     *  falls back to localStorage then to TWEAK_DEFAULTS. */
+    tweaks: jsonb("tweaks"),
+    /** User-configurable watchlist terms (["gpt-6", "agentic IDE", ...]). */
+    watchlist: jsonb("watchlist"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -429,6 +435,13 @@ export const feedback = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     vote: feedbackVoteEnum("vote").notNull(),
     note: text("note"),
+    /** Present only on vote='save' rows. Null = uncategorized (the default
+     *  "inbox" collection). FK is intentionally nullable + on-delete-set-null
+     *  so deleting a collection reparents its saves rather than losing them. */
+    collectionId: integer("collection_id").references(
+      () => savedCollections.id,
+      { onDelete: "set null" },
+    ),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -444,6 +457,42 @@ export const feedback = pgTable(
       t.createdAt,
     ),
     itemIdx: index("feedback_item_idx").on(t.itemId, t.createdAt),
+    collectionIdx: index("feedback_collection_idx").on(t.collectionId),
+  }),
+);
+
+/**
+ * saved_collections — user-named bookmark folders. One row per collection per
+ * user. Referenced by `feedback.collection_id` for vote='save' rows so
+ * the UI can surface named groups instead of just time-window buckets.
+ *
+ * `pinned` controls render ordering in the left sidebar. `sortOrder` is a
+ * dense float so client-side reorders don't need to renumber the whole list.
+ */
+export const savedCollections = pgTable(
+  "saved_collections",
+  {
+    id: serial("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    nameCjk: text("name_cjk"),
+    pinned: boolean("pinned").notNull().default(false),
+    sortOrder: integer("sort_order").notNull().default(1000),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    userIdx: index("saved_collections_user_idx").on(t.userId),
+    uniqName: uniqueIndex("saved_collections_user_name_idx").on(
+      t.userId,
+      t.name,
+    ),
   }),
 );
 

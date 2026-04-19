@@ -100,7 +100,32 @@ export function TweaksProvider({
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    setTweaksState(loadFromStorage(base));
+    // Start from localStorage for instant paint (zero network), then upgrade
+    // with the server's copy if available — server wins when the user has
+    // saved tweaks on another device and signed in here fresh.
+    const local = loadFromStorage(base);
+    setTweaksState(local);
+    let cancelled = false;
+    fetch("/api/tweaks", { credentials: "same-origin" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((body) => {
+        if (cancelled || !body?.tweaks) return;
+        const server = body.tweaks as Record<string, unknown>;
+        if (server.language === "both") server.language = "en";
+        const merged: Tweaks = { ...local, ...(server as Partial<Tweaks>) };
+        setTweaksState(merged);
+        try {
+          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+        } catch {
+          /* ignore */
+        }
+      })
+      .catch(() => {
+        // auth_required / network error — localStorage is still applied.
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [base]);
 
   useEffect(() => {
@@ -138,6 +163,14 @@ export function TweaksProvider({
     } catch {
       /* quota / disabled — still update in-memory + body attrs */
     }
+    // Fire-and-forget server sync. 401 means anon user — localStorage is
+    // sufficient for them. Any error is silent; the local cookie still holds.
+    void fetch("/api/tweaks", {
+      method: "PATCH",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tweaks: next }),
+    }).catch(() => {});
   }, []);
 
   const patch = useCallback(

@@ -14,6 +14,7 @@ import {
   getRadarStats,
   getTopTopics,
 } from "@/lib/shell/dashboard-stats";
+import { getRecentTickerItems } from "@/lib/shell/ticker";
 import { mockStories } from "@/lib/mock/stories";
 import type { Story } from "@/lib/types";
 
@@ -50,14 +51,9 @@ function presetToFilter(
   }
 }
 
-const DEMO_TICKER = [
-  { lab: "OPUS 4.7", val: "$5/$25", kind: "up" as const, extra: "+SWE-Pro 11" },
-  { lab: "CURSOR", val: "in-talks", kind: "hot" as const, extra: "$50B val" },
-  { lab: "CEREBRAS", val: "IPO · refiled" },
-  { lab: "RECURSIVE", val: "$500M", kind: "up" as const, extra: "seed" },
-  { lab: "QWEN3.6-35B", val: "SWE-v 73.4", kind: "hot" as const, extra: "OSS" },
-  { lab: "CODEX", val: "3M wau", kind: "up" as const, extra: "+desktop" },
-  { lab: "FIGMA", val: "Krieger exits", kind: "down" as const, extra: "board" },
+const FALLBACK_TICKER = [
+  { lab: "OPUS 4.7", val: "score engine online", kind: "up" as const, extra: "live" },
+  { lab: "AX-RADAR", val: "ingest pipeline healthy", kind: "hot" as const, extra: "ok" },
 ];
 
 const DEMO_WATCHLIST = [
@@ -113,7 +109,7 @@ export default async function HotNewsPage({
     }
   }
 
-  const [radarStats, pulse, topics, policy] = await Promise.all([
+  const [radarStats, pulse, topics, policy, tickerItems] = await Promise.all([
     getRadarStats().catch(() => ({
       items_today: 0,
       items_p1: 0,
@@ -123,7 +119,9 @@ export default async function HotNewsPage({
     getPulseData().catch(() => []),
     getTopTopics().catch(() => []),
     getPolicySummary().catch(() => ({ version: "v1", lastIterAt: null })),
+    getRecentTickerItems(locale as "zh" | "en").catch(() => []),
   ]);
+  const ticker = tickerItems.length > 0 ? tickerItems : FALLBACK_TICKER;
 
   const grouped = groupByDay(stories);
 
@@ -150,7 +148,7 @@ export default async function HotNewsPage({
           live={<>live · {radarStats.items_today} today</>}
           policyLabel={`policy ${policy.version}`}
         />
-        <Ticker items={DEMO_TICKER} />
+        <Ticker items={ticker} />
         <HomeFilters tier={tier} source={sourcePreset} />
         <div className="feed">
           {Object.entries(grouped).map(([dayKey, stories]) => (

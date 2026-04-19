@@ -1,4 +1,5 @@
 "use client";
+import { useEffect, useState } from "react";
 import { RadarWidget, type RadarStats } from "./radar-widget";
 import { useTweaks } from "@/hooks/use-tweaks";
 
@@ -30,40 +31,9 @@ export function RightRail({
     <aside className="rail-r scroll-dark">
       {tweaks.showRadar && <RadarWidget stats={stats} />}
 
-      <div className="panel">
-        <div className="hd">
-          <span className="t">{zh ? "监控" : "watchlist"}</span>
-          <span className="more">+ {zh ? "添加" : "add"}</span>
-        </div>
-        <div className="bd">
-          {watchlist.length === 0 && (
-            <div
-              style={{
-                color: "var(--fg-3)",
-                fontSize: 11,
-                fontStyle: "italic",
-                padding: "6px 0",
-              }}
-            >
-              {zh ? "暂无关键词" : "no terms yet"}
-            </div>
-          )}
-          {watchlist.map((w) => (
-            <div key={w.q} className="watch-row">
-              <span className="sym">▸</span>
-              <span className="q">{w.q}</span>
-              <span className="hits">{w.hits}</span>
-              <span className={`d ${w.delta > 0 ? "up" : "z"}`}>
-                {w.delta > 0 ? `+${w.delta}` : "—"}
-              </span>
-            </div>
-          ))}
-          <div className="watch-add">
-            <span className="plus">+</span>{" "}
-            {zh ? "监控新关键词" : "watch new term"}
-          </div>
-        </div>
-      </div>
+      <WatchlistPanel fallback={watchlist} zh={zh} />
+
+
 
       <div className="panel">
         <div className="hd">
@@ -134,5 +104,178 @@ export function RightRail({
         </div>
       </div>
     </aside>
+  );
+}
+
+/**
+ * Watchlist panel — hydrates from /api/tweaks on mount to pick up the user's
+ * saved terms, falls back to the passed-in demo list. Edit mode lets the
+ * user add/remove terms; save fires a single PATCH /api/tweaks {watchlist}.
+ */
+function WatchlistPanel({
+  fallback,
+  zh,
+}: {
+  fallback: WatchlistEntry[];
+  zh: boolean;
+}) {
+  const [terms, setTerms] = useState<string[]>(() =>
+    fallback.map((w) => w.q),
+  );
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/tweaks", { credentials: "same-origin" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((body) => {
+        if (cancelled) return;
+        if (Array.isArray(body?.watchlist)) setTerms(body.watchlist);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const save = async (next: string[]) => {
+    setBusy(true);
+    try {
+      await fetch("/api/tweaks", {
+        method: "PATCH",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ watchlist: next }),
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const addTerm = () => {
+    const v = draft.trim();
+    if (!v) return;
+    if (terms.includes(v)) {
+      setDraft("");
+      return;
+    }
+    const next = [...terms, v].slice(0, 24);
+    setTerms(next);
+    setDraft("");
+    void save(next);
+  };
+
+  const remove = (q: string) => {
+    const next = terms.filter((t) => t !== q);
+    setTerms(next);
+    void save(next);
+  };
+
+  return (
+    <div className="panel">
+      <div className="hd">
+        <span className="t">{zh ? "监控" : "watchlist"}</span>
+        <span
+          className="more"
+          role="button"
+          onClick={() => setEditing((e) => !e)}
+          style={{
+            cursor: "pointer",
+            color: editing ? "var(--accent-green)" : "var(--fg-3)",
+          }}
+        >
+          {editing ? (zh ? "完成" : "done") : zh ? "编辑" : "edit"}
+        </span>
+      </div>
+      <div className="bd" style={{ opacity: busy ? 0.6 : 1 }}>
+        {terms.length === 0 && !editing && (
+          <div
+            style={{
+              color: "var(--fg-3)",
+              fontSize: 11,
+              fontStyle: "italic",
+              padding: "6px 0",
+            }}
+          >
+            {zh ? "暂无关键词" : "no terms yet"}
+          </div>
+        )}
+        {terms.map((q) => (
+          <div key={q} className="watch-row">
+            <span className="sym">▸</span>
+            <span className="q">{q}</span>
+            <span />
+            {editing ? (
+              <span
+                onClick={() => remove(q)}
+                style={{
+                  color: "var(--accent-red)",
+                  cursor: "pointer",
+                  fontSize: 11,
+                  textAlign: "right",
+                }}
+              >
+                ✕
+              </span>
+            ) : (
+              <span className="d z">—</span>
+            )}
+          </div>
+        ))}
+
+        {editing ? (
+          <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+            <input
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") addTerm();
+              }}
+              placeholder={zh ? "输入关键词…" : "new term…"}
+              maxLength={64}
+              style={{
+                flex: 1,
+                background: "var(--bg-0)",
+                border: "1px dashed var(--border-1)",
+                color: "var(--fg-1)",
+                padding: "6px 8px",
+                fontFamily: "var(--font-mono)",
+                fontSize: 11,
+                outline: "none",
+                borderRadius: 2,
+              }}
+            />
+            <button
+              type="button"
+              onClick={addTerm}
+              disabled={!draft.trim() || busy}
+              style={{
+                background: "transparent",
+                color: "var(--accent-green)",
+                border: "1px dashed var(--border-1)",
+                fontFamily: "var(--font-mono)",
+                fontSize: 11,
+                padding: "4px 10px",
+                cursor: draft.trim() ? "pointer" : "not-allowed",
+                borderRadius: 2,
+              }}
+            >
+              +
+            </button>
+          </div>
+        ) : (
+          <div
+            className="watch-add"
+            role="button"
+            onClick={() => setEditing(true)}
+          >
+            <span className="plus">+</span>{" "}
+            {zh ? "监控新关键词" : "watch new term"}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
