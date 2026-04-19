@@ -23,7 +23,7 @@ const RANGE_LABEL: Record<Range, { en: string; zh: string }> = {
   month: { en: "past 30d", zh: "近 30 天" },
 };
 
-const MONTHLY_CAP_USD = Number(process.env.USAGE_MONTHLY_CAP_USD ?? 500);
+const MONTHLY_CAP_USD = Number(process.env.USAGE_MONTHLY_CAP_USD ?? 1000);
 
 /**
  * /admin/usage — full LLM-spend view matching the design demo.

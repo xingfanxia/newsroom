@@ -125,11 +125,14 @@ export async function getSystemSnapshot(): Promise<SystemSnapshot> {
       const fails = r.consecutiveFailures ?? 0;
       const lastOk = r.lastSuccessAt;
       const lastFetch = r.lastFetchedAt;
+      // Classification is cadence-agnostic: "healthy" means the source has
+      // fetched successfully at least once and has zero consecutive failures.
+      // The previous 2-hour freshness threshold mis-flagged every daily +
+      // weekly source as idle even though they were running fine.
       let status: SystemService["status"] = "idle";
       if (r.status === "error" || fails >= 3) status = "error";
       else if (fails >= 1) status = "degraded";
-      else if (lastOk && now.getTime() - lastOk.getTime() < 2 * 60 * 60 * 1000)
-        status = "healthy";
+      else if (lastOk) status = "healthy";
       else status = "idle";
       return {
         id: r.sourceId,

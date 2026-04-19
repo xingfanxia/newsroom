@@ -45,21 +45,27 @@ function presetToFilter(
   }
 }
 
+const PAGE_SIZE = 200;
+
 export default async function AllPostsPage({
   params,
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ source?: string; date?: string }>;
+  searchParams: Promise<{ source?: string; date?: string; offset?: string }>;
 }) {
   const [{ locale }, sp] = await Promise.all([params, searchParams]);
   setRequestLocale(locale);
   const sourcePreset = coerceSource(sp.source);
   const sourceFilter = presetToFilter(sourcePreset);
   const activeDate = sp.date && DATE_RE.test(sp.date) ? sp.date : undefined;
-  // When a day is picked, show everything from that day; otherwise show the
-  // latest 120 across all days. 80 was too tight once backfill landed.
-  const limit = activeDate ? 500 : 120;
+  // When a day is picked, show everything from that day uncapped (500 is
+  // the safety ceiling). Otherwise paginate in PAGE_SIZE chunks via `offset`.
+  const offset = (() => {
+    const n = Number.parseInt(sp.offset ?? "0", 10);
+    return Number.isFinite(n) && n >= 0 ? n : 0;
+  })();
+  const limit = activeDate ? 500 : PAGE_SIZE;
 
   let stories: Story[] = [];
   try {
@@ -67,6 +73,7 @@ export default async function AllPostsPage({
       tier: "all",
       locale: locale as "zh" | "en",
       limit,
+      offset,
       date: activeDate,
       ...sourceFilter,
     });
@@ -134,8 +141,82 @@ export default async function AllPostsPage({
             </div>
           )}
         </div>
+
+        {!activeDate && stories.length > 0 && (
+          <Pagination
+            offset={offset}
+            pageSize={PAGE_SIZE}
+            currentCount={stories.length}
+            source={sourcePreset}
+            locale={locale as "en" | "zh"}
+          />
+        )}
       </main>
     </ViewShell>
+  );
+}
+
+function Pagination({
+  offset,
+  pageSize,
+  currentCount,
+  source,
+  locale,
+}: {
+  offset: number;
+  pageSize: number;
+  currentCount: number;
+  source: SourcePreset;
+  locale: "en" | "zh";
+}) {
+  const zh = locale === "zh";
+  const build = (nextOffset: number) => {
+    const qs = new URLSearchParams();
+    if (source && source !== "all") qs.set("source", source);
+    if (nextOffset > 0) qs.set("offset", String(nextOffset));
+    const s = qs.toString();
+    return `/${locale}/all${s ? `?${s}` : ""}`;
+  };
+  const prevOffset = Math.max(0, offset - pageSize);
+  const nextOffset = offset + pageSize;
+  const hasNext = currentCount >= pageSize;
+  const hasPrev = offset > 0;
+  const pageNum = Math.floor(offset / pageSize) + 1;
+
+  return (
+    <nav
+      aria-label={zh ? "分页" : "pagination"}
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        padding: "18px 0 40px",
+        gap: 12,
+        fontFamily: "var(--font-mono)",
+        fontSize: 11,
+        color: "var(--fg-3)",
+        borderTop: "1px dashed var(--border-1)",
+        marginTop: 18,
+      }}
+    >
+      {hasPrev ? (
+        <a href={build(prevOffset)} className="mini-btn">
+          ← {zh ? "上一页" : "newer"}
+        </a>
+      ) : (
+        <span style={{ opacity: 0.3 }}>← {zh ? "上一页" : "newer"}</span>
+      )}
+      <span style={{ letterSpacing: "0.08em", textTransform: "uppercase" }}>
+        {zh ? "第" : "page"} {pageNum} · {offset + 1}–{offset + currentCount}
+      </span>
+      {hasNext ? (
+        <a href={build(nextOffset)} className="mini-btn">
+          {zh ? "下一页" : "older"} →
+        </a>
+      ) : (
+        <span style={{ opacity: 0.3 }}>{zh ? "下一页" : "older"} →</span>
+      )}
+    </nav>
   );
 }
 

@@ -39,10 +39,12 @@ export function CalendarGrid({
   const counts = new Map(days.map((d) => [d.date, d.count]));
   const peak = Math.max(1, ...days.map((d) => d.count));
 
-  // Build month buckets newest-first. monthsBack=2 → current month + prior.
+  // Build month buckets chronological — oldest on the left, current month
+  // on the right. monthsBack=2 → [prior, current] order.
   const today = new Date();
   const months = Array.from({ length: monthsBack }, (_, i) => {
-    const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+    const offset = monthsBack - 1 - i;
+    const d = new Date(today.getFullYear(), today.getMonth() - offset, 1);
     return { year: d.getFullYear(), month: d.getMonth() };
   });
 
@@ -109,14 +111,23 @@ export function CalendarGrid({
                       </span>
                     );
                   }
+                  // Click on the currently-active cell clears the filter
+                  // (toggle behavior). This saves a round-trip through the
+                  // separate "clear filter" button when you're just sampling
+                  // a few days.
+                  const href = isActive ? build(undefined) : build(c.iso);
                   return (
                     <Link
                       key={i}
-                      href={build(c.iso)}
+                      href={href}
                       className="calendar-cell"
                       data-active={isActive ? "true" : "false"}
                       data-empty={count === 0 ? "true" : "false"}
-                      title={`${c.iso} · ${count} ${zh ? "项" : "items"}`}
+                      title={
+                        isActive
+                          ? `${c.iso} · ${zh ? "再点一次清除" : "click again to clear"}`
+                          : `${c.iso} · ${count} ${zh ? "项" : "items"}`
+                      }
                       scroll={false}
                       style={
                         count > 0
