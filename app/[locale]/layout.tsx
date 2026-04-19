@@ -70,7 +70,7 @@ export default async function LocaleLayout({
         data-theme="midnight"
         data-accent="green"
         data-mono="jetbrains"
-        data-cjk="notoSerif"
+        data-cjk="notoSans"
         data-radius="sharp"
         data-chrome="terminal"
         data-score="ring"

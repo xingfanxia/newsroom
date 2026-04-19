@@ -1,7 +1,7 @@
 # AX's AI RADAR
 
 > **A bilingual AI intelligence radar with a self-iterating editorial agent.** 50+ sources in, curated signal out.
-> Dark-mode-native observatory aesthetic; cyan-neon accent; zh/en locale-first.
+> Terminal-forward command-center aesthetic with HKR score rings; JetBrains Mono + Noto Sans/Serif SC; zh/en locale-first.
 
 🌐 **Live**: [newsroom-orpin.vercel.app](https://newsroom-orpin.vercel.app) → redirects to `/zh`
 📦 **Repo**: [github.com/xingfanxia/newsroom](https://github.com/xingfanxia/newsroom)
@@ -25,15 +25,18 @@ AX's AI RADAR is a dashboard for editors and analysts who cover the AI industry.
 
 | Route | Purpose |
 |---|---|
-| `/{locale}` | 热点资讯 / Hot News — curated timeline with importance scores + feedback controls |
-| `/{locale}/low-follower` | 低粉爆文 — high-engagement posts from small accounts (coming soon) |
-| `/{locale}/x-monitor` | X 监控 — watchlist of researchers & labs on X/Twitter (coming soon) |
-| `/{locale}/saved` | 收藏 — bookmarked stories (coming soon) |
-| `/{locale}/sources` | 信源 — full source catalog (40+ feeds) |
-| `/{locale}/admin/system` | System queue and logs (coming soon) |
-| `/{locale}/admin/policy` | Read-only view of the live `editorial.skill.md` |
-| `/{locale}/admin/iterations` | Agent-assisted policy updates with diff preview |
-| `/{locale}/admin/users` | Access control (coming soon) |
+| `/{locale}` | 热点资讯 / Hot News — curated timeline with HKR rings + tier/source filters + auto-scroll ticker |
+| `/{locale}/all` | 全部 / All Posts — everything non-excluded, same source filter |
+| `/{locale}/low-follower` | 低粉爆文 (coming-soon — blocked on X search API tier) |
+| `/{locale}/x-monitor` | X 监控 — 7 tracked handles with per-handle sidebar + firehose feed |
+| `/{locale}/saved` | 收藏 — **user-named collections** with inbox + tags + move/export MD |
+| `/{locale}/sources` | 信源 — grouped tables or card grid (`?view=cards`) |
+| `/{locale}/podcasts` | 播客 · 视频 — podcast/video feed with per-channel filter pills |
+| `/{locale}/admin/usage` | 用量 — LLM spend cards (today / 7d / 30d) |
+| `/{locale}/admin/system` | 系统 — Detailed LLM cost + recent calls |
+| `/{locale}/admin/policy` | 精选策略 — **editable** markdown with live preview; commits new version |
+| `/{locale}/admin/iterations` | 策略迭代 — metric cards + agent console + diff preview + **version timeline** |
+| `/{locale}/admin/users` | 用户 (coming soon) |
 
 ### Tech stack
 
@@ -51,7 +54,7 @@ AX's AI RADAR is a dashboard for editors and analysts who cover the AI industry.
 
 ### Design system
 
-See [`DESIGN.md`](./DESIGN.md) — adapted from Linear's DESIGN.md with a cyan-neon accent. The reference inspiration screenshots are in [`docs/design/reference-screenshots/`](./docs/design/reference-screenshots/).
+Terminal-forward command-center aesthetic — green/orange/blue accents on a near-black canvas, JetBrains Mono for Latin + Noto Sans/Serif SC for CJK, HKR circular score rings, `.shell` grid with left nav + main + optional right rail, auto-scrolling ticker, radar-sweep widget. Tokens in [`app/globals.css`](./app/globals.css); full layout rules in [`app/terminal.css`](./app/terminal.css). Live-configurable via the site-config panel (⌥, to open) with 4 themes × 6 accents × 4 radii × 3 chrome styles × 4 score visuals.
 
 ### Data ingestion & AI pipeline
 
@@ -91,8 +94,10 @@ See [`.env.example`](./.env.example) for the complete template. On Vercel, most 
 | **M3 — Feedback + Auth** | `feedback` table + admin gate + real metrics on 策略迭代 page (Supabase Auth → password gate in s6) | ✅ shipped |
 | **M4 — Editorial agent** | Azure Pro agent reads feedback, diffs `editorial.skill.md`, streams to console | ✅ shipped |
 | **X ingestion** | 7 watched X accounts via API v2 pay-per-tweet, since_id cursor, retweets/replies filtered | ✅ shipped (s6) |
-| **Content backfill** | Fill 2026 historical items from RSS archives / Wayback / vendor archive pages | ⏳ next |
-| **M5 — Low-follower viral + cluster UI** | Low-follower viral detector, "also reported by N sources" chips | planned |
+| **Content backfill** | Fill 2026 historical items from Wayback Machine + ArXiv + X historical (+2907 new items) | ✅ shipped (s7) |
+| **Terminal design port** | Full ax-radar mock port: HKR rings, site-config panel, bilingual zh/en, 12 views on `<ViewShell>` | ✅ shipped (s7) |
+| **Saved collections + server tweaks** | Named bookmark folders with inbox fallback; cross-device tweak/watchlist persistence via `users.tweaks` jsonb | ✅ shipped (s7) |
+| **M5 — Low-follower viral + cluster UI** | Low-follower viral detector (X `search/all` quota), "also reported by N sources" chips | planned |
 
 Full blueprint + deviations in [`docs/architecture/ingestion.md`](./docs/architecture/ingestion.md). Handoff notes in [`docs/HANDOFF.md`](./docs/HANDOFF.md).
 
@@ -113,13 +118,16 @@ AX 的 AI 雷达是一款面向 AI 行业编辑和分析师的情报工作台，
 
 | 路由 | 说明 |
 |---|---|
-| `/{locale}` | 热点资讯 — 自动精选时间线，含 importance 分数和反馈按钮 |
-| `/{locale}/low-follower` | 低粉爆文（即将推出） |
-| `/{locale}/x-monitor` | X 监控（即将推出） |
-| `/{locale}/saved` | 收藏（即将推出） |
-| `/{locale}/sources` | 信源 — 完整信源目录 |
-| `/{locale}/admin/iterations` | 策略迭代 — Agent 辅助策略更新 + Diff 预览 |
-| `/{locale}/admin/policy` | 精选策略 — 当前 `editorial.skill.md` 只读视图 |
+| `/{locale}` | 热点资讯 — HKR 分数环 + 等级/信源过滤 + 自动滚动头条 |
+| `/{locale}/all` | 全部 — 所有未排除的内容，共用信源过滤 |
+| `/{locale}/low-follower` | 低粉爆文（即将推出 — 待 X 高级搜索配额） |
+| `/{locale}/x-monitor` | X 监控 — 7 个账号侧栏 + 时间线 |
+| `/{locale}/saved` | 收藏 — **自定义收藏夹**，支持收件箱、标签、移动、导出 Markdown |
+| `/{locale}/sources` | 信源 — 分组表格或卡片网格（`?view=cards`） |
+| `/{locale}/podcasts` | 播客 · 视频 — 节目流 + 频道过滤 |
+| `/{locale}/admin/usage` | 用量 — LLM 花费卡片（今日 / 7 天 / 30 天） |
+| `/{locale}/admin/iterations` | 策略迭代 — 指标卡片 + Agent 控制台 + Diff 预览 + **版本时间轴** |
+| `/{locale}/admin/policy` | 精选策略 — **可编辑** markdown，带实时预览，可直接提交新版本 |
 
 ### 技术栈
 
@@ -127,7 +135,7 @@ Next.js 16（App Router + Turbopack + Fluid Compute）· React 19 · TypeScript 
 
 ### 设计系统
 
-见 [`DESIGN.md`](./DESIGN.md)，基于 Linear 的设计体系调整而来，主色由靛紫替换为霓虹青。参考截图在 [`docs/design/reference-screenshots/`](./docs/design/reference-screenshots/)。
+终端风格指挥中心配色 — 绿橙蓝多重强调色 + HKR 环形分数 + JetBrains Mono + Noto 衬线/黑体 SC。变量在 [`app/globals.css`](./app/globals.css)，布局在 [`app/terminal.css`](./app/terminal.css)。界面内可通过 `⌥,` 快捷键唤出站点配置面板，实时切换 4 主题 × 6 强调色 × 4 圆角 × 3 外壳样式 × 4 分数视图。
 
 ### 本地启动
 
@@ -150,8 +158,10 @@ bun run dev
 | **M3 — 反馈 + 鉴权** | feedback 表 + 管理员鉴权（s6 由 Supabase 改为密码门）+ 策略迭代真实指标 | ✅ 已上线 |
 | **M4 — 编辑 agent** | Agent 读反馈、改策略、审核 diff、提交 v-next | ✅ 已上线 |
 | **X 采集** | 7 个重点账号 via X API v2，since_id 增量、转推/回复已过滤 | ✅ 已上线 (s6) |
-| **内容回填** | 用 Wayback Machine / 存档页补齐 2026 年的历史内容 | ⏳ 下一步 |
-| **M5 — 低粉爆文 / 聚类 UI** | 高互动筛选、跨源展示 | 计划中 |
+| **内容回填** | Wayback Machine + ArXiv + X 历史（新增 2907 条） | ✅ 已上线 (s7) |
+| **终端设计迁移** | 完整迁移 ax-radar 设计：HKR 环、站点配置面板、双语支持，12 个页面 | ✅ 已上线 (s7) |
+| **收藏夹 + 服务端配置** | 自定义收藏夹、收件箱兜底；跨设备的 `users.tweaks` 配置同步 | ✅ 已上线 (s7) |
+| **M5 — 低粉爆文 / 聚类 UI** | 低粉爆文探测（待 X 高级搜索）、"N 个信源都报道了" | 计划中 |
 
 完整蓝图与偏差记录见 [`docs/architecture/ingestion.md`](./docs/architecture/ingestion.md)。会话交接记录见 [`docs/HANDOFF.md`](./docs/HANDOFF.md)。
 

@@ -41,9 +41,12 @@
   --tint-white-04: rgba(255,255,255,0.04);
   --tint-white-06: rgba(255,255,255,0.06);
 
-  /* Typography */
-  --font-mono: 'JetBrains Mono', 'JetBrains Mono Variable', ui-monospace, 'SF Mono', Menlo, monospace;
-  --font-sans-cjk: 'Noto Sans SC', 'JetBrains Mono', system-ui, sans-serif;
+  /* Typography — `--font-mono` lists Noto Sans SC AFTER JetBrains so Latin
+   * glyphs keep their mono metric while Chinese glyphs (absent from JetBrains)
+   * fall back to Noto Sans SC rather than the OS's default CJK face (which
+   * differs per-platform and breaks visual consistency with the nav). */
+  --font-mono: 'JetBrains Mono', 'JetBrains Mono Variable', 'Noto Sans SC', ui-monospace, 'SF Mono', Menlo, monospace;
+  --font-sans-cjk: 'Noto Sans SC', 'PingFang SC', system-ui, sans-serif;
   --font-serif-cjk: 'Noto Serif SC', 'Songti SC', serif;
 
   /* Sizes */

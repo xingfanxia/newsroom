@@ -32,7 +32,9 @@ export const TWEAK_DEFAULTS: Tweaks = {
   accent: "green",
   theme: "midnight",
   monoFont: "jetbrains",
-  cjkFont: "notoSerif",
+  // Noto Sans SC matches how --font-mono falls back to Sans SC for CJK
+  // glyphs that JetBrains doesn't carry. Consistent nav + body rendering.
+  cjkFont: "notoSans",
   radius: "sharp",
   chromeStyle: "terminal",
   scoreStyle: "ring",
