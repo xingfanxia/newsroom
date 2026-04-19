@@ -2,6 +2,10 @@
 
 > Read this first before resuming. Sessions 1-3 = M0-M2 + RSS/commentary/newsletter/i18n/cost/perf/HKR/bilingual. **Session 4** = Jina body fetch + 晚点 prompts + per-axis HKR + concurrency fan-out + YouTube transcripts + `/podcasts` UI. **Session 5** = M3 auth+feedback+admin-gate MERGED + podcast detail + CRON_SECRET fix + commentary depth-rewrite x2. **Session 6** = M4 editorial agent MERGED · X ingestion MERGED · feed source filter + /all sidebar route · Supabase auth ripped out in favour of password gate · 20 broken sources disabled. **Session 7 (this one)** = **2026 backfill (+2907 items) · full terminal-aesthetic frontend port (12 views) · named saved-collections + server-side tweaks persistence · policy editor + iterations timeline** — 12 of 14 catalogued design-mock divergences closed.
 
+> ### ⚠ Session 8 first task: **triage the user's bug reports**
+>
+> User flagged at end of s7: "a lot of issues needs to be fixed in next session." They did NOT enumerate which ones. **Read [`docs/SESSION8-PUNCHLIST.md`](./SESSION8-PUNCHLIST.md) FIRST** — it has a pre-built punch list of plausible issues (mobile layout unverified, tweaks sync floods on rapid change, stale `?collection` URLs, native confirm() dialogs ugly on mobile, etc). Ask the user to name the specific bugs they saw, cross-reference against the punch list, then triage from there.
+
 ---
 
 ## TL;DR — where the project is at end of session 7
