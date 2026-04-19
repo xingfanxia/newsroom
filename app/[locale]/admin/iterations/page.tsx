@@ -1,10 +1,10 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { ChevronDown } from "lucide-react";
 import { MetricCard } from "@/components/admin/metric-card";
 import { FeedbackItem } from "@/components/admin/feedback-item";
 import { VersionPill } from "@/components/admin/version-pill";
 import { IterationRunner } from "@/components/admin/iteration-runner";
 import type { RunnerStatus } from "@/components/admin/iteration-runner";
+import { VersionTimeline } from "@/components/admin/version-timeline";
 import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
 import { getRadarStats } from "@/lib/shell/dashboard-stats";
@@ -204,49 +204,25 @@ export default async function IterationsPage({
             minFeedbackToIterate={MIN_FEEDBACK_TO_ITERATE}
           />
 
-          {/* Version history */}
-          <section className="surface-elevated p-6">
-            <header className="flex items-center gap-3">
-              <ChevronDown size={14} className="text-[var(--color-fg-dim)]" />
-              <h3 className="text-[18px] font-[590] tracking-tight text-[var(--color-fg)]">
-                {t("versionHistory.title")}
-              </h3>
-              <span className="text-[12px] font-[510] text-[var(--color-fg-dim)]">
+          {/* Version history — vertical timeline */}
+          <section className="panel">
+            <div className="hd">
+              <span className="t">{t("versionHistory.title")}</span>
+              <span className="more">
                 {t("versionHistory.count", { count: history.length })}
               </span>
-            </header>
-            <div className="mt-4 flex flex-col divide-y divide-[var(--color-border-subtle)]">
-              {history.length === 0 ? (
-                <p className="py-6 text-center text-[13px] text-[var(--color-fg-dim)]">
-                  {t("versionHistory.empty")}
-                </p>
-              ) : (
-                history.map((v) => (
-                  <div
-                    key={v.id}
-                    className="flex items-center justify-between py-3"
-                  >
-                    <div className="flex items-center gap-3">
-                      <VersionPill version={`v${v.version}`} />
-                      <span className="font-mono text-[12px] tabular text-[var(--color-fg-dim)]">
-                        {new Date(v.committedAt).toLocaleString(
-                          locale === "zh" ? "zh-CN" : "en-US",
-                        )}
-                      </span>
-                      {v.committedBy ? (
-                        <span className="text-[12px] text-[var(--color-fg-dim)]">
-                          {t("versionHistory.committedBy", {
-                            who: v.committedBy,
-                          })}
-                        </span>
-                      ) : null}
-                    </div>
-                    <span className="text-[12px] text-[var(--color-fg-dim)]">
-                      {v.feedbackCount}
-                    </span>
-                  </div>
-                ))
-              )}
+            </div>
+            <div className="bd" style={{ padding: 18 }}>
+              <VersionTimeline
+                locale={locale as "en" | "zh"}
+                versions={history.map((v) => ({
+                  version: v.version,
+                  committedAt: new Date(v.committedAt).toISOString(),
+                  committedBy: v.committedBy,
+                  feedbackCount: v.feedbackCount,
+                  reasoning: v.reasoning ?? null,
+                }))}
+              />
             </div>
           </section>
         </div>

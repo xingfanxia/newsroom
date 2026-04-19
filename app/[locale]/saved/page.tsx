@@ -3,25 +3,63 @@ import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
 import { Item } from "@/components/feed/item";
 import { DayBreak } from "../_day-break";
-import { getSavedCollections, getSavedStories } from "@/lib/items/saved";
+import { CollectionSidebar } from "@/components/saved/collection-sidebar";
+import { SavedMetaStrip } from "@/components/saved/saved-meta-strip";
+import { SavedTags } from "@/components/saved/saved-tags";
+import { getSavedStories, getSavedTags, getSavedTotals } from "@/lib/items/saved";
+import { getInboxCount, listCollections } from "@/lib/items/collections";
 import { getPulseData, getRadarStats } from "@/lib/shell/dashboard-stats";
-import { getSessionUser, ADMIN_USER_ID } from "@/lib/auth/session";
+import { ADMIN_USER_ID, getSessionUser, upsertAppUser } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
+function parseCollection(raw: string | undefined): number | "inbox" | undefined {
+  if (!raw || raw === "all") return undefined;
+  if (raw === "inbox") return "inbox";
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+}
+
 export default async function SavedPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string }>;
+  searchParams: Promise<{ collection?: string }>;
 }) {
-  const { locale } = await params;
+  const [{ locale }, sp] = await Promise.all([params, searchParams]);
   setRequestLocale(locale);
+
   const user = await getSessionUser();
   const userId = user?.id ?? ADMIN_USER_ID;
+  if (user) await upsertAppUser(user);
 
-  const [stories, collections, stats, pulse] = await Promise.all([
-    getSavedStories(userId, locale as "zh" | "en").catch(() => []),
-    getSavedCollections(userId).catch(() => []),
+  const collectionParam = parseCollection(sp.collection);
+  const activeId: number | "inbox" =
+    collectionParam === "inbox"
+      ? "inbox"
+      : typeof collectionParam === "number"
+        ? collectionParam
+        : "inbox";
+  const collectionFilter: number | "inbox" | null =
+    collectionParam ?? "inbox"; // default view = inbox
+
+  const [
+    stories,
+    collections,
+    inboxCount,
+    totals,
+    tags,
+    stats,
+    pulse,
+  ] = await Promise.all([
+    getSavedStories(userId, locale as "zh" | "en", {
+      collection: collectionFilter,
+    }).catch(() => []),
+    listCollections(userId).catch(() => []),
+    getInboxCount(userId).catch(() => 0),
+    getSavedTotals(userId).catch(() => ({ total: 0, thisWeek: 0, thisMonth: 0 })),
+    getSavedTags(userId, { collection: collectionFilter }).catch(() => []),
     getRadarStats().catch(() => ({
       items_today: 0,
       items_p1: 0,
@@ -32,6 +70,12 @@ export default async function SavedPage({
   ]);
 
   const grouped = groupByDay(stories);
+  const activeCollectionName = (() => {
+    if (activeId === "inbox") return locale === "zh" ? "收件箱" : "inbox";
+    const c = collections.find((x) => x.id === activeId);
+    if (!c) return locale === "zh" ? "收件箱" : "inbox";
+    return locale === "zh" ? c.nameCjk || c.name : c.name;
+  })();
 
   return (
     <ViewShell
@@ -41,51 +85,75 @@ export default async function SavedPage({
         signal_ratio: 0.72,
       }}
       pulse={pulse}
-      crumb="~/saved"
+      crumb={
+        activeId === "inbox"
+          ? "~/saved"
+          : `~/saved/${activeCollectionName.replace(/\s+/g, "-").toLowerCase()}`
+      }
       cmd="cat bookmarks/*.json | wc -l"
     >
       <main className="main">
         <PageHead
           en="saved"
           cjk="收藏"
-          count={stories.length}
-          countLabel="items"
-          extra={<span>synced · last sync 2m ago</span>}
+          count={totals.total}
+          countLabel={locale === "zh" ? "收藏" : "items"}
+          extra={
+            <span>
+              {locale === "zh"
+                ? `本周 ${totals.thisWeek} · 本月 ${totals.thisMonth}`
+                : `${totals.thisWeek} this week · ${totals.thisMonth} this month`}
+            </span>
+          }
         />
+
         <div
           className="saved-layout"
-          style={{ display: "grid", gridTemplateColumns: "240px 1fr", gap: 18, marginTop: 14 }}
+          style={{
+            display: "grid",
+            gridTemplateColumns: "240px 1fr",
+            gap: 18,
+            marginTop: 14,
+          }}
         >
-          <aside className="coll-list">
-            <div
-              className="sec"
-              style={{ padding: 0, marginBottom: 6 }}
-            >
-              <span>collections</span>
-              <span className="sec-c">{collections.length}</span>
-            </div>
-            {collections.map((c) => (
-              <div key={c.id} className="watch-row" style={{ padding: "8px 4px" }}>
-                <span className="sym">▸</span>
-                <span className="q">{c.label}</span>
-                <span className="hits">{c.count}</span>
-                <span />
-              </div>
-            ))}
+          <div>
+            <CollectionSidebar
+              locale={locale as "en" | "zh"}
+              collections={collections}
+              inboxCount={inboxCount}
+              activeId={activeId}
+            />
+            <SavedTags tags={tags} />
+          </div>
+
+          <div>
             <div
               style={{
-                marginTop: 14,
-                paddingTop: 10,
-                borderTop: "1px dashed var(--border-1)",
-                fontSize: 10.5,
-                color: "var(--fg-3)",
-                letterSpacing: "0.02em",
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                marginBottom: 12,
+                paddingBottom: 10,
+                borderBottom: "1px dashed var(--border-1)",
+                fontFamily: "var(--font-mono)",
+                fontSize: 12,
               }}
             >
-              ⌘S on any item · remove to unsave
+              <span
+                style={{
+                  color: "var(--accent-orange)",
+                  fontWeight: 700,
+                  fontFamily:
+                    locale === "zh" ? "var(--font-sans-cjk)" : "var(--font-mono)",
+                }}
+              >
+                ▸ {activeCollectionName}
+              </span>
+              <span style={{ color: "var(--fg-3)", fontSize: 10.5 }}>
+                {stories.length} {locale === "zh" ? "条" : "saved"}
+              </span>
             </div>
-          </aside>
-          <div>
+
             {stories.length === 0 ? (
               <div
                 style={{
@@ -93,12 +161,13 @@ export default async function SavedPage({
                   textAlign: "center",
                   color: "var(--fg-3)",
                   border: "1px dashed var(--border-1)",
-                  borderRadius: 4,
+                  borderRadius: 2,
+                  marginTop: 10,
                 }}
               >
-                no saved items yet ·{" "}
-                <span style={{ color: "var(--accent-green)" }}>⌘S</span> to save
-                from the feed
+                {locale === "zh" ? "当前收藏夹为空 · " : "nothing saved here yet · "}
+                <span style={{ color: "var(--accent-green)" }}>⌘S</span>{" "}
+                {locale === "zh" ? "从信息流保存" : "to save from the feed"}
               </div>
             ) : (
               <div className="feed">
@@ -106,11 +175,22 @@ export default async function SavedPage({
                   <div key={dayKey}>
                     <DayBreak date={new Date(dayKey)} />
                     {list.map((s) => (
-                      <Item
+                      <div
                         key={s.id}
-                        story={s}
-                        locale={locale as "en" | "zh"}
-                      />
+                        style={{
+                          borderTop: "1px solid var(--border-1)",
+                          paddingTop: 10,
+                        }}
+                      >
+                        <SavedMetaStrip
+                          itemId={Number.parseInt(s.id, 10)}
+                          itemUrl={s.url}
+                          savedAt={s.savedAt}
+                          currentCollectionId={s.collectionId}
+                          collections={collections}
+                        />
+                        <Item story={s} locale={locale as "en" | "zh"} />
+                      </div>
                     ))}
                   </div>
                 ))}
@@ -123,14 +203,14 @@ export default async function SavedPage({
   );
 }
 
-function groupByDay(
-  stories: Awaited<ReturnType<typeof getSavedStories>>,
-): Record<string, typeof stories> {
+function groupByDay<T extends { publishedAt: string }>(
+  stories: T[],
+): Record<string, T[]> {
   const sorted = [...stories].sort(
     (a, b) =>
       new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
   );
-  const byDay: Record<string, typeof stories> = {};
+  const byDay: Record<string, T[]> = {};
   for (const s of sorted) {
     const d = new Date(s.publishedAt);
     const canonical = new Date(
