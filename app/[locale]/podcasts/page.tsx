@@ -38,24 +38,14 @@ export default async function PodcastsPage({
   // `tier='all'` surfaces excluded episodes too — lets the user catch low-
   // score YT videos (usually off-topic history/crypto stuff) that score
   // filters out of the default featured view.
-  const stories = await getFeaturedStories({
+  const filtered = await getFeaturedStories({
     tier: activeTier,
     locale: locale as "zh" | "en",
-    sourceGroup: "podcast",
+    sourceGroup: activeChannel ? undefined : "podcast",
+    sourceId: activeChannel ?? undefined,
     includeSourceGroup: true,
     limit: activeChannel ? 300 : 120,
   }).catch((): Story[] => []);
-
-  const filtered = activeChannel
-    ? stories.filter((s) => {
-        const channel = channels.find((c) => c.id === activeChannel);
-        if (!channel) return true;
-        return (
-          s.source.publisher === channel.nameEn ||
-          s.source.publisher === channel.nameZh
-        );
-      })
-    : stories;
 
   const grouped = groupByDay(filtered);
   const activeLabel = activeChannel

@@ -37,45 +37,14 @@ export default async function XMonitorPage({
     ? handles.some((h) => h.id === activeHandle)
     : false;
 
-  const stories = await getFeaturedStories({
+  const narrowedStories = await getFeaturedStories({
     tier: "all",
     locale: locale as "zh" | "en",
+    sourceId: activeIsValid && activeHandle ? activeHandle : undefined,
     sourceKind: activeIsValid ? undefined : "x-api",
-    // When a specific handle is selected, we use getFeaturedStories's
-    // per-source capability. Otherwise we fall back to kind=x-api to span all 7.
-    ...(activeIsValid ? { /* TODO pass sourceId */ } : {}),
-    limit: 80,
+    limit: activeIsValid ? 200 : 80,
   }).catch((): Story[] => []);
 
-  const filtered = activeIsValid
-    ? stories.filter(() => {
-        // getFeaturedStories doesn't currently support a single-source filter
-        // as a first-class param; we filter client-side to keep the PR small.
-        // This is safe because sourceKind=x-api already narrowed to ~120 rows.
-        return true;
-      })
-    : stories;
-  // If activeHandle is valid we still need to narrow. Pull all x-api then
-  // filter by matching handle via the source map.
-  const handleIdSet = new Set(handles.map((h) => h.id));
-  const narrowedStories =
-    activeIsValid && activeHandle
-      ? (
-          await getFeaturedStories({
-            tier: "all",
-            locale: locale as "zh" | "en",
-            sourceKind: "x-api",
-            limit: 200,
-          }).catch((): Story[] => [])
-        ).filter((s) => {
-          // Story object doesn't expose sourceId directly — infer from source.publisher.
-          const h = handles.find((x) => x.id === activeHandle);
-          if (!h) return true;
-          return s.source.publisher === h.nameEn || s.source.publisher === h.nameZh;
-        })
-      : filtered;
-
-  void handleIdSet;
   const grouped = groupByDay(narrowedStories);
   const activeLabel: string = activeIsValid
     ? handles.find((h) => h.id === activeHandle)?.handle ?? activeHandle ?? ""

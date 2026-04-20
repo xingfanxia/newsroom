@@ -12,6 +12,10 @@ export type FeedQuery = {
   limit?: number;
   /** Skip the first N items — for pagination. Defaults to 0. */
   offset?: number;
+  /** Filter by exact source.id — used by /podcasts per-channel, /x-monitor
+   *  per-handle, and the public API's ?source_id= param. Takes precedence
+   *  over sourceGroup/sourceKind when set. */
+  sourceId?: string;
   /** Filter by source.group — e.g. "podcast" for the /podcasts page. */
   sourceGroup?: string;
   /** Filter by source.kind — e.g. "x-api" for the /x-monitor page. */
@@ -19,21 +23,30 @@ export type FeedQuery = {
   /** Restrict to items whose published_at falls on this calendar day
    *  (UTC, YYYY-MM-DD). Used by the /all day-picker. */
   date?: string;
+  /** ISO-8601 lower bound on published_at (inclusive). Used by /api/v1/feed's
+   *  date_from window. Ignored when `date` is set. */
+  dateFrom?: string;
+  /** ISO-8601 upper bound on published_at (exclusive). Used by /api/v1/feed's
+   *  date_to window. Ignored when `date` is set. */
+  dateTo?: string;
   /** Include the story's source-group so UI can show format badges
    *  (podcast/vendor-official/media/…). Defaults to false for home feed. */
   includeSourceGroup?: boolean;
+  /** Case-insensitive substring match against title + both-locale
+   *  title/summary columns. Used by /api/v1/search lexical mode. Raw
+   *  input is passed to ILIKE without escaping, so callers who need
+   *  literal `%` or `_` should pre-escape (v1 behavior; ok for keyword
+   *  search, revisit if power-user wildcards cause surprises). */
+  searchText?: string;
 };
 
 /**
- * Fetch the curated feed for the home page timeline.
- * Returns Story[] in the shape the existing UI expects.
- * Only one item per cluster (the lead), with memberCount surfaced as crossSourceCount.
+ * Build the shared WHERE expression used by both getFeaturedStories and
+ * countFeaturedStories so pagination totals can't drift from the
+ * actually-returned rows.
  */
-export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
+function buildFeedWhere(q: FeedQuery) {
   const tier: Tier = q.tier ?? "featured";
-  const limit = q.limit ?? 40;
-  const offset = q.offset ?? 0;
-  const client = db();
 
   // Tiers are inclusive: "featured" shows featured+p1; "all" shows everything non-excluded.
   const tierFilter =
@@ -47,6 +60,9 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
   // Unclustered-but-enriched items are surfaced as-is (no cluster yet).
   const dedupFilter = sql`(${items.clusterId} IS NULL OR ${clusters.leadItemId} = ${items.id})`;
 
+  const sourceIdFilter = q.sourceId
+    ? sql`${items.sourceId} = ${q.sourceId}`
+    : sql`TRUE`;
   const groupFilter = q.sourceGroup
     ? sql`${sources.group} = ${q.sourceGroup}`
     : sql`TRUE`;
@@ -58,7 +74,42 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
   // binding (same pattern as dashboard-stats).
   const dateFilter = q.date
     ? sql`${items.publishedAt} >= ${`${q.date}T00:00:00Z`}::timestamptz AND ${items.publishedAt} < ${`${q.date}T00:00:00Z`}::timestamptz + interval '1 day'`
+    : q.dateFrom || q.dateTo
+      ? sql`${items.publishedAt} >= ${q.dateFrom ?? "1970-01-01"}::timestamptz AND ${items.publishedAt} < ${q.dateTo ?? "2999-01-01"}::timestamptz`
+      : sql`TRUE`;
+
+  const searchFilter = q.searchText
+    ? sql`(
+        ${items.title} ILIKE ${`%${q.searchText}%`} OR
+        ${items.titleZh} ILIKE ${`%${q.searchText}%`} OR
+        ${items.titleEn} ILIKE ${`%${q.searchText}%`} OR
+        ${items.summaryZh} ILIKE ${`%${q.searchText}%`} OR
+        ${items.summaryEn} ILIKE ${`%${q.searchText}%`}
+      )`
     : sql`TRUE`;
+
+  return and(
+    isNotNull(items.enrichedAt),
+    isNotNull(items.importance),
+    tierFilter,
+    dedupFilter,
+    sourceIdFilter,
+    groupFilter,
+    kindFilter,
+    dateFilter,
+    searchFilter,
+  );
+}
+
+/**
+ * Fetch the curated feed for the home page timeline.
+ * Returns Story[] in the shape the existing UI expects.
+ * Only one item per cluster (the lead), with memberCount surfaced as crossSourceCount.
+ */
+export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
+  const limit = q.limit ?? 40;
+  const offset = q.offset ?? 0;
+  const client = db();
 
   const rows = await client
     .select({
@@ -92,17 +143,7 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
     .from(items)
     .innerJoin(sources, eq(items.sourceId, sources.id))
     .leftJoin(clusters, eq(items.clusterId, clusters.id))
-    .where(
-      and(
-        isNotNull(items.enrichedAt),
-        isNotNull(items.importance),
-        tierFilter,
-        dedupFilter,
-        groupFilter,
-        kindFilter,
-        dateFilter,
-      ),
-    )
+    .where(buildFeedWhere(q))
     .orderBy(desc(items.publishedAt))
     .limit(limit)
     .offset(offset);
@@ -141,6 +182,7 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
 
     return {
       id: String(r.id),
+      sourceId: r.sourceId,
       source: {
         publisher,
         kindCode: r.sourceKind as Story["source"]["kindCode"],
@@ -174,5 +216,21 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
       hkr: (r.hkr as Story["hkr"]) ?? undefined,
     };
   });
+}
+
+/**
+ * COUNT(*) over the same feed filters as getFeaturedStories — used by the
+ * /api/v1/feed response's `total` field so agents can page through results.
+ * The JOIN on clusters is preserved because the dedup filter references it.
+ */
+export async function countFeaturedStories(q: FeedQuery = {}): Promise<number> {
+  const client = db();
+  const [row] = await client
+    .select({ c: sql<number>`count(*)::int` })
+    .from(items)
+    .innerJoin(sources, eq(items.sourceId, sources.id))
+    .leftJoin(clusters, eq(items.clusterId, clusters.id))
+    .where(buildFeedWhere(q));
+  return row?.c ?? 0;
 }
 

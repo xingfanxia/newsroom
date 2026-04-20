@@ -95,6 +95,7 @@ export async function getSavedStories(
 
     return {
       id: String(r.id),
+      sourceId: r.sourceId,
       source: {
         publisher,
         kindCode: r.sourceKind as Story["source"]["kindCode"],

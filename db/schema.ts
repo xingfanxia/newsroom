@@ -575,6 +575,45 @@ export const iterationRuns = pgTable(
   }),
 );
 
+/**
+ * api_tokens — Bearer tokens used by external agents to hit /api/v1/*.
+ *
+ * Storage model mirrors lib/auth/password.ts's HMAC scheme: we never persist
+ * the plaintext token, only sha256(token). Tokens themselves are 32 random
+ * bytes (256 bits of entropy from crypto.randomBytes), so brute-force is
+ * impossible by construction — we use sha256 rather than bcrypt so the
+ * per-request lookup is O(log n) via the unique index instead of a full
+ * table scan. See scripts/ops/mint-api-token.ts for minting.
+ *
+ * v1 = single-user, single-scope (token grants full read+write over the
+ * admin user's data). If we reintroduce multi-user in v2, add a
+ * `scopes text[]` column rather than splitting the table.
+ */
+export const apiTokens = pgTable(
+  "api_tokens",
+  {
+    id: serial("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** Hex-encoded sha256(token). Unique. */
+    tokenHash: text("token_hash").notNull(),
+    /** Human-readable identifier (e.g. "claude-desktop", "cursor-laptop")
+     *  so the operator can recognize + revoke individual tokens. */
+    label: text("label").notNull(),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    /** Non-null = revoked; auth middleware treats these as not-found. */
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  },
+  (t) => ({
+    hashIdx: uniqueIndex("api_tokens_token_hash_idx").on(t.tokenHash),
+    userIdx: index("api_tokens_user_idx").on(t.userId),
+  }),
+);
+
 // ── Types ───────────────────────────────────────────────────────
 export type Source = typeof sources.$inferSelect;
 export type NewSource = typeof sources.$inferInsert;
@@ -598,5 +637,7 @@ export type PolicyVersion = typeof policyVersions.$inferSelect;
 export type NewPolicyVersion = typeof policyVersions.$inferInsert;
 export type IterationRun = typeof iterationRuns.$inferSelect;
 export type NewIterationRun = typeof iterationRuns.$inferInsert;
+export type ApiToken = typeof apiTokens.$inferSelect;
+export type NewApiToken = typeof apiTokens.$inferInsert;
 
 export type { TSourceKind, TSourceGroup, TCadence };

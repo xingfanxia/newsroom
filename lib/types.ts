@@ -35,6 +35,11 @@ export type Source = {
 
 export type Story = {
   id: string;
+  /** Canonical source id (e.g. "dwarkesh-yt"). Used by filtered pages and by
+   *  /api/v1/feed so callers can disambiguate two sources with the same
+   *  publisher name (there are none today, but the field is load-bearing
+   *  for per-source API queries). */
+  sourceId: string;
   source: {
     publisher: string;
     /** Canonical source kind — UI translates via i18n (sources.kindFilter.*). */

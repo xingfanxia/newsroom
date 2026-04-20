@@ -10,6 +10,7 @@ function hoursAgo(h: number, m = 0): string {
 export const mockStories: Story[] = [
   {
     id: "1",
+    sourceId: "anthropic-news",
     source: { publisher: "Anthropic", kindCode: "scrape", localeCode: "en" },
     featured: true,
     title: "Reverse-engineering Claude's exploit for CVE-2026-2796",
@@ -24,6 +25,7 @@ export const mockStories: Story[] = [
   },
   {
     id: "2",
+    sourceId: "openai-blog",
     source: { publisher: "OpenAI", kindCode: "rss", localeCode: "en" },
     featured: true,
     title: "Product discovery lands inside ChatGPT",
@@ -38,6 +40,7 @@ export const mockStories: Story[] = [
   },
   {
     id: "3",
+    sourceId: "anthropic-news",
     source: { publisher: "Anthropic", kindCode: "scrape", localeCode: "en" },
     featured: true,
     title: "Let Claude use your computer",
@@ -53,6 +56,7 @@ export const mockStories: Story[] = [
   },
   {
     id: "4",
+    sourceId: "anthropic-news",
     source: { publisher: "Anthropic", kindCode: "scrape", localeCode: "en" },
     featured: true,
     title: "Claude Code ships auto-mode permissions",
@@ -67,6 +71,7 @@ export const mockStories: Story[] = [
   },
   {
     id: "5",
+    sourceId: "xiaomi-news",
     source: { publisher: "Xiaomi", kindCode: "rsshub", localeCode: "zh" },
     featured: false,
     title: "Xiaomi releases multimodal model MIMO-V2-OMNI",
@@ -81,6 +86,7 @@ export const mockStories: Story[] = [
   },
   {
     id: "6",
+    sourceId: "deepmind-blog",
     source: { publisher: "DeepMind", kindCode: "rss", localeCode: "en" },
     featured: false,
     title: "Gemini 3.1 Pro adds temporal-consistency video benchmark",
@@ -95,6 +101,7 @@ export const mockStories: Story[] = [
   },
   {
     id: "7",
+    sourceId: "dwarkesh-yt",
     source: { publisher: "Dwarkesh Patel", kindCode: "rss", localeCode: "en" },
     featured: false,
     title: "Dario Amodei on the critical path to 2027",
@@ -109,6 +116,7 @@ export const mockStories: Story[] = [
   },
   {
     id: "8",
+    sourceId: "jiqizhixin-rsshub",
     source: { publisher: "Synced (机器之心)", kindCode: "rsshub", localeCode: "zh" },
     featured: false,
     title: "ByteDance Doubao team publishes composable tool-agent framework",

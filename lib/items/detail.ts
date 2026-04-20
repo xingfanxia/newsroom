@@ -49,6 +49,7 @@ export async function getItemDetail(
       publishedAt: items.publishedAt,
       bodyMd: items.bodyMd,
       bodyFetchedAt: items.bodyFetchedAt,
+      sourceId: items.sourceId,
       sourceNameZh: sources.nameZh,
       sourceNameEn: sources.nameEn,
       sourceLocale: sources.locale,
@@ -90,6 +91,7 @@ export async function getItemDetail(
 
   const story: Story = {
     id: String(r.id),
+    sourceId: r.sourceId,
     source: {
       publisher: locale === "en" ? r.sourceNameEn : r.sourceNameZh,
       kindCode: r.sourceKind as Story["source"]["kindCode"],

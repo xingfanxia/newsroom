@@ -196,15 +196,35 @@ know whether that's high or low. The skill says "importance ∈ [0-100],
 
 ## Rollout order (s9)
 
-Phase 1 — Read API (half a session):
-1. `lib/auth/api-token.ts` + `api_tokens` table + migration
-2. `/api/v1/feed`, `/api/v1/items/[id]`, `/api/v1/sources`
-3. `/api/v1/search` with lexical mode only (semantic later)
-4. Integration test that exercises each endpoint end-to-end
+Phase 1 — Read API ✅ **SHIPPED 2026-04-20 (s9)**:
+1. ✅ `lib/auth/api-token.ts` + `api_tokens` table + migration (sha256
+   hashing, not bcrypt — 256-bit tokens make brute force infeasible so
+   the unique-index lookup is safe and O(log n) instead of linear).
+2. ✅ `/api/v1/feed` (tier/date/date_from/date_to/source_id/source_group/
+   source_kind filters, pagination with total), `/api/v1/items/[id]`
+   (full bilingual detail + HKR + body_md), `/api/v1/sources` (catalog +
+   live health).
+3. ✅ `/api/v1/search?mode=lexical` (ILIKE across both-locale title +
+   summary). `mode=semantic` returns 501 until Phase 3.
+4. ✅ `scripts/ops/mint-api-token.ts` CLI (mint/list/revoke).
+5. ✅ 14 integration tests in `tests/api/v1.test.ts` — real DB, real
+   route handlers called directly with synthetic `Request` objects
+   (no subprocess + no curl + no mocks). Auth gate (missing/invalid/
+   revoked), feed shape, source_id filter narrowing, items 400/404/200,
+   sources catalog shape, search 400/501/200 lexical.
+
+Pre-req closed in the same phase: `lib/items/live.ts#buildFeedWhere`
+now factors filter construction so `getFeaturedStories` and
+`countFeaturedStories` share it exactly (pagination totals cannot
+drift). `Story.sourceId` is now populated everywhere Story is built
+(live / saved / detail / mock), which killed the publisher-string
+workarounds on /podcasts and /x-monitor — per-source filtering now
+happens at the SQL layer.
 
 Phase 2 — Write API (quarter session):
 5. `/api/v1/saved`, `/api/v1/collections/*`, `/api/v1/watchlist`
-6. Admin UI for minting API tokens (or a CLI `scripts/ops/mint-api-token.ts`)
+6. Admin UI for minting API tokens — CLI already exists at
+   `scripts/ops/mint-api-token.ts`.
 
 Phase 3 — Semantic search (quarter session):
 7. Add semantic mode to `/api/v1/search`: embed query + pgvector HNSW
