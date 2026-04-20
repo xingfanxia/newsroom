@@ -520,6 +520,12 @@
   border: 1px solid var(--border-1);
   border-radius: 4px;
   overflow: hidden;
+  /* Don't let the rail's flex container squeeze us below content height.
+     Without this the rail compresses long panels (radar stat-grid,
+     topics cloud, watchlist empty-state) and overflow:hidden on .panel
+     clips the overflowed content instead of triggering the rail's
+     outer scroll. */
+  flex-shrink: 0;
 }
 .panel .hd {
   display: flex; justify-content: space-between; align-items: center;
@@ -546,12 +552,12 @@
 .radar-ring { stroke: var(--border-1); fill: none; }
 .radar-ring.mid { stroke: var(--border-2); stroke-dasharray: 2 3; }
 .radar-sweep {
-  /* transform-box: fill-box + 50% 50% is the correct spell for SVG <g>
-     rotation — plain `transform-origin: center` or `50%` is interpreted in
-     element-box coords (0, 0) in most browsers and pins rotation to the
-     SVG origin instead of the radar center. */
-  transform-box: fill-box;
-  transform-origin: 50% 50%;
+  /* Use explicit SVG user units (viewBox coords) for the transform origin,
+     NOT % or fill-box. `transform-box: fill-box` made the sweep rotate
+     around the wedge path's own bounding-box center (~67, 28) instead of
+     the radar's true center (50, 50), so the tip swung outside the rings.
+     `50px 50px` maps directly to the viewBox (50, 50) — the radar center. */
+  transform-origin: 50px 50px;
   animation: sweep 6s linear infinite;
 }
 @keyframes sweep { to { transform: rotate(360deg); } }
@@ -575,7 +581,9 @@
 .stat .n .sfx { color: var(--fg-3); font-size: 11px; font-weight: 400; margin-left: 2px; }
 .stat .l { font-size: 9.5px; color: var(--fg-3); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 4px; }
 
-/* topics cloud */
+/* topics cloud — cap the panel body height and scroll within so the tag
+   cloud doesn't push the curation-policy panel off the rail. */
+.panel .bd:has(.topics) { max-height: 320px; overflow-y: auto; }
 .topics { display: flex; flex-wrap: wrap; gap: 5px; }
 .topic {
   display: inline-flex; align-items: center; gap: 6px;
