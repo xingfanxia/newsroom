@@ -17,6 +17,7 @@ export type LLMTask =
   | "commentary"
   | "newsletter"
   | "agent"
+  | "search"
   | "other";
 
 export type LLMUsageContext = {

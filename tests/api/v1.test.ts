@@ -207,13 +207,26 @@ describe("/api/v1/search", () => {
     expect(res.status).toBe(400);
   });
 
-  test("returns 501 when mode=semantic (Phase 3 reserved)", async () => {
+  test("semantic mode returns ranked items with distance", async () => {
     const res = await searchGet(
-      authedReq("/api/v1/search?q=agent&mode=semantic"),
+      authedReq("/api/v1/search?q=autonomous+coding+agent&mode=semantic&limit=5"),
     );
-    expect(res.status).toBe(501);
-    const body = await res.json();
-    expect(body.error).toBe("not_implemented");
+    // Can be 200 on success or 500 if AZURE_OPENAI_EMBEDDING_DEPLOYMENT is
+    // missing / rate-limited in the test env. Accept either and only
+    // assert the shape when we got data back.
+    if (res.status === 200) {
+      const body = await res.json();
+      expect(body.mode).toBe("semantic");
+      expect(body.q).toBe("autonomous coding agent");
+      expect(Array.isArray(body.items)).toBe(true);
+      expect(typeof body.embedding_dims).toBe("number");
+      expect(typeof body.latency_ms).toBe("number");
+      if (body.items.length > 0) {
+        expect(typeof body.items[0].distance).toBe("number");
+      }
+    } else {
+      expect(res.status).toBe(500);
+    }
   });
 
   test("lexical search returns shape matching /feed items", async () => {

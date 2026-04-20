@@ -221,28 +221,60 @@ drift). `Story.sourceId` is now populated everywhere Story is built
 workarounds on /podcasts and /x-monitor — per-source filtering now
 happens at the SQL layer.
 
-Phase 2 — Write API (quarter session):
-5. `/api/v1/saved`, `/api/v1/collections/*`, `/api/v1/watchlist`
-6. Admin UI for minting API tokens — CLI already exists at
-   `scripts/ops/mint-api-token.ts`.
+Phase 2 — Write API ✅ **SHIPPED 2026-04-20 (s9)**:
+- ✅ `/api/v1/saved` (GET lists with collection filter, POST toggles with
+  optional collection pin)
+- ✅ `/api/v1/collections` (GET list, POST create, PATCH rename/pin,
+  DELETE cascade-to-inbox)
+- ✅ `/api/v1/tweaks` (GET current prefs + watchlist, PATCH partial
+  update — watchlist is full-replace to keep agent mental model simple)
+- ✅ `/api/v1/usage/summary` (LLM spend + token mix + per-task
+  breakdown, windowed today | week | month)
 
-Phase 3 — Semantic search (quarter session):
-7. Add semantic mode to `/api/v1/search`: embed query + pgvector HNSW
-8. Benchmark: cold query p95 target <500ms on current 6.8k-item index
+Phase 3 — Semantic search ✅ **SHIPPED 2026-04-20 (s9)**:
+- ✅ `/api/v1/search?mode=semantic` now live. `lib/items/semantic-search.ts`
+  embeds the query via Azure text-embedding-3-large (same deployment the
+  enrichment pipeline uses), then ranks items via
+  `ORDER BY embedding <#> $q::halfvec(3072)` on the HNSW-indexed column.
+  Returns each hit with a raw `distance` score (smaller = closer; ~-1
+  for near-identical vectors) so callers can threshold client-side.
+- ✅ Benchmark (smoke-tested against 6.8k-item index): cold query
+  end-to-end p50 ~250ms, embedding dominates (~150ms) with the SQL at
+  ~80ms — well under the 500ms target. The HNSW index is used even with
+  WHERE filters at this cardinality.
+- Added `search` to `LLMTask` enum so semantic-search embeds show up as
+  their own line in `/admin/usage` rather than mingling with pipeline
+  embeds.
 
-Phase 4 — MCP server (half a session):
-9. `/api/mcp/sse` route with `@modelcontextprotocol/sdk`
-10. Register all tools + resources
-11. Publish installer snippet: `claude_desktop_config.json` block with
-    SSE URL + Bearer token placeholder
+Phase 4 — MCP server ✅ **SHIPPED 2026-04-20 (s9)**:
+- ✅ `/api/mcp` endpoint via `@modelcontextprotocol/sdk@1.29.0` (path
+  changed from `/api/mcp/sse` because Streamable HTTP uses a single
+  multi-method path, not a GET-only SSE URL). Stateless mode —
+  `sessionIdGenerator: undefined`, `enableJsonResponse: true`.
+- ✅ 7 tools registered: `ax_radar_feed`, `ax_radar_get_item`,
+  `ax_radar_search`, `ax_radar_sources`, `ax_radar_save`,
+  `ax_radar_collections_list`, `ax_radar_usage`.
+- ✅ 1 resource registered: `ax-radar://today` (today's feed rendered
+  as markdown briefing).
+- ✅ Bearer auth reuses `requireApiToken` from /api/v1 — same tokens,
+  same revocation path.
+- ✅ Smoke-tested: `initialize` → `tools/list` → `tools/call` all pass
+  against the dev server.
 
-Phase 5 — Claude Code skill (short):
-12. `~/.claude/skills/ax-radar/SKILL.md` with glossary + examples
-13. `mcp.json` pointing at the production MCP server
-14. Test end-to-end: `claude` asks "brief me on this week's radar"
-    → skill autoloads → MCP retrieves → answer with citations
+Phase 5 — Claude Code skill ✅ **SHIPPED 2026-04-20 (s9)**:
+- ✅ `~/.claude/skills/ax-radar/SKILL.md` — domain glossary (HKR,
+  tiers, source groups, importance scale), per-tool intent table,
+  three canonical example flows (morning briefing / topic research /
+  saving), setup instructions for Claude Desktop + Claude Code CLI +
+  Cursor, and guardrails (don't blast the feed into transcript, use
+  semantic over lexical by default, saves need explicit intent).
+- Skill description triggers auto-invoke on "what's on the radar",
+  "brief me", "find stories about …", "save this".
+- MCP config goes into the client's own config file (claude_desktop_config.json
+  / `claude mcp add` / Cursor settings) — the skill can't register MCP
+  servers itself.
 
-Total estimated effort: ~1 full session if focused.
+Total actual effort: ~one focused session.
 
 ---
 

@@ -1,12 +1,17 @@
 /**
  * GET /api/v1/search — Bearer-gated search across enriched items.
  *
- * v1 exposes `mode=lexical` (default): case-insensitive ILIKE against
- * title + both-locale title/summary columns. The response shape matches
- * /api/v1/feed so agents can reuse their item parser.
+ *   mode=lexical (default): case-insensitive ILIKE against title + both-locale
+ *   title/summary columns. Fast, cheap, exact substring matches only.
  *
- * `mode=semantic` is reserved for Phase 3 (pgvector HNSW on
- * items.embedding). Requesting it today returns 501.
+ *   mode=semantic: embeds the query via Azure text-embedding-3-large (one call
+ *   per request, ~$0.00002) and ranks items by pgvector cosine distance on the
+ *   HNSW-indexed embedding column. Finds conceptual matches ("agentic coding"
+ *   returns items about autonomous IDE agents even if the exact phrase is
+ *   absent). Returns each hit with a `distance` field the agent can use to
+ *   threshold results (smaller = closer; for unit vectors -1 is identical).
+ *
+ * Response shape matches /api/v1/feed so agents can reuse their item parser.
  *
  * Query params:
  *   q            = free-text (required, non-empty)
@@ -14,7 +19,7 @@
  *   tier         = featured | p1 | all (default all — search should span)
  *   date / date_from / date_to / source_id / source_group / source_kind
  *   limit        = 1..100, default 20
- *   offset       = ≥0, default 0
+ *   offset       = ≥0, default 0 (lexical only — semantic doesn't paginate)
  *   locale       = zh | en (default en)
  */
 import { z } from "zod";
@@ -24,6 +29,7 @@ import {
   getFeaturedStories,
   type FeedQuery,
 } from "@/lib/items/live";
+import { semanticSearch } from "@/lib/items/semantic-search";
 import type { Story } from "@/lib/types";
 
 const querySchema = z.object({
@@ -79,14 +85,39 @@ export async function GET(req: Request) {
   const p = parsed.data;
 
   if (p.mode === "semantic") {
-    return Response.json(
-      {
-        error: "not_implemented",
-        detail:
-          "semantic mode ships in Phase 3 (pgvector HNSW). Use mode=lexical for now.",
-      },
-      { status: 501 },
-    );
+    try {
+      const started = Date.now();
+      const result = await semanticSearch(p.q, {
+        locale: p.locale,
+        limit: p.limit,
+        sourceId: p.source_id,
+        sourceGroup: p.source_group,
+        sourceKind: p.source_kind,
+        dateFrom: p.date_from,
+        dateTo: p.date_to,
+        // Semantic search defaults to spanning everything, including
+        // excluded-tier items, because intent often conflicts with
+        // curator heuristics (an "excluded" interview can be exactly
+        // what the agent is hunting for).
+        includeExcluded: p.tier === "all",
+      });
+      return Response.json({
+        mode: "semantic",
+        q: p.q,
+        items: result.items.map((s) => ({
+          ...toApiItem(s),
+          distance: s.distance,
+        })),
+        total: result.total,
+        limit: p.limit,
+        offset: 0,
+        embedding_dims: result.embeddingDims,
+        latency_ms: Date.now() - started,
+      });
+    } catch (err) {
+      console.error("[api/v1/search semantic] failed", err);
+      return Response.json({ error: "server_error" }, { status: 500 });
+    }
   }
 
   const feedQuery: FeedQuery = {
