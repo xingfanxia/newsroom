@@ -178,6 +178,23 @@ export const sourceCatalog: Source[] = [
     tags: ["policy", "newsletter"],
     enabled: true,
   },
+  {
+    id: "ai-chatgroup-daily",
+    name: {
+      en: "AI Chat-Group Daily (群聊日报)",
+      zh: "AI 群聊日报",
+    },
+    url: "https://louyu2015.github.io/AI-chatgroup-daily/feed.xml",
+    kind: "atom",
+    group: "newsletter",
+    locale: "zh",
+    cadence: "daily",
+    priority: 2,
+    tags: ["community", "digest", "zh", "newsletter"],
+    enabled: true,
+    notes:
+      "Atom feed — RSS <summary> is only the first ~500 chars; the real post is at the <link> URL. Jina Reader fetches the full page on the body-fetch stage.",
+  },
 
   // ── Research ────────────────────────────────────────────────────
   {
