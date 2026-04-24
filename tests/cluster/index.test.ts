@@ -124,3 +124,30 @@ describe("Cluster UPDATE on member join", () => {
     expect(workerSrc).toContain("memberCount: sql`${clusters.memberCount} + 1`");
   });
 });
+
+// ── Race safety: neighbor-promotion path ─────────────────────────────────────
+
+describe("Neighbor-promotion race safety", () => {
+  it("creates the shared cluster with memberCount=0 (not 1) so a stolen neighbor doesn't leave a phantom +1", () => {
+    // Before this fix: insert with memberCount=1 (assuming neighbor will join),
+    // then itemId join +1 → 2 even when the neighbor was claimed by a concurrent
+    // worker. After the fix: start at 0, only bump when the neighbor claim
+    // returns rows.
+    expect(workerSrc).toContain(
+      ".values({ leadItemId: nearest.id, memberCount: 0 })",
+    );
+  });
+
+  it("checks .returning() on the neighbor claim before incrementing memberCount", () => {
+    // The atomic-claim pattern returns 0 rows when a concurrent worker won;
+    // we must inspect the returned array length before bumping the counter.
+    expect(workerSrc).toContain("neighborClaim.length > 0");
+  });
+
+  it("repoints leadItemId to itemId when the neighbor was stolen (no dangling lead)", () => {
+    // If we lose the race, the cluster repurposes itself as a singleton for
+    // itemId; lead must point to itemId since the original neighbor is now in
+    // some other cluster.
+    expect(workerSrc).toContain(".set({ leadItemId: itemId })");
+  });
+});
