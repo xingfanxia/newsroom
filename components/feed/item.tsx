@@ -1,6 +1,9 @@
 "use client";
 import { useState } from "react";
 import { HkrRing } from "./hkr-ring";
+import { EventBadge } from "./event-badge";
+import { CoverageChip } from "./coverage-chip";
+import { SignalDrawer } from "./signal-drawer";
 import { useTweaks } from "@/hooks/use-tweaks";
 import type { Story } from "@/lib/types";
 
@@ -29,6 +32,7 @@ export function Item({ story, locale }: Props) {
   const [open, setOpen] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const { tweaks } = useTweaks();
   const lang = tweaks.language;
   const showZh = lang === "zh";
@@ -86,6 +90,7 @@ export function Item({ story, locale }: Props) {
       </div>
       <div className="i-body">
         <div className="i-meta">
+          <EventBadge story={story} showZh={showZh} />
           {tierPill}
           <span className="src">{story.source.publisher}</span>
           <span className="chan">· {story.source.kindCode}</span>
@@ -93,6 +98,11 @@ export function Item({ story, locale }: Props) {
           <span className="time-m">
             {hh} · {date}
           </span>
+          <CoverageChip
+            story={story}
+            showZh={showZh}
+            onClick={() => setDrawerOpen((d) => !d)}
+          />
         </div>
 
         {/* Title — single-locale per tweaks.language, no duplicate en/zh. */}
@@ -231,6 +241,14 @@ export function Item({ story, locale }: Props) {
             </button>
           </div>
         </div>
+
+        <SignalDrawer
+          clusterId={story.clusterId}
+          locale={locale}
+          showZh={showZh}
+          open={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+        />
       </div>
 
       <div className="i-score">

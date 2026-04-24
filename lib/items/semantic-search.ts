@@ -20,7 +20,7 @@
  */
 import { and, eq, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { items, sources, halfvecToDriver } from "@/db/schema";
+import { items, sources, clusters, halfvecToDriver } from "@/db/schema";
 import { embed } from "@/lib/llm";
 import type { Story } from "@/lib/types";
 
@@ -70,7 +70,14 @@ export async function semanticSearch(
       : sql`TRUE`;
   const exclusionFilter = opts.includeExcluded
     ? sql`TRUE`
-    : sql`${items.tier} <> 'excluded'`;
+    : sql`COALESCE(${clusters.eventTier}, ${items.tier}) <> 'excluded'`;
+
+  // Event-aware dedup — parallel to lib/items/live.ts. Singletons (no cluster
+  // row) pass through; multi-member clusters return only their lead item so
+  // search results don't spam the same event in N locales. Downside: if the
+  // query's nearest vector match is a non-lead member, it's hidden — but the
+  // lead is always indexed too and usually ranks close enough.
+  const dedupFilter = sql`(${items.clusterId} IS NULL OR ${clusters.leadItemId} = ${items.id})`;
 
   // `<#>` returns negative distance for unit vectors; smaller = closer.
   // We expose raw distance to the caller so they can tune a threshold.
@@ -107,11 +114,13 @@ export async function semanticSearch(
     })
     .from(items)
     .innerJoin(sources, eq(items.sourceId, sources.id))
+    .leftJoin(clusters, eq(items.clusterId, clusters.id))
     .where(
       and(
         isNotNull(items.embedding),
         isNotNull(items.enrichedAt),
         exclusionFilter,
+        dedupFilter,
         sourceIdFilter,
         groupFilter,
         kindFilter,

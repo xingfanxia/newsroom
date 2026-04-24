@@ -217,19 +217,71 @@ export const rawItems = pgTable(
   }),
 );
 
-/** Clusters — groups of near-duplicate items (cosine similarity > threshold). */
-export const clusters = pgTable("clusters", {
-  id: serial("id").primaryKey(),
-  /** Canonical lead item shown in the timeline. No FK constraint (circular dep). */
-  leadItemId: integer("lead_item_id").notNull(),
-  memberCount: integer("member_count").notNull().default(1),
-  firstSeenAt: timestamp("first_seen_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+/**
+ * clusters — groups of items covering the same real-world event.
+ *
+ * Extended 2026-04-24 (event-aggregation phase) to carry event-level
+ * editorial fields — canonical titles, commentary, importance, tier —
+ * lifted from items so a single event produces a single feed card and
+ * a single commentary generation regardless of coverage count.
+ *
+ * TypeScript imports this same table as `events` (see alias at bottom
+ * of this file) for semantic clarity in new code; the physical table
+ * name stays `clusters` to preserve the existing `items.cluster_id` FK
+ * without a rename migration.
+ */
+export const clusters = pgTable(
+  "clusters",
+  {
+    id: serial("id").primaryKey(),
+    /** Canonical lead item shown in the timeline. No FK constraint (circular dep). */
+    leadItemId: integer("lead_item_id").notNull(),
+    memberCount: integer("member_count").notNull().default(1),
+    /** Inception — day the event broke. Archive anchor. */
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    /** Last time a new member joined or Stage B rearbitrated. Trending-now anchor. */
+    latestMemberAt: timestamp("latest_member_at", { withTimezone: true }),
+    /** Cached coverage count — mirrors member_count for now but kept
+     *  distinct to leave room for future weighting (e.g. corroborating
+     *  vs primary, if we ever add role annotation). */
+    coverage: integer("coverage").notNull().default(1),
+    // ── Canonical event name (Haiku-generated when member_count ≥ 2) ──
+    canonicalTitleZh: text("canonical_title_zh"),
+    canonicalTitleEn: text("canonical_title_en"),
+    /** Last time canonical_title_* was regenerated. Used to throttle
+     *  regen when membership grows slowly. */
+    titledAt: timestamp("titled_at", { withTimezone: true }),
+    // ── Event-level summaries (copied from lead on migration; regenerated on multi-member change) ──
+    summaryZh: text("summary_zh"),
+    summaryEn: text("summary_en"),
+    // ── Event-level editorial commentary — replaces per-item fields for multi-member clusters ──
+    editorNoteZh: text("editor_note_zh"),
+    editorNoteEn: text("editor_note_en"),
+    editorAnalysisZh: text("editor_analysis_zh"),
+    editorAnalysisEn: text("editor_analysis_en"),
+    commentaryAt: timestamp("commentary_at", { withTimezone: true }),
+    // ── Event importance + tier (computed from members + coverage boost) ──
+    importance: integer("importance"),
+    /** featured | p1 | all | excluded — matches items.tier semantics but event-level. */
+    eventTier: text("event_tier"),
+    hkr: jsonb("hkr"),
+    // ── Stage B verdict lock — prevents Stage A from reshuffling LLM-confirmed membership. ──
+    verifiedAt: timestamp("verified_at", { withTimezone: true }),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    firstSeenIdx: index("clusters_first_seen_at_idx").on(t.firstSeenAt),
+    latestMemberIdx: index("clusters_latest_member_at_idx").on(t.latestMemberAt),
+    tierLatestIdx: index("clusters_tier_latest_idx").on(
+      t.eventTier,
+      t.latestMemberAt,
+    ),
+  }),
+);
 
 export const items = pgTable(
   "items",
@@ -296,6 +348,10 @@ export const items = pgTable(
       onDelete: "set null",
     }),
     clusteredAt: timestamp("clustered_at", { withTimezone: true }),
+    /** Stage B (LLM arbitration) verdict lock. When set, Stage A
+     *  embedding-based clustering will skip this item as a neighbor
+     *  candidate — its cluster assignment has been LLM-confirmed. */
+    clusterVerifiedAt: timestamp("cluster_verified_at", { withTimezone: true }),
   },
   (t) => ({
     contentHashIdx: uniqueIndex("items_content_hash_idx").on(t.contentHash),
@@ -313,6 +369,10 @@ export const items = pgTable(
       .on(t.clusteredAt)
       .where(sql`${t.clusteredAt} IS NULL AND ${t.embedding} IS NOT NULL`),
     clusterIdx: index("items_cluster_idx").on(t.clusterId, t.publishedAt),
+    /** Pending Stage B — items the arbitrator hasn't seen yet. */
+    clusterVerifiedIdx: index("items_cluster_verified_idx")
+      .on(t.clusterVerifiedAt)
+      .where(sql`${t.clusterVerifiedAt} IS NULL`),
   }),
 );
 
@@ -587,6 +647,38 @@ export const iterationRuns = pgTable(
 );
 
 /**
+ * cluster_splits — audit trail for Stage B LLM arbitration verdicts.
+ *
+ * One row per item that the arbitrator decided doesn't belong to the
+ * cluster it was provisionally assigned to by Stage A embedding similarity.
+ * Surviving members (those the arbitrator kept) are not logged here.
+ *
+ * Retained for weekly operator review + as future training signal for
+ * prompt tuning. No FK to from_cluster_id because clusters can be GC'd
+ * and the audit should survive.
+ */
+export const clusterSplits = pgTable(
+  "cluster_splits",
+  {
+    id: serial("id").primaryKey(),
+    itemId: integer("item_id")
+      .notNull()
+      .references(() => items.id, { onDelete: "cascade" }),
+    /** No FK — clusters can be GC'd; audit outlives them. */
+    fromClusterId: integer("from_cluster_id").notNull(),
+    /** Arbitrator's reason, ≤280 chars. */
+    reason: text("reason").notNull(),
+    splitAt: timestamp("split_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    recentIdx: index("cluster_splits_recent_idx").on(t.splitAt),
+    itemIdx: index("cluster_splits_item_idx").on(t.itemId),
+  }),
+);
+
+/**
  * api_tokens — Bearer tokens used by external agents to hit /api/v1/*.
  *
  * Storage model mirrors lib/auth/password.ts's HMAC scheme: we never persist
@@ -650,5 +742,17 @@ export type IterationRun = typeof iterationRuns.$inferSelect;
 export type NewIterationRun = typeof iterationRuns.$inferInsert;
 export type ApiToken = typeof apiTokens.$inferSelect;
 export type NewApiToken = typeof apiTokens.$inferInsert;
+
+// ── Event-aggregation aliases (clusters table repurposed as first-class events) ──
+/** Semantic alias — the clusters table represents "events" in the
+ *  event-aggregation model (canonical titles, cross-source commentary,
+ *  coverage boost). Physical table name is `clusters` for FK continuity
+ *  with items.cluster_id. New code should import `events`; existing code
+ *  using `clusters` continues to work. */
+export const events = clusters;
+export type Event = typeof clusters.$inferSelect;
+export type NewEvent = typeof clusters.$inferInsert;
+export type ClusterSplit = typeof clusterSplits.$inferSelect;
+export type NewClusterSplit = typeof clusterSplits.$inferInsert;
 
 export type { TSourceKind, TSourceGroup, TCadence };

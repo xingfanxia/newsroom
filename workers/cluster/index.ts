@@ -3,8 +3,8 @@ import { db } from "@/db/client";
 import { items, clusters } from "@/db/schema";
 
 const MAX_PER_RUN = 200;
-const SIMILARITY_THRESHOLD = 0.88;
-const WINDOW_HOURS = 48;
+const SIMILARITY_THRESHOLD = 0.80;
+const WINDOW_HOURS = 72;
 
 export type ClusterReport = {
   processed: number;
@@ -84,9 +84,13 @@ async function assignOneToCluster(itemId: number): Promise<AssignOutcome> {
   // Widened neighbor search: include ANY enriched+embedded item (not just ones
   // already clustered). If the nearest is unclustered-but-near, we promote it
   // to a cluster lead so near-duplicates in the same batch can still merge.
+  // Window is anchored to the target item's own published_at (bidirectional
+  // ±WINDOW_HOURS) so backfill items can find their temporal cohort even when
+  // they arrive late. Candidates with cluster_verified_at IS NOT NULL are
+  // excluded so Stage B verified-locks are respected.
   const nearestResult = await client.execute(sql`
     WITH target AS (
-      SELECT embedding FROM items WHERE id = ${itemId}
+      SELECT embedding, published_at FROM items WHERE id = ${itemId}
     )
     SELECT
       i.id,
@@ -97,7 +101,11 @@ async function assignOneToCluster(itemId: number): Promise<AssignOutcome> {
     WHERE i.id <> ${itemId}
       AND i.embedding IS NOT NULL
       AND i.enriched_at IS NOT NULL
-      AND i.published_at > now() - make_interval(hours => ${WINDOW_HOURS})
+      AND i.cluster_verified_at IS NULL
+      AND i.published_at BETWEEN
+          (SELECT published_at FROM target) - make_interval(hours => ${WINDOW_HOURS})
+          AND
+          (SELECT published_at FROM target) + make_interval(hours => ${WINDOW_HOURS})
     ORDER BY i.embedding <=> (SELECT embedding FROM target)
     LIMIT 1
   `);
@@ -120,20 +128,44 @@ async function assignOneToCluster(itemId: number): Promise<AssignOutcome> {
       clusterId = nearest.cluster_id;
       outcome = "assigned";
     } else {
-      // Neighbor is enriched but not yet clustered. Promote neighbor to be
-      // the lead of a new shared cluster, assign both items to it.
+      // Neighbor is enriched but not yet clustered. Try to atomically claim
+      // it as the lead of a new shared cluster.
+      //
+      // Race-safe sequence:
+      //   1. Create cluster with member_count=0 (we haven't joined anyone yet).
+      //   2. Try to claim the neighbor (the contended row) with a guarded UPDATE.
+      //   3. If the claim succeeds → bump member_count to 1.
+      //      If a concurrent worker beat us to the neighbor → repurpose this
+      //      cluster as a singleton for itemId (lead points at itemId, not the
+      //      lost neighbor) so we don't end up with a phantom 2-member count.
       const [created] = await client
         .insert(clusters)
-        .values({ leadItemId: nearest.id, memberCount: 1 })
+        .values({ leadItemId: nearest.id, memberCount: 0 })
         .returning({ id: clusters.id });
       clusterId = created.id;
-      // Best-effort: claim the neighbor atomically too so concurrent runs don't
-      // re-cluster it. If somebody else got there first, our later join is harmless.
-      await client
+
+      const neighborClaim = await client
         .update(items)
         .set({ clusterId, clusteredAt: new Date() })
-        .where(sql`${items.id} = ${nearest.id} AND ${items.clusteredAt} IS NULL`);
-      outcome = "assigned";
+        .where(sql`${items.id} = ${nearest.id} AND ${items.clusteredAt} IS NULL`)
+        .returning({ id: items.id });
+
+      if (neighborClaim.length > 0) {
+        await client
+          .update(clusters)
+          .set({ memberCount: sql`${clusters.memberCount} + 1` })
+          .where(sql`${clusters.id} = ${clusterId}`);
+        outcome = "assigned";
+      } else {
+        // Neighbor was stolen mid-race. Repoint the cluster's lead to itemId
+        // so it becomes a clean singleton when we join below; otherwise the
+        // lead would dangle to a row that's now in some other cluster.
+        await client
+          .update(clusters)
+          .set({ leadItemId: itemId })
+          .where(sql`${clusters.id} = ${clusterId}`);
+        outcome = "created";
+      }
     }
   } else {
     // No neighbor above threshold — new singleton cluster.
@@ -162,6 +194,8 @@ async function assignOneToCluster(itemId: number): Promise<AssignOutcome> {
     .update(clusters)
     .set({
       memberCount: sql`${clusters.memberCount} + 1`,
+      latestMemberAt: new Date(),
+      coverage: sql`${clusters.memberCount} + 1`,
       updatedAt: new Date(),
     })
     .where(sql`${clusters.id} = ${clusterId}`);

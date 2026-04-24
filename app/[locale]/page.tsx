@@ -105,6 +105,10 @@ export default async function HotNewsPage({
       locale: locale as "zh" | "en",
       limit,
       date: activeDate,
+      // When no explicit day is picked, use the Today view: trending events
+      // (ongoing + broken-today). With a date filter, stay in Archive so the
+      // day-picker's calendar semantics hold.
+      view: activeDate ? "archive" : "today",
       ...sourceFilter,
     });
   } catch {

@@ -15,9 +15,12 @@ export type LLMTask =
   | "score"
   | "embed"
   | "commentary"
+  | "event-commentary"
   | "newsletter"
   | "agent"
   | "search"
+  | "arbitrate"
+  | "canonical-title"
   | "other";
 
 export type LLMUsageContext = {
