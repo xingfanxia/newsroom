@@ -108,6 +108,67 @@
   border: 1px solid var(--border-1);
 }
 
+/* Source picker (wraps .search, adds active chip + dropdown) */
+.source-picker { position: relative; }
+.source-picker .search.on { border-color: var(--accent-blue); }
+.source-active {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 8px;
+  margin-bottom: 6px;
+  background: rgba(88,166,255,0.08);
+  border: 1px solid rgba(88,166,255,0.35);
+  border-radius: 2px;
+  font-size: 11px; color: var(--fg-0);
+  font-family: var(--font-mono);
+}
+.source-active .dot-marker { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.source-active-name {
+  flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.source-active-clear {
+  background: transparent; border: 0; cursor: pointer;
+  color: var(--fg-2); font-size: 14px; line-height: 1;
+  padding: 0 2px; font-family: var(--font-mono);
+}
+.source-active-clear:hover { color: var(--accent-red); }
+.source-dropdown {
+  position: absolute; left: 0; right: 0; top: calc(100% + 4px);
+  max-height: 340px; overflow-y: auto;
+  background: var(--bg-1);
+  border: 1px solid var(--border-2);
+  border-radius: 2px;
+  z-index: 40;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.45);
+  display: flex; flex-direction: column;
+}
+.source-dropdown-empty {
+  padding: 14px; font-size: 11px; color: var(--fg-3); text-align: center;
+  font-family: var(--font-mono);
+}
+.source-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px;
+  background: transparent; border: 0; cursor: pointer;
+  border-bottom: 1px solid var(--border-1);
+  text-align: left;
+  font-family: var(--font-mono); font-size: 12px; color: var(--fg-1);
+}
+.source-row:last-child { border-bottom: 0; }
+.source-row.on { background: var(--bg-2); color: var(--fg-0); }
+.source-row:hover { background: var(--bg-2); }
+.source-row-primary { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.source-row-secondary {
+  font-size: 10.5px; color: var(--fg-3);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  max-width: 40%;
+}
+.source-row-badge {
+  font-size: 9.5px; color: var(--fg-3);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  padding: 2px 6px; border: 1px solid var(--border-1); border-radius: 2px;
+  flex-shrink: 0;
+}
+
 .sec {
   font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;
   color: var(--fg-3); padding: 14px 6px 6px; display: flex; justify-content: space-between;
@@ -481,6 +542,34 @@
 .i-expand .k.e::before { background: var(--accent-orange); }
 .i-expand .k.r::before { background: var(--accent-blue); }
 .i-expand .v { font-size: 12.5px; line-height: 1.7; color: var(--fg-1); }
+
+/* Editor note = TL;DR callout. Break out of the 90px/1fr grid so it reads as
+   a highlighted banner, not another row. */
+.i-expand .kv.tldr {
+  display: block;
+  margin: 2px 0 12px;
+  padding: 10px 14px;
+  background: rgba(255,166,87,0.06);
+  border-left: 2px solid var(--accent-orange);
+  border-bottom: 0;
+  border-radius: 2px;
+}
+.i-expand .kv.tldr .k { padding-top: 0; margin-bottom: 6px; color: var(--accent-orange); font-size: 9.5px; letter-spacing: 0.14em; }
+.i-expand .kv.tldr .v { font-size: 13px; color: var(--fg-0); font-weight: 500; line-height: 1.6; }
+
+/* Editor analysis = long-form reading. Label above, wider readable measure,
+   purple accent to visually separate from the orange TL;DR. */
+.i-expand .kv.analysis {
+  display: block;
+  padding: 14px 0 4px;
+  margin-top: 10px;
+  border-top: 1px solid var(--border-1);
+  border-bottom: 0;
+}
+.i-expand .kv.analysis .k { padding-top: 0; margin-bottom: 10px; color: var(--accent-purple); }
+.i-expand .kv.analysis .k::before { background: var(--accent-purple); }
+.i-expand .kv.analysis .v { font-size: 13px; line-height: 1.85; color: var(--fg-1); max-width: 72ch; white-space: pre-wrap; }
+
 .i-expand .actions {
   display: flex; gap: 6px; margin-top: 10px;
   padding-top: 10px; border-top: 1px solid var(--border-1);
@@ -785,7 +874,7 @@
 }
 .ticker {
   display: inline-flex; gap: 32px;
-  animation: tick 60s linear infinite;
+  animation: tick 120s linear infinite;
   font-size: 11px; color: var(--fg-2);
   padding-left: 100%;
 }

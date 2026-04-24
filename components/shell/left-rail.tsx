@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BrandLogo } from "./brand-logo";
 import { PulseBox, type PulsePoint } from "./pulse-box";
+import { SourcePicker } from "./source-picker";
 import { useTweaks } from "@/hooks/use-tweaks";
 import { NAV_ADMIN, NAV_PRIMARY, activeNavId } from "@/lib/shell/nav-data";
 
@@ -39,15 +40,7 @@ export function LeftRail({
         </div>
       </div>
 
-      <div className="search">
-        <span className="prompt-dollar">$</span>
-        <input
-          placeholder={lang === "zh" ? "搜索信源…" : "grep sources…"}
-          disabled
-          aria-label="search"
-        />
-        <kbd>⌘K</kbd>
-      </div>
+      <SourcePicker locale={locale} lang={lang} />
 
       <div className="sec">
         <span>{lang === "zh" ? "频道" : "feeds"}</span>

@@ -121,22 +121,15 @@ export function Item({ story, locale }: Props) {
             </div>
           )}
           {editorNote && (
-            <div className="kv">
-              <div className="k e">{showZh ? "编辑点评" : "editor note"}</div>
-              <div className="v" style={{ color: "var(--fg-0)" }}>
-                {editorNote}
-              </div>
+            <div className="kv tldr">
+              <div className="k e">{showZh ? "编辑点评" : "editor tl;dr"}</div>
+              <div className="v">{editorNote}</div>
             </div>
           )}
           {editorAnalysis && editorAnalysis !== editorNote && (
-            <div className="kv">
-              <div className="k e">{showZh ? "深度解读" : "editor analysis"}</div>
-              <div
-                className="v"
-                style={{ color: "var(--fg-1)", whiteSpace: "pre-wrap", lineHeight: 1.75 }}
-              >
-                {editorAnalysis}
-              </div>
+            <div className="kv analysis">
+              <div className="k">{showZh ? "深度解读" : "deep read"}</div>
+              <div className="v">{editorAnalysis}</div>
             </div>
           )}
           {hkrPass && (

@@ -144,6 +144,11 @@ export const sources = pgTable(
     priority: integer("priority").notNull().default(2),
     tags: text("tags").array().notNull().default(sql`ARRAY[]::text[]`),
     enabled: boolean("enabled").notNull().default(true),
+    /** Operator-opted-in sources (community digests, hand-picked YouTube
+     *  channels, etc.) get a tier floor of "all" regardless of scorer verdict.
+     *  Scorer still runs for importance/HKR, but never forces "excluded".
+     *  Replaces the previous hardcoded `*-yt` check in workers/enrich. */
+    neverExclude: boolean("never_exclude").notNull().default(false),
     notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

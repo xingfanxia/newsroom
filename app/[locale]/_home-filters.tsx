@@ -50,6 +50,9 @@ export function HomeFilters({
       if (v == null || v === "" || v === "all" || v === "featured") next.delete(k);
       else next.set(k, v);
     }
+    // Preset pills and source_id are mutually exclusive. Clicking a preset
+    // drops the pinned publisher so the URL stays interpretable.
+    if (patch.source !== undefined) next.delete("source_id");
     const qs = next.toString();
     start(() => router.push(qs ? `${pathname}?${qs}` : pathname));
   };

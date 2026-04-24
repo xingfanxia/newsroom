@@ -1,7 +1,7 @@
 import pLimit from "p-limit";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { items } from "@/db/schema";
+import { items, sources } from "@/db/schema";
 import type { Item } from "@/db/schema";
 import {
   generateStructured,
@@ -79,6 +79,15 @@ export async function runEnrichBatch(): Promise<EnrichReport> {
   }
 
   const policy = await loadPolicy();
+
+  // Source-level allow-list: sources flagged never_exclude get a tier floor
+  // of "all". Load once and pass through instead of querying per item.
+  const neverExcludeRows = await client
+    .select({ id: sources.id })
+    .from(sources)
+    .where(eq(sources.neverExclude, true));
+  const neverExcludeSet = new Set(neverExcludeRows.map((r) => r.id));
+
   const limit = pLimit(CONCURRENCY);
   const errors: { itemId: number; stage: string; code: string }[] = [];
   let enriched = 0;
@@ -87,7 +96,7 @@ export async function runEnrichBatch(): Promise<EnrichReport> {
     pending.map((item) =>
       limit(async () => {
         try {
-          await enrichOne(item, policy);
+          await enrichOne(item, policy, neverExcludeSet);
           enriched++;
         } catch (err) {
           const code =
@@ -122,7 +131,11 @@ class StageError extends Error {
   }
 }
 
-async function enrichOne(item: Item, policy: PolicyT): Promise<void> {
+async function enrichOne(
+  item: Item,
+  policy: PolicyT,
+  neverExcludeSet: Set<string>,
+): Promise<void> {
   const client = db();
 
   // ── Stage 1: summary + tags (low reasoning, fast) ──
@@ -195,15 +208,15 @@ async function enrichOne(item: Item, policy: PolicyT): Promise<void> {
     throw tag(err, "score");
   }
 
-  // YouTube channels are hand-picked long-form interviews; even off-topic
-  // episodes (Dwarkesh x Sarah Paine on USSR history, thevalley101 on
-  // restaurant export) are interesting to the operator by virtue of being
-  // on the allow-list at all. Floor the scorer's tier at "all" so nothing
-  // gets dropped to excluded — low importance is still preserved so they
-  // sort below curated AI content, they just stay browseable.
-  const isYoutube = item.sourceId.endsWith("-yt");
+  // Operator-flagged sources (sources.never_exclude) keep tier floored at
+  // "all" regardless of scorer verdict. YouTube channels and community
+  // digests (ai-chatgroup-daily) are the primary cases: interesting by
+  // virtue of being hand-added to the allow-list. Low importance still
+  // sorts them below curated AI content — they just stay browseable.
   const finalTier =
-    isYoutube && scored.tier === "excluded" ? "all" : scored.tier;
+    neverExcludeSet.has(item.sourceId) && scored.tier === "excluded"
+      ? "all"
+      : scored.tier;
 
   // ── Stage 4: persist (commentary runs in a separate worker) ──
   await client

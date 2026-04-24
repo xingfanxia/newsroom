@@ -71,20 +71,28 @@ export default async function HotNewsPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ tier?: string; source?: string; date?: string }>;
+  searchParams: Promise<{
+    tier?: string;
+    source?: string;
+    source_id?: string;
+    date?: string;
+  }>;
 }) {
   const [{ locale }, sp] = await Promise.all([params, searchParams]);
   if (sp.tier === "all") {
     const qs = new URLSearchParams();
     if (sp.source) qs.set("source", sp.source);
+    if (sp.source_id) qs.set("source_id", sp.source_id);
     if (sp.date) qs.set("date", sp.date);
     const search = qs.toString();
     redirect(`/${locale}/all${search ? `?${search}` : ""}`);
   }
   setRequestLocale(locale);
   const tier = coerceTier(sp.tier);
+  // source_id pins a specific publisher and overrides any preset bucket.
+  const sourceId = sp.source_id?.trim() || undefined;
   const sourcePreset = coerceSource(sp.source);
-  const sourceFilter = presetToFilter(sourcePreset);
+  const sourceFilter = sourceId ? { sourceId } : presetToFilter(sourcePreset);
   const activeDate = sp.date && DATE_RE.test(sp.date) ? sp.date : undefined;
   // Day picked → show everything curated that day. Unfiltered top-featured
   // view bumps to 120 (was 40 and people kept asking where the rest went).
@@ -105,7 +113,7 @@ export default async function HotNewsPage({
 
   // Cold-start fallback: if there's literally no enriched content, show mock
   // so the shell renders something sensible.
-  if (stories.length === 0 && tier === "featured" && sourcePreset === "all" && !activeDate) {
+  if (stories.length === 0 && tier === "featured" && sourcePreset === "all" && !sourceId && !activeDate) {
     try {
       const probe = await getFeaturedStories({
         tier: "all",
@@ -165,6 +173,7 @@ export default async function HotNewsPage({
           active={activeDate}
           basePath={`/${locale}`}
           preserveSource={sourcePreset}
+          preserveSourceId={sourceId}
           locale={locale as "en" | "zh"}
           monthsBack={2}
         />

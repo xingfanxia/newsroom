@@ -15,6 +15,7 @@ export function CalendarGrid({
   active,
   basePath,
   preserveSource,
+  preserveSourceId,
   locale,
   monthsBack = 2,
 }: {
@@ -22,6 +23,7 @@ export function CalendarGrid({
   active?: string;
   basePath: string;
   preserveSource?: string;
+  preserveSourceId?: string;
   locale: "en" | "zh";
   monthsBack?: number;
 }) {
@@ -30,7 +32,10 @@ export function CalendarGrid({
   const build = (date?: string) => {
     const qs = new URLSearchParams();
     if (date) qs.set("date", date);
-    if (preserveSource && preserveSource !== "all")
+    // source_id wins over the preset bucket when both exist (pinned publisher
+    // is more specific than a preset bucket).
+    if (preserveSourceId) qs.set("source_id", preserveSourceId);
+    else if (preserveSource && preserveSource !== "all")
       qs.set("source", preserveSource);
     const s = qs.toString();
     return `${basePath}${s ? `?${s}` : ""}`;

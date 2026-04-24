@@ -52,12 +52,18 @@ export default async function AllPostsPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ source?: string; date?: string; offset?: string }>;
+  searchParams: Promise<{
+    source?: string;
+    source_id?: string;
+    date?: string;
+    offset?: string;
+  }>;
 }) {
   const [{ locale }, sp] = await Promise.all([params, searchParams]);
   setRequestLocale(locale);
+  const sourceId = sp.source_id?.trim() || undefined;
   const sourcePreset = coerceSource(sp.source);
-  const sourceFilter = presetToFilter(sourcePreset);
+  const sourceFilter = sourceId ? { sourceId } : presetToFilter(sourcePreset);
   const activeDate = sp.date && DATE_RE.test(sp.date) ? sp.date : undefined;
   // When a day is picked, show everything from that day uncapped (500 is
   // the safety ceiling). Otherwise paginate in PAGE_SIZE chunks via `offset`.
@@ -121,6 +127,7 @@ export default async function AllPostsPage({
           active={activeDate}
           basePath={`/${locale}/all`}
           preserveSource={sourcePreset}
+          preserveSourceId={sourceId}
           locale={locale as "en" | "zh"}
           monthsBack={3}
         />
@@ -148,6 +155,7 @@ export default async function AllPostsPage({
             pageSize={PAGE_SIZE}
             currentCount={stories.length}
             source={sourcePreset}
+            sourceId={sourceId}
             locale={locale as "en" | "zh"}
           />
         )}
@@ -161,18 +169,21 @@ function Pagination({
   pageSize,
   currentCount,
   source,
+  sourceId,
   locale,
 }: {
   offset: number;
   pageSize: number;
   currentCount: number;
   source: SourcePreset;
+  sourceId?: string;
   locale: "en" | "zh";
 }) {
   const zh = locale === "zh";
   const build = (nextOffset: number) => {
     const qs = new URLSearchParams();
-    if (source && source !== "all") qs.set("source", source);
+    if (sourceId) qs.set("source_id", sourceId);
+    else if (source && source !== "all") qs.set("source", source);
     if (nextOffset > 0) qs.set("offset", String(nextOffset));
     const s = qs.toString();
     return `/${locale}/all${s ? `?${s}` : ""}`;
