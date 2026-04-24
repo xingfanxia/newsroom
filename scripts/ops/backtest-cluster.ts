@@ -130,6 +130,11 @@ async function main() {
   const distanceCutoff = 1 - args.threshold;
   const client = db();
 
+  // The full-window cross-join over thousands of items × HNSW lateral can
+  // exceed Supabase's default 60-120s statement_timeout. Bump it for this
+  // session — operator-only script, not on the request path.
+  await client.execute(sql`SET statement_timeout = '600s'`);
+
   console.log("=== Backtest configuration ===");
   console.log(`  threshold:    ${args.threshold} (distance cutoff ${distanceCutoff.toFixed(3)})`);
   console.log(`  window:       ±${args.windowHours} hours`);
