@@ -110,14 +110,15 @@ async function assignOneToCluster(itemId: number): Promise<AssignOutcome> {
     LIMIT 1
   `);
 
-  const nearest = (nearestResult as { rows?: unknown[] }).rows?.[0] as
-    | {
-        id: number;
-        cluster_id: number | null;
-        clustered_at: Date | null;
-        distance: number;
-      }
-    | undefined;
+  // postgres-js's drizzle adapter returns a RowList that extends Array<T>;
+  // it has NO `.rows` property. Indexing as an array is the correct shape.
+  const nearestRows = nearestResult as unknown as Array<{
+    id: number;
+    cluster_id: number | null;
+    clustered_at: Date | null;
+    distance: number;
+  }>;
+  const nearest = nearestRows[0];
 
   let clusterId: number;
   let outcome: AssignOutcome;

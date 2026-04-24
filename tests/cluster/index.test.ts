@@ -125,6 +125,21 @@ describe("Cluster UPDATE on member join", () => {
   });
 });
 
+// ── Result-row extraction (regression test for the singleton bug) ────────────
+
+describe("Nearest-neighbor result extraction", () => {
+  it("indexes the result as an array, not via a non-existent .rows property", () => {
+    // postgres-js's drizzle adapter returns RowList<T> which extends Array<T>;
+    // there is no .rows field. The previous (buggy) code used
+    //   (nearestResult as { rows?: unknown[] }).rows?.[0]
+    // which always evaluated to `undefined`, so EVERY item took the singleton
+    // path regardless of its actual nearest-neighbor distance. That silently
+    // turned the entire cluster pipeline into a no-op (all member_count=1).
+    expect(workerSrc).not.toContain("(nearestResult as { rows?: unknown[] })");
+    expect(workerSrc).toContain("nearestRows[0]");
+  });
+});
+
 // ── Race safety: neighbor-promotion path ─────────────────────────────────────
 
 describe("Neighbor-promotion race safety", () => {
