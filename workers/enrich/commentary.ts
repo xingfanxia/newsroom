@@ -1,13 +1,20 @@
 /**
- * Commentary backfill — picks items where tier ∈ (featured, p1) AND
+ * Commentary backfill — picks items where tier ∈ (featured, p1, all) AND
  * commentary_at IS NULL, runs the Stage-4 commentary call, persists.
  * Runs after the main enrich batch so transient failures get retried
  * on the next tick instead of leaving holes.
+ *
+ * Stage D skip: items that are members of a multi-source cluster
+ * (cluster_id IS NOT NULL AND clusters.member_count >= 2) are excluded from
+ * per-item commentary. Those events get event-level commentary from
+ * workers/cluster/commentary.ts instead. Singletons (cluster_id IS NULL, or
+ * cluster.member_count = 1) continue to receive per-item commentary here as
+ * the fallback for single-source events.
  */
 import pLimit from "p-limit";
-import { and, eq, isNull, inArray } from "drizzle-orm";
+import { and, eq, isNull, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { items } from "@/db/schema";
+import { items, clusters, type Item } from "@/db/schema";
 import { generateStructured, profiles } from "@/lib/llm";
 import {
   commentarySchema,
@@ -41,16 +48,26 @@ export async function runCommentaryBackfill(): Promise<CommentaryBackfillReport>
   const started = Date.now();
   const client = db();
 
-  const pending = await client
-    .select()
+  // Stage D skip: exclude items that belong to a multi-member cluster —
+  // those get event-level commentary from workers/cluster/commentary.ts.
+  // A LEFT JOIN on clusters lets us filter in a single query:
+  //   - cluster_id IS NULL → singleton item (no cluster yet) → include
+  //   - cluster.member_count = 1 → singleton cluster → include
+  //   - cluster.member_count >= 2 → multi-source event → exclude (Stage D handles it)
+  const pending: Item[] = await client
+    .select({ item: items })
     .from(items)
+    .leftJoin(clusters, eq(items.clusterId, clusters.id))
     .where(
       and(
         inArray(items.tier, ["featured", "p1", "all"]),
         isNull(items.commentaryAt),
+        // Keep singletons and unclustered items; skip multi-member clusters.
+        sql`(${items.clusterId} IS NULL OR COALESCE(${clusters.memberCount}, 1) < 2)`,
       ),
     )
-    .limit(MAX_PER_RUN);
+    .limit(MAX_PER_RUN)
+    .then((rows: Array<{ item: Item }>) => rows.map((r) => r.item));
 
   if (pending.length === 0) {
     return {
@@ -67,7 +84,7 @@ export async function runCommentaryBackfill(): Promise<CommentaryBackfillReport>
   let generated = 0;
 
   await Promise.allSettled(
-    pending.map((item) =>
+    pending.map((item: Item) =>
       limit(async () => {
         try {
           const tagBag = (item.tags ?? {}) as {
