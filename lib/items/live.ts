@@ -42,6 +42,18 @@ export type FeedQuery = {
    *  nav tab — operator hand-picks publishers worth surfacing even if the
    *  scorer's tier is low. */
   curatedOnly?: boolean;
+  /** Event-aggregation view semantics (see docs/aggregation/DESIGN.md §7).
+   *   'today'   = trending: events with firstSeenAt today OR latestMemberAt
+   *               within hotWindowHours, plus fresh singletons from today.
+   *               Ordered by latestMemberAt DESC then importance DESC.
+   *   'archive' = calendar: events bucketed on firstSeenAt day. Ordered by
+   *               firstSeenAt DESC then importance DESC.
+   *   Default: 'archive' (backwards-compatible with existing home-feed
+   *   behavior until UI cutover sets 'today' explicitly). */
+  view?: "today" | "archive";
+  /** Hot window in hours for the Today view's "still-developing" cutoff.
+   *  Defaults to 24. Wider window keeps multi-day stories visible longer. */
+  hotWindowHours?: number;
 };
 
 /**
@@ -51,14 +63,21 @@ export type FeedQuery = {
  */
 function buildFeedWhere(q: FeedQuery) {
   const tier: Tier = q.tier ?? "featured";
+  const view = q.view ?? "archive";
+  const hotH = q.hotWindowHours ?? 24;
+
+  // Event-aware tier filter: prefer cluster.event_tier when the item is part of
+  // a cluster (multi-member events get their own tier from coverage boost +
+  // Stage D re-score); fall back to items.tier for singletons + unclustered.
+  const effectiveTier = sql`COALESCE(${clusters.eventTier}, ${items.tier})`;
 
   // Tiers are inclusive: "featured" shows featured+p1; "all" shows everything non-excluded.
   const tierFilter =
     tier === "p1"
-      ? sql`${items.tier} = 'p1'`
+      ? sql`${effectiveTier} = 'p1'`
       : tier === "featured"
-        ? sql`${items.tier} IN ('featured', 'p1')`
-        : sql`${items.tier} <> 'excluded'`;
+        ? sql`${effectiveTier} IN ('featured', 'p1')`
+        : sql`${effectiveTier} <> 'excluded'`;
 
   // Cluster dedup: only return the item that's its cluster's lead.
   // Unclustered-but-enriched items are surfaced as-is (no cluster yet).
@@ -73,14 +92,24 @@ function buildFeedWhere(q: FeedQuery) {
   const kindFilter = q.sourceKind
     ? sql`${sources.kind} = ${q.sourceKind}`
     : sql`TRUE`;
-  // Day filter: published_at falls within [date 00:00 UTC, date+1 00:00 UTC).
-  // Explicit ::timestamptz on both ends so postgres doesn't reject the param
-  // binding (same pattern as dashboard-stats).
+  // View-aware day filter:
+  //   archive: bucket on COALESCE(cluster.first_seen_at, items.published_at)
+  //            — events anchor to inception day, singletons to their pub day.
+  //   today:   combined trending — firstSeenAt today OR latestMemberAt within
+  //            hotWindow OR unclustered-item published today (singleton path).
+  //   explicit date filter (q.date / q.dateFrom/dateTo) overrides view.
+  const anchorExpr = sql`COALESCE(${clusters.firstSeenAt}, ${items.publishedAt})`;
   const dateFilter = q.date
-    ? sql`${items.publishedAt} >= ${`${q.date}T00:00:00Z`}::timestamptz AND ${items.publishedAt} < ${`${q.date}T00:00:00Z`}::timestamptz + interval '1 day'`
+    ? sql`${anchorExpr} >= ${`${q.date}T00:00:00Z`}::timestamptz AND ${anchorExpr} < ${`${q.date}T00:00:00Z`}::timestamptz + interval '1 day'`
     : q.dateFrom || q.dateTo
-      ? sql`${items.publishedAt} >= ${q.dateFrom ?? "1970-01-01"}::timestamptz AND ${items.publishedAt} < ${q.dateTo ?? "2999-01-01"}::timestamptz`
-      : sql`TRUE`;
+      ? sql`${anchorExpr} >= ${q.dateFrom ?? "1970-01-01"}::timestamptz AND ${anchorExpr} < ${q.dateTo ?? "2999-01-01"}::timestamptz`
+      : view === "today"
+        ? sql`(
+            ${clusters.firstSeenAt} >= date_trunc('day', now())
+            OR ${clusters.latestMemberAt} > now() - make_interval(hours => ${hotH})
+            OR (${items.clusterId} IS NULL AND ${items.publishedAt} >= date_trunc('day', now()))
+          )`
+        : sql`TRUE`;
 
   const searchFilter = q.searchText
     ? sql`(
@@ -88,7 +117,9 @@ function buildFeedWhere(q: FeedQuery) {
         ${items.titleZh} ILIKE ${`%${q.searchText}%`} OR
         ${items.titleEn} ILIKE ${`%${q.searchText}%`} OR
         ${items.summaryZh} ILIKE ${`%${q.searchText}%`} OR
-        ${items.summaryEn} ILIKE ${`%${q.searchText}%`}
+        ${items.summaryEn} ILIKE ${`%${q.searchText}%`} OR
+        ${clusters.canonicalTitleZh} ILIKE ${`%${q.searchText}%`} OR
+        ${clusters.canonicalTitleEn} ILIKE ${`%${q.searchText}%`}
       )`
     : sql`TRUE`;
 
@@ -120,6 +151,18 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
   const offset = q.offset ?? 0;
   const client = db();
 
+  const view = q.view ?? "archive";
+
+  // Today view orders by recency-of-activity (latestMemberAt for events,
+  // publishedAt fallback for singletons). Archive view orders by inception
+  // (firstSeenAt for events, publishedAt fallback). Both secondary-sort by
+  // importance so featured events outrank low-importance items at the same
+  // timestamp.
+  const orderExpr =
+    view === "today"
+      ? sql`COALESCE(${clusters.latestMemberAt}, ${items.publishedAt}) DESC, COALESCE(${clusters.importance}, ${items.importance}) DESC`
+      : sql`COALESCE(${clusters.firstSeenAt}, ${items.publishedAt}) DESC, COALESCE(${clusters.importance}, ${items.importance}) DESC`;
+
   const rows = await client
     .select({
       id: items.id,
@@ -147,15 +190,37 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
       sourceLocale: sources.locale,
       sourceKind: sources.kind,
       sourceGroup: sources.group,
+      // ── Event-aggregation: cluster-level fields for multi-member events ──
+      clusterId: items.clusterId,
       clusterMemberCount: clusters.memberCount,
+      clusterCoverage: clusters.coverage,
+      clusterFirstSeenAt: clusters.firstSeenAt,
+      clusterLatestMemberAt: clusters.latestMemberAt,
+      clusterCanonicalTitleZh: clusters.canonicalTitleZh,
+      clusterCanonicalTitleEn: clusters.canonicalTitleEn,
+      clusterEditorNoteZh: clusters.editorNoteZh,
+      clusterEditorNoteEn: clusters.editorNoteEn,
+      clusterEditorAnalysisZh: clusters.editorAnalysisZh,
+      clusterEditorAnalysisEn: clusters.editorAnalysisEn,
+      clusterImportance: clusters.importance,
+      clusterEventTier: clusters.eventTier,
+      clusterHkr: clusters.hkr,
     })
     .from(items)
     .innerJoin(sources, eq(items.sourceId, sources.id))
     .leftJoin(clusters, eq(items.clusterId, clusters.id))
     .where(buildFeedWhere(q))
-    .orderBy(desc(items.publishedAt))
+    .orderBy(orderExpr)
     .limit(limit)
     .offset(offset);
+
+  const hotWindowMs = (q.hotWindowHours ?? 24) * 3_600_000;
+  const now = Date.now();
+  const startOfTodayMs = (() => {
+    const d = new Date();
+    d.setUTCHours(0, 0, 0, 0);
+    return d.getTime();
+  })();
 
   return rows.map((r): Story => {
     const tagBag = (r.tags ?? {}) as {
@@ -173,21 +238,67 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
     const publisher =
       q.locale === "en" ? r.sourceNameEn : r.sourceNameZh;
 
-    // Title fallback ladder: prefer LLM-translated locale match, fall back to
-    // the other locale, fall back to the raw source title.
+    // Event-aware title fallback ladder:
+    //   cluster.canonical_title_<locale>   (LLM-generated neutral event name)
+    //   → item.title_<locale>              (item's locale-specific title)
+    //   → item.title_<other-locale>        (whichever locale we have)
+    //   → item.title                       (raw source title)
     const title =
       q.locale === "en"
-        ? r.titleEn ?? r.titleZh ?? r.title
-        : r.titleZh ?? r.titleEn ?? r.title;
+        ? (r.clusterCanonicalTitleEn ??
+          r.titleEn ??
+          r.titleZh ??
+          r.title)
+        : (r.clusterCanonicalTitleZh ??
+          r.titleZh ??
+          r.titleEn ??
+          r.title);
 
+    // Event-aware editor note/analysis: cluster-level wins when present
+    // (multi-member events have commentary at cluster, singletons keep it at item).
     const editorNote =
       q.locale === "en"
-        ? r.editorNoteEn ?? r.editorNoteZh
-        : r.editorNoteZh ?? r.editorNoteEn;
+        ? (r.clusterEditorNoteEn ??
+          r.clusterEditorNoteZh ??
+          r.editorNoteEn ??
+          r.editorNoteZh)
+        : (r.clusterEditorNoteZh ??
+          r.clusterEditorNoteEn ??
+          r.editorNoteZh ??
+          r.editorNoteEn);
     const editorAnalysis =
       q.locale === "en"
-        ? r.editorAnalysisEn ?? r.editorAnalysisZh
-        : r.editorAnalysisZh ?? r.editorAnalysisEn;
+        ? (r.clusterEditorAnalysisEn ??
+          r.clusterEditorAnalysisZh ??
+          r.editorAnalysisEn ??
+          r.editorAnalysisZh)
+        : (r.clusterEditorAnalysisZh ??
+          r.clusterEditorAnalysisEn ??
+          r.editorAnalysisZh ??
+          r.editorAnalysisEn);
+
+    // Event-aware importance + tier.
+    const effectiveImportance = r.clusterImportance ?? r.importance ?? 0;
+    const effectiveTier = (r.clusterEventTier ?? r.tier ?? "all") as Story["tier"];
+
+    // Coverage: memberCount when in a multi-member cluster; undefined for singletons.
+    const coverage =
+      r.clusterMemberCount && r.clusterMemberCount > 1
+        ? r.clusterMemberCount
+        : undefined;
+
+    // Still-developing: event broke before today AND last new coverage within hot window.
+    const firstSeenMs = r.clusterFirstSeenAt?.getTime();
+    const latestMemberMs = r.clusterLatestMemberAt?.getTime();
+    const stillDeveloping =
+      firstSeenMs !== undefined &&
+      latestMemberMs !== undefined &&
+      firstSeenMs < startOfTodayMs &&
+      latestMemberMs > now - hotWindowMs;
+
+    // HKR fallback: cluster-level for multi-member events, item-level otherwise.
+    const effectiveHkr =
+      (r.clusterHkr as Story["hkr"] | null) ?? (r.hkr as Story["hkr"] | null);
 
     return {
       id: String(r.id),
@@ -200,17 +311,18 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
           ? (r.sourceGroup as Story["source"]["groupCode"])
           : undefined,
       },
-      featured: r.tier === "featured" || r.tier === "p1",
+      featured: effectiveTier === "featured" || effectiveTier === "p1",
       title,
       summary:
         q.locale === "en"
           ? r.summaryEn ?? r.summaryZh ?? ""
           : r.summaryZh ?? r.summaryEn ?? "",
       tags: flatTags,
-      importance: r.importance ?? 0,
-      tier: (r.tier ?? "all") as Story["tier"],
+      importance: effectiveImportance,
+      tier: effectiveTier,
       publishedAt: r.publishedAt.toISOString(),
       url: r.url,
+      // crossSourceCount kept for backwards compat; UI migrates to `coverage`.
       crossSourceCount:
         r.clusterMemberCount && r.clusterMemberCount > 1
           ? r.clusterMemberCount - 1
@@ -222,9 +334,63 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
         q.locale === "en"
           ? r.reasoningEn ?? r.reasoningZh ?? r.reasoning ?? undefined
           : r.reasoningZh ?? r.reasoningEn ?? r.reasoning ?? undefined,
-      hkr: (r.hkr as Story["hkr"]) ?? undefined,
+      hkr: effectiveHkr ?? undefined,
+      // ── Event-aggregation fields ──
+      clusterId: r.clusterId ?? undefined,
+      coverage,
+      firstSeenAt: r.clusterFirstSeenAt?.toISOString(),
+      latestMemberAt: r.clusterLatestMemberAt?.toISOString(),
+      canonicalTitleZh: r.clusterCanonicalTitleZh ?? undefined,
+      canonicalTitleEn: r.clusterCanonicalTitleEn ?? undefined,
+      stillDeveloping: stillDeveloping || undefined,
     };
   });
+}
+
+/**
+ * List all members of a cluster (event) for the signal-drawer UI.
+ *
+ * Ordered by importance DESC (most authoritative / high-signal member first),
+ * then publishedAt ASC (earliest covering source at the top of ties). Per-member
+ * roles (primary / corroborating) are intentionally not modeled — this ordering
+ * produces the same editorial surface with less schema surface area.
+ *
+ * Returns an empty array for clusters that don't exist (safe for agents that
+ * call without checking the feed response first).
+ */
+export async function getEventMembers(
+  clusterId: number,
+  locale: Locale = "zh",
+): Promise<NonNullable<Story["members"]>> {
+  const client = db();
+  const rows = await client
+    .select({
+      sourceId: items.sourceId,
+      sourceNameZh: sources.nameZh,
+      sourceNameEn: sources.nameEn,
+      titleZh: items.titleZh,
+      titleEn: items.titleEn,
+      rawTitle: items.title,
+      url: items.url,
+      publishedAt: items.publishedAt,
+      importance: items.importance,
+    })
+    .from(items)
+    .innerJoin(sources, eq(items.sourceId, sources.id))
+    .where(eq(items.clusterId, clusterId))
+    .orderBy(sql`${items.importance} DESC NULLS LAST, ${items.publishedAt} ASC`);
+
+  return rows.map((r) => ({
+    sourceId: r.sourceId,
+    sourceName: (locale === "en" ? r.sourceNameEn : r.sourceNameZh) ?? r.sourceId,
+    title:
+      locale === "en"
+        ? (r.titleEn ?? r.titleZh ?? r.rawTitle)
+        : (r.titleZh ?? r.titleEn ?? r.rawTitle),
+    url: r.url,
+    publishedAt: r.publishedAt.toISOString(),
+    importance: r.importance ?? 0,
+  }));
 }
 
 /**

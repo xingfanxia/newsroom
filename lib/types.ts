@@ -78,6 +78,31 @@ export type Story = {
     reasonsZh?: { h: string; k: string; r: string };
     reasonsEn?: { h: string; k: string; r: string };
   };
+  // ── Event-aggregation fields (populated when item belongs to a multi-member
+  //    cluster; undefined for singletons which continue to render as today) ──
+  /** Cluster DB id — used by the signal-drawer to fetch /api/v1/events/:id/members. */
+  clusterId?: number;
+  /** >= 1; undefined for singletons. member_count of the cluster. */
+  coverage?: number;
+  /** ISO — cluster.first_seen_at (inception day; archive anchor). */
+  firstSeenAt?: string;
+  /** ISO — cluster.latest_member_at (recency signal for Today view + still-developing badge). */
+  latestMemberAt?: string;
+  /** LLM-generated neutral canonical name, zh. Falls back to item's titleZh when absent. */
+  canonicalTitleZh?: string;
+  /** LLM-generated neutral canonical name, en. */
+  canonicalTitleEn?: string;
+  /** Derived server-side: firstSeenAt < today AND latestMemberAt > now-hotWindow. */
+  stillDeveloping?: boolean;
+  /** Optional — populated by /api/v1/events/:id/members only, never eager. */
+  members?: Array<{
+    sourceId: string;
+    sourceName: string;
+    title: string;
+    url: string;
+    publishedAt: string;
+    importance: number;
+  }>;
 };
 
 export type FeedbackEntry = {
