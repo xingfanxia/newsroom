@@ -16,7 +16,7 @@ export const NAV_PRIMARY: NavItem[] = [
   { id: "hot",        href: "/",             label: "hot feed",   cjk: "热点资讯", live: true },
   { id: "all",        href: "/all",          label: "all posts",  cjk: "全部" },
   { id: "podcasts",   href: "/podcasts",     label: "podcasts",   cjk: "播客·视频" },
-  { id: "lowfollow",  href: "/low-follower", label: "viral",      cjk: "低粉爆文" },
+  { id: "curated",    href: "/curated",      label: "curated",    cjk: "AX 严选" },
   { id: "xmonitor",   href: "/x-monitor",    label: "X monitor",  cjk: "X 监控" },
   { id: "saved",      href: "/saved",        label: "saved",      cjk: "收藏" },
   { id: "sources",    href: "/sources",      label: "sources",    cjk: "信源" },

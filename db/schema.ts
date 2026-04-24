@@ -149,6 +149,12 @@ export const sources = pgTable(
      *  Scorer still runs for importance/HKR, but never forces "excluded".
      *  Replaces the previous hardcoded `*-yt` check in workers/enrich. */
     neverExclude: boolean("never_exclude").notNull().default(false),
+    /** Hand-picked sources surfaced on the "AX 严选 / curated" nav tab.
+     *  Distinct from `never_exclude` on purpose: never_exclude is a pipeline
+     *  behavior (tier floor at scorer), curated is a UI-level opt-in for the
+     *  editorial picks tab. YouTube channels stay on /podcasts so they don't
+     *  need this flag; newsletters/digests worth surfacing do. */
+    curated: boolean("curated").notNull().default(false),
     notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

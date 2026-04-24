@@ -13,7 +13,7 @@ describe("activeNavId", () => {
     expect(activeNavId("/zh/saved")).toBe("saved");
     expect(activeNavId("/en/sources")).toBe("sources");
     expect(activeNavId("/en/podcasts")).toBe("podcasts");
-    expect(activeNavId("/en/low-follower")).toBe("lowfollow");
+    expect(activeNavId("/en/curated")).toBe("curated");
     expect(activeNavId("/en/x-monitor")).toBe("xmonitor");
     expect(activeNavId("/en/all")).toBe("all");
   });

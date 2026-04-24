@@ -8,7 +8,7 @@
     "hotNews": "Hot News",
     "allPosts": "All",
     "podcasts": "Podcasts / Video",
-    "lowFollower": "Low-follower Viral",
+    "curated": "AX Curated",
     "xMonitor": "X Monitor",
     "saved": "Saved",
     "sources": "Sources",
@@ -200,9 +200,9 @@
       "noTranscript": "Transcript isn't available yet — YouTube didn't expose captions for this episode, or Jina Reader hasn't picked it up."
     }
   },
-  "lowFollower": {
-    "title": "Low-follower Viral",
-    "subtitle": "High-engagement posts from small accounts — early signal before the mainstream."
+  "curated": {
+    "title": "AX Curated",
+    "subtitle": "Operator-picked sources — scorer can't hide them. Flag a source with curated=true to surface it here."
   },
   "xMonitor": {
     "title": "X Monitor",

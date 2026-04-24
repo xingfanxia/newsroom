@@ -38,6 +38,10 @@ export type FeedQuery = {
    *  literal `%` or `_` should pre-escape (v1 behavior; ok for keyword
    *  search, revisit if power-user wildcards cause surprises). */
   searchText?: string;
+  /** Restrict to items from `sources.curated = true`. Powers the AX 严选
+   *  nav tab — operator hand-picks publishers worth surfacing even if the
+   *  scorer's tier is low. */
+  curatedOnly?: boolean;
 };
 
 /**
@@ -88,6 +92,10 @@ function buildFeedWhere(q: FeedQuery) {
       )`
     : sql`TRUE`;
 
+  const curatedFilter = q.curatedOnly
+    ? sql`${sources.curated} = TRUE`
+    : sql`TRUE`;
+
   return and(
     isNotNull(items.enrichedAt),
     isNotNull(items.importance),
@@ -98,6 +106,7 @@ function buildFeedWhere(q: FeedQuery) {
     kindFilter,
     dateFilter,
     searchFilter,
+    curatedFilter,
   );
 }
 

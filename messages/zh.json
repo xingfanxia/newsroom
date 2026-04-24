@@ -8,7 +8,7 @@
     "hotNews": "热点资讯",
     "allPosts": "全部",
     "podcasts": "播客 / 视频",
-    "lowFollower": "低粉爆文",
+    "curated": "AX 严选",
     "xMonitor": "X 监控",
     "saved": "收藏",
     "sources": "信源",
@@ -180,9 +180,9 @@
       "weekly": "每周"
     }
   },
-  "lowFollower": {
-    "title": "低粉爆文",
-    "subtitle": "低关注量账号发出的高互动内容 — 先找到 Alpha，再看它是否值得上热点"
+  "curated": {
+    "title": "AX 严选",
+    "subtitle": "运营手选的信源 — 不受 scorer 打压，全部照常露出；想加入就在 sources 表把 curated 标为 true"
   },
   "podcasts": {
     "title": "播客 / 视频",
