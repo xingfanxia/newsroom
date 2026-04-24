@@ -279,23 +279,45 @@ async function applySplitVerdict(
     return 0;
   }
 
+  if (rejectedIds.length >= members.length) {
+    // LLM rejected every member — operationally meaningless. We have no
+    // signal about which member is the canonical event, so unlinking all
+    // of them would just orphan the items + leave a zombie cluster row.
+    // Treat as keep + log so the cluster_splits prompt can be tuned.
+    console.warn(
+      `[arbitrate] cluster ${clusterId}: LLM rejected all ${members.length} members; treating as keep`,
+    );
+    await applyKeepVerdict(clusterId, members);
+    return 0;
+  }
+
   const client = db();
   const now = new Date();
   const rejectedSet = new Set(rejectedIds);
 
+  // Count actual unlinks inside the transaction so a hallucinated id (one
+  // that doesn't belong to this cluster) doesn't drive member_count negative.
+  let actuallyUnlinked = 0;
+
   await client.transaction(async (tx: DbTx) => {
-    // Unlink each rejected item
+    // Unlink each rejected item, but ONLY if it currently belongs to this
+    // cluster. Hallucinated ids (cross-cluster or already-unlinked) silently
+    // no-op rather than corrupting another cluster's membership.
     for (const itemId of rejectedIds) {
-      await tx
+      const updated = await tx
         .update(items)
         .set({
           clusterId: null,
           clusteredAt: null,
           clusterVerifiedAt: null,
         })
-        .where(eq(items.id, itemId));
+        .where(and(eq(items.id, itemId), eq(items.clusterId, clusterId)))
+        .returning({ id: items.id });
 
-      // Write audit row
+      if (updated.length === 0) continue;
+      actuallyUnlinked++;
+
+      // Audit only the rejections that actually fired.
       await tx.insert(clusterSplits).values({
         itemId,
         fromClusterId: clusterId,
@@ -303,14 +325,16 @@ async function applySplitVerdict(
       });
     }
 
-    // Decrement member_count by the number of rejected items
-    await tx
-      .update(clusters)
-      .set({
-        memberCount: sql`${clusters.memberCount} - ${rejectedIds.length}`,
-        updatedAt: now,
-      })
-      .where(eq(clusters.id, clusterId));
+    if (actuallyUnlinked > 0) {
+      // Decrement by the count of real unlinks, not the LLM-supplied length.
+      await tx
+        .update(clusters)
+        .set({
+          memberCount: sql`${clusters.memberCount} - ${actuallyUnlinked}`,
+          updatedAt: now,
+        })
+        .where(eq(clusters.id, clusterId));
+    }
 
     // Verify surviving members
     await tx
@@ -333,7 +357,7 @@ async function applySplitVerdict(
     await persistImportance(clusterId, survivors);
   }
 
-  return rejectedIds.length;
+  return actuallyUnlinked;
 }
 
 async function persistImportance(

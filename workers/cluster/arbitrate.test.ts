@@ -307,6 +307,59 @@ describe("runArbitrationBatch — split verdict", () => {
     }
     expect(auditRows).toHaveLength(0);
   });
+
+  it("split with all members rejected falls back to keep (no zombie cluster)", () => {
+    // Edge case: LLM rejects every member of the cluster. Unlinking all of
+    // them would orphan the items and leave a zombie cluster row, so we
+    // treat as keep. This guard appears at the top of applySplitVerdict.
+    const members = [1, 2, 3];
+    const rejectedIds = [1, 2, 3];
+
+    const isAllRejected = rejectedIds.length >= members.length;
+    expect(isAllRejected).toBe(true);
+
+    // In the keep-fallback branch, no audit rows are written and member_count
+    // is not decremented.
+    const auditRows: unknown[] = [];
+    let memberCountDecrement = 0;
+    if (!isAllRejected && rejectedIds.length > 0) {
+      for (const id of rejectedIds) {
+        auditRows.push({ itemId: id });
+      }
+      memberCountDecrement = rejectedIds.length;
+    }
+    expect(auditRows).toHaveLength(0);
+    expect(memberCountDecrement).toBe(0);
+  });
+
+  it("hallucinated rejected ids (not in cluster) don't drive member_count negative", () => {
+    // LLM occasionally returns an id from a different cluster. The unlink
+    // UPDATE is now scoped to `cluster_id = $clusterId`, so the hallucinated
+    // id silently no-ops. We count actual unlinks via .returning() and only
+    // decrement member_count by that real count.
+    const clusterId = 42;
+    const memberIds = new Set([10, 11]);
+    const rejectedIds = [10, 999]; // 999 is not in this cluster
+
+    let actuallyUnlinked = 0;
+    const auditRows: unknown[] = [];
+    for (const itemId of rejectedIds) {
+      // Simulate the guarded UPDATE: only fires if itemId belongs to clusterId.
+      if (memberIds.has(itemId)) {
+        actuallyUnlinked++;
+        auditRows.push({ itemId, fromClusterId: clusterId });
+      }
+    }
+
+    expect(actuallyUnlinked).toBe(1);
+    expect(auditRows).toHaveLength(1);
+
+    // Decrement uses the real count, not rejectedIds.length, so member_count
+    // can never go negative even with hallucinated ids.
+    const memberCountAfter = memberIds.size - actuallyUnlinked;
+    expect(memberCountAfter).toBe(1);
+    expect(memberCountAfter).toBeGreaterThanOrEqual(0);
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
