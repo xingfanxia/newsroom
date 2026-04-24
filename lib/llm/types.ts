@@ -18,6 +18,7 @@ export type LLMTask =
   | "newsletter"
   | "agent"
   | "search"
+  | "arbitrate"
   | "other";
 
 export type LLMUsageContext = {
