@@ -180,10 +180,7 @@ async function processOneCluster(candidate: ClusterCandidate): Promise<void> {
 
   const result = await generateStructured({
     ...profiles.enrich,
-    // "event-commentary" is logged as the task label in llm_usage.
-    // The LLMTask union doesn't yet include this label — cast to string
-    // so the DB text column accepts it without widening the union type.
-    task: "commentary",
+    task: "event-commentary",
     system: eventCommentarySystem,
     messages: [{ role: "user", content: userPrompt }],
     schema: eventCommentarySchema,

@@ -129,7 +129,7 @@ async function titleOneCluster(
     // Haiku: cheap, fast, sufficient for title generation.
     provider: "anthropic",
     deployment: "claude-haiku-4-5",
-    task: "other",
+    task: "canonical-title",
     system: canonicalTitleSystem,
     messages: [
       {
