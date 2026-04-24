@@ -7,11 +7,14 @@
  */
 import { describe, expect, it } from "bun:test";
 import { readFileSync } from "fs";
-import { resolve } from "path";
+import { resolve, dirname } from "path";
+import { fileURLToPath } from "url";
 
 // Read the worker source once; all assertions are string searches.
+// Use fileURLToPath for ESM+TSC compatibility (import.meta.dir is Bun-only).
+const __dirname = dirname(fileURLToPath(import.meta.url));
 const workerSrc = readFileSync(
-  resolve(import.meta.dir, "../../workers/cluster/index.ts"),
+  resolve(__dirname, "../../workers/cluster/index.ts"),
   "utf8",
 );
 

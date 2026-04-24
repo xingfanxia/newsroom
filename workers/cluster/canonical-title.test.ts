@@ -11,7 +11,7 @@
  * the worker's runCanonicalTitleBatch() can be imported there directly.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "bun:test";
 import { canonicalTitleSystem, canonicalTitleUserPrompt } from "./prompt";
 
 // Mirror of MAX_TITLES_PER_RUN from ./canonical-title — kept here to avoid

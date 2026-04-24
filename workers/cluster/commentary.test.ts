@@ -18,7 +18,7 @@
  * tests/cluster/commentary.integration.test.ts and mock generateStructured.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "bun:test";
 import {
   eventCommentaryUserPrompt,
   eventCommentarySystem,
