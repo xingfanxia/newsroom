@@ -8,7 +8,7 @@
     { "path": "/api/cron/normalize", "schedule": "37 */6 * * *" },
     { "path": "/api/cron/enrich", "schedule": "*/15 * * * *" },
     { "path": "/api/cron/cluster", "schedule": "*/30 * * * *" },
-    { "path": "/api/cron/newsletter-daily", "schedule": "11 9 * * *" },
+    { "path": "/api/cron/newsletter-daily", "schedule": "0 5 * * *" },
     { "path": "/api/cron/newsletter-monthly", "schedule": "37 9 1 * *" }
   ]
 }
