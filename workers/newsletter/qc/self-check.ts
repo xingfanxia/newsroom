@@ -1,11 +1,13 @@
 /**
- * L1-L2 self-check for daily column drafts.
- * Pure function; no IO. Mechanical scanners only — L3 (content quality) and
- * L4 (活人感) are subjective and stay manual per design 4.
+ * L1 self-check for daily column drafts.
+ * Pure function; no IO. Mechanical banned-phrase scanner only.
  *
- * L1 — banned phrases that signal AI-tone leakage. Scan everywhere.
- * L2 — banned punctuation. Scan title + narrative_md only; summary_md
- *      gets a pass on colons because numbered list `1. title: take` is OK.
+ * Voice was rebased away from khazix-pure (no colons / no em-dashes / no
+ * quotes) toward "professional newsletter with personality" — punctuation
+ * rules dropped because Stratechery-register English/Chinese needs them
+ * for proper structure. Phrase scanner survives because corporate AI-slop
+ * clichés (说白了 / 综上所述 / 本质上) are universally bad regardless of
+ * register.
  */
 
 const L1_BANNED_PHRASES = [
@@ -17,22 +19,12 @@ const L1_BANNED_PHRASES = [
   "不可否认",
   "综上所述",
   "总的来说",
-  "值得注意的是",
   "不难发现",
   "让我们来看看",
   "接下来让我们",
-  "首先",
-  "其次",
-  "最后",
   "在当今",
   "随着技术",
   "这给我们的启示",
-];
-
-const L2_PUNCT: { name: string; re: RegExp }[] = [
-  { name: "冒号", re: /[:：]/ },
-  { name: "破折号", re: /——/ },
-  { name: "双引号", re: /["“”]/ },
 ];
 
 export type ColumnDraft = {
@@ -63,27 +55,17 @@ export function runColumnSelfCheck(draft: ColumnDraft): SelfCheckResult {
       hits.push({
         layer: "l1",
         rule: phrase,
-        snippet: fullText.slice(Math.max(0, idx - 15), idx + phrase.length + 15),
-      });
-    }
-  }
-
-  // L2 — title + narrative only; summary's numbered list allowed colons.
-  const l2Scope = `${draft.title}\n${draft.narrative_md}`;
-  for (const { name, re } of L2_PUNCT) {
-    const m = l2Scope.match(re);
-    if (m && m.index !== undefined) {
-      hits.push({
-        layer: "l2",
-        rule: name,
-        snippet: l2Scope.slice(Math.max(0, m.index - 15), m.index + 15),
+        snippet: fullText.slice(
+          Math.max(0, idx - 15),
+          idx + phrase.length + 15,
+        ),
       });
     }
   }
 
   return {
     l1Pass: !hits.some((h) => h.layer === "l1"),
-    l2Pass: !hits.some((h) => h.layer === "l2"),
+    l2Pass: true,
     hits,
   };
 }

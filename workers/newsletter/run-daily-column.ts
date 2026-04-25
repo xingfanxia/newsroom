@@ -23,19 +23,19 @@ const dailyColumnSchema = z.object({
     .min(1)
     .max(80)
     .describe(
-      "≤20 字 卡兹克式标题; concrete + curiosity-driven; no marketing verbs (赋能/助力/引领). No subheadings or generic category names like 今日 AI 要闻.",
+      "≤24 字 concrete + opinionated title (Stratechery-register, not category-name). No marketing verbs.",
     ),
   summary_md: z
     .string()
-    .min(150)
+    .min(200)
     .describe(
-      "Numbered 1-5 markdown list. Each entry: '1. [event title] — [50-100 字 quick take with personal reaction] [#item-id]'. Item id format strict: [#1234].",
+      "Numbered 1-5 markdown list. Each entry 60-120 字: title — quick take with judgment — [#item-id].",
     ),
   narrative_md: z
     .string()
-    .min(800)
+    .min(2500)
     .describe(
-      "2000-4000 字 through-flow markdown. NO ## or ### subheadings. References summary entries as 第 N 件. ≥1 cultural-升维 connection. ≥3 一句话独立成段. ≥1 self-deprecation (愚钝如我 / 我也还在摸索 / etc.).",
+      "3500-6000 字 long-form analysis. USE markdown structure: ## subheadings (recommended 2-3 主题块), ### sub-subheadings, lists, blockquotes, **bold**, *italic*. References summary as 第 N 件 (callback). At least one industry/historical/cultural reference where it surfaces naturally.",
     ),
   featured_item_ids: z
     .array(z.number())
@@ -45,8 +45,8 @@ const dailyColumnSchema = z.object({
   theme_tag: z
     .string()
     .min(1)
-    .max(24)
-    .describe("≤8 字 day theme tag (e.g., 模型大战白热化 / Agentic 编码新基线)."),
+    .max(30)
+    .describe("≤10 字 day theme (e.g., 算力合同战 / Agentic 编码新基线 / 监管正面碰撞)."),
 });
 
 export type DailyColumnReport = {
@@ -110,7 +110,7 @@ export async function runDailyColumn(
     messages: [{ role: "user", content: userPrompt }],
     schema: dailyColumnSchema,
     schemaName: "DailyColumn",
-    maxTokens: 12000,
+    maxTokens: 20000,
   });
 
   const draft = result.data;
