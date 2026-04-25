@@ -53,8 +53,7 @@ export function DailyColumnRenderer({ column }: { column: ColumnRow }) {
         </time>
       </header>
 
-      <section className="daily-section">
-        <div className="daily-section-label">今日五件事</div>
+      <section className="daily-lede">
         <Prose>{summary}</Prose>
       </section>
 
