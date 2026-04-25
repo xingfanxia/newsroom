@@ -1,9 +1,17 @@
 import { NextResponse } from "next/server";
 import { runClusterBatch } from "@/workers/cluster";
 import { runArbitrationBatch } from "@/workers/cluster/arbitrate";
+import { runMergeBatch } from "@/workers/cluster/merge";
 import { runCanonicalTitleBatch } from "@/workers/cluster/canonical-title";
 import { runEventCommentaryBatch } from "@/workers/cluster/commentary";
 import { verifyCron } from "../_auth";
+
+// Merge-stage recency window. Each tick (every 30 min) only considers
+// multi-member clusters whose latest_member_at is within the last 6h —
+// keeps the pairwise-distance compute under ~1s on typical traffic.
+// Operators can run scripts/migrations/merge-near-duplicate-clusters.ts
+// with --hours 72 or --all for wider sweeps.
+const MERGE_RECENCY_HOURS = 6;
 
 export const maxDuration = 800;
 export const dynamic = "force-dynamic";
@@ -41,6 +49,17 @@ export async function GET(req: Request) {
   // Locks survivors via verified_at + cluster_verified_at so Stage A won't
   // re-merge what was split.
   const arbitrate = await safeStage("arbitrate", () => runArbitrationBatch());
+  // Stage B+: merge near-duplicate multi-member clusters that Stage A's
+  // greedy nearest-neighbor missed (typically because two same-source twins
+  // arrived in the same batch and paired with each other before the older
+  // cross-source cluster was indexed). Runs AFTER arbitrate so Stage B has
+  // already split unrelated items out of any over-broad cluster — feeding
+  // a cleaner pool into the merge candidate query. Survivor's verified_at
+  // / titled_at / commentary_at are nulled on merge so the next tick re-
+  // arbitrates / re-titles / re-comments with the larger pool.
+  const merge = await safeStage("merge", () =>
+    runMergeBatch({ recencyHours: MERGE_RECENCY_HOURS }),
+  );
   // Stage C: neutral canonical titles for multi-member clusters.
   const canonicalTitles = await safeStage("canonical-title", () =>
     runCanonicalTitleBatch(),
@@ -55,6 +74,7 @@ export async function GET(req: Request) {
     at: new Date().toISOString(),
     cluster,
     arbitrate,
+    merge,
     canonicalTitles,
     eventCommentary,
   });
