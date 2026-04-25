@@ -18,6 +18,13 @@ describe("activeNavId", () => {
     expect(activeNavId("/en/all")).toBe("all");
     expect(activeNavId("/en/papers")).toBe("papers");
     expect(activeNavId("/zh/papers")).toBe("papers");
+    expect(activeNavId("/en/daily")).toBe("daily");
+    expect(activeNavId("/zh/daily")).toBe("daily");
+  });
+
+  it("matches daily archive nested routes via prefix", () => {
+    expect(activeNavId("/zh/daily/2026-04-25")).toBe("daily");
+    expect(activeNavId("/zh/daily/archive")).toBe("daily");
   });
 
   it("matches admin routes", () => {
@@ -46,9 +53,10 @@ describe("activeNavId", () => {
 });
 
 describe("nav data shape", () => {
-  it("exposes 8 primary nav items (including papers tab)", () => {
-    expect(NAV_PRIMARY).toHaveLength(8);
+  it("exposes 9 primary nav items (including papers + daily tabs)", () => {
+    expect(NAV_PRIMARY).toHaveLength(9);
     expect(NAV_PRIMARY.find((n) => n.id === "papers")).toBeDefined();
+    expect(NAV_PRIMARY.find((n) => n.id === "daily")).toBeDefined();
   });
 
   it("exposes 5 admin nav items (including the new usage route)", () => {
