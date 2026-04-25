@@ -147,10 +147,10 @@ export default async function HotNewsPage({
   ]);
   const ticker = tickerItems.length > 0 ? tickerItems : FALLBACK_TICKER;
 
-  // Today view (no date picked) renders a flat importance-sorted list — the
-  // header already says "today". Archive view (date picked) groups by day so
-  // multi-day pages still get DayBreak separators.
-  const grouped = activeDate ? groupByDay(stories) : null;
+  // Both today and archive views render chronologically (published_at DESC
+  // with importance as tiebreaker), so day-grouping is meaningful in both
+  // — the user sees clear "today / yesterday / 2d ago" boundaries.
+  const grouped = groupByDay(stories);
 
   return (
     <ViewShell
@@ -187,20 +187,14 @@ export default async function HotNewsPage({
           monthsBack={2}
         />
         <div className="feed">
-          {grouped ? (
-            Object.entries(grouped).map(([dayKey, dayStories]) => (
-              <div key={dayKey}>
-                <DayBreak date={new Date(dayKey)} />
-                {dayStories.map((s) => (
-                  <Item key={s.id} story={s} locale={locale as "en" | "zh"} />
-                ))}
-              </div>
-            ))
-          ) : (
-            stories.map((s) => (
-              <Item key={s.id} story={s} locale={locale as "en" | "zh"} />
-            ))
-          )}
+          {Object.entries(grouped).map(([dayKey, dayStories]) => (
+            <div key={dayKey}>
+              <DayBreak date={new Date(dayKey)} />
+              {dayStories.map((s) => (
+                <Item key={s.id} story={s} locale={locale as "en" | "zh"} />
+              ))}
+            </div>
+          ))}
           {stories.length === 0 && (
             <div style={{ padding: 60, color: "var(--fg-3)", textAlign: "center" }}>
               no items match — try widening filters

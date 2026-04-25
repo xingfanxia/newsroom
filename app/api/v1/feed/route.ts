@@ -13,7 +13,8 @@
  *
  * Query params:
  *   tier             = featured (default) | p1 | all
- *   view             = today (trending: latestMemberAt anchor) | archive (default; published_at anchor)
+ *   view             = today (trending: importance-sorted, ongoing+broken-today)
+ *                    | archive (default; chronological, published_at anchor)
  *   hot_window_hours = 1..168, default 24 — only matters for view=today
  *   date             = YYYY-MM-DD (exclusive with date_from/date_to)
  *   date_from        = ISO-8601 (inclusive lower bound)
@@ -21,6 +22,13 @@
  *   source_id        = exact source id (e.g. "dwarkesh-yt")
  *   source_group     = podcast | newsletter | vendor-official | …
  *   source_kind      = rss | atom | api | rsshub | scrape | x-api
+ *   curated_only     = true → only sources flagged curated=true (AX严选 tab)
+ *   exclude_source_tags = comma-separated tag list. Excludes sources whose
+ *                         tags overlap any of these. Useful: "arxiv,paper" to
+ *                         filter out research-paper feeds.
+ *   include_source_tags = comma-separated tag list. Inverse of exclude_source_tags;
+ *                         only returns items whose source tags overlap. Useful:
+ *                         "arxiv,paper" to fetch the 论文 tab.
  *   limit            = 1..500, default 40
  *   offset           = ≥0, default 0
  *   locale           = zh | en (default en)
@@ -53,10 +61,25 @@ const querySchema = z.object({
   source_id: z.string().min(1).optional(),
   source_group: z.string().min(1).optional(),
   source_kind: z.string().min(1).optional(),
+  curated_only: z
+    .enum(["true", "false", "1", "0"])
+    .optional()
+    .transform((v) => v === "true" || v === "1"),
+  exclude_source_tags: z.string().min(1).optional(),
+  include_source_tags: z.string().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(500).optional().default(40),
   offset: z.coerce.number().int().min(0).optional().default(0),
   locale: z.enum(["zh", "en"]).optional().default("en"),
 });
+
+function parseTagList(s: string | undefined): string[] | undefined {
+  if (!s) return undefined;
+  const tags = s
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
+  return tags.length > 0 ? tags : undefined;
+}
 
 type ApiItem = {
   id: string;
@@ -148,6 +171,9 @@ export async function GET(req: Request) {
     includeSourceGroup: true,
     view: q.view,
     hotWindowHours: q.hot_window_hours,
+    curatedOnly: q.curated_only || undefined,
+    excludeSourceTags: parseTagList(q.exclude_source_tags),
+    includeSourceTags: parseTagList(q.include_source_tags),
   };
 
   try {

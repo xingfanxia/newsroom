@@ -189,14 +189,11 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
 
   const view = q.view ?? "archive";
 
-  // Today view orders by importance — the home feed is "what matters today",
-  // not "what was just touched". Recency is a tiebreaker so equally-important
-  // events surface the freshest signal first.
-  // Archive view stays chronological (matches calendar / date-filter anchor).
-  const orderExpr =
-    view === "today"
-      ? sql`COALESCE(${clusters.importance}, ${items.importance}) DESC NULLS LAST, COALESCE(${clusters.latestMemberAt}, ${items.publishedAt}) DESC`
-      : sql`${items.publishedAt} DESC, COALESCE(${clusters.importance}, ${items.importance}) DESC`;
+  // Today view: rank by lead's published_at first (so old still-developing
+  // events don't beat fresh news on importance ties — many P1s sit at 100),
+  // then importance as tiebreaker. Same anchor as the date filter and calendar.
+  // Archive view: identical ordering.
+  const orderExpr = sql`${items.publishedAt} DESC, COALESCE(${clusters.importance}, ${items.importance}) DESC`;
 
   const rows = await client
     .select({

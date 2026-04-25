@@ -93,7 +93,7 @@ function buildServer(user: SessionUser): McpServer {
     {
       title: "Browse the AX Radar feed",
       description:
-        "Return curated items from the AX Radar timeline. Each row is a single editorial card: a singleton article OR a multi-source EVENT (multiple publishers covering the same real-world story merged into one card). When `coverage > 1` the row is an event — use ax_radar_event_members to see all the sources covering it. `view=today` gives trending: events with new coverage in the last 24h. `view=archive` (default) is the calendar timeline keyed on the lead's published_at. `tier=featured` is today's signal, `tier=all` spans everything non-excluded.",
+        "Return curated items from the AX Radar timeline. Each row is a single editorial card: a singleton article OR a multi-source EVENT (multiple publishers covering the same real-world story merged into one card). When `coverage > 1` the row is an event — use ax_radar_event_members to see all the sources covering it. `view=today` is the importance-sorted hot feed (热点聚合) — what matters today, including events still developing. `view=archive` (default) is the chronological calendar timeline keyed on the lead's published_at. `tier=featured` is today's signal, `tier=all` spans everything non-excluded. Set `curated_only=true` for the operator-curated AX严选 stream (hand-picked publishers like 鸭哥/grapeot, 群聊日报). Use `exclude_source_tags='arxiv,paper'` to drop research-paper feeds from a news view, or `include_source_tags='arxiv,paper'` for the 论文 tab.",
       inputSchema: {
         tier: z.enum(["featured", "p1", "all"]).optional(),
         view: z.enum(["today", "archive"]).optional(),
@@ -101,6 +101,9 @@ function buildServer(user: SessionUser): McpServer {
         source_id: z.string().optional(),
         source_group: z.string().optional(),
         source_kind: z.string().optional(),
+        curated_only: z.boolean().optional(),
+        exclude_source_tags: z.array(z.string()).optional(),
+        include_source_tags: z.array(z.string()).optional(),
         date: z.string().optional(),
         date_from: z.string().optional(),
         date_to: z.string().optional(),
@@ -125,6 +128,9 @@ function buildServer(user: SessionUser): McpServer {
         includeSourceGroup: true,
         view: args.view ?? "archive",
         hotWindowHours: args.hot_window_hours,
+        curatedOnly: args.curated_only,
+        excludeSourceTags: args.exclude_source_tags,
+        includeSourceTags: args.include_source_tags,
       };
       const [stories, total] = await Promise.all([
         getFeaturedStories(q),
@@ -449,13 +455,42 @@ function buildServer(user: SessionUser): McpServer {
     },
   );
 
+  // Renders a Story[] as a markdown briefing; shared by today/hot/curated resources.
+  function storyMarkdown(
+    title: string,
+    subtitle: string,
+    stories: Awaited<ReturnType<typeof getFeaturedStories>>,
+  ): string {
+    const lines = [`# ${title}`, "", subtitle, ""];
+    for (const s of stories) {
+      const hkr = s.hkr
+        ? ` \`${s.hkr.h ? "H" : "·"}${s.hkr.k ? "K" : "·"}${s.hkr.r ? "R" : "·"}\``
+        : "";
+      const isEvent = (s.coverage ?? 0) > 1 && s.clusterId != null;
+      const coverageBadge = isEvent ? ` · **${s.coverage} sources**` : "";
+      const stillDeveloping = s.stillDeveloping ? " · *still developing*" : "";
+      const headline =
+        isEvent && s.canonicalTitleEn ? s.canonicalTitleEn : s.title;
+      lines.push(
+        `## [${headline}](${s.url})`,
+        `*${s.source.publisher}* · importance ${s.importance}${coverageBadge}${stillDeveloping}${hkr}`,
+        "",
+        s.summary,
+        "",
+        s.editorNote ? `> ${s.editorNote}` : "",
+        "",
+      );
+    }
+    return lines.filter(Boolean).join("\n");
+  }
+
   server.registerResource(
     "today",
     "ax-radar://today",
     {
-      title: "Today's curated feed",
+      title: "Today's hot events (热点聚合)",
       description:
-        "Today's featured items as a readable markdown briefing — publisher, headline, summary, and HKR chips. Cheapest way to ask 'what should I know this morning?'.",
+        "Today's importance-sorted hot feed — same as the homepage 热点聚合 tab. Multi-source events ranked by editorial importance, plus today's high-signal singletons. Research papers (arxiv/HF Papers) are excluded — see ax-radar://papers for those. Cheapest way to ask 'what should I know this morning?'.",
       mimeType: "text/markdown",
     },
     async (uri) => {
@@ -465,38 +500,87 @@ function buildServer(user: SessionUser): McpServer {
         limit: 30,
         includeSourceGroup: true,
         view: "today",
+        excludeSourceTags: ["arxiv", "paper"],
       });
       const today = new Date().toISOString().slice(0, 10);
-      const lines = [
-        `# AX Radar — ${today}`,
-        "",
-        `${stories.length} featured item(s). Tier = featured + p1. View = today (trending).`,
-        "",
-      ];
-      for (const s of stories) {
-        const hkr = s.hkr
-          ? ` \`${s.hkr.h ? "H" : "·"}${s.hkr.k ? "K" : "·"}${s.hkr.r ? "R" : "·"}\``
-          : "";
-        const isEvent = (s.coverage ?? 0) > 1 && s.clusterId != null;
-        const coverageBadge = isEvent ? ` · **${s.coverage} sources**` : "";
-        const stillDeveloping = s.stillDeveloping ? " · *still developing*" : "";
-        const headline = isEvent && s.canonicalTitleEn ? s.canonicalTitleEn : s.title;
-        lines.push(
-          `## [${headline}](${s.url})`,
-          `*${s.source.publisher}* · importance ${s.importance}${coverageBadge}${stillDeveloping}${hkr}`,
-          "",
-          s.summary,
-          "",
-          s.editorNote ? `> ${s.editorNote}` : "",
-          "",
-        );
-      }
       return {
         contents: [
           {
             uri: uri.href,
             mimeType: "text/markdown",
-            text: lines.filter(Boolean).join("\n"),
+            text: storyMarkdown(
+              `AX Radar — 热点聚合 · ${today}`,
+              `${stories.length} item(s). Tier = featured + p1. Importance-sorted. Papers excluded.`,
+              stories,
+            ),
+          },
+        ],
+      };
+    },
+  );
+
+  server.registerResource(
+    "curated",
+    "ax-radar://curated",
+    {
+      title: "AX严选 — operator-curated stream",
+      description:
+        "Hand-picked publishers the operator surfaces independently of the importance scorer (鸭哥/grapeot, AI 群聊日报, etc.). Use this to see what the human editor specifically chose to highlight, regardless of tier. Same as the homepage AX 严选 tab. Returns the most recent items across all curated sources.",
+      mimeType: "text/markdown",
+    },
+    async (uri) => {
+      const stories = await getFeaturedStories({
+        tier: "all",
+        locale: "en",
+        limit: 30,
+        includeSourceGroup: true,
+        curatedOnly: true,
+      });
+      const today = new Date().toISOString().slice(0, 10);
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            mimeType: "text/markdown",
+            text: storyMarkdown(
+              `AX Radar — AX 严选 · ${today}`,
+              `${stories.length} item(s) from operator-curated publishers.`,
+              stories,
+            ),
+          },
+        ],
+      };
+    },
+  );
+
+  server.registerResource(
+    "papers",
+    "ax-radar://papers",
+    {
+      title: "Recent research papers (论文)",
+      description:
+        "Latest items from arxiv + HuggingFace Papers feeds. Same as the homepage 论文 tab.",
+      mimeType: "text/markdown",
+    },
+    async (uri) => {
+      const stories = await getFeaturedStories({
+        tier: "all",
+        locale: "en",
+        limit: 30,
+        includeSourceGroup: true,
+        includeSourceTags: ["arxiv", "paper"],
+      });
+      const today = new Date().toISOString().slice(0, 10);
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            mimeType: "text/markdown",
+            text: storyMarkdown(
+              `AX Radar — 论文 · ${today}`,
+              `${stories.length} paper(s) from arxiv + HF Papers.`,
+              stories,
+            ),
           },
         ],
       };
