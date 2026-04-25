@@ -13,8 +13,9 @@ export type NavItem = {
 };
 
 export const NAV_PRIMARY: NavItem[] = [
-  { id: "hot",        href: "/",             label: "hot feed",   cjk: "热点资讯", live: true },
+  { id: "hot",        href: "/",             label: "hot events", cjk: "热点聚合", live: true },
   { id: "all",        href: "/all",          label: "all posts",  cjk: "全部" },
+  { id: "papers",     href: "/papers",       label: "papers",     cjk: "论文" },
   { id: "podcasts",   href: "/podcasts",     label: "podcasts",   cjk: "播客·视频" },
   { id: "curated",    href: "/curated",      label: "curated",    cjk: "AX 严选" },
   { id: "xmonitor",   href: "/x-monitor",    label: "X monitor",  cjk: "X 监控" },
