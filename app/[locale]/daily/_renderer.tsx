@@ -23,9 +23,22 @@ function formatDate(d: Date): string {
   }).format(d);
 }
 
+/**
+ * Convert reader-meaningless [#1234] item refs into clickable links to the
+ * item detail page. Applied to summary + narrative markdown before render.
+ *
+ * Markdown link syntax `[label](url)` round-trips through react-markdown
+ * cleanly, so we just rewrite each [#NNNN] occurrence inline.
+ */
+function linkifyItemRefs(md: string): string {
+  return md.replace(/\[#(\d+)\]/g, (_, id) => `[#${id}](/zh/items/${id})`);
+}
+
 export function DailyColumnRenderer({ column }: { column: ColumnRow }) {
   const dateLabel = formatDate(column.periodStart);
   const issueId = `AX 的 AI 日报 · ${dateKey(column.periodStart)}`;
+  const summary = linkifyItemRefs(column.columnSummaryMd);
+  const narrative = linkifyItemRefs(column.columnNarrativeMd);
   return (
     <article className="mx-auto max-w-3xl px-4 py-12">
       <header className="mb-10 border-b border-[var(--color-border)] pb-6">
@@ -52,19 +65,19 @@ export function DailyColumnRenderer({ column }: { column: ColumnRow }) {
         <h2 className="mb-3 text-[15px] uppercase tracking-[0.18em] text-[var(--color-muted)]">
           今日五件事
         </h2>
-        <Prose>{column.columnSummaryMd}</Prose>
+        <Prose>{summary}</Prose>
       </section>
 
       <section className="border-t border-[var(--color-border)] pt-8">
-        <Prose>{column.columnNarrativeMd}</Prose>
+        <Prose>{narrative}</Prose>
       </section>
 
       <footer className="mt-16 border-t border-[var(--color-border)] pt-6 text-xs text-[var(--color-muted)]">
         <Link
-          href="/zh/daily/archive"
+          href="/zh/daily"
           className="text-[var(--color-accent)] hover:underline"
         >
-          ← 历史日报
+          ← 全部日报
         </Link>
       </footer>
     </article>
