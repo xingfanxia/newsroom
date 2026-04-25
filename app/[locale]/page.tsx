@@ -109,6 +109,8 @@ export default async function HotNewsPage({
       // (ongoing + broken-today). With a date filter, stay in Archive so the
       // day-picker's calendar semantics hold.
       view: activeDate ? "archive" : "today",
+      // Papers live on /papers — keep them out of the news feed.
+      excludeSourceTags: ["arxiv", "paper"],
       ...sourceFilter,
     });
   } catch {
@@ -145,7 +147,10 @@ export default async function HotNewsPage({
   ]);
   const ticker = tickerItems.length > 0 ? tickerItems : FALLBACK_TICKER;
 
-  const grouped = groupByDay(stories);
+  // Today view (no date picked) renders a flat importance-sorted list — the
+  // header already says "today". Archive view (date picked) groups by day so
+  // multi-day pages still get DayBreak separators.
+  const grouped = activeDate ? groupByDay(stories) : null;
 
   return (
     <ViewShell
@@ -164,8 +169,8 @@ export default async function HotNewsPage({
     >
       <main className="main">
         <PageHead
-          en={activeDate ? `hot feed · ${activeDate}` : "hot feed"}
-          cjk={activeDate ? `热点资讯 · ${activeDate}` : "热点资讯"}
+          en={activeDate ? `hot events · ${activeDate}` : "hot events"}
+          cjk={activeDate ? `热点聚合 · ${activeDate}` : "热点聚合"}
           count={stories.length}
           live={<>live · {radarStats.items_today} today</>}
           policyLabel={`policy ${policy.version}`}
@@ -182,14 +187,20 @@ export default async function HotNewsPage({
           monthsBack={2}
         />
         <div className="feed">
-          {Object.entries(grouped).map(([dayKey, stories]) => (
-            <div key={dayKey}>
-              <DayBreak date={new Date(dayKey)} />
-              {stories.map((s) => (
-                <Item key={s.id} story={s} locale={locale as "en" | "zh"} />
-              ))}
-            </div>
-          ))}
+          {grouped ? (
+            Object.entries(grouped).map(([dayKey, dayStories]) => (
+              <div key={dayKey}>
+                <DayBreak date={new Date(dayKey)} />
+                {dayStories.map((s) => (
+                  <Item key={s.id} story={s} locale={locale as "en" | "zh"} />
+                ))}
+              </div>
+            ))
+          ) : (
+            stories.map((s) => (
+              <Item key={s.id} story={s} locale={locale as "en" | "zh"} />
+            ))
+          )}
           {stories.length === 0 && (
             <div style={{ padding: 60, color: "var(--fg-3)", textAlign: "center" }}>
               no items match — try widening filters
@@ -209,12 +220,10 @@ export default async function HotNewsPage({
 }
 
 function groupByDay(stories: Story[]) {
-  const sorted = [...stories].sort(
-    (a, b) =>
-      new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
-  );
+  // Preserve the SQL order — today view is importance-first, archive view is
+  // chronological. Resorting by publishedAt would undo today's importance sort.
   const byDay: Record<string, Story[]> = {};
-  for (const s of sorted) {
+  for (const s of stories) {
     const d = new Date(s.publishedAt);
     const canonical = new Date(
       d.getFullYear(),

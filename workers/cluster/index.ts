@@ -3,7 +3,12 @@ import { db } from "@/db/client";
 import { items, clusters } from "@/db/schema";
 
 const MAX_PER_RUN = 200;
-const SIMILARITY_THRESHOLD = 0.80;
+// Cosine similarity floor for join. 0.75 catches cross-source coverage of the
+// same event ("DeepSeek announces V4" from TechCrunch vs Bloomberg vs Verge
+// land at sim 0.76-0.77) while keeping genuinely-different angles separate
+// ("DeepSeek announce" vs "DeepSeek 384K output spec" sit at sim 0.51).
+// Stage B then arbitrates ambiguous merges and locks decisions.
+const SIMILARITY_THRESHOLD = 0.75;
 const WINDOW_HOURS = 72;
 
 export type ClusterReport = {
@@ -86,8 +91,15 @@ async function assignOneToCluster(itemId: number): Promise<AssignOutcome> {
   // to a cluster lead so near-duplicates in the same batch can still merge.
   // Window is anchored to the target item's own published_at (bidirectional
   // ±WINDOW_HOURS) so backfill items can find their temporal cohort even when
-  // they arrive late. Candidates with cluster_verified_at IS NOT NULL are
-  // excluded so Stage B verified-locks are respected.
+  // they arrive late.
+  //
+  // Verified items are NOT excluded from candidates — Stage A only ever ADDS
+  // members to clusters, never reshuffles or splits, so a new item joining a
+  // Stage-B-verified cluster is safe (the verified-lock protects existing
+  // membership, not future joins). An earlier version of this query excluded
+  // `cluster_verified_at IS NOT NULL` rows; that turned every multi-member
+  // verified cluster into a recall black hole — the next item about the same
+  // event couldn't see it and spawned a singleton.
   const nearestResult = await client.execute(sql`
     WITH target AS (
       SELECT embedding, published_at FROM items WHERE id = ${itemId}
@@ -101,7 +113,6 @@ async function assignOneToCluster(itemId: number): Promise<AssignOutcome> {
     WHERE i.id <> ${itemId}
       AND i.embedding IS NOT NULL
       AND i.enriched_at IS NOT NULL
-      AND i.cluster_verified_at IS NULL
       AND i.published_at BETWEEN
           (SELECT published_at FROM target) - make_interval(hours => ${WINDOW_HOURS})
           AND

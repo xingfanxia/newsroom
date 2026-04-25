@@ -42,6 +42,13 @@ export type FeedQuery = {
    *  nav tab — operator hand-picks publishers worth surfacing even if the
    *  scorer's tier is low. */
   curatedOnly?: boolean;
+  /** Drop any source whose tags overlap this list. The home (热点聚合) feed
+   *  uses this to keep arxiv/paper content out of the news view — papers
+   *  live on the dedicated /papers tab. Postgres `&&` overlap operator. */
+  excludeSourceTags?: string[];
+  /** Inverse of excludeSourceTags — only return items whose source tags
+   *  overlap this list. Powers the /papers tab. */
+  includeSourceTags?: string[];
   /** Event-aggregation view semantics (see docs/aggregation/DESIGN.md §7).
    *   'today'   = trending: events with firstSeenAt today OR latestMemberAt
    *               within hotWindowHours, plus fresh singletons from today.
@@ -135,6 +142,16 @@ function buildFeedWhere(q: FeedQuery) {
     ? sql`${sources.curated} = TRUE`
     : sql`TRUE`;
 
+  const excludeTagsFilter =
+    q.excludeSourceTags && q.excludeSourceTags.length > 0
+      ? sql`NOT (${sources.tags} && ${q.excludeSourceTags}::text[])`
+      : sql`TRUE`;
+
+  const includeTagsFilter =
+    q.includeSourceTags && q.includeSourceTags.length > 0
+      ? sql`${sources.tags} && ${q.includeSourceTags}::text[]`
+      : sql`TRUE`;
+
   return and(
     isNotNull(items.enrichedAt),
     isNotNull(items.importance),
@@ -146,6 +163,8 @@ function buildFeedWhere(q: FeedQuery) {
     dateFilter,
     searchFilter,
     curatedFilter,
+    excludeTagsFilter,
+    includeTagsFilter,
   );
 }
 
@@ -161,15 +180,13 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
 
   const view = q.view ?? "archive";
 
-  // Today view orders by recency-of-activity (latestMemberAt for events,
-  // publishedAt fallback for singletons). Archive view orders by the lead's
-  // own published_at — this matches the date-filter anchor and the calendar
-  // count, so a row's bucket day = its position in the ordering.
-  // Both secondary-sort by importance so featured events outrank low-importance
-  // items at the same timestamp.
+  // Today view orders by importance — the home feed is "what matters today",
+  // not "what was just touched". Recency is a tiebreaker so equally-important
+  // events surface the freshest signal first.
+  // Archive view stays chronological (matches calendar / date-filter anchor).
   const orderExpr =
     view === "today"
-      ? sql`COALESCE(${clusters.latestMemberAt}, ${items.publishedAt}) DESC, COALESCE(${clusters.importance}, ${items.importance}) DESC`
+      ? sql`COALESCE(${clusters.importance}, ${items.importance}) DESC NULLS LAST, COALESCE(${clusters.latestMemberAt}, ${items.publishedAt}) DESC`
       : sql`${items.publishedAt} DESC, COALESCE(${clusters.importance}, ${items.importance}) DESC`;
 
   const rows = await client

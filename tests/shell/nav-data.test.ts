@@ -16,6 +16,8 @@ describe("activeNavId", () => {
     expect(activeNavId("/en/curated")).toBe("curated");
     expect(activeNavId("/en/x-monitor")).toBe("xmonitor");
     expect(activeNavId("/en/all")).toBe("all");
+    expect(activeNavId("/en/papers")).toBe("papers");
+    expect(activeNavId("/zh/papers")).toBe("papers");
   });
 
   it("matches admin routes", () => {
@@ -44,8 +46,9 @@ describe("activeNavId", () => {
 });
 
 describe("nav data shape", () => {
-  it("exposes 7 primary nav items", () => {
-    expect(NAV_PRIMARY).toHaveLength(7);
+  it("exposes 8 primary nav items (including papers tab)", () => {
+    expect(NAV_PRIMARY).toHaveLength(8);
+    expect(NAV_PRIMARY.find((n) => n.id === "papers")).toBeDefined();
   });
 
   it("exposes 5 admin nav items (including the new usage route)", () => {

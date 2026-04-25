@@ -68,6 +68,8 @@ function googleClient() {
 
 let cachedAzure: ReturnType<typeof createAzure> | null = null;
 function azureClient() {
+  // Embeddings-only (legacy chat-completions deployments still resolve here too,
+  // but production chat traffic moved to azureChatClient as of gpt-5.5).
   const apiKey = process.env.AZURE_OPENAI_API_KEY;
   const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
   const apiVersion =
@@ -86,6 +88,27 @@ function azureClient() {
     useDeploymentBasedUrls: true,
   });
   return cachedAzure;
+}
+
+let cachedAzureChat: ReturnType<typeof createOpenAI> | null = null;
+function azureChatClient() {
+  // Standard chat lives on the AI Foundry "project" Responses-API endpoint
+  // (ax-useast-resource as of gpt-5.5). Same shape as PRO (createOpenAI +
+  // baseURL override + api-key header) but a different resource + key.
+  const apiKey = process.env.AZURE_OPENAI_CHAT_API_KEY;
+  const endpoint = process.env.AZURE_OPENAI_CHAT_ENDPOINT; // ".../openai/v1/"
+  if (!apiKey || !endpoint) {
+    throw new LLMError(
+      "azure-openai",
+      "AZURE_OPENAI_CHAT_API_KEY and AZURE_OPENAI_CHAT_ENDPOINT must be set",
+    );
+  }
+  cachedAzureChat ??= createOpenAI({
+    apiKey,
+    baseURL: endpoint,
+    headers: { "api-key": apiKey },
+  });
+  return cachedAzureChat;
 }
 
 let cachedAzurePro: ReturnType<typeof createOpenAI> | null = null;
@@ -131,10 +154,13 @@ function modelFor(
           "gemini-3.1-pro-preview",
       );
     case "azure-openai":
-      return azureClient().chat(
+      // gpt-5.5-standard is a Responses-API-only deployment on the AI Foundry
+      // project endpoint — no legacy /chat/completions surface, so we route
+      // through azureChatClient().responses() instead of azureClient().chat().
+      return azureChatClient().responses(
         opts?.deployment ??
-          process.env.AZURE_OPENAI_DEPLOYMENT ??
-          "gpt-5.4-standard",
+          process.env.AZURE_OPENAI_CHAT_DEPLOYMENT ??
+          "gpt-5.5-standard",
       );
     case "azure-openai-pro":
       // .responses() uses Azure's new Responses API — reasoning-native,
@@ -172,6 +198,38 @@ function reasoningProviderOptions(effort?: ReasoningEffort) {
   } as const;
 }
 
+/**
+ * Azure Foundry's Responses-API endpoint (gpt-5.5-standard) rejects requests
+ * that pass a top-level `system` field — the AI SDK's `system → instructions`
+ * conversion produces an input item with empty `type`, and the API responds
+ * with `Invalid value: ''. Supported values are: 'message', 'reasoning', ...`.
+ *
+ * Workaround: fold the system prompt into the first user message as a prefix.
+ * Every other provider continues to receive `system` as a discrete role.
+ */
+type ChatLike = {
+  system?: string;
+  messages: Array<{ role: string; content: unknown }>;
+};
+function applyAzureFoundryWorkaround<T extends ChatLike>(
+  provider: LLMProvider,
+  req: T,
+): T {
+  if (provider !== "azure-openai" || !req.system) return req;
+  const merged = `${req.system}\n\n---\n\n`;
+  const [first, ...rest] = req.messages;
+  const firstContent = typeof first?.content === "string" ? first.content : "";
+  const newFirst =
+    first && first.role === "user"
+      ? { ...first, content: merged + firstContent }
+      : { role: "user" as const, content: merged };
+  const newMessages =
+    first && first.role === "user"
+      ? [newFirst, ...rest]
+      : [newFirst, ...req.messages];
+  return { ...req, system: undefined, messages: newMessages } as T;
+}
+
 // ── Public API ──────────────────────────────────────────────────
 
 export async function generateText(
@@ -179,12 +237,13 @@ export async function generateText(
 ): Promise<GenerateTextResult> {
   const provider = resolveProvider(req.provider);
   const model = modelFor(provider, { deployment: req.deployment });
+  const adjusted = applyAzureFoundryWorkaround(provider, req);
   const started = Date.now();
   try {
     const result = await aiGenerateText({
       model,
-      system: req.system,
-      messages: req.messages,
+      system: adjusted.system,
+      messages: adjusted.messages,
       maxOutputTokens: req.maxTokens ?? 2048,
       providerOptions: reasoningProviderOptions(req.reasoningEffort),
       ...(req.temperature !== undefined
@@ -226,12 +285,13 @@ export async function generateStructured<T extends z.ZodTypeAny>(
 ): Promise<GenerateStructuredResult<T>> {
   const provider = resolveProvider(req.provider);
   const model = modelFor(provider, { deployment: req.deployment });
+  const adjusted = applyAzureFoundryWorkaround(provider, req);
   const started = Date.now();
   try {
     const result = await aiGenerateObject({
       model,
-      system: req.system,
-      messages: req.messages,
+      system: adjusted.system,
+      messages: adjusted.messages,
       schema: req.schema,
       schemaName: req.schemaName,
       schemaDescription: req.schemaDescription,
@@ -273,10 +333,11 @@ export async function generateStructured<T extends z.ZodTypeAny>(
 export function streamText(req: GenerateTextRequest) {
   const provider = resolveProvider(req.provider);
   const model = modelFor(provider, { deployment: req.deployment });
+  const adjusted = applyAzureFoundryWorkaround(provider, req);
   return aiStreamText({
     model,
-    system: req.system,
-    messages: req.messages,
+    system: adjusted.system,
+    messages: adjusted.messages,
     maxOutputTokens: req.maxTokens ?? 2048,
     providerOptions: reasoningProviderOptions(req.reasoningEffort),
     ...(req.temperature !== undefined
@@ -399,7 +460,14 @@ export function availableProviders(): LLMProvider[] {
   const out: LLMProvider[] = [];
   if (process.env.ANTHROPIC_API_KEY) out.push("anthropic");
   if (process.env.GEMINI_API_KEY) out.push("gemini");
-  if (process.env.AZURE_OPENAI_API_KEY && process.env.AZURE_OPENAI_ENDPOINT) {
+  // azure-openai requires both: chat creds (gpt-5.5 Responses API) AND
+  // legacy creds (embeddings via createAzure). Either missing → no provider.
+  if (
+    process.env.AZURE_OPENAI_CHAT_API_KEY &&
+    process.env.AZURE_OPENAI_CHAT_ENDPOINT &&
+    process.env.AZURE_OPENAI_API_KEY &&
+    process.env.AZURE_OPENAI_ENDPOINT
+  ) {
     out.push("azure-openai");
   }
   if (
