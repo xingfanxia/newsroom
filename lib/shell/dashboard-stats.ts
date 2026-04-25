@@ -95,16 +95,34 @@ export async function getTopTopics(limit = 16): Promise<TopicEntry[]> {
  * set + non-excluded, so UI counts don't over-promise items that won't render.
  */
 export type DayBucket = { date: string; count: number };
+/**
+ * Calendar-grid counts. Must agree exactly with the date-filter in
+ * lib/items/live.ts — clicking a calendar cell must return the items the
+ * count promised.
+ *
+ * Bucket anchor = lead item's published_at:
+ *   - Singletons (cluster_id NULL) bucket on their own published_at.
+ *   - Multi-member events bucket on the lead item's published_at, which
+ *     since dedup filters i.id = c.lead_item_id IS just i.published_at —
+ *     no separate join needed. (This was a regression from an earlier
+ *     iteration that bucketed on cluster.first_seen_at; that anchor places
+ *     events on their earliest-member day, which often contradicts the
+ *     intuitive "the day the event happened" — i.e. when the lead's
+ *     coverage was published.)
+ *   - Excluded tier honored via COALESCE(cluster.event_tier, items.tier).
+ */
 export async function getDayCounts(days = 30): Promise<DayBucket[]> {
   const client = db();
   const rows = await client.execute(sql`
-    SELECT to_char(date_trunc('day', ${items.publishedAt}), 'YYYY-MM-DD') AS d,
+    SELECT to_char(date_trunc('day', i.published_at), 'YYYY-MM-DD') AS d,
            count(*)::int AS n
-    FROM ${items}
-    WHERE ${items.enrichedAt} IS NOT NULL
-      AND ${items.importance} IS NOT NULL
-      AND coalesce(${items.tier}, 'all') <> 'excluded'
-      AND ${items.publishedAt} >= now() - (${days} * interval '1 day')
+    FROM items i
+    LEFT JOIN clusters c ON c.id = i.cluster_id
+    WHERE i.enriched_at IS NOT NULL
+      AND i.importance IS NOT NULL
+      AND coalesce(c.event_tier, i.tier, 'all') <> 'excluded'
+      AND (i.cluster_id IS NULL OR c.lead_item_id = i.id)
+      AND i.published_at >= now() - (${days} * interval '1 day')
     GROUP BY 1
     ORDER BY 1 DESC
     LIMIT ${days}

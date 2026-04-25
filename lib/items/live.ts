@@ -92,17 +92,25 @@ function buildFeedWhere(q: FeedQuery) {
   const kindFilter = q.sourceKind
     ? sql`${sources.kind} = ${q.sourceKind}`
     : sql`TRUE`;
-  // View-aware day filter:
-  //   archive: bucket on COALESCE(cluster.first_seen_at, items.published_at)
-  //            — events anchor to inception day, singletons to their pub day.
+  // View-aware day filter. Bucket anchor for date filtering = items.published_at.
+  // The dedup filter above ensures we only count/show the lead item per cluster,
+  // so items.published_at IS the lead's published_at for events. This matches
+  // calendar getDayCounts() and the user's intuition ("clicking April 16 shows
+  // events whose lead coverage dropped April 16").
+  //
+  // Earlier iterations used COALESCE(cluster.first_seen_at, items.published_at)
+  // which buckets events on their EARLIEST member's day — so an event whose
+  // first source dropped April 14 but whose lead coverage came April 16 would
+  // sit in the April 14 calendar cell, leaving April 16 empty even though the
+  // user thinks of it as an April 16 event.
+  //
   //   today:   combined trending — firstSeenAt today OR latestMemberAt within
-  //            hotWindow OR unclustered-item published today (singleton path).
+  //            hotWindow OR unclustered-item published today.
   //   explicit date filter (q.date / q.dateFrom/dateTo) overrides view.
-  const anchorExpr = sql`COALESCE(${clusters.firstSeenAt}, ${items.publishedAt})`;
   const dateFilter = q.date
-    ? sql`${anchorExpr} >= ${`${q.date}T00:00:00Z`}::timestamptz AND ${anchorExpr} < ${`${q.date}T00:00:00Z`}::timestamptz + interval '1 day'`
+    ? sql`${items.publishedAt} >= ${`${q.date}T00:00:00Z`}::timestamptz AND ${items.publishedAt} < ${`${q.date}T00:00:00Z`}::timestamptz + interval '1 day'`
     : q.dateFrom || q.dateTo
-      ? sql`${anchorExpr} >= ${q.dateFrom ?? "1970-01-01"}::timestamptz AND ${anchorExpr} < ${q.dateTo ?? "2999-01-01"}::timestamptz`
+      ? sql`${items.publishedAt} >= ${q.dateFrom ?? "1970-01-01"}::timestamptz AND ${items.publishedAt} < ${q.dateTo ?? "2999-01-01"}::timestamptz`
       : view === "today"
         ? sql`(
             ${clusters.firstSeenAt} >= date_trunc('day', now())
@@ -154,14 +162,15 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
   const view = q.view ?? "archive";
 
   // Today view orders by recency-of-activity (latestMemberAt for events,
-  // publishedAt fallback for singletons). Archive view orders by inception
-  // (firstSeenAt for events, publishedAt fallback). Both secondary-sort by
-  // importance so featured events outrank low-importance items at the same
-  // timestamp.
+  // publishedAt fallback for singletons). Archive view orders by the lead's
+  // own published_at — this matches the date-filter anchor and the calendar
+  // count, so a row's bucket day = its position in the ordering.
+  // Both secondary-sort by importance so featured events outrank low-importance
+  // items at the same timestamp.
   const orderExpr =
     view === "today"
       ? sql`COALESCE(${clusters.latestMemberAt}, ${items.publishedAt}) DESC, COALESCE(${clusters.importance}, ${items.importance}) DESC`
-      : sql`COALESCE(${clusters.firstSeenAt}, ${items.publishedAt}) DESC, COALESCE(${clusters.importance}, ${items.importance}) DESC`;
+      : sql`${items.publishedAt} DESC, COALESCE(${clusters.importance}, ${items.importance}) DESC`;
 
   const rows = await client
     .select({
