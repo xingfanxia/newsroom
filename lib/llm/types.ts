@@ -17,6 +17,7 @@ export type LLMTask =
   | "commentary"
   | "event-commentary"
   | "newsletter"
+  | "daily-column"
   | "agent"
   | "search"
   | "arbitrate"

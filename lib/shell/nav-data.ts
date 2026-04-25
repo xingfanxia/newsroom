@@ -14,6 +14,7 @@ export type NavItem = {
 
 export const NAV_PRIMARY: NavItem[] = [
   { id: "hot",        href: "/",             label: "hot events", cjk: "热点聚合", live: true },
+  { id: "daily",      href: "/daily",        label: "daily column", cjk: "每日 AI 日报" },
   { id: "all",        href: "/all",          label: "all posts",  cjk: "全部" },
   { id: "papers",     href: "/papers",       label: "papers",     cjk: "论文" },
   { id: "podcasts",   href: "/podcasts",     label: "podcasts",   cjk: "播客·视频" },
