@@ -43,6 +43,7 @@ import { requireApiToken } from "@/lib/auth/api-token";
 import {
   countFeaturedStories,
   getFeaturedStories,
+  getEventMembers,
   type FeedQuery,
 } from "@/lib/items/live";
 import { semanticSearch } from "@/lib/items/semantic-search";
@@ -92,9 +93,11 @@ function buildServer(user: SessionUser): McpServer {
     {
       title: "Browse the AX Radar feed",
       description:
-        "Return curated items from the AX Radar timeline. Use this as the default 'what's happening' call — tier=featured gives today's signal, tier=all spans everything enriched. Filter by source group (podcast/media/vendor-official/…), source kind (rss/x-api/…), exact source id (e.g. dwarkesh-yt), or a published-date window. Items come back newest-first.",
+        "Return curated items from the AX Radar timeline. Each row is a single editorial card: a singleton article OR a multi-source EVENT (multiple publishers covering the same real-world story merged into one card). When `coverage > 1` the row is an event — use ax_radar_event_members to see all the sources covering it. `view=today` gives trending: events with new coverage in the last 24h. `view=archive` (default) is the calendar timeline keyed on the lead's published_at. `tier=featured` is today's signal, `tier=all` spans everything non-excluded.",
       inputSchema: {
         tier: z.enum(["featured", "p1", "all"]).optional(),
+        view: z.enum(["today", "archive"]).optional(),
+        hot_window_hours: z.number().int().min(1).max(168).optional(),
         source_id: z.string().optional(),
         source_group: z.string().optional(),
         source_kind: z.string().optional(),
@@ -107,9 +110,10 @@ function buildServer(user: SessionUser): McpServer {
       },
     },
     async (args) => {
+      const locale = args.locale ?? "en";
       const q: FeedQuery = {
         tier: args.tier ?? "featured",
-        locale: args.locale ?? "en",
+        locale,
         limit: args.limit ?? 40,
         offset: args.offset ?? 0,
         sourceId: args.source_id,
@@ -119,29 +123,73 @@ function buildServer(user: SessionUser): McpServer {
         dateFrom: args.date_from,
         dateTo: args.date_to,
         includeSourceGroup: true,
+        view: args.view ?? "archive",
+        hotWindowHours: args.hot_window_hours,
       };
       const [stories, total] = await Promise.all([
         getFeaturedStories(q),
         countFeaturedStories(q),
       ]);
       return text({
-        items: stories.map((s) => ({
-          id: s.id,
-          title: s.title,
-          summary: s.summary,
-          publisher: s.source.publisher,
-          source_id: s.sourceId,
-          source_group: s.source.groupCode ?? null,
-          tier: s.tier,
-          importance: s.importance,
-          hkr: s.hkr ?? null,
-          url: s.url,
-          published_at: s.publishedAt,
-          has_commentary: Boolean(s.editorNote || s.editorAnalysis),
-        })),
+        items: stories.map((s) => {
+          const isEvent = (s.coverage ?? 0) > 1 && s.clusterId != null;
+          return {
+            id: s.id,
+            title: s.title,
+            summary: s.summary,
+            publisher: s.source.publisher,
+            source_id: s.sourceId,
+            source_group: s.source.groupCode ?? null,
+            tier: s.tier,
+            importance: s.importance,
+            hkr: s.hkr ?? null,
+            url: s.url,
+            published_at: s.publishedAt,
+            has_commentary: Boolean(s.editorNote || s.editorAnalysis),
+            // Event aggregation — null for singletons.
+            cluster_id: s.clusterId ?? null,
+            coverage: s.coverage ?? null,
+            canonical_title: isEvent
+              ? (locale === "zh" ? s.canonicalTitleZh : s.canonicalTitleEn) ??
+                null
+              : null,
+            first_seen_at: s.firstSeenAt ?? null,
+            latest_member_at: s.latestMemberAt ?? null,
+            still_developing: s.stillDeveloping ?? null,
+          };
+        }),
         total,
         limit: q.limit,
         offset: q.offset,
+        view: q.view,
+      });
+    },
+  );
+
+  server.registerTool(
+    "ax_radar_event_members",
+    {
+      title: "Fetch cross-source coverage for one event",
+      description:
+        "Given a cluster_id from ax_radar_feed (rows where coverage > 1 are multi-source events), return the full list of items that comprise the event — title, source, url, importance — ordered by importance DESC. Use this to drill into 'who else covered this story?' or to cite multiple primary sources when summarizing.",
+      inputSchema: {
+        cluster_id: z.number().int().positive(),
+        locale: z.enum(["zh", "en"]).optional(),
+      },
+    },
+    async ({ cluster_id, locale }) => {
+      const members = await getEventMembers(cluster_id, locale ?? "en");
+      return text({
+        cluster_id,
+        members: members.map((m) => ({
+          source_id: m.sourceId,
+          source_name: m.sourceName,
+          title: m.title,
+          url: m.url,
+          published_at: m.publishedAt,
+          importance: m.importance,
+        })),
+        total: members.length,
       });
     },
   );
@@ -186,9 +234,11 @@ function buildServer(user: SessionUser): McpServer {
       const mode = args.mode ?? "lexical";
       const limit = args.limit ?? 20;
 
+      const locale = args.locale ?? "en";
+
       if (mode === "semantic") {
         const result = await semanticSearch(args.q, {
-          locale: args.locale ?? "en",
+          locale,
           limit,
           sourceId: args.source_id,
           sourceGroup: args.source_group,
@@ -199,25 +249,35 @@ function buildServer(user: SessionUser): McpServer {
         return text({
           mode: "semantic",
           q: args.q,
-          items: result.items.map((s) => ({
-            id: s.id,
-            title: s.title,
-            summary: s.summary,
-            publisher: s.source.publisher,
-            source_id: s.sourceId,
-            tier: s.tier,
-            importance: s.importance,
-            url: s.url,
-            published_at: s.publishedAt,
-            distance: s.distance,
-          })),
+          items: result.items.map((s) => {
+            const isEvent = (s.coverage ?? 0) > 1 && s.clusterId != null;
+            return {
+              id: s.id,
+              title: s.title,
+              summary: s.summary,
+              publisher: s.source.publisher,
+              source_id: s.sourceId,
+              tier: s.tier,
+              importance: s.importance,
+              url: s.url,
+              published_at: s.publishedAt,
+              distance: s.distance,
+              cluster_id: s.clusterId ?? null,
+              coverage: s.coverage ?? null,
+              canonical_title: isEvent
+                ? (locale === "zh"
+                    ? s.canonicalTitleZh
+                    : s.canonicalTitleEn) ?? null
+                : null,
+            };
+          }),
           total: result.total,
         });
       }
 
       const q: FeedQuery = {
         tier: "all",
-        locale: args.locale ?? "en",
+        locale,
         limit,
         sourceId: args.source_id,
         sourceGroup: args.source_group,
@@ -231,17 +291,27 @@ function buildServer(user: SessionUser): McpServer {
       return text({
         mode: "lexical",
         q: args.q,
-        items: stories.map((s) => ({
-          id: s.id,
-          title: s.title,
-          summary: s.summary,
-          publisher: s.source.publisher,
-          source_id: s.sourceId,
-          tier: s.tier,
-          importance: s.importance,
-          url: s.url,
-          published_at: s.publishedAt,
-        })),
+        items: stories.map((s) => {
+          const isEvent = (s.coverage ?? 0) > 1 && s.clusterId != null;
+          return {
+            id: s.id,
+            title: s.title,
+            summary: s.summary,
+            publisher: s.source.publisher,
+            source_id: s.sourceId,
+            tier: s.tier,
+            importance: s.importance,
+            url: s.url,
+            published_at: s.publishedAt,
+            cluster_id: s.clusterId ?? null,
+            coverage: s.coverage ?? null,
+            canonical_title: isEvent
+              ? (locale === "zh"
+                  ? s.canonicalTitleZh
+                  : s.canonicalTitleEn) ?? null
+              : null,
+          };
+        }),
         total: stories.length,
       });
     },
@@ -394,21 +464,26 @@ function buildServer(user: SessionUser): McpServer {
         locale: "en",
         limit: 30,
         includeSourceGroup: true,
+        view: "today",
       });
       const today = new Date().toISOString().slice(0, 10);
       const lines = [
         `# AX Radar — ${today}`,
         "",
-        `${stories.length} featured item(s). Tier = featured + p1.`,
+        `${stories.length} featured item(s). Tier = featured + p1. View = today (trending).`,
         "",
       ];
       for (const s of stories) {
         const hkr = s.hkr
           ? ` \`${s.hkr.h ? "H" : "·"}${s.hkr.k ? "K" : "·"}${s.hkr.r ? "R" : "·"}\``
           : "";
+        const isEvent = (s.coverage ?? 0) > 1 && s.clusterId != null;
+        const coverageBadge = isEvent ? ` · **${s.coverage} sources**` : "";
+        const stillDeveloping = s.stillDeveloping ? " · *still developing*" : "";
+        const headline = isEvent && s.canonicalTitleEn ? s.canonicalTitleEn : s.title;
         lines.push(
-          `## [${s.title}](${s.url})`,
-          `*${s.source.publisher}* · importance ${s.importance}${hkr}`,
+          `## [${headline}](${s.url})`,
+          `*${s.source.publisher}* · importance ${s.importance}${coverageBadge}${stillDeveloping}${hkr}`,
           "",
           s.summary,
           "",

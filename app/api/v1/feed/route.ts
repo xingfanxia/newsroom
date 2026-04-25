@@ -5,17 +5,25 @@
  * `total` count for pagination. Filter surface mirrors the internal
  * FeedQuery type, but uses snake_case externally (date_from, source_id, ...).
  *
+ * Multi-source events: when an item is part of a multi-member cluster (an
+ * "event" — same real-world story covered by multiple publishers), the
+ * response includes `cluster_id`, `coverage`, `canonical_title`, etc. Hit
+ * GET /api/v1/events/:cluster_id/members for the full cross-source list.
+ * Singleton items (no cluster or member_count=1) leave these fields null.
+ *
  * Query params:
- *   tier         = featured (default) | p1 | all
- *   date         = YYYY-MM-DD (exclusive with date_from/date_to)
- *   date_from    = ISO-8601 (inclusive lower bound)
- *   date_to      = ISO-8601 (exclusive upper bound)
- *   source_id    = exact source id (e.g. "dwarkesh-yt")
- *   source_group = podcast | newsletter | vendor-official | …
- *   source_kind  = rss | atom | api | rsshub | scrape | x-api
- *   limit        = 1..500, default 40
- *   offset       = ≥0, default 0
- *   locale       = zh | en (default en)
+ *   tier             = featured (default) | p1 | all
+ *   view             = today (trending: latestMemberAt anchor) | archive (default; published_at anchor)
+ *   hot_window_hours = 1..168, default 24 — only matters for view=today
+ *   date             = YYYY-MM-DD (exclusive with date_from/date_to)
+ *   date_from        = ISO-8601 (inclusive lower bound)
+ *   date_to          = ISO-8601 (exclusive upper bound)
+ *   source_id        = exact source id (e.g. "dwarkesh-yt")
+ *   source_group     = podcast | newsletter | vendor-official | …
+ *   source_kind      = rss | atom | api | rsshub | scrape | x-api
+ *   limit            = 1..500, default 40
+ *   offset           = ≥0, default 0
+ *   locale           = zh | en (default en)
  */
 import { z } from "zod";
 import { requireApiToken } from "@/lib/auth/api-token";
@@ -28,6 +36,14 @@ import type { Story } from "@/lib/types";
 
 const querySchema = z.object({
   tier: z.enum(["featured", "p1", "all"]).optional().default("featured"),
+  view: z.enum(["today", "archive"]).optional().default("archive"),
+  hot_window_hours: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(168)
+    .optional()
+    .default(24),
   date: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "expected YYYY-MM-DD")
@@ -58,9 +74,26 @@ type ApiItem = {
   published_at: string;
   has_commentary: boolean;
   cross_source_count: number | null;
+  // ── Event aggregation (null for singletons) ──
+  /** clusters.id — pass to GET /api/v1/events/:id/members for cross-source list. */
+  cluster_id: number | null;
+  /** member_count — number of sources covering this event. 1 = singleton. */
+  coverage: number | null;
+  /** Neutral canonical event name in the requested locale. Falls back null for singletons. */
+  canonical_title: string | null;
+  /** ISO — first time any source covered this event (event inception). */
+  first_seen_at: string | null;
+  /** ISO — most recent member join (today-view recency anchor). */
+  latest_member_at: string | null;
+  /** True iff first_seen_at < today AND latest_member_at within hot_window_hours. */
+  still_developing: boolean | null;
 };
 
-function toApiItem(s: Story): ApiItem {
+function toApiItem(s: Story, locale: "zh" | "en"): ApiItem {
+  const isEvent = (s.coverage ?? 0) > 1 && s.clusterId != null;
+  const canonical = isEvent
+    ? (locale === "zh" ? s.canonicalTitleZh : s.canonicalTitleEn) ?? null
+    : null;
   return {
     id: s.id,
     title: s.title,
@@ -76,7 +109,13 @@ function toApiItem(s: Story): ApiItem {
     url: s.url,
     published_at: s.publishedAt,
     has_commentary: Boolean(s.editorNote || s.editorAnalysis),
-    cross_source_count: s.crossSourceCount ?? null,
+    cross_source_count: s.crossSourceCount ?? s.coverage ?? null,
+    cluster_id: s.clusterId ?? null,
+    coverage: s.coverage ?? null,
+    canonical_title: canonical,
+    first_seen_at: s.firstSeenAt ?? null,
+    latest_member_at: s.latestMemberAt ?? null,
+    still_developing: s.stillDeveloping ?? null,
   };
 }
 
@@ -107,6 +146,8 @@ export async function GET(req: Request) {
     dateFrom: q.date_from,
     dateTo: q.date_to,
     includeSourceGroup: true,
+    view: q.view,
+    hotWindowHours: q.hot_window_hours,
   };
 
   try {
@@ -115,10 +156,11 @@ export async function GET(req: Request) {
       countFeaturedStories(feedQuery),
     ]);
     return Response.json({
-      items: stories.map(toApiItem),
+      items: stories.map((s) => toApiItem(s, q.locale)),
       total,
       limit: q.limit,
       offset: q.offset,
+      view: q.view,
     });
   } catch (err) {
     console.error("[api/v1/feed] failed", err);
