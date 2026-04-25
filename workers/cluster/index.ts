@@ -188,6 +188,16 @@ async function assignOneToCluster(itemId: number): Promise<AssignOutcome> {
     .returning({ id: items.id });
 
   if (claimed.length === 0) {
+    // The cluster row is a zombie if WE created it in this call (created /
+    // promote-neighbor lost-race / no-neighbor singleton paths) — we hold
+    // an empty cluster row that no item will join. Clean it up. The "join
+    // existing cluster" branch sets outcome to "assigned" with an existing
+    // cluster_id, so we leave that alone (it has real members).
+    if (outcome === "created") {
+      await client
+        .delete(clusters)
+        .where(sql`${clusters.id} = ${clusterId} AND ${clusters.memberCount} = 0`);
+    }
     return "already-claimed";
   }
 
