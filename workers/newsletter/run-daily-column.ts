@@ -18,35 +18,14 @@ import { selectDailyColumnPool, type SelectedRow } from "./select";
 import { runColumnSelfCheck } from "./qc/self-check";
 
 const dailyColumnSchema = z.object({
-  title: z
-    .string()
-    .min(1)
-    .max(80)
-    .describe(
-      "≤24 字 concrete + opinionated title (Stratechery-register, not category-name). No marketing verbs.",
-    ),
-  summary_md: z
-    .string()
-    .min(200)
-    .describe(
-      "Numbered 1-5 markdown list. Each entry 60-120 字: title — quick take with judgment — [#item-id].",
-    ),
+  title: z.string().min(1).max(80).describe("≤24 字 总标题"),
+  summary_md: z.string().min(80).describe("100-200 字 开场白"),
   narrative_md: z
     .string()
     .min(2500)
-    .describe(
-      "3500-6000 字 long-form analysis. USE markdown structure: ## subheadings (recommended 2-3 主题块), ### sub-subheadings, lists, blockquotes, **bold**, *italic*. References summary as 第 N 件 (callback). At least one industry/historical/cultural reference where it surfaces naturally.",
-    ),
-  featured_item_ids: z
-    .array(z.number())
-    .min(1)
-    .max(3)
-    .describe("Item IDs given deep treatment in narrative_md."),
-  theme_tag: z
-    .string()
-    .min(1)
-    .max(30)
-    .describe("≤10 字 day theme (e.g., 算力合同战 / Agentic 编码新基线 / 监管正面碰撞)."),
+    .describe("6-10 个 ## 小节, 每节 200-1000 字 (虎嗅周报体)"),
+  featured_item_ids: z.array(z.number()).min(1).max(3),
+  theme_tag: z.string().min(1).max(30),
 });
 
 export type DailyColumnReport = {
@@ -110,7 +89,7 @@ export async function runDailyColumn(
     messages: [{ role: "user", content: userPrompt }],
     schema: dailyColumnSchema,
     schemaName: "DailyColumn",
-    maxTokens: 20000,
+    maxTokens: 30000,
   });
 
   const draft = result.data;
