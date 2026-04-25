@@ -28,9 +28,9 @@ Rules:
 - Articles about the same company/person/technology but DIFFERENT specific events are NOT the same event. SPLIT them.
 - When in doubt, KEEP. The goal is deduping redundant coverage; over-splitting defeats the purpose.
 
-Output JSON: { verdict: "keep" | "split", rejectedMemberIds?: number[], reason: string }
-- "keep": all members are the same event
-- "split": rejectedMemberIds is the subset to move out; remainder stays
+Output JSON: { verdict: "keep" | "split", rejectedMemberIds: number[] | null, reason: string }
+- "keep": all members are the same event; set rejectedMemberIds to null
+- "split": rejectedMemberIds is the subset (item_id values) to move out; remainder stays
 - reason: ≤ 280 chars, audit-grade plain language`;
 
 export function arbitrateUserPrompt(input: {
