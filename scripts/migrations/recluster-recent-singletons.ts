@@ -15,6 +15,7 @@
  *   bun run scripts/migrations/recluster-recent-singletons.ts             # dry-run, last 48h
  *   bun run scripts/migrations/recluster-recent-singletons.ts --apply     # actually mutate
  *   bun run scripts/migrations/recluster-recent-singletons.ts --hours 72  # widen window
+ *   bun run scripts/migrations/recluster-recent-singletons.ts --all       # all singletons, no time bound
  */
 
 import { sql } from "drizzle-orm";
@@ -24,11 +25,13 @@ import { items, clusters } from "@/db/schema";
 const SIMILARITY_THRESHOLD = 0.75;
 const WINDOW_HOURS = 72;
 
-type CliFlags = { apply: boolean; hours: number };
+type CliFlags = { apply: boolean; hours: number | null };
 
 function parseFlags(): CliFlags {
   const args = process.argv.slice(2);
   const apply = args.includes("--apply");
+  const all = args.includes("--all");
+  if (all) return { apply, hours: null };
   const hoursIdx = args.indexOf("--hours");
   const hours =
     hoursIdx >= 0 && args[hoursIdx + 1]
@@ -60,12 +63,17 @@ async function main() {
   const distanceThreshold = 1 - SIMILARITY_THRESHOLD;
 
   console.log(
-    `[recluster-singletons] mode=${apply ? "APPLY" : "DRY-RUN"} window=${hours}h threshold=sim≥${SIMILARITY_THRESHOLD}`,
+    `[recluster-singletons] mode=${apply ? "APPLY" : "DRY-RUN"} window=${hours == null ? "ALL" : `${hours}h`} threshold=sim≥${SIMILARITY_THRESHOLD}`,
   );
 
-  // Singletons we'll consider — published in window, member_count=1, not item-verified.
-  // Sort by published_at ASC so earlier items merge into clusters first; later
-  // items in the same group then find a now-larger target.
+  // Singletons we'll consider — member_count=1, not item-verified, optionally
+  // bounded to last N hours. Sort by published_at ASC so earlier items merge
+  // into clusters first; later items in the same group then find a now-larger
+  // target. Inner nearest-neighbor query still ±WINDOW_HOURS-bounded around
+  // each item's own published_at, so old items only merge with same-era items.
+  const windowFilter = hours == null
+    ? sql`TRUE`
+    : sql`i.published_at > now() - make_interval(hours => ${hours})`;
   const singletons = (await client.execute(sql`
     SELECT i.id AS item_id, i.cluster_id, i.published_at,
            LEFT(COALESCE(i.title_zh, i.title), 80) AS title
@@ -73,7 +81,7 @@ async function main() {
     JOIN clusters c ON i.cluster_id = c.id
     WHERE c.member_count = 1
       AND i.cluster_verified_at IS NULL
-      AND i.published_at > now() - make_interval(hours => ${hours})
+      AND ${windowFilter}
       AND i.embedding IS NOT NULL
       AND i.enriched_at IS NOT NULL
     ORDER BY i.published_at ASC
