@@ -36,10 +36,16 @@ export type ArbitrationReport = {
   errors: Array<{ clusterId: number; reason: string }>;
 };
 
-// Zod schema for the LLM response
+// Zod schema for the LLM response.
+//
+// Azure OpenAI's strict structured-output mode requires every property to
+// appear in the schema's `required` list, even ones that are conceptually
+// optional. So instead of `.optional()` (which omits from `required`), we
+// use `.nullable()` — the field is always present, and the LLM returns
+// `null` when verdict='keep'.
 const arbitrateResponseSchema = z.object({
   verdict: z.enum(["keep", "split"]),
-  rejectedMemberIds: z.array(z.number()).optional(),
+  rejectedMemberIds: z.array(z.number()).nullable(),
   reason: z.string().max(280),
 });
 
