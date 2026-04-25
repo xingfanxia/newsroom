@@ -21,8 +21,8 @@ const workerSrc = readFileSync(
 // ── Constants ────────────────────────────────────────────────────────────────
 
 describe("Stage A constants", () => {
-  it("SIMILARITY_THRESHOLD is 0.80 (widened from 0.88)", () => {
-    expect(workerSrc).toContain("const SIMILARITY_THRESHOLD = 0.80;");
+  it("SIMILARITY_THRESHOLD is 0.75 (lowered from 0.80 to catch cross-source coverage)", () => {
+    expect(workerSrc).toContain("const SIMILARITY_THRESHOLD = 0.75;");
   });
 
   it("WINDOW_HOURS is 72 (extended from 48)", () => {
@@ -35,34 +35,36 @@ describe("Stage A constants", () => {
 describe("Threshold distance conversion", () => {
   /**
    * The worker converts sim → distance: threshold = 1 - SIMILARITY_THRESHOLD.
-   * At 0.80 sim threshold the distance threshold is 0.20.
-   * Items with cosine similarity 0.82 (distance 0.18) MUST cluster.
-   * Items with cosine similarity 0.78 (distance 0.22) must NOT cluster.
+   * At 0.75 sim threshold the distance threshold is 0.25.
+   * Cross-source coverage (TechCrunch / Bloomberg / Verge of the same launch)
+   * sits at sim 0.76-0.77 (distance 0.23-0.24) — newly merged.
+   * Genuinely different angles (Reddit spec discussion vs press release)
+   * sit at sim 0.51 (distance 0.49) — still separate.
    */
-  const SIMILARITY_THRESHOLD = 0.80;
-  const distanceThreshold = 1 - SIMILARITY_THRESHOLD; // 0.20
+  const SIMILARITY_THRESHOLD = 0.75;
+  const distanceThreshold = 1 - SIMILARITY_THRESHOLD; // 0.25
 
-  it("distance threshold is 0.20 for sim threshold 0.80", () => {
-    expect(distanceThreshold).toBeCloseTo(0.20, 10);
+  it("distance threshold is 0.25 for sim threshold 0.75", () => {
+    expect(distanceThreshold).toBeCloseTo(0.25, 10);
   });
 
-  it("cosine similarity 0.82 → distance 0.18 passes threshold (≤ 0.20)", () => {
-    const distance = 1 - 0.82; // 0.18
+  it("cosine similarity 0.77 → distance 0.23 passes threshold (≤ 0.25)", () => {
+    const distance = 1 - 0.77;
     expect(distance).toBeLessThanOrEqual(distanceThreshold);
   });
 
-  it("cosine similarity 0.78 → distance 0.22 does NOT pass threshold (> 0.20)", () => {
-    const distance = 1 - 0.78; // 0.22
+  it("cosine similarity 0.51 (different-angle Reddit spec) does NOT pass", () => {
+    const distance = 1 - 0.51;
     expect(distance).toBeGreaterThan(distanceThreshold);
   });
 
-  it("cosine similarity 0.88 (old threshold) still passes new threshold", () => {
-    const distance = 1 - 0.88; // 0.12
+  it("cosine similarity 0.88 still passes the new threshold", () => {
+    const distance = 1 - 0.88;
     expect(distance).toBeLessThanOrEqual(distanceThreshold);
   });
 
-  it("cosine similarity exactly 0.80 passes (boundary)", () => {
-    const distance = 1 - 0.80; // 0.20
+  it("cosine similarity exactly 0.75 passes (boundary)", () => {
+    const distance = 1 - 0.75;
     expect(distance).toBeLessThanOrEqual(distanceThreshold);
   });
 });
@@ -100,11 +102,18 @@ describe("Neighbor SQL — published_at window anchor", () => {
   });
 });
 
-// ── SQL: Stage B verified-lock exclusion ─────────────────────────────────────
+// ── SQL: Stage B verified items remain JOINABLE ─────────────────────────────
 
-describe("Neighbor SQL — cluster_verified_at exclusion", () => {
-  it("WHERE clause excludes rows where cluster_verified_at IS NOT NULL", () => {
-    expect(workerSrc).toContain("AND i.cluster_verified_at IS NULL");
+describe("Neighbor SQL — verified items must be joinable", () => {
+  it("WHERE clause does NOT exclude cluster_verified_at IS NOT NULL rows", () => {
+    // An earlier version filtered `AND i.cluster_verified_at IS NULL` to
+    // protect Stage B's verify-lock. But Stage A only ADDS members — never
+    // splits or reshuffles — so the filter was protective theater that
+    // turned every verified cluster into a recall black hole: the next
+    // item about the same event couldn't see the cluster and spawned a
+    // singleton. The fix: drop the filter and rely on the structural
+    // invariant (Stage A is add-only).
+    expect(workerSrc).not.toContain("AND i.cluster_verified_at IS NULL");
   });
 });
 
