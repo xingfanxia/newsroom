@@ -24,11 +24,9 @@ function formatDate(d: Date): string {
 }
 
 /**
- * Convert reader-meaningless [#1234] item refs into clickable links to the
- * item detail page. Applied to summary + narrative markdown before render.
- *
- * Markdown link syntax `[label](url)` round-trips through react-markdown
- * cleanly, so we just rewrite each [#NNNN] occurrence inline.
+ * Rewrite reader-meaningless [#NNNN] item refs as clickable links to the
+ * item detail page. react-markdown round-trips `[label](url)` cleanly so
+ * we just inject the URL inline.
  */
 function linkifyItemRefs(md: string): string {
   return md.replace(/\[#(\d+)\]/g, (_, id) => `[#${id}](/zh/items/${id})`);
@@ -39,43 +37,35 @@ export function DailyColumnRenderer({ column }: { column: ColumnRow }) {
   const issueId = `AX 的 AI 日报 · ${dateKey(column.periodStart)}`;
   const summary = linkifyItemRefs(column.columnSummaryMd);
   const narrative = linkifyItemRefs(column.columnNarrativeMd);
+
   return (
-    <article className="mx-auto max-w-3xl px-4 py-12">
-      <header className="mb-10 border-b border-[var(--color-border)] pb-6">
-        <div className="flex items-center justify-between text-xs uppercase tracking-[0.18em] text-[var(--color-muted)]">
-          <span>{issueId}</span>
+    <article className="daily-article">
+      <header className="daily-head">
+        <div className="daily-meta">
+          <span className="daily-issue">{issueId}</span>
           {column.columnThemeTag ? (
-            <span className="text-[var(--color-accent)]">
-              # {column.columnThemeTag}
-            </span>
+            <span className="tier-f">{column.columnThemeTag}</span>
           ) : null}
         </div>
-        <h1 className="mt-3 text-[28px] font-[600] tracking-[-0.4px] leading-tight text-[var(--color-fg)]">
-          {column.columnTitle}
-        </h1>
-        <time
-          className="mt-2 block text-[13px] text-[var(--color-muted)]"
-          dateTime={column.periodStart.toISOString()}
-        >
+        <h1 className="daily-title">{column.columnTitle}</h1>
+        <time className="daily-date" dateTime={column.periodStart.toISOString()}>
           {dateLabel}
         </time>
       </header>
 
-      <section className="mb-10">
-        <h2 className="mb-3 text-[15px] uppercase tracking-[0.18em] text-[var(--color-muted)]">
-          今日五件事
-        </h2>
+      <section className="daily-section">
+        <div className="daily-section-label">今日五件事</div>
         <Prose>{summary}</Prose>
       </section>
 
-      <section className="border-t border-[var(--color-border)] pt-8">
+      <section className="daily-section daily-section--narrative">
         <Prose>{narrative}</Prose>
       </section>
 
-      <footer className="mt-16 border-t border-[var(--color-border)] pt-6 text-xs text-[var(--color-muted)]">
+      <footer className="daily-foot">
         <Link
           href="/zh/daily"
-          className="text-[var(--color-accent)] hover:underline"
+          className="text-[var(--color-cyan,var(--accent-blue))] underline underline-offset-4 decoration-[currentColor]/40 hover:decoration-[currentColor]"
         >
           ← 全部日报
         </Link>

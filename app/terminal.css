@@ -1873,3 +1873,88 @@ body[data-radius="pill"] .tile { border-radius: 10px; }
 .signal-drawer__source { color: var(--fg-2); font-size: 10.5px; white-space: nowrap; }
 .signal-drawer__time { color: var(--fg-3); font-size: 10px; white-space: nowrap; }
 .signal-drawer__member-title { color: var(--fg-1); font-size: 11.5px; line-height: 1.4; }
+
+/* ── Daily column article ──────────────────────────────────────────
+   Long-form 卡兹克-voice column rendered at /zh/daily/[date]. Visual
+   rhythm matches the rest of the radar (mono headlines, dim meta,
+   Prose body) but with article-grade reading width + breathing room. */
+
+.daily-article {
+  max-width: 760px;
+  padding: 8px 0 64px;
+}
+
+.daily-head {
+  border-bottom: 1px solid var(--border-1);
+  padding-bottom: 22px;
+  margin-bottom: 28px;
+}
+
+.daily-meta {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 11.5px; color: var(--fg-2);
+  font-family: var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+
+.daily-meta .daily-issue { color: var(--fg-1); }
+.daily-meta .tier-f {
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.daily-title {
+  font-family: var(--font-mono);
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: var(--fg-0);
+  margin: 0;
+}
+
+.daily-date {
+  display: block;
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--fg-3);
+  font-family: var(--font-mono);
+}
+
+.daily-section { margin-bottom: 32px; }
+
+.daily-section-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-3);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.daily-section--narrative {
+  border-top: 1px solid var(--border-1);
+  padding-top: 28px;
+  margin-top: 8px;
+}
+
+/* Slightly more generous reading rhythm than the default Prose, which targets
+   dense editorial cards rather than article body copy. */
+.daily-article p { font-size: 15px; line-height: 1.85; color: var(--fg-1); }
+.daily-article ol, .daily-article ul { font-size: 15px; line-height: 1.8; color: var(--fg-1); }
+
+.daily-foot {
+  margin-top: 56px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border-1);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--fg-3);
+}
+
+@media (max-width: 720px) {
+  .daily-title { font-size: 22px; }
+  .daily-meta { flex-wrap: wrap; gap: 8px; }
+}
