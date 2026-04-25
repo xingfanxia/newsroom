@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { renderRssFeed, type RssItem } from "@/lib/rss/render";
 
 describe("renderRssFeed", () => {

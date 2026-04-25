@@ -36,7 +36,10 @@
  *     }
  *   }
  */
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import {
+  McpServer,
+  ResourceTemplate,
+} from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { z } from "zod";
 import { requireApiToken } from "@/lib/auth/api-token";
@@ -52,8 +55,8 @@ import { applyFeedbackToggle } from "@/lib/feedback/toggle";
 import { listCollections } from "@/lib/items/collections";
 import { totalsByWindow } from "@/lib/llm/stats";
 import { db } from "@/db/client";
-import { feedback, sources, sourceHealth } from "@/db/schema";
-import { and, asc, eq } from "drizzle-orm";
+import { feedback, sources, sourceHealth, newsletters } from "@/db/schema";
+import { and, asc, eq, sql } from "drizzle-orm";
 import type { SessionUser } from "@/lib/auth/session";
 
 type ToolOutput = {
@@ -581,6 +584,140 @@ function buildServer(user: SessionUser): McpServer {
               `${stories.length} paper(s) from arxiv + HF Papers.`,
               stories,
             ),
+          },
+        ],
+      };
+    },
+  );
+
+  // ── Daily column resources ─────────────────────────────────────
+  function dateKey(d: Date): string {
+    return d.toISOString().slice(0, 10);
+  }
+
+  function renderColumnMarkdown(row: {
+    columnTitle: string | null;
+    columnSummaryMd: string | null;
+    columnNarrativeMd: string | null;
+    columnThemeTag: string | null;
+    periodStart: Date;
+  }): string {
+    const dk = dateKey(row.periodStart);
+    const tag = row.columnThemeTag ? `\n\n_# ${row.columnThemeTag}_` : "";
+    return `# AX 的 AI 日报 · ${dk}\n\n## ${row.columnTitle ?? ""}${tag}\n\n${row.columnSummaryMd ?? ""}\n\n---\n\n${row.columnNarrativeMd ?? ""}`;
+  }
+
+  server.registerResource(
+    "daily-latest",
+    "ax-radar://daily/latest",
+    {
+      title: "Latest daily AI column",
+      description:
+        "The most recent daily AI column written by the AX Radar editorial bot in 卡兹克 voice. Title format: 'AX 的 AI 日报 · YYYY-MM-DD'. Body has a 5-item numbered exec summary (skim layer) and a 2000-4000 字 long-form narrative (deep layer with personal takes + cultural 升维). Selection draws from today's 严选 ∪ top hot items, papers excluded. Cron writes one per day at ~9pm PT.",
+      mimeType: "text/markdown",
+    },
+    async (uri) => {
+      const client = db();
+      const rows = await client
+        .select({
+          columnTitle: newsletters.columnTitle,
+          columnSummaryMd: newsletters.columnSummaryMd,
+          columnNarrativeMd: newsletters.columnNarrativeMd,
+          columnThemeTag: newsletters.columnThemeTag,
+          periodStart: newsletters.periodStart,
+        })
+        .from(newsletters)
+        .where(
+          sql`${newsletters.kind} = 'daily'
+            AND ${newsletters.locale} = 'zh'
+            AND ${newsletters.columnTitle} IS NOT NULL`,
+        )
+        .orderBy(sql`${newsletters.periodStart} DESC`)
+        .limit(1);
+
+      if (rows.length === 0) {
+        return {
+          contents: [
+            {
+              uri: uri.href,
+              mimeType: "text/markdown",
+              text: "_今日的日报还没生成_",
+            },
+          ],
+        };
+      }
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            mimeType: "text/markdown",
+            text: renderColumnMarkdown(rows[0]!),
+          },
+        ],
+      };
+    },
+  );
+
+  server.registerResource(
+    "daily-by-date",
+    new ResourceTemplate("ax-radar://daily/{date}", { list: undefined }),
+    {
+      title: "Daily AI column by date",
+      description:
+        "Daily column for a specific date (YYYY-MM-DD). Returns the column written for the 24h window ending on that date's 9pm PT cron tick. 404-equivalent empty resource when no column exists for that date.",
+      mimeType: "text/markdown",
+    },
+    async (uri, variables) => {
+      const date = String(variables.date ?? "");
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        return {
+          contents: [
+            {
+              uri: uri.href,
+              mimeType: "text/markdown",
+              text: "_invalid date format — expected YYYY-MM-DD_",
+            },
+          ],
+        };
+      }
+      const dayStart = new Date(`${date}T00:00:00Z`);
+      const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+      const client = db();
+      const rows = await client
+        .select({
+          columnTitle: newsletters.columnTitle,
+          columnSummaryMd: newsletters.columnSummaryMd,
+          columnNarrativeMd: newsletters.columnNarrativeMd,
+          columnThemeTag: newsletters.columnThemeTag,
+          periodStart: newsletters.periodStart,
+        })
+        .from(newsletters)
+        .where(
+          sql`${newsletters.kind} = 'daily'
+            AND ${newsletters.locale} = 'zh'
+            AND ${newsletters.columnTitle} IS NOT NULL
+            AND ${newsletters.periodStart} >= ${dayStart.toISOString()}::timestamptz
+            AND ${newsletters.periodStart} <  ${dayEnd.toISOString()}::timestamptz`,
+        )
+        .limit(1);
+
+      if (rows.length === 0) {
+        return {
+          contents: [
+            {
+              uri: uri.href,
+              mimeType: "text/markdown",
+              text: `_no column for ${date}_`,
+            },
+          ],
+        };
+      }
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            mimeType: "text/markdown",
+            text: renderColumnMarkdown(rows[0]!),
           },
         ],
       };

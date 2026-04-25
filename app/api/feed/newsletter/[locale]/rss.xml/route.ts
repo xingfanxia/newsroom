@@ -24,10 +24,15 @@ export async function GET(
   const locale: "zh" | "en" = raw === "en" ? "en" : "zh";
   const client = db();
 
+  // Legacy structured-digest only — new daily column ships at /api/rss/daily.xml.
+  // Filter out new daily-column rows (which have NULL headline + non-NULL column_title).
   const rows = await client
     .select()
     .from(newsletters)
-    .where(sql`${newsletters.locale} = ${locale}`)
+    .where(
+      sql`${newsletters.locale} = ${locale}
+        AND ${newsletters.headline} IS NOT NULL`,
+    )
     .orderBy(desc(newsletters.publishedAt))
     .limit(60);
 
@@ -42,17 +47,23 @@ export async function GET(
           : locale === "zh"
             ? "日报"
             : "Daily";
-      const title = `[${kindLabel}] ${n.headline}`;
+      // headline filter on the WHERE means these are non-null in practice,
+      // but TS sees the column type as nullable post-migration.
+      const headline = n.headline ?? "";
+      const overview = n.overview ?? "";
+      const highlights = n.highlights ?? "";
+      const commentary = n.commentary ?? "";
+      const title = `[${kindLabel}] ${headline}`;
       const content = `
-<h2>${escape(n.headline)}</h2>
+<h2>${escape(headline)}</h2>
 <p><strong>${locale === "zh" ? "全局概览" : "Overview"}</strong></p>
-<p>${escape(n.overview)}</p>
+<p>${escape(overview)}</p>
 <hr/>
 <p><strong>${locale === "zh" ? "特别关注" : "Highlights"}</strong></p>
-${mdToHtml(n.highlights)}
+${mdToHtml(highlights)}
 <hr/>
 <p><strong>${locale === "zh" ? "点评" : "Commentary"}</strong></p>
-${mdToHtml(n.commentary)}
+${mdToHtml(commentary)}
 <hr/>
 <p><em>${locale === "zh" ? "覆盖" : "Covered"} ${n.storyCount} ${locale === "zh" ? "条故事" : "stories"} · ${formatRange(n.periodStart, n.periodEnd, locale)}</em></p>`.trim();
 
@@ -61,7 +72,7 @@ ${mdToHtml(n.commentary)}
       <link>${escape(SITE_URL + path)}</link>
       <guid isPermaLink="false">newsletter-${n.id}</guid>
       <pubDate>${n.publishedAt.toUTCString()}</pubDate>
-      <description><![CDATA[${n.overview}]]></description>
+      <description><![CDATA[${overview}]]></description>
       <content:encoded><![CDATA[${content}]]></content:encoded>
       <category>${escape(kindLabel)}</category>
     </item>`;
