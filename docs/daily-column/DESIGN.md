@@ -1,7 +1,10 @@
 # 每日 AI 日报 — Design
 
-**Status**: Approved 2026-04-25, ready for implementation planning.
-**Scope**: Add a daily 9pm-Pacific opinionated AI column written in 卡兹克 (khazix) voice; expose newsletter + 3 lanes via RSS; add MCP resources for the column; new operator skill that composes existing `ax-radar` + `khazix-writer` skills.
+**Status**: SHIPPED 2026-04-25. Voice + UI iterated three times same day; final state captured in `HANDOFF-2026-04-25.md`.
+
+**Scope**: Daily 9pm-PT opinionated AI column in **虎嗅有意思周报** voice (rebased from initial khazix-pure spec); newsletter + 3 lane RSS feeds; MCP resources for column; operator skill composing existing `ax-radar` + writing-style references.
+
+> **Note**: The original spec called for 卡兹克 voice. Voice was rebased twice during shipping (khazix → Stratechery → 虎嗅周报) based on operator feedback. See `HANDOFF-2026-04-25.md` for the full journey + final voice spec.
 
 ---
 
