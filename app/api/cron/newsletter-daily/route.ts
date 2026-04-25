@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { runNewsletterBatch } from "@/workers/newsletter";
+import { runDailyColumn } from "@/workers/newsletter";
 import { verifyCron } from "../_auth";
 
 export const maxDuration = 800;
@@ -10,10 +10,10 @@ export async function GET(req: Request) {
   const deny = verifyCron(req);
   if (deny) return deny;
 
-  const report = await runNewsletterBatch("daily");
+  const report = await runDailyColumn();
   return NextResponse.json({
-    kind: "newsletter-daily",
+    kind: "daily-column",
     at: new Date().toISOString(),
-    newsletter: report,
+    report,
   });
 }
