@@ -142,14 +142,23 @@ function buildFeedWhere(q: FeedQuery) {
     ? sql`${sources.curated} = TRUE`
     : sql`TRUE`;
 
+  // Drizzle binds a JS array via `${arr}` as a tuple `($1, $2)`, not a Postgres
+  // ARRAY literal — that produces `ARRAY['x'] && ($1, $2)::text[]` which the
+  // planner rejects. Build the array explicitly with sql.join.
   const excludeTagsFilter =
     q.excludeSourceTags && q.excludeSourceTags.length > 0
-      ? sql`NOT (${sources.tags} && ${q.excludeSourceTags}::text[])`
+      ? sql`NOT (${sources.tags} && ARRAY[${sql.join(
+          q.excludeSourceTags.map((t) => sql`${t}`),
+          sql`, `,
+        )}]::text[])`
       : sql`TRUE`;
 
   const includeTagsFilter =
     q.includeSourceTags && q.includeSourceTags.length > 0
-      ? sql`${sources.tags} && ${q.includeSourceTags}::text[]`
+      ? sql`${sources.tags} && ARRAY[${sql.join(
+          q.includeSourceTags.map((t) => sql`${t}`),
+          sql`, `,
+        )}]::text[]`
       : sql`TRUE`;
 
   return and(
