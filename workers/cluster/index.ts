@@ -86,33 +86,40 @@ async function assignOneToCluster(itemId: number): Promise<AssignOutcome> {
   const client = db();
   const threshold = 1 - SIMILARITY_THRESHOLD; // cosine sim → distance
 
-  // Widened neighbor search: include ANY enriched+embedded item (not just ones
-  // already clustered). If the nearest is unclustered-but-near, we promote it
-  // to a cluster lead so near-duplicates in the same batch can still merge.
+  // Two-pass nearest-neighbor lookup, split by cluster status. We bias Stage A
+  // toward joining an existing cluster when both a clustered and an unclustered
+  // neighbor sit within threshold — even if the unclustered one is slightly
+  // closer.
+  //
+  // Why the bias: Stage A is greedy and append-only — it never merges clusters.
+  // Without this bias, two near-duplicate items arriving in the same batch
+  // (e.g., two Bloomberg articles about the same launch, both unclustered,
+  // mutual nearest neighbors at sim 0.95) pair with EACH OTHER instead of
+  // joining an older cluster about the same event that already has cross-
+  // source coverage. The result was a parallel cluster that never reconciled —
+  // visible to the user as the same story appearing as 2-3 separate event
+  // cards (the Google→Anthropic $40B case: 6 items split across 3 clusters
+  // by source, every pairwise distance < 0.13 well within threshold).
+  //
   // Window is anchored to the target item's own published_at (bidirectional
   // ±WINDOW_HOURS) so backfill items can find their temporal cohort even when
-  // they arrive late.
-  //
-  // Verified items are NOT excluded from candidates — Stage A only ever ADDS
-  // members to clusters, never reshuffles or splits, so a new item joining a
-  // Stage-B-verified cluster is safe (the verified-lock protects existing
-  // membership, not future joins). An earlier version of this query excluded
-  // `cluster_verified_at IS NOT NULL` rows; that turned every multi-member
-  // verified cluster into a recall black hole — the next item about the same
-  // event couldn't see it and spawned a singleton.
-  const nearestResult = await client.execute(sql`
+  // they arrive late. Verified items are NOT excluded — Stage A only ADDS
+  // members, never reshuffles, so a new item joining a Stage-B-verified
+  // cluster is safe (the verified-lock protects existing membership, not
+  // future joins).
+  const nearestClusteredResult = await client.execute(sql`
     WITH target AS (
       SELECT embedding, published_at FROM items WHERE id = ${itemId}
     )
     SELECT
       i.id,
       i.cluster_id,
-      i.clustered_at,
-      (i.embedding <=> (SELECT embedding FROM target)) AS distance
+      (i.embedding <=> (SELECT embedding FROM target))::float8 AS distance
     FROM items i
     WHERE i.id <> ${itemId}
       AND i.embedding IS NOT NULL
       AND i.enriched_at IS NOT NULL
+      AND i.cluster_id IS NOT NULL
       AND i.published_at BETWEEN
           (SELECT published_at FROM target) - make_interval(hours => ${WINDOW_HOURS})
           AND
@@ -123,61 +130,85 @@ async function assignOneToCluster(itemId: number): Promise<AssignOutcome> {
 
   // postgres-js's drizzle adapter returns a RowList that extends Array<T>;
   // it has NO `.rows` property. Indexing as an array is the correct shape.
-  const nearestRows = nearestResult as unknown as Array<{
+  const nearestClustered = (nearestClusteredResult as unknown as Array<{
     id: number;
-    cluster_id: number | null;
-    clustered_at: Date | null;
+    cluster_id: number;
     distance: number;
-  }>;
-  const nearest = nearestRows[0];
+  }>)[0];
+
+  // Only run the unclustered-neighbor query if the clustered one didn't give
+  // us a within-threshold winner — saves one HNSW probe in the common case.
+  const nearestUnclustered =
+    nearestClustered && nearestClustered.distance <= threshold
+      ? null
+      : ((await client.execute(sql`
+          WITH target AS (
+            SELECT embedding, published_at FROM items WHERE id = ${itemId}
+          )
+          SELECT
+            i.id,
+            (i.embedding <=> (SELECT embedding FROM target))::float8 AS distance
+          FROM items i
+          WHERE i.id <> ${itemId}
+            AND i.embedding IS NOT NULL
+            AND i.enriched_at IS NOT NULL
+            AND i.cluster_id IS NULL
+            AND i.published_at BETWEEN
+                (SELECT published_at FROM target) - make_interval(hours => ${WINDOW_HOURS})
+                AND
+                (SELECT published_at FROM target) + make_interval(hours => ${WINDOW_HOURS})
+          ORDER BY i.embedding <=> (SELECT embedding FROM target)
+          LIMIT 1
+        `)) as unknown as Array<{ id: number; distance: number }>)[0];
 
   let clusterId: number;
   let outcome: AssignOutcome;
 
-  if (nearest && nearest.distance <= threshold) {
-    if (nearest.cluster_id != null) {
-      // Neighbor already in a cluster — join it.
-      clusterId = nearest.cluster_id;
+  if (nearestClustered && nearestClustered.distance <= threshold) {
+    // Bias: join the existing cluster even if an unclustered neighbor is
+    // slightly closer. Trades best-mate optimality for cross-cluster recall.
+    clusterId = nearestClustered.cluster_id;
+    outcome = "assigned";
+  } else if (nearestUnclustered && nearestUnclustered.distance <= threshold) {
+    // No clustered neighbor close enough; promote the unclustered neighbor
+    // to the lead of a new shared cluster.
+    //
+    // Race-safe sequence:
+    //   1. Create cluster with member_count=0 (we haven't joined anyone yet).
+    //   2. Try to claim the neighbor (the contended row) with a guarded UPDATE.
+    //   3. If the claim succeeds → bump member_count to 1.
+    //      If a concurrent worker beat us to the neighbor → repurpose this
+    //      cluster as a singleton for itemId (lead points at itemId, not the
+    //      lost neighbor) so we don't end up with a phantom 2-member count.
+    const [created] = await client
+      .insert(clusters)
+      .values({ leadItemId: nearestUnclustered.id, memberCount: 0 })
+      .returning({ id: clusters.id });
+    clusterId = created.id;
+
+    const neighborClaim = await client
+      .update(items)
+      .set({ clusterId, clusteredAt: new Date() })
+      .where(
+        sql`${items.id} = ${nearestUnclustered.id} AND ${items.clusteredAt} IS NULL`,
+      )
+      .returning({ id: items.id });
+
+    if (neighborClaim.length > 0) {
+      await client
+        .update(clusters)
+        .set({ memberCount: sql`${clusters.memberCount} + 1` })
+        .where(sql`${clusters.id} = ${clusterId}`);
       outcome = "assigned";
     } else {
-      // Neighbor is enriched but not yet clustered. Try to atomically claim
-      // it as the lead of a new shared cluster.
-      //
-      // Race-safe sequence:
-      //   1. Create cluster with member_count=0 (we haven't joined anyone yet).
-      //   2. Try to claim the neighbor (the contended row) with a guarded UPDATE.
-      //   3. If the claim succeeds → bump member_count to 1.
-      //      If a concurrent worker beat us to the neighbor → repurpose this
-      //      cluster as a singleton for itemId (lead points at itemId, not the
-      //      lost neighbor) so we don't end up with a phantom 2-member count.
-      const [created] = await client
-        .insert(clusters)
-        .values({ leadItemId: nearest.id, memberCount: 0 })
-        .returning({ id: clusters.id });
-      clusterId = created.id;
-
-      const neighborClaim = await client
-        .update(items)
-        .set({ clusterId, clusteredAt: new Date() })
-        .where(sql`${items.id} = ${nearest.id} AND ${items.clusteredAt} IS NULL`)
-        .returning({ id: items.id });
-
-      if (neighborClaim.length > 0) {
-        await client
-          .update(clusters)
-          .set({ memberCount: sql`${clusters.memberCount} + 1` })
-          .where(sql`${clusters.id} = ${clusterId}`);
-        outcome = "assigned";
-      } else {
-        // Neighbor was stolen mid-race. Repoint the cluster's lead to itemId
-        // so it becomes a clean singleton when we join below; otherwise the
-        // lead would dangle to a row that's now in some other cluster.
-        await client
-          .update(clusters)
-          .set({ leadItemId: itemId })
-          .where(sql`${clusters.id} = ${clusterId}`);
-        outcome = "created";
-      }
+      // Neighbor was stolen mid-race. Repoint the cluster's lead to itemId
+      // so it becomes a clean singleton when we join below; otherwise the
+      // lead would dangle to a row that's now in some other cluster.
+      await client
+        .update(clusters)
+        .set({ leadItemId: itemId })
+        .where(sql`${clusters.id} = ${clusterId}`);
+      outcome = "created";
     }
   } else {
     // No neighbor above threshold — new singleton cluster.

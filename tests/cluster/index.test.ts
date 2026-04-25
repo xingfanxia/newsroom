@@ -145,7 +145,58 @@ describe("Nearest-neighbor result extraction", () => {
     // path regardless of its actual nearest-neighbor distance. That silently
     // turned the entire cluster pipeline into a no-op (all member_count=1).
     expect(workerSrc).not.toContain("(nearestResult as { rows?: unknown[] })");
-    expect(workerSrc).toContain("nearestRows[0]");
+    expect(workerSrc).not.toContain(".rows?.[0]");
+    expect(workerSrc).toContain("nearestClusteredResult as unknown as Array<");
+  });
+});
+
+// ── Two-pass nearest-neighbor with prefer-clustered bias ─────────────────────
+
+describe("Prefer-clustered bias (clone-cluster prevention)", () => {
+  it("runs a clustered-only nearest-neighbor query (cluster_id IS NOT NULL)", () => {
+    // Before this fix: a single nearest-neighbor query returned the global top-1
+    // regardless of cluster status. When two near-duplicate items from the same
+    // batch were each other's nearest (e.g., two Bloomberg articles about the
+    // same launch, distance 0.047), they paired with each other into a NEW
+    // cluster — never seeing an older, already-clustered Hacker News item about
+    // the same event at distance 0.060. Result: 6 items about Google → Anthropic
+    // $40B split across 3 sibling-source clusters that Stage A could never
+    // merge (Stage A is append-only, no cluster-merge verdict).
+    //
+    // Fix: split the lookup. First find the nearest CLUSTERED item; only fall
+    // back to the unclustered query if that one is out of threshold.
+    expect(workerSrc).toContain("AND i.cluster_id IS NOT NULL");
+  });
+
+  it("runs an unclustered-only fallback query (cluster_id IS NULL)", () => {
+    // The fallback handles the legitimate case of two new items arriving with
+    // no existing cluster about their topic — they should still pair into a
+    // new shared cluster, exactly like before.
+    expect(workerSrc).toContain("AND i.cluster_id IS NULL");
+  });
+
+  it("only runs the unclustered query when the clustered query missed", () => {
+    // Saves one HNSW probe in the common case (clustered match exists).
+    expect(workerSrc).toMatch(
+      /nearestClustered && nearestClustered\.distance <= threshold[\s\S]+?\? null[\s\S]+?: \(\(await client\.execute\(sql`/,
+    );
+  });
+
+  it("prefers nearestClustered over nearestUnclustered when both within threshold", () => {
+    // The branching block: nearestClustered first, nearestUnclustered second.
+    // This is the bias that fixes the clone-cluster bug — clustered wins even
+    // if unclustered is slightly closer.
+    expect(workerSrc).toMatch(
+      /if \(nearestClustered && nearestClustered\.distance <= threshold\)[\s\S]+?else if \(nearestUnclustered && nearestUnclustered\.distance <= threshold\)/,
+    );
+  });
+
+  it("documents the bias rule and its rationale", () => {
+    expect(workerSrc).toContain("Bias:");
+    // The rationale must mention what the bias trades off (best-mate optimality)
+    // for what it gains (cross-cluster recall) — without the why, future
+    // maintainers will revert this thinking it's a regression.
+    expect(workerSrc).toContain("cross-cluster recall");
   });
 });
 
@@ -158,7 +209,7 @@ describe("Neighbor-promotion race safety", () => {
     // worker. After the fix: start at 0, only bump when the neighbor claim
     // returns rows.
     expect(workerSrc).toContain(
-      ".values({ leadItemId: nearest.id, memberCount: 0 })",
+      ".values({ leadItemId: nearestUnclustered.id, memberCount: 0 })",
     );
   });
 
