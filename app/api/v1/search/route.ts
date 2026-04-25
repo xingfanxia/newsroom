@@ -50,7 +50,11 @@ const querySchema = z.object({
   locale: z.enum(["zh", "en"]).optional().default("en"),
 });
 
-function toApiItem(s: Story) {
+function toApiItem(s: Story, locale: "zh" | "en") {
+  const isEvent = (s.coverage ?? 0) > 1 && s.clusterId != null;
+  const canonical = isEvent
+    ? (locale === "zh" ? s.canonicalTitleZh : s.canonicalTitleEn) ?? null
+    : null;
   return {
     id: s.id,
     title: s.title,
@@ -66,6 +70,9 @@ function toApiItem(s: Story) {
     url: s.url,
     published_at: s.publishedAt,
     has_commentary: Boolean(s.editorNote || s.editorAnalysis),
+    cluster_id: s.clusterId ?? null,
+    coverage: s.coverage ?? null,
+    canonical_title: canonical,
   };
 }
 
@@ -105,7 +112,7 @@ export async function GET(req: Request) {
         mode: "semantic",
         q: p.q,
         items: result.items.map((s) => ({
-          ...toApiItem(s),
+          ...toApiItem(s, p.locale),
           distance: s.distance,
         })),
         total: result.total,
@@ -143,7 +150,7 @@ export async function GET(req: Request) {
     return Response.json({
       mode: p.mode,
       q: p.q,
-      items: stories.map(toApiItem),
+      items: stories.map((s) => toApiItem(s, p.locale)),
       total,
       limit: p.limit,
       offset: p.offset,
