@@ -323,3 +323,7 @@ function newsletterUserPrompt(args: DraftArgs): string {
 ${lines.join("\n\n")}
 </window>`;
 }
+
+// Daily column writer (replaces runNewsletterBatch("daily") for new format).
+export { runDailyColumn } from "./run-daily-column";
+export type { DailyColumnReport } from "./run-daily-column";
