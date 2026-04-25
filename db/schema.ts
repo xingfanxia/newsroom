@@ -391,14 +391,29 @@ export const newsletters = pgTable(
     locale: text("locale").notNull(),
     periodStart: timestamp("period_start", { withTimezone: true }).notNull(),
     periodEnd: timestamp("period_end", { withTimezone: true }).notNull(),
-    headline: text("headline").notNull(),
-    /** 全局概览 — 3-4 sentence overview of the window. */
-    overview: text("overview").notNull(),
-    /** 特别关注 — 3-5 markdown bullet points on must-read stories,
-     *  each optionally linking back to an item id. */
-    highlights: text("highlights").notNull(),
-    /** 点评 — 2-3 paragraph markdown analysis on themes + what to watch. */
-    commentary: text("commentary").notNull(),
+    /** Legacy structured-digest fields — populated for monthly newsletter
+     *  format. New daily-column rows leave these NULL and write column_*
+     *  instead. Nullable so daily writer can omit. */
+    headline: text("headline"),
+    /** 全局概览 — 3-4 sentence overview of the window (legacy / monthly). */
+    overview: text("overview"),
+    /** 特别关注 — 3-5 markdown bullet points (legacy / monthly). */
+    highlights: text("highlights"),
+    /** 点评 — 2-3 paragraph markdown analysis (legacy / monthly). */
+    commentary: text("commentary"),
+    /** Daily column — 卡兹克-voice 标题 ≤20 字, populated for kind='daily'
+     *  new format. NULL for monthly + legacy daily rows. */
+    columnTitle: text("column_title"),
+    /** Daily column — numbered 1-5 markdown list, each entry 50-100 字
+     *  with quick take + [#item-id] backlink. */
+    columnSummaryMd: text("column_summary_md"),
+    /** Daily column — 2000-4000 字 long-form narrative, no markdown
+     *  subheadings, references summary entries as 第 N 件. */
+    columnNarrativeMd: text("column_narrative_md"),
+    /** Daily column — 1-3 item IDs given deep treatment in narrative_md. */
+    columnFeaturedItemIds: jsonb("column_featured_item_ids").$type<number[]>(),
+    /** Daily column — ≤8 字 day theme tag (e.g., "模型大战白热化"). */
+    columnThemeTag: text("column_theme_tag"),
     /** List of referenced item IDs (for backlinks + crediting). */
     itemIds: jsonb("item_ids").$type<number[]>(),
     storyCount: integer("story_count").notNull().default(0),
@@ -717,6 +732,27 @@ export const apiTokens = pgTable(
   }),
 );
 
+/**
+ * column_qc_log — observability for daily-column L1-L2 self-check hits.
+ * Non-blocking: a column with hits still ships; this gives the operator a
+ * queryable record of recurring voice-rule violations. One row per cron run
+ * that flagged ≥1 hit. Cleaned up alongside the parent newsletter row.
+ */
+export const columnQcLog = pgTable("column_qc_log", {
+  id: serial("id").primaryKey(),
+  newsletterId: integer("newsletter_id").references(() => newsletters.id, {
+    onDelete: "cascade",
+  }),
+  generatedAt: timestamp("generated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  l1Pass: boolean("l1_pass").notNull(),
+  l2Pass: boolean("l2_pass").notNull(),
+  hits: jsonb("hits").$type<
+    { layer: "l1" | "l2"; rule: string; snippet: string }[]
+  >(),
+});
+
 // ── Types ───────────────────────────────────────────────────────
 export type Source = typeof sources.$inferSelect;
 export type NewSource = typeof sources.$inferInsert;
@@ -754,5 +790,7 @@ export type Event = typeof clusters.$inferSelect;
 export type NewEvent = typeof clusters.$inferInsert;
 export type ClusterSplit = typeof clusterSplits.$inferSelect;
 export type NewClusterSplit = typeof clusterSplits.$inferInsert;
+export type ColumnQcLog = typeof columnQcLog.$inferSelect;
+export type NewColumnQcLog = typeof columnQcLog.$inferInsert;
 
 export type { TSourceKind, TSourceGroup, TCadence };
