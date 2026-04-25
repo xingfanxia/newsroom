@@ -2,20 +2,20 @@ import { describe, expect, it } from "bun:test";
 import { runColumnSelfCheck } from "./self-check";
 
 describe("runColumnSelfCheck", () => {
-  it("passes a clean draft", () => {
+  it("passes a clean draft with normal punctuation", () => {
     const result = runColumnSelfCheck({
-      title: "今天 AI 圈又不太平",
+      title: "OpenAI 把 GPT-5.5 接进 API",
       summary_md:
-        "1. OpenAI 发了 GPT-5.5，确实是个跳跃。说实话我对参数效率印象更深。 [#101]",
+        "1. OpenAI 发布 GPT-5.5: 确实是个跳跃。我的判断是这次主要是工程优化。 [#101]",
       narrative_md:
-        "我跟你说，今天最有意思的不是 5.5 这个数字。\n\n而是它的训练成本。。。\n\n回到这块，愚钝如我没完全看明白他们的论文。",
+        "我的判断是, 今天最有意思的不是 5.5 这个数字。而是它的训练成本——公开信息没披露具体数字, 但可以从云合同的尺寸推断。",
     });
     expect(result.l1Pass).toBe(true);
     expect(result.l2Pass).toBe(true);
     expect(result.hits).toEqual([]);
   });
 
-  it("flags L1 banned phrases", () => {
+  it("flags L1 banned phrases (corporate AI-slop)", () => {
     const result = runColumnSelfCheck({
       title: "AI 行业",
       summary_md: "1. X 发了产品 [#1]",
@@ -30,31 +30,18 @@ describe("runColumnSelfCheck", () => {
     expect(rules).toContain("综上所述");
   });
 
-  it("flags L2 banned punctuation in narrative", () => {
+  it("L2 always passes (punctuation rules dropped after voice rebase)", () => {
     const result = runColumnSelfCheck({
-      title: "今日 AI",
+      title: "今日 AI: 一个判断",
       summary_md: "1. X [#1]",
-      narrative_md: '这件事："我觉得很重要"——但其实没那么严重。',
+      narrative_md:
+        '这件事的关键在于："谁来买单" — 答案不在产品页, 而在合同条款里。',
     });
-    expect(result.l2Pass).toBe(false);
-    const rules = result.hits
-      .filter((h) => h.layer === "l2")
-      .map((h) => h.rule);
-    expect(rules).toContain("冒号");
-    expect(rules).toContain("破折号");
-    expect(rules).toContain("双引号");
-  });
-
-  it("does NOT flag colons in summary numbered list (allowed exception)", () => {
-    const result = runColumnSelfCheck({
-      title: "今日 AI",
-      summary_md: "1. OpenAI 发布 GPT-5.5: 确实有意思 [#1]",
-      narrative_md: "说真的我觉得这个挺好的。",
-    });
+    // colons, em-dashes, double quotes are all OK now
     expect(result.l2Pass).toBe(true);
   });
 
-  it("captures snippet context around hits", () => {
+  it("captures snippet context around L1 hits", () => {
     const result = runColumnSelfCheck({
       title: "title",
       summary_md: "1. x [#1]",
@@ -63,5 +50,15 @@ describe("runColumnSelfCheck", () => {
     const hit = result.hits.find((h) => h.rule === "说白了");
     expect(hit?.snippet).toContain("说白了");
     expect(hit?.snippet.length).toBeLessThanOrEqual(50);
+  });
+
+  it("does not flag '首先 / 其次 / 最后' anymore (was khazix-only constraint)", () => {
+    const result = runColumnSelfCheck({
+      title: "title",
+      summary_md: "1. x [#1]",
+      narrative_md:
+        "先看 X 怎么走, 再看 Y 怎么响应, 最后值得跟进的是 Z 的回应。",
+    });
+    expect(result.l1Pass).toBe(true);
   });
 });
