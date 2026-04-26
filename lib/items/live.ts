@@ -111,8 +111,23 @@ function buildFeedWhere(q: FeedQuery) {
   // sit in the April 14 calendar cell, leaving April 16 empty even though the
   // user thinks of it as an April 16 event.
   //
-  //   today:   combined trending — firstSeenAt today OR latestMemberAt within
-  //            hotWindow OR unclustered-item published today.
+  //   today:   combined trending — match ANY of:
+  //              (1) cluster firstSeenAt today (newly broken event), OR
+  //              (2) cluster latestMemberAt within hotWindow (still developing), OR
+  //              (3) item published since the start of yesterday (fresh-but-
+  //                  cold rescue, day-aligned so it doesn't drift with clock).
+  //
+  //            Without (3), a fresh article from yesterday that joined a cold
+  //            singleton cluster (cluster.first_seen_at = yesterday, no later
+  //            members so latest_member_at also yesterday → > 24h ago) was
+  //            invisible on the home page despite being recent + high-tier.
+  //            That's how "热点聚合" ended up showing 04-22 stories on top
+  //            ("持续报道 · 1d" because they got a NEW member today) while
+  //            burying yesterday's actual fresh articles in cold singleton
+  //            clusters. Day-aligned via date_trunc so an item published
+  //            yesterday morning still shows when checked this afternoon
+  //            (a relative `> now() - 24h` window would drop it after lunch).
+  //            Same tier filter still gates quality.
   //   explicit date filter (q.date / q.dateFrom/dateTo) overrides view.
   const dateFilter = q.date
     ? sql`${items.publishedAt} >= ${`${q.date}T00:00:00Z`}::timestamptz AND ${items.publishedAt} < ${`${q.date}T00:00:00Z`}::timestamptz + interval '1 day'`
@@ -122,7 +137,7 @@ function buildFeedWhere(q: FeedQuery) {
         ? sql`(
             ${clusters.firstSeenAt} >= date_trunc('day', now())
             OR ${clusters.latestMemberAt} > now() - make_interval(hours => ${hotH})
-            OR (${items.clusterId} IS NULL AND ${items.publishedAt} >= date_trunc('day', now()))
+            OR ${items.publishedAt} >= date_trunc('day', now() - interval '1 day')
           )`
         : sql`TRUE`;
 
