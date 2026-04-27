@@ -128,7 +128,16 @@ export default async function HotNewsPage({
       // so power users still get the full feed for their slice. Threshold 80
       // (vs 85) admits a few more borderline-major stories per day; cap of 3
       // gives a "day digest" feel without burying the headline behind volume.
-      ...(dailyHighlights ? { minImportance: 80, maxPerDay: 3 } : {}),
+      //
+      // recentDayRescueDays: 3 — Stage D cluster scoring lags ingestion by
+      // ~1-2 days. Without rescue, recent days where leads sit at imp 60-79
+      // disappear entirely from the home feed and the user sees "stuff from
+      // 3 days ago first." The OR-bypass admits any lead from the last 3
+      // calendar days regardless of threshold; maxPerDay=3 still bounds
+      // each rescued day to its top-3 by importance.
+      ...(dailyHighlights
+        ? { minImportance: 80, maxPerDay: 3, recentDayRescueDays: 3 }
+        : {}),
       ...sourceFilter,
     });
   } catch {

@@ -95,3 +95,35 @@ describe("daily-highlights mode (minImportance + maxPerDay)", () => {
     expect(homeSrc).toContain("maxPerDay: 3");
   });
 });
+
+describe("recent-day rescue (recentDayRescueDays)", () => {
+  // Symptom: when the operator's stage-D scoring lags ingestion, the most
+  // recent days have leads but none at importance >= 80, so the daily-
+  // highlights filter drops them. User sees "stuff from 3 days ago first."
+  //
+  // Fix: when recentDayRescueDays is set, OR-bypass minImportance for items
+  // published in the last N calendar days. The maxPerDay cap still trims
+  // each rescued day to top-N by importance, so noise stays bounded.
+  it("FeedQuery exposes recentDayRescueDays", () => {
+    expect(liveSrc).toContain("recentDayRescueDays?: number");
+  });
+
+  it("buildFeedWhere ORs in a day-aligned recent-window bypass when rescue is set", () => {
+    // Day-aligned via date_trunc so the rescue covers calendar days, not a
+    // rolling 24h window — same convention as the today-view rescue clause.
+    expect(liveSrc).toMatch(
+      /OR\s+\$\{items\.publishedAt\}\s+>=\s+date_trunc\('day',\s+now\(\)\s+-\s+make_interval\(days\s*=>/,
+    );
+  });
+
+  it("home page passes recentDayRescueDays alongside daily-highlights filters", () => {
+    const homeSrc = readFileSync(
+      resolve(__dirname, "../../app/[locale]/page.tsx"),
+      "utf8",
+    );
+    // 3 covers today + yesterday + 2 days ago — the typical scoring-lag
+    // window. Day with weak news ingest (e.g. 04-25 max imp = 76) still
+    // surfaces top-3 by importance instead of being skipped entirely.
+    expect(homeSrc).toContain("recentDayRescueDays: 3");
+  });
+});
