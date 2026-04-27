@@ -40,12 +40,65 @@ describe("canonicalTitleSystem", () => {
   });
 });
 
+describe("canonicalTitleSystem — anti-bias rules added 2026-04-26", () => {
+  it("forbids platform/source names appearing in canonical titles", () => {
+    // Otherwise: "DeepSeek V4 发布传闻在 Reddit 流传" — the title leaks the
+    // coverage platform when most members are r/LocalLLaMA. The title is the
+    // EVENT, not where it was reported.
+    expect(canonicalTitleSystem).toMatch(/在.*Reddit.*流传|on Reddit|Reddit thread/);
+    expect(canonicalTitleSystem).toContain("EVENT, not where it was reported");
+  });
+
+  it("instructs to prefer confirmation over speculation", () => {
+    // Otherwise: a cluster with one "DeepSeek V4 已发布" + several "DeepSeek V4
+    // 真的发布了吗?" gets titled "rumors" because the speculation members
+    // outnumber the confirmation. Confirmation wins.
+    expect(canonicalTitleSystem).toMatch(/confirmation|reactions to/i);
+    expect(canonicalTitleSystem).toMatch(/Only emit.*rumored.*if NO member confirms/);
+  });
+
+  it("highlights PRIMARY source as the strongest signal", () => {
+    expect(canonicalTitleSystem).toContain("PRIMARY");
+    expect(canonicalTitleSystem).toContain("CORROBORATING");
+  });
+});
+
 describe("canonicalTitleUserPrompt", () => {
+  function member(
+    overrides: Partial<{
+      zh: string | null;
+      en: string | null;
+      source: string;
+      group: string;
+      isPrimary: boolean;
+    }>,
+  ) {
+    return {
+      zh: null,
+      en: null,
+      source: "TestSource",
+      group: "media",
+      isPrimary: false,
+      ...overrides,
+    };
+  }
+
   it("includes all member titles and source names", () => {
     const prompt = canonicalTitleUserPrompt({
       memberTitles: [
-        { zh: "OpenAI发布GPT-5", en: "OpenAI launches GPT-5", source: "TechCrunch" },
-        { zh: null, en: "GPT-5 is here", source: "Wired" },
+        member({
+          zh: "OpenAI发布GPT-5",
+          en: "OpenAI launches GPT-5",
+          source: "TechCrunch",
+          group: "media",
+          isPrimary: true,
+        }),
+        member({
+          zh: null,
+          en: "GPT-5 is here",
+          source: "Wired",
+          group: "media",
+        }),
       ],
       leadSummaryZh: "OpenAI正式推出GPT-5模型",
       leadSummaryEn: "OpenAI officially released GPT-5",
@@ -57,12 +110,57 @@ describe("canonicalTitleUserPrompt", () => {
     expect(prompt).toContain("GPT-5 is here");
     expect(prompt).toContain("OpenAI正式推出GPT-5模型");
     expect(prompt).toContain("OpenAI officially released GPT-5");
-    expect(prompt).toContain("Member titles (2 sources)");
+  });
+
+  it("renders PRIMARY first, CORROBORATING second", () => {
+    const prompt = canonicalTitleUserPrompt({
+      memberTitles: [
+        member({
+          source: "Reddit",
+          group: "social",
+          zh: "传闻 X",
+          en: "Rumor X",
+        }),
+        member({
+          source: "VendorBlog",
+          group: "vendor-official",
+          zh: "X 已发布",
+          en: "X released",
+          isPrimary: true,
+        }),
+      ],
+      leadSummaryZh: null,
+      leadSummaryEn: null,
+    });
+
+    const primaryIdx = prompt.indexOf("PRIMARY source");
+    const corroboratingIdx = prompt.indexOf("CORROBORATING sources");
+    expect(primaryIdx).toBeGreaterThan(-1);
+    expect(corroboratingIdx).toBeGreaterThan(primaryIdx);
+    // Vendor-official goes in PRIMARY section, social in CORROBORATING.
+    const vendorIdx = prompt.indexOf("VendorBlog");
+    const redditIdx = prompt.indexOf("Reddit");
+    expect(vendorIdx).toBeGreaterThan(primaryIdx);
+    expect(vendorIdx).toBeLessThan(corroboratingIdx);
+    expect(redditIdx).toBeGreaterThan(corroboratingIdx);
+  });
+
+  it("tags each member with its source group", () => {
+    const prompt = canonicalTitleUserPrompt({
+      memberTitles: [
+        member({ group: "vendor-official", isPrimary: true, source: "S1" }),
+        member({ group: "social", source: "S2" }),
+      ],
+      leadSummaryZh: null,
+      leadSummaryEn: null,
+    });
+    expect(prompt).toContain("[group=vendor-official]");
+    expect(prompt).toContain("[group=social]");
   });
 
   it("falls back to (none) for null zh/en titles", () => {
     const prompt = canonicalTitleUserPrompt({
-      memberTitles: [{ zh: null, en: null, source: "TestSource" }],
+      memberTitles: [member({ isPrimary: true })],
       leadSummaryZh: null,
       leadSummaryEn: null,
     });
@@ -75,7 +173,7 @@ describe("canonicalTitleUserPrompt", () => {
 
   it("emits JSON instruction at end", () => {
     const prompt = canonicalTitleUserPrompt({
-      memberTitles: [{ zh: "标题", en: "Title", source: "src" }],
+      memberTitles: [member({ zh: "标题", en: "Title", source: "src", isPrimary: true })],
       leadSummaryZh: null,
       leadSummaryEn: null,
     });
@@ -85,27 +183,13 @@ describe("canonicalTitleUserPrompt", () => {
     expect(prompt).toContain("JSON only");
   });
 
-  it("numbers each source 1-based", () => {
-    const prompt = canonicalTitleUserPrompt({
-      memberTitles: [
-        { zh: "A", en: "A", source: "S1" },
-        { zh: "B", en: "B", source: "S2" },
-        { zh: "C", en: "C", source: "S3" },
-      ],
-      leadSummaryZh: null,
-      leadSummaryEn: null,
-    });
-
-    expect(prompt).toContain("1. [S1]");
-    expect(prompt).toContain("2. [S2]");
-    expect(prompt).toContain("3. [S3]");
-  });
-
-  it("correctly reports member count in header", () => {
+  it("counts corroborating sources in the section header", () => {
     const titles = Array.from({ length: 7 }, (_, i) => ({
       zh: `标题${i}`,
       en: `Title ${i}`,
       source: `src${i}`,
+      group: "media",
+      isPrimary: i === 0,
     }));
 
     const prompt = canonicalTitleUserPrompt({
@@ -114,7 +198,7 @@ describe("canonicalTitleUserPrompt", () => {
       leadSummaryEn: null,
     });
 
-    expect(prompt).toContain("Member titles (7 sources)");
+    expect(prompt).toContain("CORROBORATING sources (6)");
   });
 });
 
@@ -232,5 +316,34 @@ describe("isTitleCandidate (candidate-selection semantics)", () => {
         updatedAt: now,
       }),
     ).toBe(true);
+  });
+});
+
+// ── SQL filter must include `titled_at IS NULL` (regression) ────────────────
+//
+// `updated_at > NULL` evaluates to NULL (falsy) in SQL, so without an explicit
+// `titled_at IS NULL` clause the candidate query silently misses any cluster
+// whose titled_at was nullified (e.g., by a backfill that recomputed leads).
+// Without this assertion, the bug returns the moment someone "simplifies" the
+// WHERE clause.
+
+import { readFileSync } from "fs";
+import { resolve, dirname } from "path";
+import { fileURLToPath } from "url";
+
+describe("Stage C SQL candidate filter", () => {
+  const __dirname = dirname(fileURLToPath(import.meta.url));
+  const workerSrc = readFileSync(resolve(__dirname, "./canonical-title.ts"), "utf8");
+
+  it("includes `titled_at IS NULL` so backfill-nullified clusters are picked up", () => {
+    expect(workerSrc).toContain("clusters.titledAt} IS NULL");
+  });
+
+  it("still has the canonical_title_zh IS NULL branch (never-titled clusters)", () => {
+    expect(workerSrc).toContain("clusters.canonicalTitleZh} IS NULL");
+  });
+
+  it("still has the updated_at > titled_at branch (membership-grew regen)", () => {
+    expect(workerSrc).toContain("clusters.updatedAt} > ${clusters.titledAt");
   });
 });

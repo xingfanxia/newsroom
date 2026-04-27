@@ -61,6 +61,17 @@ export type FeedQuery = {
   /** Hot window in hours for the Today view's "still-developing" cutoff.
    *  Defaults to 24. Wider window keeps multi-day stories visible longer. */
   hotWindowHours?: number;
+  /** Quality threshold on the effective importance (cluster.importance when
+   *  multi-member, else item.importance). Items below this score are filtered
+   *  out. Used by the home page's daily-highlights default (≥ 85) so the
+   *  feed surfaces the major events of each day instead of mid-tier noise.
+   *  Per-tab overrides drop this to 0 to expose the full pool. */
+  minImportance?: number;
+  /** Daily-highlights mode: emit only the highest-importance lead per
+   *  calendar day (UTC). Pairs with `minImportance` to give the home page
+   *  a clean "one big story per day" timeline that browses backward in
+   *  time without burying days under their own internal volume. */
+  dedupByDay?: boolean;
 };
 
 /**
@@ -111,8 +122,23 @@ function buildFeedWhere(q: FeedQuery) {
   // sit in the April 14 calendar cell, leaving April 16 empty even though the
   // user thinks of it as an April 16 event.
   //
-  //   today:   combined trending — firstSeenAt today OR latestMemberAt within
-  //            hotWindow OR unclustered-item published today.
+  //   today:   combined trending — match ANY of:
+  //              (1) cluster firstSeenAt today (newly broken event), OR
+  //              (2) cluster latestMemberAt within hotWindow (still developing), OR
+  //              (3) item published since the start of yesterday (fresh-but-
+  //                  cold rescue, day-aligned so it doesn't drift with clock).
+  //
+  //            Without (3), a fresh article from yesterday that joined a cold
+  //            singleton cluster (cluster.first_seen_at = yesterday, no later
+  //            members so latest_member_at also yesterday → > 24h ago) was
+  //            invisible on the home page despite being recent + high-tier.
+  //            That's how "热点聚合" ended up showing 04-22 stories on top
+  //            ("持续报道 · 1d" because they got a NEW member today) while
+  //            burying yesterday's actual fresh articles in cold singleton
+  //            clusters. Day-aligned via date_trunc so an item published
+  //            yesterday morning still shows when checked this afternoon
+  //            (a relative `> now() - 24h` window would drop it after lunch).
+  //            Same tier filter still gates quality.
   //   explicit date filter (q.date / q.dateFrom/dateTo) overrides view.
   const dateFilter = q.date
     ? sql`${items.publishedAt} >= ${`${q.date}T00:00:00Z`}::timestamptz AND ${items.publishedAt} < ${`${q.date}T00:00:00Z`}::timestamptz + interval '1 day'`
@@ -122,7 +148,7 @@ function buildFeedWhere(q: FeedQuery) {
         ? sql`(
             ${clusters.firstSeenAt} >= date_trunc('day', now())
             OR ${clusters.latestMemberAt} > now() - make_interval(hours => ${hotH})
-            OR (${items.clusterId} IS NULL AND ${items.publishedAt} >= date_trunc('day', now()))
+            OR ${items.publishedAt} >= date_trunc('day', now() - interval '1 day')
           )`
         : sql`TRUE`;
 
@@ -161,6 +187,14 @@ function buildFeedWhere(q: FeedQuery) {
         )}]::text[]`
       : sql`TRUE`;
 
+  // Effective-importance threshold. Cluster importance (Stage D) wins when
+  // present — a multi-source event with coverage boost can sit above its
+  // lead's raw importance.
+  const minImportanceFilter =
+    q.minImportance != null && q.minImportance > 0
+      ? sql`COALESCE(${clusters.importance}, ${items.importance}) >= ${q.minImportance}`
+      : sql`TRUE`;
+
   return and(
     isNotNull(items.enrichedAt),
     isNotNull(items.importance),
@@ -174,6 +208,7 @@ function buildFeedWhere(q: FeedQuery) {
     curatedFilter,
     excludeTagsFilter,
     includeTagsFilter,
+    minImportanceFilter,
   );
 }
 
@@ -189,11 +224,26 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
 
   const view = q.view ?? "archive";
 
-  // Today view: rank by lead's published_at first (so old still-developing
-  // events don't beat fresh news on importance ties — many P1s sit at 100),
-  // then importance as tiebreaker. Same anchor as the date filter and calendar.
-  // Archive view: identical ordering.
-  const orderExpr = sql`${items.publishedAt} DESC, COALESCE(${clusters.importance}, ${items.importance}) DESC`;
+  // Default ordering: lead's published_at first (so old still-developing events
+  // don't beat fresh news on importance ties — many P1s sit at 100), importance
+  // as tiebreaker.
+  //
+  // When `dedupByDay` is set, swap the primary sort to day-then-importance so
+  // each day's highest-importance lead comes out first; the TS-side dedup
+  // below picks the first row per day. This is the home page's daily-
+  // highlights default — one big story per day instead of multiple mid-tier
+  // items competing for attention.
+  const orderExpr = q.dedupByDay
+    ? sql`to_char(${items.publishedAt} AT TIME ZONE 'UTC', 'YYYY-MM-DD') DESC,
+          COALESCE(${clusters.importance}, ${items.importance}) DESC,
+          ${items.publishedAt} DESC`
+    : sql`${items.publishedAt} DESC, COALESCE(${clusters.importance}, ${items.importance}) DESC`;
+
+  // dedupByDay needs a wider fetch window than `limit` because we collapse
+  // multiple per-day rows down to one. Fetching `limit * 5` covers days that
+  // happen to have many items at the importance threshold without forcing the
+  // caller to pre-compute the multiplier. Capped at 500 to bound DB cost.
+  const fetchLimit = q.dedupByDay ? Math.min(Math.max(limit * 5, 200), 500) : limit;
 
   const rows = await client
     .select({
@@ -243,8 +293,26 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
     .leftJoin(clusters, eq(items.clusterId, clusters.id))
     .where(buildFeedWhere(q))
     .orderBy(orderExpr)
-    .limit(limit)
+    .limit(fetchLimit)
     .offset(offset);
+
+  // dedupByDay: SQL is sorted day-DESC then importance-DESC, so the first row
+  // we encounter for each calendar day is that day's highest-importance lead.
+  // Walk the rows once, take the first per day, stop at `limit` days.
+  const dedupedRows = q.dedupByDay
+    ? (() => {
+        const seen = new Set<string>();
+        const out: typeof rows = [];
+        for (const r of rows) {
+          const day = r.publishedAt.toISOString().slice(0, 10);
+          if (seen.has(day)) continue;
+          seen.add(day);
+          out.push(r);
+          if (out.length >= limit) break;
+        }
+        return out;
+      })()
+    : rows;
 
   const hotWindowMs = (q.hotWindowHours ?? 24) * 3_600_000;
   const now = Date.now();
@@ -254,7 +322,7 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
     return d.getTime();
   })();
 
-  return rows.map((r): Story => {
+  return dedupedRows.map((r): Story => {
     const tagBag = (r.tags ?? {}) as {
       capabilities?: string[];
       entities?: string[];

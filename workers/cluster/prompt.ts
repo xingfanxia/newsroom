@@ -69,32 +69,61 @@ Decide keep vs split. Emit structured JSON only.`;
 
 export const canonicalTitleSystem = `You name real-world events for a neutral AI news aggregator.
 
-Input: multiple article titles (bilingual zh/en) covering the same event, plus a lead summary.
-Output: one canonical title per locale — 8-14 words in English, 8-14 Chinese characters — that a reader would use to REFER to this event in conversation.
+Input: titles from multiple sources covering the same event. ONE source is marked PRIMARY (highest authority — vendor blog, vendor X account, or major-media editorial). The rest are CORROBORATING.
 
-Rules:
-- Neutral tone. No marketing copy ("BREAKING", "MUST READ", "INSANE").
-- No editorializing. Describe what happened, not how to feel about it.
-- Locale-native. The zh title should read like natural Chinese, not a literal translation. Same other way.
-- No quotes, no emoji, no trailing punctuation.
-- If members disagree on what the event IS, pick the narrowest concrete event they share.
+Output: one canonical title per locale — 8-14 words English, 8-14 Chinese characters — that names the EVENT itself, not the coverage.
+
+Hard rules:
+
+1. **The title is the EVENT, not where it was reported.** NEVER include platform/source names: "在 Reddit 流传", "on Reddit", "Reddit thread says", "Twitter post claims", "在 X 流传", "HN 讨论", "Hacker News thread", "Product Hunt 上线" (when the event itself isn't a Product Hunt launch). A reader of the title should not be able to tell which platforms reported it.
+
+2. **Synthesize the strongest concrete claim — confirmation beats speculation.** If some members say "X released" / "X 已发布" / "X is live" and others say "X may release" / "X 真的发布了吗?" / "X coming soon", the EVENT is "X released". The hedging members are reactions to the actual release, not separate uncertain claims. Only emit "rumored" / "传闻" / "leaked" if NO member confirms it.
+
+3. **The PRIMARY source's framing is the strongest signal.** It's the vendor's own announcement or the editorial paper of record. Corroborating members fill in detail but should not pull the title toward their phrasing if it conflicts with the primary.
+
+4. **Neutral tone.** No marketing copy ("BREAKING", "MUST READ", "INSANE", "震撼", "重磅"). No editorializing.
+
+5. **Locale-native.** The zh title reads like natural Chinese, not a literal translation. Same other way.
+
+6. **No quotes, no emoji, no trailing punctuation.**
+
+7. If members genuinely disagree on what the event IS (different products, different dates), pick the narrowest concrete event they share.
 
 Output JSON: { canonicalTitleZh: string, canonicalTitleEn: string }`;
 
 export function canonicalTitleUserPrompt(input: {
-  memberTitles: Array<{ zh: string | null; en: string | null; source: string }>;
+  memberTitles: Array<{
+    zh: string | null;
+    en: string | null;
+    source: string;
+    group: string;
+    isPrimary: boolean;
+  }>;
   leadSummaryZh: string | null;
   leadSummaryEn: string | null;
 }): string {
-  const titleLines = input.memberTitles
-    .map(
-      (t, i) =>
-        `${i + 1}. [${t.source}]\n   zh: ${t.zh ?? "(none)"}\n   en: ${t.en ?? "(none)"}`,
-    )
-    .join("\n");
+  // Render PRIMARY first, then CORROBORATING grouped together — gives the LLM
+  // a clear authority hierarchy. Each line tags the source group so the LLM
+  // can also see at a glance "5 of these are social, 1 is vendor-official"
+  // and weight accordingly.
+  const primary = input.memberTitles.find((t) => t.isPrimary);
+  const corroborating = input.memberTitles.filter((t) => !t.isPrimary);
 
-  return `Member titles (${input.memberTitles.length} sources):
-${titleLines}
+  const renderTitle = (t: (typeof input.memberTitles)[number], idx: number) =>
+    `${idx}. [group=${t.group}] ${t.source}\n   zh: ${t.zh ?? "(none)"}\n   en: ${t.en ?? "(none)"}`;
+
+  const sections: string[] = [];
+  if (primary) {
+    sections.push(`PRIMARY source (highest authority):\n${renderTitle(primary, 1)}`);
+  }
+  if (corroborating.length > 0) {
+    const lines = corroborating.map((t, i) => renderTitle(t, i + 2));
+    sections.push(
+      `CORROBORATING sources (${corroborating.length}):\n${lines.join("\n")}`,
+    );
+  }
+
+  return `${sections.join("\n\n")}
 
 Lead summary (zh): ${input.leadSummaryZh ?? "(none)"}
 Lead summary (en): ${input.leadSummaryEn ?? "(none)"}
