@@ -68,7 +68,9 @@ export default async function PapersPage({
       tracked_sources: 0,
     })),
     getPulseData().catch(() => []),
-    getDayCounts(60).catch(() => []),
+    // Papers calendar mirrors the feed's includeSourceTags filter so cells
+    // count only paper-tagged leads — same contract as the home page.
+    getDayCounts(60, { includeSourceTags: PAPER_TAGS }).catch(() => []),
   ]);
 
   const grouped = groupByDay(stories);

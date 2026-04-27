@@ -161,7 +161,13 @@ export default async function HotNewsPage({
     getTopTopics().catch(() => []),
     getPolicySummary().catch(() => ({ version: "v1", lastIterAt: null })),
     getRecentTickerItems(locale as "zh" | "en").catch(() => []),
-    getDayCounts(60).catch(() => []),
+    // Calendar must apply the SAME filters as the feed — otherwise the cell
+    // count over-promises (e.g., a day whose lead items are all arxiv shows
+    // a non-zero count but the home feed's excludeSourceTags renders empty).
+    getDayCounts(60, {
+      excludeSourceTags: ["arxiv", "paper"],
+      tier: "featured",
+    }).catch(() => []),
   ]);
   const ticker = tickerItems.length > 0 ? tickerItems : FALLBACK_TICKER;
 
