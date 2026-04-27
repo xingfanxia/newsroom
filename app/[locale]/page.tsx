@@ -121,11 +121,14 @@ export default async function HotNewsPage({
       view: activeDate || dailyHighlights ? "archive" : "today",
       // Papers live on /papers — keep them out of the news feed.
       excludeSourceTags: ["arxiv", "paper"],
-      // Default home (no filter): one big story per day at importance >= 85.
-      // Surfaces the day's major events (Apple CEO transition, GPT-5.5 release,
-      // Google→Anthropic $40B investment) instead of mid-tier noise. Tab/source
-      // filters opt out so power users still get the full feed for their slice.
-      ...(dailyHighlights ? { minImportance: 85, dedupByDay: true } : {}),
+      // Default home (no filter): up to 3 stories per day at importance >= 80.
+      // Surfaces the day's notable events (Apple CEO transition, GPT-5.5 release,
+      // Google→Anthropic $40B + secondary stories like DRAM shortages, OpenAI
+      // exec departures) instead of mid-tier noise. Tab/source filters opt out
+      // so power users still get the full feed for their slice. Threshold 80
+      // (vs 85) admits a few more borderline-major stories per day; cap of 3
+      // gives a "day digest" feel without burying the headline behind volume.
+      ...(dailyHighlights ? { minImportance: 80, maxPerDay: 3 } : {}),
       ...sourceFilter,
     });
   } catch {

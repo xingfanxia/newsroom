@@ -63,15 +63,17 @@ export type FeedQuery = {
   hotWindowHours?: number;
   /** Quality threshold on the effective importance (cluster.importance when
    *  multi-member, else item.importance). Items below this score are filtered
-   *  out. Used by the home page's daily-highlights default (≥ 85) so the
-   *  feed surfaces the major events of each day instead of mid-tier noise.
+   *  out. Used by the home page's daily-highlights default (≥ 80) so the
+   *  feed surfaces the day's events worth reading instead of mid-tier noise.
    *  Per-tab overrides drop this to 0 to expose the full pool. */
   minImportance?: number;
-  /** Daily-highlights mode: emit only the highest-importance lead per
-   *  calendar day (UTC). Pairs with `minImportance` to give the home page
-   *  a clean "one big story per day" timeline that browses backward in
-   *  time without burying days under their own internal volume. */
-  dedupByDay?: boolean;
+  /** Daily-highlights mode: cap items per calendar day (UTC). Pairs with
+   *  `minImportance` to give the home page a clean "top-N stories per day"
+   *  timeline that browses backward in time without burying days under
+   *  their own internal volume. Set to 1 for a strict one-per-day timeline
+   *  or 3-5 for a "day digest" feel. Items within a day come out in
+   *  importance-DESC order then publishedAt-DESC tiebreaker. */
+  maxPerDay?: number;
 };
 
 /**
@@ -228,22 +230,26 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
   // don't beat fresh news on importance ties — many P1s sit at 100), importance
   // as tiebreaker.
   //
-  // When `dedupByDay` is set, swap the primary sort to day-then-importance so
-  // each day's highest-importance lead comes out first; the TS-side dedup
-  // below picks the first row per day. This is the home page's daily-
-  // highlights default — one big story per day instead of multiple mid-tier
-  // items competing for attention.
-  const orderExpr = q.dedupByDay
+  // When `maxPerDay` is set, swap the primary sort to day-then-importance so
+  // each day's strongest leads come out first; the TS-side cap below keeps
+  // the top-N per day. This is the home page's daily-highlights default —
+  // a few important stories per day instead of multiple mid-tier items
+  // competing for attention.
+  const useDayCap = q.maxPerDay != null && q.maxPerDay > 0;
+  const orderExpr = useDayCap
     ? sql`to_char(${items.publishedAt} AT TIME ZONE 'UTC', 'YYYY-MM-DD') DESC,
           COALESCE(${clusters.importance}, ${items.importance}) DESC,
           ${items.publishedAt} DESC`
     : sql`${items.publishedAt} DESC, COALESCE(${clusters.importance}, ${items.importance}) DESC`;
 
-  // dedupByDay needs a wider fetch window than `limit` because we collapse
-  // multiple per-day rows down to one. Fetching `limit * 5` covers days that
-  // happen to have many items at the importance threshold without forcing the
-  // caller to pre-compute the multiplier. Capped at 500 to bound DB cost.
-  const fetchLimit = q.dedupByDay ? Math.min(Math.max(limit * 5, 200), 500) : limit;
+  // maxPerDay needs a wider fetch window than `limit` because we may discard
+  // many rows per day above the cap. Heuristic: 5x typical-discard headroom
+  // (most filtered-out rows per day sit in the 5-20 range), with a 200-row
+  // floor so quiet days don't starve the timeline, and a 500-row ceiling to
+  // bound DB cost.
+  const fetchLimit = useDayCap
+    ? Math.min(Math.max(limit * 5, 200), 500)
+    : limit;
 
   const rows = await client
     .select({
@@ -296,17 +302,19 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
     .limit(fetchLimit)
     .offset(offset);
 
-  // dedupByDay: SQL is sorted day-DESC then importance-DESC, so the first row
-  // we encounter for each calendar day is that day's highest-importance lead.
-  // Walk the rows once, take the first per day, stop at `limit` days.
-  const dedupedRows = q.dedupByDay
+  // maxPerDay: SQL is sorted day-DESC then importance-DESC, so the first N
+  // rows we encounter for each calendar day are that day's strongest leads.
+  // Walk the rows once, keep up to `maxPerDay` per day, stop at `limit` total.
+  const dedupedRows = useDayCap
     ? (() => {
-        const seen = new Set<string>();
+        const counts = new Map<string, number>();
+        const cap = q.maxPerDay!;
         const out: typeof rows = [];
         for (const r of rows) {
           const day = r.publishedAt.toISOString().slice(0, 10);
-          if (seen.has(day)) continue;
-          seen.add(day);
+          const count = counts.get(day) ?? 0;
+          if (count >= cap) continue;
+          counts.set(day, count + 1);
           out.push(r);
           if (out.length >= limit) break;
         }

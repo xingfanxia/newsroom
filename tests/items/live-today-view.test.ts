@@ -47,10 +47,10 @@ describe("view=today filter — fresh-but-cold rescue clause", () => {
   });
 });
 
-describe("daily-highlights mode (minImportance + dedupByDay)", () => {
-  it("FeedQuery exposes minImportance and dedupByDay", () => {
+describe("daily-highlights mode (minImportance + maxPerDay)", () => {
+  it("FeedQuery exposes minImportance and maxPerDay", () => {
     expect(liveSrc).toContain("minImportance?: number");
-    expect(liveSrc).toContain("dedupByDay?: boolean");
+    expect(liveSrc).toContain("maxPerDay?: number");
   });
 
   it("buildFeedWhere applies minImportance to effective importance (cluster wins)", () => {
@@ -62,19 +62,20 @@ describe("daily-highlights mode (minImportance + dedupByDay)", () => {
     );
   });
 
-  it("dedupByDay swaps SQL ORDER BY to day-DESC then importance-DESC", () => {
+  it("maxPerDay swaps SQL ORDER BY to day-DESC then importance-DESC", () => {
     // Default sort is publishedAt-DESC, importance-DESC tiebreaker — which
     // picks the LATEST published item per day, not the highest-importance.
-    // For daily highlights we need the day's strongest event first, so the
+    // For daily highlights we need the day's strongest events first, so the
     // primary sort changes to to_char(...,'YYYY-MM-DD') DESC.
     expect(liveSrc).toContain(
       "to_char(${items.publishedAt} AT TIME ZONE 'UTC', 'YYYY-MM-DD') DESC",
     );
   });
 
-  it("dedupByDay TS-side dedup keeps first row per calendar day", () => {
-    expect(liveSrc).toContain("const seen = new Set<string>();");
+  it("maxPerDay TS-side cap keeps top-N rows per calendar day", () => {
+    expect(liveSrc).toContain("const counts = new Map<string, number>();");
     expect(liveSrc).toContain(".publishedAt.toISOString().slice(0, 10)");
+    expect(liveSrc).toContain("if (count >= cap) continue;");
   });
 
   it("daily-highlights only kicks in for the unfiltered home (preserves drill-ins)", () => {
@@ -90,7 +91,7 @@ describe("daily-highlights mode (minImportance + dedupByDay)", () => {
     expect(homeSrc).toMatch(
       /!activeDate\s*&&\s*!sourceId\s*&&\s*sourcePreset === "all"\s*&&\s*tier === "featured"/,
     );
-    expect(homeSrc).toContain("minImportance: 85");
-    expect(homeSrc).toContain("dedupByDay: true");
+    expect(homeSrc).toContain("minImportance: 80");
+    expect(homeSrc).toContain("maxPerDay: 3");
   });
 });
