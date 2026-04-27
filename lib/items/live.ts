@@ -74,6 +74,14 @@ export type FeedQuery = {
    *  or 3-5 for a "day digest" feel. Items within a day come out in
    *  importance-DESC order then publishedAt-DESC tiebreaker. */
   maxPerDay?: number;
+  /** Bypass `minImportance` for items published in the last N calendar days.
+   *  Stage D cluster-importance scoring runs periodically and lags ingestion
+   *  by 1-2 days — without rescue, recent days that have leads but none yet
+   *  pushed to imp >= threshold get skipped, so the home feed appears to
+   *  start "3 days ago." `maxPerDay` still bounds each rescued day to its
+   *  top-N by importance, so noise stays capped. Day-aligned (not rolling
+   *  24h) so the rescue boundary doesn't drift across the day. */
+  recentDayRescueDays?: number;
 };
 
 /**
@@ -192,9 +200,19 @@ function buildFeedWhere(q: FeedQuery) {
   // Effective-importance threshold. Cluster importance (Stage D) wins when
   // present — a multi-source event with coverage boost can sit above its
   // lead's raw importance.
+  //
+  // recentDayRescueDays bypasses the threshold for items published in the
+  // last N calendar days — covers the scoring-pipeline lag where the most
+  // recent days have leads but Stage D hasn't pumped them to imp >= threshold
+  // yet. Day-aligned via date_trunc so the cutoff doesn't drift mid-day.
   const minImportanceFilter =
     q.minImportance != null && q.minImportance > 0
-      ? sql`COALESCE(${clusters.importance}, ${items.importance}) >= ${q.minImportance}`
+      ? q.recentDayRescueDays != null && q.recentDayRescueDays > 0
+        ? sql`(
+            COALESCE(${clusters.importance}, ${items.importance}) >= ${q.minImportance}
+            OR ${items.publishedAt} >= date_trunc('day', now() - make_interval(days => ${q.recentDayRescueDays - 1}))
+          )`
+        : sql`COALESCE(${clusters.importance}, ${items.importance}) >= ${q.minImportance}`
       : sql`TRUE`;
 
   return and(

@@ -72,7 +72,9 @@ export default async function CuratedPage({
       tracked_sources: 0,
     })),
     getPulseData().catch(() => []),
-    getDayCounts(60).catch(() => []),
+    // Curated calendar mirrors the feed's curatedOnly filter so cells
+    // count only AX-curated leads — same contract as the home page.
+    getDayCounts(60, { curatedOnly: true }).catch(() => []),
   ]);
 
   const grouped = groupByDay(stories);

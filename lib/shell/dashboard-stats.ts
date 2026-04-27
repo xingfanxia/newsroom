@@ -96,9 +96,10 @@ export async function getTopTopics(limit = 16): Promise<TopicEntry[]> {
  */
 export type DayBucket = { date: string; count: number };
 /**
- * Calendar-grid counts. Must agree exactly with the date-filter in
- * lib/items/live.ts — clicking a calendar cell must return the items the
- * count promised.
+ * Calendar-grid counts. Must agree exactly with the per-page feed filters
+ * in lib/items/live.ts — clicking a calendar cell must return the items
+ * the count promised. Each page (home / all / papers / curated) passes
+ * its own filter slice so the cell number matches what'll render.
  *
  * Bucket anchor = lead item's published_at:
  *   - Singletons (cluster_id NULL) bucket on their own published_at.
@@ -110,19 +111,70 @@ export type DayBucket = { date: string; count: number };
  *     intuitive "the day the event happened" — i.e. when the lead's
  *     coverage was published.)
  *   - Excluded tier honored via COALESCE(cluster.event_tier, items.tier).
+ *
+ * `opts.tier` narrows beyond the default <> 'excluded' (e.g., 'featured'
+ * for the home page so the cell counts only featured+p1 leads, matching
+ * the feed query). `opts.excludeSourceTags` / `includeSourceTags` /
+ * `curatedOnly` mirror the same-named FeedQuery fields. JOIN on sources
+ * is unconditional so we can apply them; the planner skips the JOIN when
+ * no source-side filter is referenced.
  */
-export async function getDayCounts(days = 30): Promise<DayBucket[]> {
+export async function getDayCounts(
+  days = 30,
+  opts?: {
+    excludeSourceTags?: string[];
+    includeSourceTags?: string[];
+    curatedOnly?: boolean;
+    tier?: "featured" | "all" | "p1";
+  },
+): Promise<DayBucket[]> {
   const client = db();
+
+  // Tier filter mirrors buildFeedWhere — 'featured' is inclusive (featured+p1).
+  const tier = opts?.tier ?? "all";
+  const tierFilter =
+    tier === "p1"
+      ? sql`coalesce(c.event_tier, i.tier) = 'p1'`
+      : tier === "featured"
+        ? sql`coalesce(c.event_tier, i.tier) IN ('featured', 'p1')`
+        : sql`coalesce(c.event_tier, i.tier, 'all') <> 'excluded'`;
+
+  // Drizzle binds JS arrays as tuples ($1,$2) which the planner rejects for
+  // `&&` / `@>`. Build the array via sql.join — same shape as buildFeedWhere.
+  const excludeTagsFilter =
+    opts?.excludeSourceTags && opts.excludeSourceTags.length > 0
+      ? sql`AND NOT (s.tags && ARRAY[${sql.join(
+          opts.excludeSourceTags.map((t) => sql`${t}`),
+          sql`, `,
+        )}]::text[])`
+      : sql``;
+
+  const includeTagsFilter =
+    opts?.includeSourceTags && opts.includeSourceTags.length > 0
+      ? sql`AND s.tags && ARRAY[${sql.join(
+          opts.includeSourceTags.map((t) => sql`${t}`),
+          sql`, `,
+        )}]::text[]`
+      : sql``;
+
+  const curatedFilter = opts?.curatedOnly
+    ? sql`AND s.curated = TRUE`
+    : sql``;
+
   const rows = await client.execute(sql`
     SELECT to_char(date_trunc('day', i.published_at), 'YYYY-MM-DD') AS d,
            count(*)::int AS n
     FROM items i
+    JOIN sources s ON s.id = i.source_id
     LEFT JOIN clusters c ON c.id = i.cluster_id
     WHERE i.enriched_at IS NOT NULL
       AND i.importance IS NOT NULL
-      AND coalesce(c.event_tier, i.tier, 'all') <> 'excluded'
+      AND ${tierFilter}
       AND (i.cluster_id IS NULL OR c.lead_item_id = i.id)
       AND i.published_at >= now() - (${days} * interval '1 day')
+      ${excludeTagsFilter}
+      ${includeTagsFilter}
+      ${curatedFilter}
     GROUP BY 1
     ORDER BY 1 DESC
     LIMIT ${days}
