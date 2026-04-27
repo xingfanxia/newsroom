@@ -98,6 +98,13 @@ export default async function HotNewsPage({
   // view bumps to 120 (was 40 and people kept asking where the rest went).
   const limit = activeDate ? 500 : 120;
 
+  // Daily-highlights mode kicks in only when the user hasn't pinned a date,
+  // a specific source, or a non-default tier filter. Otherwise the user is
+  // intentionally drilling in (e.g., /zh?source=media) and expects the full
+  // chronological feed for that filter — not one item per day.
+  const dailyHighlights =
+    !activeDate && !sourceId && sourcePreset === "all" && tier === "featured";
+
   let stories: Story[] = [];
   try {
     stories = await getFeaturedStories({
@@ -105,12 +112,20 @@ export default async function HotNewsPage({
       locale: locale as "zh" | "en",
       limit,
       date: activeDate,
-      // When no explicit day is picked, use the Today view: trending events
-      // (ongoing + broken-today). With a date filter, stay in Archive so the
-      // day-picker's calendar semantics hold.
-      view: activeDate ? "archive" : "today",
+      // View selection:
+      //   - Specific date picked → archive view (full day's items, no time clip)
+      //   - Daily-highlights default → archive view too (we want top-per-day
+      //     across history, not just hot clusters from the last 24h)
+      //   - Otherwise (tab/source drill-in) → today view (trending events
+      //     with hot-window + start-of-yesterday rescue, see lib/items/live.ts)
+      view: activeDate || dailyHighlights ? "archive" : "today",
       // Papers live on /papers — keep them out of the news feed.
       excludeSourceTags: ["arxiv", "paper"],
+      // Default home (no filter): one big story per day at importance >= 85.
+      // Surfaces the day's major events (Apple CEO transition, GPT-5.5 release,
+      // Google→Anthropic $40B investment) instead of mid-tier noise. Tab/source
+      // filters opt out so power users still get the full feed for their slice.
+      ...(dailyHighlights ? { minImportance: 85, dedupByDay: true } : {}),
       ...sourceFilter,
     });
   } catch {

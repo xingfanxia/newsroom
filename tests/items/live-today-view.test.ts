@@ -46,3 +46,51 @@ describe("view=today filter — fresh-but-cold rescue clause", () => {
     expect(flat).toContain("day-aligned");
   });
 });
+
+describe("daily-highlights mode (minImportance + dedupByDay)", () => {
+  it("FeedQuery exposes minImportance and dedupByDay", () => {
+    expect(liveSrc).toContain("minImportance?: number");
+    expect(liveSrc).toContain("dedupByDay?: boolean");
+  });
+
+  it("buildFeedWhere applies minImportance to effective importance (cluster wins)", () => {
+    // COALESCE(cluster.importance, item.importance) so multi-source events with
+    // Stage D coverage boost can satisfy the threshold even if the lead's raw
+    // score is below it.
+    expect(liveSrc).toMatch(
+      /COALESCE\(\$\{clusters\.importance\},\s+\$\{items\.importance\}\)\s+>=\s+\$\{q\.minImportance\}/,
+    );
+  });
+
+  it("dedupByDay swaps SQL ORDER BY to day-DESC then importance-DESC", () => {
+    // Default sort is publishedAt-DESC, importance-DESC tiebreaker — which
+    // picks the LATEST published item per day, not the highest-importance.
+    // For daily highlights we need the day's strongest event first, so the
+    // primary sort changes to to_char(...,'YYYY-MM-DD') DESC.
+    expect(liveSrc).toContain(
+      "to_char(${items.publishedAt} AT TIME ZONE 'UTC', 'YYYY-MM-DD') DESC",
+    );
+  });
+
+  it("dedupByDay TS-side dedup keeps first row per calendar day", () => {
+    expect(liveSrc).toContain("const seen = new Set<string>();");
+    expect(liveSrc).toContain(".publishedAt.toISOString().slice(0, 10)");
+  });
+
+  it("daily-highlights only kicks in for the unfiltered home (preserves drill-ins)", () => {
+    // Tab/source/date drill-ins must keep returning the full chronological
+    // feed for their slice. The home page guards with:
+    //   !activeDate && !sourceId && sourcePreset === 'all' && tier === 'featured'
+    // so opening /zh?source=media or /zh?date=2026-04-21 stays unfiltered.
+    const homeSrc = readFileSync(
+      resolve(__dirname, "../../app/[locale]/page.tsx"),
+      "utf8",
+    );
+    expect(homeSrc).toContain("dailyHighlights");
+    expect(homeSrc).toMatch(
+      /!activeDate\s*&&\s*!sourceId\s*&&\s*sourcePreset === "all"\s*&&\s*tier === "featured"/,
+    );
+    expect(homeSrc).toContain("minImportance: 85");
+    expect(homeSrc).toContain("dedupByDay: true");
+  });
+});
