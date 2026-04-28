@@ -3,6 +3,7 @@ import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
 import { Item } from "@/components/feed/item";
 import { DayBreak } from "../_day-break";
+import { groupByDay } from "@/lib/feed/group-by-day";
 import { XHandlesSidebar } from "@/components/x-monitor/handles-sidebar";
 import { getFeaturedStories } from "@/lib/items/live";
 import { getPulseData, getRadarStats } from "@/lib/shell/dashboard-stats";
@@ -45,7 +46,11 @@ export default async function XMonitorPage({
     limit: activeIsValid ? 200 : 80,
   }).catch((): Story[] => []);
 
-  const grouped = groupByDay(narrowedStories);
+  const sorted = [...narrowedStories].sort(
+    (a, b) =>
+      new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
+  );
+  const grouped = groupByDay(sorted);
   const activeLabel: string = activeIsValid
     ? handles.find((h) => h.id === activeHandle)?.handle ?? activeHandle ?? ""
     : locale === "zh"
@@ -113,7 +118,7 @@ export default async function XMonitorPage({
             <div className="feed">
               {Object.entries(grouped).map(([dayKey, list]) => (
                 <div key={dayKey}>
-                  <DayBreak date={new Date(dayKey)} />
+                  <DayBreak dayKey={dayKey} />
                   {list.map((s) => (
                     <Item key={s.id} story={s} locale={locale as "en" | "zh"} />
                   ))}
@@ -132,22 +137,4 @@ export default async function XMonitorPage({
       </main>
     </ViewShell>
   );
-}
-
-function groupByDay(stories: Story[]): Record<string, Story[]> {
-  const sorted = [...stories].sort(
-    (a, b) =>
-      new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
-  );
-  const byDay: Record<string, Story[]> = {};
-  for (const s of sorted) {
-    const d = new Date(s.publishedAt);
-    const canonical = new Date(
-      d.getFullYear(),
-      d.getMonth(),
-      d.getDate(),
-    ).toISOString();
-    (byDay[canonical] ??= []).push(s);
-  }
-  return byDay;
 }

@@ -3,6 +3,7 @@ import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
 import { Item } from "@/components/feed/item";
 import { DayBreak } from "../_day-break";
+import { groupByDay } from "@/lib/feed/group-by-day";
 import { PodcastChannelPills } from "./_channel-pills";
 import { getFeaturedStories } from "@/lib/items/live";
 import { getPulseData, getRadarStats } from "@/lib/shell/dashboard-stats";
@@ -47,7 +48,11 @@ export default async function PodcastsPage({
     limit: activeChannel ? 300 : 120,
   }).catch((): Story[] => []);
 
-  const grouped = groupByDay(filtered);
+  const sorted = [...filtered].sort(
+    (a, b) =>
+      new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
+  );
+  const grouped = groupByDay(sorted);
   const activeLabel = activeChannel
     ? (locale === "zh"
         ? channels.find((c) => c.id === activeChannel)?.nameZh
@@ -111,7 +116,7 @@ export default async function PodcastsPage({
         <div className="feed">
           {Object.entries(grouped).map(([dayKey, list]) => (
             <div key={dayKey}>
-              <DayBreak date={new Date(dayKey)} />
+              <DayBreak dayKey={dayKey} />
               {list.map((s) => (
                 <Item key={s.id} story={s} locale={locale as "en" | "zh"} />
               ))}
@@ -199,22 +204,4 @@ function TierPills({
       </span>
     </div>
   );
-}
-
-function groupByDay(stories: Story[]): Record<string, Story[]> {
-  const sorted = [...stories].sort(
-    (a, b) =>
-      new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
-  );
-  const byDay: Record<string, Story[]> = {};
-  for (const s of sorted) {
-    const d = new Date(s.publishedAt);
-    const canonical = new Date(
-      d.getFullYear(),
-      d.getMonth(),
-      d.getDate(),
-    ).toISOString();
-    (byDay[canonical] ??= []).push(s);
-  }
-  return byDay;
 }

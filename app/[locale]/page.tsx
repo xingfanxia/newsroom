@@ -8,6 +8,7 @@ import { RightRail } from "@/components/feed/right-rail";
 import { CalendarGrid } from "@/components/feed/calendar-grid";
 import { DayBreak } from "./_day-break";
 import { HomeFilters, type HomeTier, type SourcePreset } from "./_home-filters";
+import { groupByDay } from "@/lib/feed/group-by-day";
 import { getFeaturedStories } from "@/lib/items/live";
 import {
   getDayCounts,
@@ -222,7 +223,7 @@ export default async function HotNewsPage({
         <div className="feed">
           {Object.entries(grouped).map(([dayKey, dayStories]) => (
             <div key={dayKey}>
-              <DayBreak date={new Date(dayKey)} />
+              <DayBreak dayKey={dayKey} />
               {dayStories.map((s) => (
                 <Item key={s.id} story={s} locale={locale as "en" | "zh"} />
               ))}
@@ -246,18 +247,3 @@ export default async function HotNewsPage({
   );
 }
 
-function groupByDay(stories: Story[]) {
-  // Preserve the SQL order — today view is importance-first, archive view is
-  // chronological. Resorting by publishedAt would undo today's importance sort.
-  const byDay: Record<string, Story[]> = {};
-  for (const s of stories) {
-    const d = new Date(s.publishedAt);
-    const canonical = new Date(
-      d.getFullYear(),
-      d.getMonth(),
-      d.getDate(),
-    ).toISOString();
-    (byDay[canonical] ??= []).push(s);
-  }
-  return byDay;
-}

@@ -3,6 +3,7 @@ import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
 import { Item } from "@/components/feed/item";
 import { DayBreak } from "../_day-break";
+import { groupByDay } from "@/lib/feed/group-by-day";
 import { CollectionSidebar } from "@/components/saved/collection-sidebar";
 import { SavedMetaStrip } from "@/components/saved/saved-meta-strip";
 import { SavedTags } from "@/components/saved/saved-tags";
@@ -69,7 +70,11 @@ export default async function SavedPage({
     getPulseData().catch(() => []),
   ]);
 
-  const grouped = groupByDay(stories);
+  const sorted = [...stories].sort(
+    (a, b) =>
+      new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
+  );
+  const grouped = groupByDay(sorted);
   const activeCollectionName = (() => {
     if (activeId === "inbox") return locale === "zh" ? "收件箱" : "inbox";
     const c = collections.find((x) => x.id === activeId);
@@ -181,7 +186,7 @@ export default async function SavedPage({
               <div className="feed">
                 {Object.entries(grouped).map(([dayKey, list]) => (
                   <div key={dayKey}>
-                    <DayBreak date={new Date(dayKey)} />
+                    <DayBreak dayKey={dayKey} />
                     {list.map((s) => (
                       <div
                         key={s.id}
@@ -209,24 +214,4 @@ export default async function SavedPage({
       </main>
     </ViewShell>
   );
-}
-
-function groupByDay<T extends { publishedAt: string }>(
-  stories: T[],
-): Record<string, T[]> {
-  const sorted = [...stories].sort(
-    (a, b) =>
-      new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
-  );
-  const byDay: Record<string, T[]> = {};
-  for (const s of sorted) {
-    const d = new Date(s.publishedAt);
-    const canonical = new Date(
-      d.getFullYear(),
-      d.getMonth(),
-      d.getDate(),
-    ).toISOString();
-    (byDay[canonical] ??= []).push(s);
-  }
-  return byDay;
 }
