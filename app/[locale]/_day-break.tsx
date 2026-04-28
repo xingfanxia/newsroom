@@ -6,21 +6,28 @@ const ZH_WEEKDAYS = ["日", "一", "二", "三", "四", "五", "六"];
 /**
  * Terminal-style day separator with bilingual date label.
  *
- * Both the ISO string and the CJK label are built from local date
- * components on purpose — `groupByDay` in the feed parents group stories
- * by local year/month/day, so the separator must match. Mixing
- * `toISOString()` (UTC) with `getFullYear()/getMonth()/getDate()` (local)
- * made stories published around UTC midnight render with two different
- * dates side-by-side (e.g. "2026-04-17 · 星期四  2026年4月16日").
+ * Takes a UTC-day key string ("YYYY-MM-DD") rather than a Date object
+ * because the parent's `groupByDay` keys by UTC day, and Date-based
+ * formatting on the client (`new Date("2026-04-24T00:00:00.000Z")`)
+ * would render in the client's local TZ — in PDT that's 04-23 evening,
+ * shifting the header label one day earlier than the UTC bucket.
+ *
+ * Parsing the YYYY-MM-DD string + formatting via getUTC* keeps server
+ * and client agreed regardless of where they run. Item-level wall-clock
+ * times (the "13:00" timestamp on each card) still localize as before;
+ * only the day-group label is anchored to UTC.
  */
-export function DayBreak({ date }: { date: Date }) {
+export function DayBreak({ dayKey }: { dayKey: string }) {
   const { tweaks } = useTweaks();
-  const y = date.getFullYear();
-  const m = date.getMonth() + 1;
-  const d = date.getDate();
-  const iso = `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-  const weekdayEn = date.toLocaleDateString("en-US", { weekday: "short" });
-  const weekdayZh = `星期${ZH_WEEKDAYS[date.getDay()]}`;
+  const [y, m, d] = dayKey.split("-").map(Number);
+  // UTC-anchored Date so getUTC* yields the same calendar fields the key encodes.
+  const date = new Date(Date.UTC(y, m - 1, d));
+  const iso = dayKey;
+  const weekdayEn = date.toLocaleDateString("en-US", {
+    weekday: "short",
+    timeZone: "UTC",
+  });
+  const weekdayZh = `星期${ZH_WEEKDAYS[date.getUTCDay()]}`;
   const zh = tweaks.language === "zh";
   return (
     <div className="daybreak">

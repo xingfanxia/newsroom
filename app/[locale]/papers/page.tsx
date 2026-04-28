@@ -4,6 +4,7 @@ import { PageHead } from "@/components/shell/page-head";
 import { Item } from "@/components/feed/item";
 import { CalendarGrid } from "@/components/feed/calendar-grid";
 import { DayBreak } from "../_day-break";
+import { groupByDay } from "@/lib/feed/group-by-day";
 import { getFeaturedStories } from "@/lib/items/live";
 import {
   getDayCounts,
@@ -73,7 +74,11 @@ export default async function PapersPage({
     getDayCounts(60, { includeSourceTags: PAPER_TAGS }).catch(() => []),
   ]);
 
-  const grouped = groupByDay(stories);
+  const sorted = [...stories].sort(
+    (a, b) =>
+      new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
+  );
+  const grouped = groupByDay(sorted);
   const zh = locale === "zh";
 
   return (
@@ -105,7 +110,7 @@ export default async function PapersPage({
         <div className="feed">
           {Object.entries(grouped).map(([dayKey, list]) => (
             <div key={dayKey}>
-              <DayBreak date={new Date(dayKey)} />
+              <DayBreak dayKey={dayKey} />
               {list.map((s) => (
                 <Item key={s.id} story={s} locale={locale as "en" | "zh"} />
               ))}
@@ -124,22 +129,4 @@ export default async function PapersPage({
       </main>
     </ViewShell>
   );
-}
-
-function groupByDay(stories: Story[]): Record<string, Story[]> {
-  const sorted = [...stories].sort(
-    (a, b) =>
-      new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
-  );
-  const byDay: Record<string, Story[]> = {};
-  for (const s of sorted) {
-    const d = new Date(s.publishedAt);
-    const canonical = new Date(
-      d.getFullYear(),
-      d.getMonth(),
-      d.getDate(),
-    ).toISOString();
-    (byDay[canonical] ??= []).push(s);
-  }
-  return byDay;
 }
