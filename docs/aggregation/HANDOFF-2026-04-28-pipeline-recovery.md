@@ -17,7 +17,7 @@ A single user-reported symptom on `/zh` ("calendar shows `27 (6)` but feed says 
 | #29 | `46aa9d8` | `fix(home): calendar count contract + recent-day rescue` |
 | #30 | `a55396c` | `fix(cron): split enrich route so each worker gets its own function budget` |
 | #31 | `27c5636` | `fix(feed): TZ-stable day grouping — UTC day key matches the SQL bucket` |
-| #32 | `<TBD>`  | `fix(enrich): rewrite prompt-injection notice to stop tripping Azure jailbreak filter` |
+| #32 | `a0d3534` | `fix(enrich): rewrite prompt-injection notice to stop tripping Azure jailbreak filter` |
 
 Followed by **a manual one-shot drain** of the enrich queue (661 items in 9 minutes via `runEnrichBatch` loop) and **a manual one-shot drain** of the cluster pipeline (Stage A→B→B+→C→D, ~40 min) — both bypassing per-Vercel-tick caps.
 
