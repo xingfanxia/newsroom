@@ -144,16 +144,38 @@ The `editor_analysis_zh` / `editor_analysis_en` field is the long-form take that
 
 ### Output shape (commentary worker)
 
+Two output shapes, picked by tier (see "Tier gating" below):
+
 ```json
+// Full path — tier ∈ (featured, p1)
 {
-  "editorNoteZh": "≤200 字符 1-2 句锐评 (终态保留, 不入此节的 brevity 约束)",
+  "editorNoteZh": "≤200 字符 1-2 句锐评",
   "editorNoteEn": "≤200 chars equivalent",
   "editorAnalysisZh": "300-500 字, 3-6 段, 短锐 deep dive",
   "editorAnalysisEn": "250-450 words, 3-6 paragraphs"
 }
+
+// Note-only path — tier = all
+{
+  "editorNoteZh": "≤200 字符 1-2 句锐评",
+  "editorNoteEn": "≤200 chars equivalent"
+}
 ```
 
-`editor_note` (短) 和 `summary_zh` (晚点骨架, 120-220 字) 不受此节约束 — 它们各保各的 voice。
+`editor_note` (短) 和 `summary_zh` (晚点骨架, 120-220 字) 不受 brevity 约束 — 它们各保各的 voice。
+
+### Tier gating (which items get the deep dive)
+
+Per item / per multi-source event:
+
+| Tier | One-liner (`editor_note_*`) | Deep dive (`editor_analysis_*`) |
+|------|---|---|
+| `featured` | ✅ | ✅ |
+| `p1` | ✅ | ✅ |
+| `all` | ✅ | ❌ (skipped — note-only LLM call) |
+| `excluded` | ❌ | ❌ (filtered upstream) |
+
+Rationale: tier `all` items are kept in the feed as browseable signal but don't warrant the cost of a 300-500 字 deep dive. The one-liner is the floor every non-excluded item gets; the analysis is reserved for items that cleared HKR + score thresholds for `featured` / `p1`. Worker dispatch lives in `workers/enrich/commentary.ts` (per-item) and `workers/cluster/commentary.ts` (event-level); `scripts/ops/backfill-style.ts` mirrors the same gate.
 
 ---
 
@@ -167,6 +189,7 @@ _These are lessons from human feedback. Append here with timestamp when the iter
 - 2026-03-25 — Theoretical-physics + AI crossover papers (e.g. computational Boltzmann solvers) are not our lane. Cap at 50.
 - 2026-03-25 — Claude-specific updates currently score high because the audience is Claude-heavy. Keep +3 bump until a feedback shift.
 - 2026-05-08 — `editor_analysis` rebase to khazix-compressed: cap at 300-500 字 (zh) / 250-450 words (en), one judgment per paragraph, no meta-commentary openers (`先把缺口摆明` / `我的判断是` / `拿外部参照看`), `正文未披露` ≤ 2 occurrences. Reason: prior 800-1400 字 spec produced verbose output user flagged as "AI 味太浓"; reference voice is khazix's daily aggregator (AI HOT) which carries the same depth in 1/3 the words. Summary + editor_note unchanged (different voice contracts per content shape).
+- 2026-05-08 — Tier-gated commentary: `editor_note_*` now runs for every non-excluded item / event (一句话点评 for all), but `editor_analysis_*` is **only** generated for tier `featured` / `p1`. Tier `all` takes the lighter note-only LLM call (~85% smaller output). Reason: reader signal showed tier `all` items don't warrant deep dives — the one-liner is the floor everyone deserves, the analysis is reserved for items that already cleared HKR + score thresholds. Cluster path also extended to cover `event_tier='all'` (previously skipped entirely).
 
 ---
 
