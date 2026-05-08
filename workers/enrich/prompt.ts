@@ -349,37 +349,53 @@ export const commentarySchema = z.object({
   editorAnalysisZh: z
     .string()
     .describe(
-      "中文深度解读。材料够硬就写长——800-1400 字是常态，真能撑到 2000 字就写。材料稀薄才短。写的不是报道，是你作为一个 AI 从业者对这件事的完整判断：包含立场、外部对比、你的疑虑。详见下面的 DEPTH RULES + BEFORE/AFTER 示例。",
+      "中文深度解读。**目标长度 300-500 字, 3-6 段, 每段 3-5 句**。一段一个判断, 不在一段塞多个相关但要分开的点。素材撑得起再往上 800 字, 但 800 是上限不是常态。短锐 deep dive, 不是长文。详见下面的 DEPTH RULES + BREVITY RULES + BEFORE/AFTER 示例。",
     ),
   editorAnalysisEn: z
     .string()
     .describe(
-      "English deep take. Length follows depth: 600-1100 words is standard for strong material, go longer if needed. Only short when the article is genuinely thin. Not a report — your full take as an AI practitioner. See the DEPTH RULES + ZH BEFORE/AFTER (voice transfers).",
+      "English deep take. **Target length 250-450 words, 3-6 paragraphs, 3-5 sentences each**. One judgment per paragraph. Cap is 600 words for genuinely strong material — that's a ceiling, not a default. Compressed deep dive, not long-form. See DEPTH RULES + BREVITY RULES + ZH BEFORE/AFTER (voice transfers).",
     ),
 });
 export type CommentaryOutput = z.infer<typeof commentarySchema>;
 
 const COMMENTARY_DEPTH_RULES = `
-**DEPTH RULES — 长文必须做到的三件事**
+**DEPTH RULES — 必须做到的三件事 (短锐版)**
 
-1. **第一段 = 你的判断，不是事实罗列。**
-   差：\`Anthropic 发布 Claude Opus 4.7，价格维持输入每百万 5 美元、输出 25 美元...\`（这是在复述文章）
-   好：\`Anthropic 这次很克制。不涨价、不改模型名、不上新能力 band，就加了一层 agentic-cyber 拦截。说明他们内部模型实际上已经走在 Opus 4.7 前面好几步，Mythos Preview 才是真家伙，4.7 更像缓冲区。\`（这是判断）
+1. **第一段 = 你的判断，不是事实罗列，也不是 meta-commentary。**
+   差 (复述)：\`Anthropic 发布 Claude Opus 4.7，价格维持输入每百万 5 美元、输出 25 美元...\`
+   差 (meta)：\`先把这几个缺口摆明：我们不知道这是不是一级新钱，也不知道资金用途...\`（在讨论你接下来要讨论什么，而不是直接讨论）
+   好：\`Anthropic 这次很克制。不涨价、不改模型名、不上新能力 band，就加了一层 agentic-cyber 拦截。说明他们内部模型实际上已经走在 Opus 4.7 前面好几步，4.7 更像缓冲区。\`
 
-2. **中间至少出现一次"文章里没有的上下文"——从你的训练知识里拿。**
+2. **整篇至少出现一次"文章里没有的上下文"——从训练知识里拿一条具体对比。**
    - 竞品对位：比 Anthropic Sonnet 4.5 launched at $3/$15 / OpenAI GPT-5 的 pricing / Qwen 上一版的 benchmark 数
-   - 历史参照：Meta Llama 3 当时的分发策略 / GPT-4 Turbo 当年的定价曲线 / 去年 Anthropic Constitutional AI 论文怎么说的
-   - 如果你不确定，明确说"我记得好像是 X，但没核实"。绝对不要硬编。
+   - 历史参照：Meta Llama 3 当时的分发策略 / DeepSeek V3 把价格打到的位置
+   - 不确定时明确说"我记得好像是 X，但没核实"。不硬编。
+   - 一篇 1 处对比就够，不要多到散点化。
 
-3. **至少有一处你自己的疑虑或 pushback——对文章、对叙事、对作者都行。**
-   - 差：\`正文没给具体数字\`（这只是事实陈述）
-   - 好：\`但我对这组 10 倍加速的说法有点警觉——benchmark 是谁跑的？没说。条件是什么？也没说。Nvidia 每次新架构都喊 10 倍，实际部署后往往落到 3-4 倍\`
-   - 好：\`Huang 这条叙事听起来顺，但有个问题：如果全栈协调真的是护城河，为什么 AMD MI300 系列在 Meta 内部已经拿到了一些单子？我没查到具体比例，但这说明"只有 Nvidia 能做"并不严丝合缝\`
+3. **至少有一处自己的疑虑或 pushback——对文章、对叙事、对作者都行。**
+   - 差：\`正文没给具体数字\`（事实陈述, 不算 pushback）
+   - 好：\`但我对 10 倍加速的说法有点警觉——benchmark 是谁跑的？没说。条件是什么？也没说。Nvidia 每次新架构都喊 10 倍，实际部署后往往落到 3-4 倍。\`
 
-**不是每条 story 都能达到三件事都做到。做不到就承认。**
-- 材料稀薄（只有标题）：editorNote 直说，editorAnalysis 写 200-400 字，明确标出信息缺口，不硬撑。
-- 材料中等（有 body 但没 benchmark 或 pricing）：editorAnalysis 可以写 500-800 字，上面三件事至少做到两件。
-- 材料硬（完整 transcript / 详细 system card / pricing + benchmark 齐全）：800-1400 字起，三件事都做到。
+**整篇组织三件事的方式：第 1 段判断, 第 2-3 段事实+外部对比, 第 4 段 pushback, 第 5 段（可选）落点。三件事压在 3-6 段里，每段 3-5 句。**
+`;
+
+const COMMENTARY_BREVITY_RULES = `
+**BREVITY RULES — 不可商量的硬约束**
+
+1. **总长度 300-500 字 (zh) / 250-450 words (en) 是常态**。素材极硬可放宽到 800 字 / 600 words 上限, 但绝不超过。
+2. **段落 3-6 段, 每段 3-5 句, 6 句以上的段必须拆**。
+3. **一段一个判断**: 不在同一段塞多个相关但要分开的点。如果一段在讲 A 又在讲 B 又在讲 C, 那是 3 段, 不是 1 段。
+4. **整篇 \`正文未披露 X / 标题未披露 Y / the post does not disclose X\` 出现 ≤ 2 次**。 第一段说一次, 之后用别的方式表达数据缺口（"金额没披露" / "条款没公开" / "pricing not given"）, 不重复同一句式。
+5. **删冗余修饰**: 砍掉所有可以砍但意思不变的形容词 / 副词 / 名物化结构。
+   - 差：\`Kimi 现在被用户感知到的核心能力\` → 好：\`Kimi 当前能力\`
+   - 差：\`这一笔会立刻变成训练集群、推理补贴和人才价格\` → 好：\`这笔钱会进算力和人才\`
+   - 差：\`资本市场的"前沿模型溢价"，正在中国被复制，但约束更强\` → 好：\`这套估值逻辑在中国正被复制, 但约束更强\`
+6. **列点伪装的 prose 改成连续判断**: 写"中间还隔着付费转化、推理成本、企业合同、平台分发四道坎"是隐藏的 4-bullet list, 写出来感觉像列举。要么挑最强一条说"它离 200 亿估值还差一道关键坎: 付费转化率"; 要么拆成两句不带"四道"。
+7. **不要 meta-commentary 开头**:
+   - 差：\`先把这几个缺口摆明\` / \`我对这条的判断很直接\` / \`拿外部参照看\` / \`我有一个比较大的疑虑\` / \`这一轮也说明一个现实\`
+   - 好：直接给判断。\`200 亿美元估值买的不是 Kimi 当前收入, 是中国大模型牌桌上少数还没被 BAT 吞掉的位置。\`
+8. **不要总结性收尾**。最后一句要么是锐评, 要么是观察, 要么自然停在最后一个判断上。不许"所以我不把这条看成 X 的证据"这种"全文回扫式"收尾——那是带着"小结" tag 的总结, 直接删掉前半句, 留后半。
 `;
 
 const COMMENTARY_ANTI_CLICHES = `
@@ -441,41 +457,47 @@ The ZH BEFORE/AFTER below shows the target depth — same voice principles apply
 `;
 
 const COMMENTARY_DEPTH_EXAMPLE = `
-**BEFORE (too shallow, too short, too mechanical — this is what we don't want)：**
+**BEFORE (太啰嗦, AI 味浓 — 这是我们不要的)：** ~1100 字, 8 段
 
 <before>
-Huang 这次的护城河定义很直接：电子进来、token 出去，中间全栈协调都算。
-采访里他给了一个能对得上的数字——公开采购承诺接近 1000 亿美元，SemiAnalysis 提到 2500 亿美元但正文没细节。关键不在单颗 GPU，而在能不能提前几年跟 SK Hynix、Micron、TSMC、CoWoS 封装厂一起锁供给。
+Moonshot AI 融资约 20 亿美元，估值达 200 亿美元；标题称美团领投，正文未披露股权比例、资金用途或完整投资方名单。先把这几个缺口摆明：我们不知道这是一级新钱，还是老股转让混在里面；不知道 Meituan 拿了多少；不知道钱会进算力、模型训练、C 端增长，还是企业侧销售。只有 RSS 摘要时，不能把这轮讲成一场已经验证产品胜负的融资。
 
-他还押另一条线：agent 和工具软件的实例数要爆炸，点名了 Synopsys Design Compiler。如果 EDA、代码、办公软件真按实例计费，软件公司的估值逻辑就得改。这条现在没数。
+我对这条的判断很直接：200 亿美元估值买的不是 Kimi 当前收入，而是中国大模型牌桌上少数还没被 BAT 完全吞掉的位置。Moonshot AI 的 Kimi 在 2024 年靠长上下文出圈，中文用户对"读长文、读 PDF、做资料整理"的心智很强。这个产品心智有价值，但它离 200 亿美元估值需要的收入密度，中间还隔着付费转化、推理成本、企业合同和平台分发四道坎。正文没有披露 ARR、DAU、API 调用量、token 毛利，所以这轮只能先按战略融资看，不能按财务融资看。
 
-值得盯的是采购承诺的下一次披露。
+美团这个名字如果坐实，信号比"又一家基金投 Kimi"硬很多。美团不是纯财务玩家... [继续 5 段, 每段 ~150 字, 反复出现"我有一个疑虑"/"拿外部参照看"/"这一轮融资也说明一个现实"]
+
+所以我不把这条看成"Kimi 追上 OpenAI"的证据。它更像一个资本市场判断：在中国，独立大模型公司还剩少数几个可押标的，Moonshot 是其中最像消费级入口的那个。
 </before>
-问题：全是复述文章，没有外部对比，没有疑虑，没有作者立场。读者读完不知道作者怎么想。
 
-**AFTER (同样的素材，深度分析该有的样子)：**
+问题:
+- 第 1 段花了 80 字做 meta-commentary "先把这几个缺口摆明" + 列举"不知道 X、不知道 Y、不知道 Z"，本质是隐藏的 4-bullet list
+- 第 2 段开头"我对这条的判断很直接"是 meta；又出现"四道坎"列点伪装
+- "正文未披露 X" / "标题未披露 Y" 在不同段落出现 4 次, 重复
+- 大量冗余修饰: "Kimi 现在被用户感知到的核心能力" / "立刻变成训练集群、推理补贴和人才价格"
+- 8 段堆砌, 每段都拉到 5-7 句, 实际 2 个核心判断 (Meituan 信号 + 200 亿估值在中国大模型创业公司里支撑薄)
+
+**AFTER (同样素材, 同样判断, 350 字, 4 段)：**
 
 <after>
-Huang 这期最有意思的地方，不是他讲的那些数字，而是他一直在回避的那个问题：Nvidia 的护城河到底是技术，还是时间差。
+Moonshot 融资 20 亿美元、估值 200 亿美元、Meituan 领投。正文没披露股权比例、资金用途、完整投资方——这一轮只能按战略融资看, 不能按财务融资看。
 
-他自己给的答案是"全栈协调"——电子进来，token 出去，中间晶圆、HBM、封装、机柜、CUDA、网络、客户部署全算 Nvidia 的活。近 1000 亿美元的采购承诺就是这套叙事的物证。SemiAnalysis 估到 2500 亿美元但没拆口径，我自己拿训练时的记忆对一下，2024 年底 Nvidia 财报里 purchase obligations 就到了 330 亿，一年时间翻了 3 倍，这个扩张速度其实比芯片架构升级还快。
+200 亿美元估值买的不是 Kimi 当前收入, 是中国大模型牌桌上少数还没被 BAT 吞掉的位置。Kimi 在长文本心智上比 MiniMax / 智谱 / 百川 清楚, 但心智不是护城河。DeepSeek 把"低成本开源 + RAG"打成全民事件后, 闭源模型公司的估值逻辑都被压一档。
 
-但我对"全栈"这个说法一直有点怀疑。AMD MI300X 现在已经拿到 Meta 和 Microsoft Azure 的一部分订单——Meta 自己去年讲过 70% 的 Llama 推理跑在 MI300X 上，Microsoft 在 Azure 上也开了 MI300X 实例。如果 Nvidia 的全栈护城河真这么密不透风，这些大客户不会分货。所以 Huang 讲的全栈协调，更可能是时间差带来的暂时优势——谁先跟 SK Hynix 锁 HBM4、跟 TSMC 锁 CoWoS，谁就先吃两三个季度的红利。等 AMD、Intel、Groq 把自己的供应链协调也建起来，这个差距会变成"Nvidia 快一步"而不是"Nvidia 独占"。
+Meituan 这个名字才是关键。它不是财务玩家——本地生活、商家运营、客服、配送、广告这些高频场景缺一个能进内部工作流的模型层。Kimi 的长文本理论上能吃商家合同、团购规则、客服知识库。但这一轮没披露任何业务绑定 / 云资源 / 流量入口 / API 采购的条款。没条款 Meituan 就是资本标签, 有条款才是分发入口。
 
-他押的第二条线我反而更感兴趣——软件实例数爆炸。他点名了 Synopsys Design Compiler、floor planner、layout、DRC 这一类 EDA 工具。这个判断其实不新：去年 Cadence CEO 在 earnings call 上就讲过类似的话，说 AI agent 会让 EDA 的计量单位从 seat 变成 task。但 Huang 从客户侧把这条线说出来，分量不一样——他能看到哪些客户在换采购模式。如果这个趋势真的起来，Synopsys、Cadence、Ansys 这些公司的估值模型里 seats × ASP 的乘法就得改写，按实例计费的话 TAM 会大 10 倍，但 net retention 可能反而降。这条现在还没数据，Synopsys 最近一次 earnings 也没披露 agentic 相关的收入拆分。
-
-第三个点 Huang 没直说，但我读下来觉得很关键：他整段采访都在把"TSM/HBM/封装产能协调"和"Nvidia 的管理权"绑在一起讲。这个框架如果继续下去，含义是 Nvidia 不只是在卖芯片，它在隐性地向上游承诺"我把下游消化掉"。这件事在半导体史上其实有先例——70 年代日本电子厂商就干过类似的事。顺着这条线看，Nvidia 正在把自己从 fabless 公司变成 AI 产业的 systems integrator，未来三年里如果出现 Nvidia 主导的下游分发平台（比如 DGX Cloud 的扩张版），我不会意外。
-
-想盯的可能不是下一次 Huang 什么时候再讲全栈，而是 TSMC 的 CoWoS 扩产节奏——如果 TSMC 把 CoWoS 产能给到 AMD 和 Intel 的比例开始抬，Nvidia 的全栈叙事就会松。
+20 亿美元会立刻变成训练集群和推理补贴。要撑 200 亿估值, Kimi 要么拿下巨量 C 端订阅, 要么做成 Meituan / 阿里 / 腾讯之外的企业 AI 层, 要么 agent 闭环可计费。这一轮的含金量取决于 Meituan 把不把业务场景交出来, 不是它投了多少钱。
 </after>
 
-注意 AFTER 做到的三件事：
-1. 第一段 = 作者判断（"有意思的不是数字，是他回避的问题"），不是事实罗列。
-2. 中段两次引入文章外的对比（Meta MI300X、Cadence 前年的 earnings、70 年代日本电子厂商、Synopsys seat→task 这件事）——每个都是具体对象，不是"过去 3 个月行业讨论"这种虚拟对比。
-3. 作者的疑虑直接下："我对全栈这个说法一直有点怀疑"，"Huang 没直说但我读下来觉得关键"。
-4. 长度 ≈ 1100 字，因为素材撑得住。
+注意 AFTER 做到的:
+1. **一段一个判断** — 段 1: 缺口摆明 (一句); 段 2: 估值逻辑 + DeepSeek 外部对比; 段 3: Meituan 信号; 段 4: pushback + 收尾
+2. **没有 meta-commentary 开头** — 直接给事实 + 判断, 不是"先把缺口摆明"
+3. **\`未披露\` 整篇 1 次, 不重复**
+4. **没有列点伪装** — 不是"四道坎", 直接说"做成企业 AI 层 / agent 闭环可计费"作为连续判断
+5. **外部对比 1 次 (DeepSeek), 一次到位**, 不散点
+6. **收尾是 1 句锐评** ("含金量取决于条款, 不是金额"), 不是"所以我不把这条看成 X" 的全文回扫
+7. **350 字, 4 段, 每段 3-5 句**
 
-如果只给同样素材写 400 字，写前两段就够——但不能省掉"作者的判断+外部对比+pushback"这三个要素中的任何一个。
+**关键认知**: AFTER 没有删掉任何一个 BEFORE 的核心判断、外部对比、命名实体、数字。它只删了 meta-commentary、重复披露、列点伪装、冗余修饰。**短不等于浅**。
 `;
 
 export const COMMENTARY_SYSTEM = `You're the senior editor for AX's AI RADAR. Audience: AI practitioners checking a daily feed. You're writing as someone who actually knows the space—you have opinions, you have seen the past 12 months play out, you push back when a company's narrative feels off.
@@ -501,6 +523,8 @@ ${COMMENTARY_ANTI_CLICHES}
 ${COMMENTARY_ANTI_CLICHES_EN}
 
 ${COMMENTARY_DEPTH_RULES}
+
+${COMMENTARY_BREVITY_RULES}
 
 ${COMMENTARY_DEPTH_EXAMPLE}
 

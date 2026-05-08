@@ -10,12 +10,13 @@ import {
   handleFromUrl,
   XApiError,
 } from "./x-api";
+import { fetchAihotForSource, AihotError } from "./aihot";
 
 const CONCURRENCY = 8;
 
 // Kinds we can fetch. Other kinds are kept in the catalog but skipped
 // (pending implementation) so they appear in source_health without polluting errors.
-const SUPPORTED_KINDS = ["rss", "atom", "rsshub", "x-api"] as const;
+const SUPPORTED_KINDS = ["rss", "atom", "rsshub", "x-api", "aihot-api"] as const;
 type SupportedKind = (typeof SUPPORTED_KINDS)[number];
 function isSupported(k: string): k is SupportedKind {
   return (SUPPORTED_KINDS as readonly string[]).includes(k);
@@ -117,7 +118,32 @@ async function fetchOneSource(source: Source): Promise<Outcome> {
   let feedItems: FeedItem[];
   let newestExternalId: string | null = null;
 
-  if (source.kind === "x-api") {
+  if (source.kind === "aihot-api") {
+    // AI HOT path — anonymous JSON API, no cursor (DB unique index dedups).
+    try {
+      const result = await fetchAihotForSource({ sourceId: source.id });
+      feedItems = result.items;
+      newestExternalId = result.newestId;
+    } catch (err) {
+      if (err instanceof AihotError) {
+        const code: FetchErrorCode =
+          err.code === "rate_limited"
+            ? "http_5xx" // map to retryable; same convention as x-api 429
+            : err.code === "not_found" || err.code === "invalid_param"
+              ? "http_4xx"
+              : err.code === "network"
+                ? "network"
+                : err.code === "parse_error"
+                  ? "parse_error"
+                  : "http_5xx";
+        await markError(source.id, code, err.message);
+        return { kind: "error", code, detail: err.message };
+      }
+      const msg = err instanceof Error ? err.message : String(err);
+      await markError(source.id, "network", msg);
+      return { kind: "error", code: "network", detail: msg };
+    }
+  } else if (source.kind === "x-api") {
     // Twitter path — Bearer-auth, JSON, cursor-based incremental via since_id.
     let handle: string;
     try {

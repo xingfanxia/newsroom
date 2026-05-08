@@ -36,6 +36,7 @@ export default async function DailyDatePage({ params }: Props) {
         columnThemeTag: newsletters.columnThemeTag,
         publishedAt: newsletters.publishedAt,
         periodStart: newsletters.periodStart,
+        aihotDailyDate: newsletters.aihotDailyDate,
       })
       .from(newsletters)
       .where(
@@ -80,6 +81,7 @@ export default async function DailyDatePage({ params }: Props) {
             columnThemeTag: r.columnThemeTag,
             publishedAt: r.publishedAt,
             periodStart: r.periodStart,
+            aihotDailyDate: r.aihotDailyDate,
           }}
         />
       </main>

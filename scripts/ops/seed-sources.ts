@@ -34,6 +34,8 @@ async function main() {
         tags: s.tags,
         enabled: s.enabled,
         notes: s.notes ?? null,
+        curated: s.curated ?? false,
+        neverExclude: s.neverExclude ?? false,
       })
       .onConflictDoUpdate({
         target: sources.id,
@@ -49,6 +51,8 @@ async function main() {
           tags: sql`EXCLUDED.tags`,
           enabled: sql`EXCLUDED.enabled`,
           notes: sql`EXCLUDED.notes`,
+          curated: sql`EXCLUDED.curated`,
+          neverExclude: sql`EXCLUDED.never_exclude`,
           updatedAt: sql`now()`,
         },
       });

@@ -105,6 +105,58 @@ If a Tavily-sourced context is provided, use it to correct errors and add one mi
 
 ---
 
+## Editor analysis style (深度解读, 短锐 deep-dive)
+
+The `editor_analysis_zh` / `editor_analysis_en` field is the long-form take that surfaces on featured / p1 cards. It is **NOT a 长文** — it's a compressed deep dive. The actual prompt-driver lives in `workers/enrich/prompt.ts` (`COMMENTARY_BREVITY_RULES` + `COMMENTARY_DEPTH_RULES`) and `workers/cluster/prompt.ts` (mirror); this section is the canonical policy spec.
+
+### Length
+
+- **目标 300-500 字 (zh) / 250-450 words (en) 是常态**
+- 素材极硬时放宽到 800 字 / 600 words **上限**
+- 信息稀薄（仅标题）时 200-400 字, 不硬撑
+
+### Hard rules
+
+1. **一段一个判断** — 3-6 段, 每段 3-5 句, 6 句必拆
+2. **第一段 = 判断, 不是事实罗列, 不是 meta-commentary**
+3. **整篇 1 处外部对比就够** (从训练知识里拿一条具体竞品/历史/价格对位, 不确定时说 "我记得好像是 X, 但没核实")
+4. **整篇 1 处 pushback** (对叙事 / 对作者 / 对一致性)
+5. **`正文未披露 X / 标题未披露 Y` 整篇 ≤ 2 次** — 不同段不重复同句式
+6. **删冗余修饰**: "现在被用户感知到的核心能力" → "当前能力"; "立刻变成训练集群、推理补贴和人才价格" → "立刻变成算力和人才"
+7. **列点伪装的 prose 改连续判断**: 不写"中间还隔着 A、B、C、D 四道坎"——挑最强一条说
+
+### Anti-pattern openers (绝不再用)
+
+- `先把这几个缺口摆明 / 先把 X 摆明`
+- `我对这条的判断很直接 / 我有一个比较大的疑虑`
+- `拿外部参照看 / 拿历史参照看 / 横向看`
+- `这一轮也说明一个现实 / 这件事也告诉我们`
+
+直接给判断本身, 不做"我接下来要讲什么"的元叙述。
+
+### Anti-pattern endings (绝不再用)
+
+- `所以我不把这条看成 X 的证据` (全文回扫式总结)
+- `值得继续盯的是 X` (套路收尾)
+- `综上所述 / 总而言之 / 归根结底` (重总结口吻)
+
+收尾要么是 1 句锐评, 要么是观察, 要么自然停在最后一个判断。
+
+### Output shape (commentary worker)
+
+```json
+{
+  "editorNoteZh": "≤200 字符 1-2 句锐评 (终态保留, 不入此节的 brevity 约束)",
+  "editorNoteEn": "≤200 chars equivalent",
+  "editorAnalysisZh": "300-500 字, 3-6 段, 短锐 deep dive",
+  "editorAnalysisEn": "250-450 words, 3-6 paragraphs"
+}
+```
+
+`editor_note` (短) 和 `summary_zh` (晚点骨架, 120-220 字) 不受此节约束 — 它们各保各的 voice。
+
+---
+
 ## Audience-fit heuristics (learned, update with each iteration)
 
 _These are lessons from human feedback. Append here with timestamp when the iteration agent makes a change._
@@ -114,6 +166,7 @@ _These are lessons from human feedback. Append here with timestamp when the iter
 - 2026-03-25 — "Safely using Sora" or similar "how-to" pieces about no-longer-hot products underperform. Cap at 55.
 - 2026-03-25 — Theoretical-physics + AI crossover papers (e.g. computational Boltzmann solvers) are not our lane. Cap at 50.
 - 2026-03-25 — Claude-specific updates currently score high because the audience is Claude-heavy. Keep +3 bump until a feedback shift.
+- 2026-05-08 — `editor_analysis` rebase to khazix-compressed: cap at 300-500 字 (zh) / 250-450 words (en), one judgment per paragraph, no meta-commentary openers (`先把缺口摆明` / `我的判断是` / `拿外部参照看`), `正文未披露` ≤ 2 occurrences. Reason: prior 800-1400 字 spec produced verbose output user flagged as "AI 味太浓"; reference voice is khazix's daily aggregator (AI HOT) which carries the same depth in 1/3 the words. Summary + editor_note unchanged (different voice contracts per content shape).
 
 ---
 

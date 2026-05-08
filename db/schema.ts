@@ -82,6 +82,7 @@ export const sourceKindEnum = pgEnum("source_kind", [
   "rsshub",
   "scrape",
   "x-api",
+  "aihot-api",
 ]);
 
 export const sourceGroupEnum = pgEnum("source_group", [
@@ -414,6 +415,12 @@ export const newsletters = pgTable(
     columnFeaturedItemIds: jsonb("column_featured_item_ids").$type<number[]>(),
     /** Daily column — ≤8 字 day theme tag (e.g., "模型大战白热化"). */
     columnThemeTag: text("column_theme_tag"),
+    /** AI HOT daily payload — full /api/public/daily response merged in as
+     *  must-cover input for the column generator. NULL when AI HOT was
+     *  unavailable that day or for legacy rows. See docs/aihot-integration/PLAN.md. */
+    aihotDailyPayload: jsonb("aihot_daily_payload"),
+    /** Which AI HOT date got merged in (YYYY-MM-DD UTC). NULL when no payload. */
+    aihotDailyDate: text("aihot_daily_date"),
     /** List of referenced item IDs (for backlinks + crediting). */
     itemIds: jsonb("item_ids").$type<number[]>(),
     storyCount: integer("story_count").notNull().default(0),

@@ -227,20 +227,40 @@ OK to use (casual, human):
 `;
 
 const COMMENTARY_DEPTH_RULES = `
-**DEPTH RULES — 多源事件评论必须做到的三件事**
+**DEPTH RULES — 多源事件评论必须做到的三件事 (短锐版)**
 
-1. **第一段 = 你的判断，不是事实罗列。**
-   差：\`Anthropic 发布 Claude Opus 4.7，价格维持输入每百万 5 美元……\`（复述文章）
-   好：\`这次多家媒体同时跟进，但各家的切入角不同——说明这不是一个有 official source 的发布，而是市场在对一个泄露信号做自主诠释。\`（判断）
+1. **第一段 = 你的判断，不是事实罗列，也不是 meta-commentary。**
+   差 (复述)：\`Anthropic 发布 Claude Opus 4.7，价格维持输入每百万 5 美元……\`
+   差 (meta)：\`先把这次多源覆盖的几个特点摆明……\`
+   好：\`这次多家媒体同时跟进，但各家切入角不同——这不是有 official source 的发布，是市场在对一个泄露信号做自主诠释。\`
 
-2. **多源覆盖时，明确指出各来源视角的差异（或一致性）。**
-   - 如果所有来源说法一致：说"N 家媒体的表述高度一致，说明这是官方主动沟通的消息"。
-   - 如果各来源角度不同：点出差异，并分析哪个角度更可信或更有信息量。
-   - 不要假装只有一个来源，也不要把"有 N 家报道"当成质量认证。
+2. **多源覆盖时, 明确指出各来源视角的差异 (或一致性) — 一段说完, 不重复。**
+   - 一致：\`N 家媒体表述高度一致，说明这是官方主动沟通。\`
+   - 不一致：\`官方账号说 X, 媒体侧解读成 Y, 这两个角度差出了什么 — [一句具体差异]。\`
+   - 不要把"有 N 家报道"当质量认证, 也不要假装只有一个来源。
 
-3. **至少有一处你自己的疑虑或 pushback——对叙事、对源、对一致性都行。**
-   - 差：\`正文没给具体数字\`（事实陈述）
-   - 好：\`N 家媒体都引了同一组数字，但没有人给出原始来源。这组数字要么来自同一个 PR 稿，要么是相互引用的链条——我自己没核实过。\`
+3. **至少一处自己的疑虑或 pushback — 对叙事、对源、对一致性都行。**
+   - 差：\`正文没给具体数字\`（事实陈述, 不算 pushback）
+   - 好：\`N 家都引同一组数字, 没人给原始来源 — 要么同一份 PR 稿, 要么互相引用的链条, 我没核实。\`
+
+**整篇组织: 第 1 段判断, 第 2 段各源差异, 第 3 段事实+外部对比, 第 4 段 pushback, 第 5 段 (可选) 落点。三件事压在 3-6 段里, 每段 3-5 句。**
+`;
+
+const COMMENTARY_BREVITY_RULES = `
+**BREVITY RULES — 不可商量的硬约束**
+
+1. **总长度 300-500 字 (zh) / 250-450 words (en) 是常态**。素材极硬可放宽到 800 字 / 600 words 上限, 不超过。
+2. **段落 3-6 段, 每段 3-5 句, 6 句以上的段必须拆**。
+3. **一段一个判断**: 不在同一段塞多个相关但要分开的点。
+4. **\`正文未披露 X / 标题未披露 Y / the post does not disclose X\` 整篇 ≤ 2 次**。第一段说一次, 之后用别的方式表达数据缺口, 不重复同一句式。
+5. **删冗余修饰**: 砍掉所有可以砍但意思不变的形容词 / 副词 / 名物化结构。
+   - 差：\`Kimi 现在被用户感知到的核心能力\` → 好：\`Kimi 当前能力\`
+   - 差：\`这一笔会立刻变成训练集群、推理补贴和人才价格\` → 好：\`这笔钱会进算力和人才\`
+6. **列点伪装的 prose 改成连续判断**: 不要写"中间还隔着 A、B、C、D 四道坎" — 这是隐藏的 4-bullet。挑最强一条说, 或拆成两句不带"四道"。
+7. **不要 meta-commentary 开头**:
+   - 差：\`先把这几个缺口摆明\` / \`我对这条的判断很直接\` / \`拿外部参照看\` / \`我有一个比较大的疑虑\` / \`这次也说明一个现实\`
+   - 好：直接给判断本身。
+8. **不要总结性收尾**。最后一句要么是锐评, 要么是观察, 要么自然停在最后一个判断。不许"所以我不把这条看成 X 的证据"这种全文回扫式收尾。
 `;
 
 // ── Schema (matches per-item commentarySchema exactly) ────────────────────
@@ -261,12 +281,12 @@ export const eventCommentarySchema = z.object({
   editorAnalysisZh: z
     .string()
     .describe(
-      "中文深度解读。材料够硬就写长——800-1400 字是常态，真能撑到 2000 字就写。材料稀薄才短。写的不是报道，是你作为一个 AI 从业者对这件事（多家报道的）的完整判断：包含立场、各源角度对比、外部对比、你的疑虑。",
+      "中文深度解读 (事件级)。**目标长度 300-500 字, 3-6 段, 每段 3-5 句**。一段一个判断, 不在一段塞多个相关但要分开的点。素材撑得起再往上 800 字, 但 800 是上限不是常态。短锐 deep dive。多源覆盖的核心信号是: 各源角度对比 + 你的判断 + 1 处外部对比 + 1 处 pushback, 压在 4-5 段里。详见 DEPTH RULES + BREVITY RULES。",
     ),
   editorAnalysisEn: z
     .string()
     .describe(
-      "English deep take. Length follows depth: 600-1100 words is standard for strong material. Not a report — your full take as an AI practitioner reading N sources. Compare angles between sources where they differ.",
+      "English event-level deep take. **Target 250-450 words, 3-6 paragraphs, 3-5 sentences each**. One judgment per paragraph. Cap is 600 words for the strongest material. Compressed deep dive. Multi-source signal: source-angle compare + your judgment + 1 external comparison + 1 pushback, all in 4-5 paragraphs.",
     ),
 });
 
@@ -302,6 +322,8 @@ ${COMMENTARY_ANTI_CLICHES}
 ${COMMENTARY_ANTI_CLICHES_EN}
 
 ${COMMENTARY_DEPTH_RULES}
+
+${COMMENTARY_BREVITY_RULES}
 
 **About drawing on training knowledge for outside context**:
 - You have the past ~year of AI news baked in. Use it. Name specific comparisons: "Anthropic's Sonnet 4.5 launched at $3/$15 per M", "OpenAI GPT-5 shipped in January 2026", "Qwen 3.5 MoE scored 75 on SWE-bench".
