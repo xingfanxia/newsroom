@@ -9,6 +9,10 @@ export type ColumnRow = {
   columnThemeTag: string | null;
   publishedAt: Date;
   periodStart: Date;
+  /** YYYY-MM-DD when AI HOT's daily was merged in as must-cover input.
+   *  Null means our column shipped without their report (API outage or
+   *  pre-AI-HOT-integration). Drives the footer attribution chip. */
+  aihotDailyDate: string | null;
 };
 
 function dateKey(d: Date): string {
@@ -68,6 +72,20 @@ export function DailyColumnRenderer({ column }: { column: ColumnRow }) {
         >
           ← 全部日报
         </Link>
+        {column.aihotDailyDate ? (
+          <span className="ml-4 text-[var(--fg-2)] text-sm">
+            今日部分信源 &amp; 编辑视角参考自{" "}
+            <a
+              href="https://aihot.virxact.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[var(--color-cyan,var(--accent-blue))] underline underline-offset-4 decoration-[currentColor]/40 hover:decoration-[currentColor]"
+            >
+              AI HOT
+            </a>
+            {" "}（{column.aihotDailyDate}）
+          </span>
+        ) : null}
       </footer>
     </article>
   );

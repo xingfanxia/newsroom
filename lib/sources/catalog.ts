@@ -766,6 +766,30 @@ export const sourceCatalog: Source[] = [
     enabled: true,
     notes: "Community-run daily-papers bridge; easier than the HF scrape",
   },
+
+  // ── AI HOT (2026-05-08) ──────────────────────────────────────────
+  // Pre-curated AI digest aggregator (https://aihot.virxact.com) by 卡兹克.
+  // Their `mode=selected` pool is hand-curated; we ingest hourly with curated=true
+  // (surfaces on AX 严选 tab) and never_exclude=true (their picks are pre-vetted,
+  // our scorer should not demote them below "all"). Daily report is fetched
+  // separately by workers/newsletter/aihot-daily.ts and merged into our column.
+  // See docs/aihot-integration/PLAN.md.
+  {
+    id: "aihot-selected",
+    name: { en: "AI HOT (Curated Pool)", zh: "AI HOT 精选" },
+    url: "internal://aihot-selected",
+    kind: "aihot-api",
+    group: "newsletter",
+    locale: "zh",
+    cadence: "hourly",
+    priority: 1,
+    tags: ["curated", "aihot", "digest", "中文", "zh"],
+    enabled: true,
+    curated: true,
+    neverExclude: true,
+    notes:
+      "Hourly pull of AI HOT's mode=selected pool. Pre-curated by 卡兹克; our scorer should not demote below 'all'. Daily-report path is separate (workers/newsletter/aihot-daily.ts).",
+  },
 ];
 
 export function sourcesByGroup() {

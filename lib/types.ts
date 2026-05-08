@@ -6,7 +6,8 @@ export type SourceKind =
   | "api"
   | "rsshub"
   | "scrape"
-  | "x-api";
+  | "x-api"
+  | "aihot-api";
 export type SourceGroup =
   | "vendor-official"
   | "media"
@@ -31,6 +32,11 @@ export type Source = {
   tags: string[];
   enabled: boolean;
   notes?: string;
+  /** Surface in the "AX 严选 / curated" tab. Default false. */
+  curated?: boolean;
+  /** Source's items get tier floor of "all" regardless of scorer verdict —
+   *  for pre-curated digests where their picks are pre-vetted. Default false. */
+  neverExclude?: boolean;
 };
 
 export type Story = {

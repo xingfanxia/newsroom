@@ -1,12 +1,15 @@
 /**
- * Daily AI column writer — 卡兹克-voice 2500-4500 字 narrative on the day's
- * 严选 ∪ 热点聚合 selection. Replaces the structured `runNewsletterBatch("daily")`
- * format (legacy fields headline/overview/highlights/commentary stay populated
- * for monthly only).
+ * Daily AI column writer — khazix-voice narrative on the day's
+ * 严选 ∪ 热点聚合 selection, with AI HOT (https://aihot.virxact.com)
+ * daily report merged in as a must-cover baseline.
  *
- * Flow: select pool → render user prompt → generateStructured against
- * gpt-5.5-standard → run L1-L2 self-check → upsert into newsletters with
- * column_* fields → log QC hits to column_qc_log if any.
+ * Flow: select pool → fetch AI HOT daily (graceful, may be null) →
+ * render user prompt with optional <aihot-daily> block → generateStructured
+ * against gpt-5.5-standard → run L1-L2 self-check → upsert into newsletters
+ * with column_* + aihot_daily_* fields → log QC hits to column_qc_log if any.
+ *
+ * Voice rebase 2026-05-08: lib/llm/prompts/daily-column.md was rebased from
+ * 虎嗅有意思周报 voice to khazix. See docs/aihot-integration/PLAN.md.
  */
 import { z } from "zod";
 import { sql } from "drizzle-orm";
@@ -16,6 +19,12 @@ import { generateStructured, profiles } from "@/lib/llm";
 import { loadDailyColumnPrompt } from "@/lib/llm/prompts/load";
 import { selectDailyColumnPool, type SelectedRow } from "./select";
 import { runColumnSelfCheck } from "./qc/self-check";
+import {
+  fetchAihotDailyForDate,
+  utcYmdFromDate,
+  renderAihotDailyForPrompt,
+} from "./aihot-daily";
+import type { AihotDailyReport } from "@/lib/sources/aihot";
 
 const dailyColumnSchema = z.object({
   title: z.string().min(1).max(80).describe("≤24 字 总标题"),
@@ -23,7 +32,7 @@ const dailyColumnSchema = z.object({
   narrative_md: z
     .string()
     .min(2500)
-    .describe("6-10 个 ## 小节, 每节 200-1000 字 (虎嗅周报体)"),
+    .describe("6-10 个 ## 小节, 每节 200-1000 字 (khazix-narrative 体)"),
   featured_item_ids: z.array(z.number()).min(1).max(3),
   theme_tag: z.string().min(1).max(30),
 });
@@ -79,7 +88,12 @@ export async function runDailyColumn(
     }
   }
 
-  const userPrompt = renderItemsForPrompt(pool.rows);
+  // ── AI HOT daily (must-cover baseline) — graceful: null on failure ──
+  const aihotPayload = await fetchAihotDailyForDate(
+    utcYmdFromDate(pool.windowEnd),
+  );
+
+  const userPrompt = renderItemsForPrompt(pool.rows, aihotPayload);
   const systemPrompt = loadDailyColumnPrompt();
 
   const result = await generateStructured({
@@ -113,6 +127,8 @@ export async function runDailyColumn(
       columnThemeTag: draft.theme_tag,
       itemIds: pool.rows.map((r) => r.id),
       storyCount: pool.rows.length,
+      aihotDailyPayload: aihotPayload ?? null,
+      aihotDailyDate: aihotPayload?.date ?? null,
     })
     .onConflictDoUpdate({
       target: [newsletters.kind, newsletters.locale, newsletters.periodStart],
@@ -124,6 +140,8 @@ export async function runDailyColumn(
         columnThemeTag: draft.theme_tag,
         itemIds: pool.rows.map((r) => r.id),
         storyCount: pool.rows.length,
+        aihotDailyPayload: aihotPayload ?? null,
+        aihotDailyDate: aihotPayload?.date ?? null,
         publishedAt: new Date(),
       },
     })
@@ -156,7 +174,10 @@ export async function runDailyColumn(
  * canonical title prefix are flagged as potential dupes — Stage A recall
  * sometimes leaks near-duplicates and the writer should merge in its take.
  */
-function renderItemsForPrompt(rows: SelectedRow[]): string {
+function renderItemsForPrompt(
+  rows: SelectedRow[],
+  aihotDaily: AihotDailyReport | null,
+): string {
   const lines = rows.map((r) => {
     const title = r.canonicalTitleZh ?? r.titleZh ?? r.titleEn ?? r.title;
     const summary = r.summaryZh ?? r.summaryEn ?? "";
@@ -187,9 +208,11 @@ function renderItemsForPrompt(rows: SelectedRow[]): string {
   ${note ? `editor_note: ${note}` : ""}`.trim();
   });
 
+  const aihotBlock = renderAihotDailyForPrompt(aihotDaily);
+
   return `<window kind="daily-column" locale="zh" story_count="${rows.length}">
 ${lines.join("\n\n")}
-</window>
+</window>${aihotBlock ? `\n\n${aihotBlock}` : ""}
 
-注意，上方 items 中可能有同一事件的多源覆盖（不同 cluster_id 但讲同一件事），如果你看到比如 3 条都是 Google 投资 Anthropic 的报道，把它们合并成 summary 里的一条编号项，narrative 里也作为一个事件深聊。你的任务是写 1 篇 5-7 分钟的日报，不是写新闻摘要的列表。`;
+注意，上方 <window> items 中可能有同一事件的多源覆盖（不同 cluster_id 但讲同一件事），如果你看到比如 3 条都是 Google 投资 Anthropic 的报道，把它们合并成 summary 里的一条编号项，narrative 里也作为一个事件深聊。你的任务是写 1 篇日报，不是写新闻摘要的列表。${aihotBlock ? "\n\n上方 <aihot-daily> 是 AI HOT 当天精编日报 (https://aihot.virxact.com), 是 must-cover 基线 — 你的 narrative 必须覆盖它的 lead.title 和所有 sections.items。flashes 选择性提及。覆盖时用我们的 voice 重写, 不要照抄他们的措辞。" : ""}`;
 }
