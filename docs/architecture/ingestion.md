@@ -35,27 +35,29 @@ Each arrow is a durable step: a failed enrich doesn't re-fetch; a failed score d
 ## 2. Components
 
 ### 2.1 Source catalog (`lib/sources/catalog.ts`)
-A typed registry. Source entry shape:
+A typed registry. Source entry shape (current as of 2026-05-08):
 
 ```ts
 type Source = {
   id: string;                    // "anthropic-blog"
   name: { en: string; zh: string };
-  url: string;                   // RSS/API/HTML URL
-  kind: "rss" | "atom" | "api" | "rsshub" | "scrape";
+  url: string;                   // RSS/API/HTML URL — or "internal://<id>" for adapter-routed kinds
+  kind: "rss" | "atom" | "api" | "rsshub" | "scrape" | "x-api" | "aihot-api";
+  group: "vendor-official" | "media" | "newsletter" | "research" | "social" | "product" | "podcast" | "policy" | "market";
   locale: "en" | "zh" | "multi";
   cadence: "live" | "hourly" | "daily" | "weekly";
   priority: 1 | 2 | 3;          // 1 = must-have, 3 = noisy/opt-in
   tags: string[];                // capability / entity / topic axes
   enabled: boolean;
-  extractor?: string;            // for scrape kind: css selector spec id
-  headers?: Record<string, string>;
-  authMethod?: "none" | "cookie" | "api-key";
   notes?: string;
+  curated?: boolean;             // surfaces on AX 严选 tab; default false
+  neverExclude?: boolean;        // pre-vetted source — scorer cannot demote below "all"; default false
 };
 ```
 
-Grouping for the `信源` UI: `vendor-official | media | newsletter | research | social | product | podcast | policy | market`.
+Grouping for the `信源` UI: same enum as `group` above.
+
+**Adapter-routed kinds** (`x-api`, `aihot-api`): `url` field is informational; the fetcher dispatches by `kind` to a dedicated adapter (`workers/fetcher/x-api.ts`, `workers/fetcher/aihot.ts`) that owns the API contract. See §2.9 for AI HOT integration.
 
 ### 2.2 Fetcher worker (`workers/fetcher/`)
 **Responsibility**: pull new items from a source, dedupe by `(source_id, external_id)`, write raw payload to `raw_items` table.
@@ -225,6 +227,7 @@ Seed watchlist (v0): `@sama`, `@AndrewYNg`, `@ylecun`, `@drjimfan`, `@karpathy`,
 - **LLM SDK choice**: original plan assumed direct vendor SDKs — migrated to **Vercel AI SDK v6** + `@ai-sdk/{anthropic,google,azure,openai}` for unified `generateText` / `generateObject` / `embed` across providers.
 - **Prompt injection defense** (not in original §2): XML-fence untrusted content + system-prompt framing + control-sequence neutralization (added per security review).
 - **Cron timing**: enrich every 15 min, cluster every 30 min, catch-up normalize every 6 h.
+- **AI HOT integration (2026-05-08)**: added pre-curated source `aihot-selected` (kind `aihot-api`) ingesting hourly from https://aihot.virxact.com; merge their structured `/api/public/daily` report into our daily column generator as a must-cover baseline (`newsletters.aihot_daily_payload` + `aihot_daily_date`). Voice prompts rebased — daily column from 虎嗅周报 → khazix narrative; `editor_analysis_zh/en` from 晚点 800-1400 字 → khazix-compressed 300-500 字. Full design: `docs/aihot-integration/PLAN.md`. New env vars: `AIHOT_API_BASE_URL` + `AIHOT_API_USER_AGENT` (both with safe defaults). Operator scripts: `scripts/ops/backfill-style.ts` (cost-bounded re-enrich) + `scripts/ops/import-aihot-daily-history.ts` (180-day daily history import).
 
 ---
 

@@ -1,10 +1,17 @@
 # 每日 AI 日报 — Design
 
-**Status**: SHIPPED 2026-04-25. Voice + UI iterated three times same day; final state captured in `HANDOFF-2026-04-25.md`.
+**Status**: SHIPPED 2026-04-25; **voice rebased back to khazix on 2026-05-08** (and AI HOT integration shipped same day).
 
-**Scope**: Daily 9pm-PT opinionated AI column in **虎嗅有意思周报** voice (rebased from initial khazix-pure spec); newsletter + 3 lane RSS feeds; MCP resources for column; operator skill composing existing `ax-radar` + writing-style references.
+**Scope**: Daily opinionated AI column; newsletter + 3 lane RSS feeds; MCP resources for column; operator skill composing existing `ax-radar` + writing-style references.
 
-> **Note**: The original spec called for 卡兹克 voice. Voice was rebased twice during shipping (khazix → Stratechery → 虎嗅周报) based on operator feedback. See `HANDOFF-2026-04-25.md` for the full journey + final voice spec.
+> **2026-05-08 update — voice + AI HOT integration**:
+>
+> - Voice rebased: 虎嗅有意思周报 → **卡兹克 (khazix) narrative** (full khazix voice in the long-form column; `editor_analysis_zh/en` on item + cluster cards rebased to **khazix-compressed** 300-500 字; `summary_zh/en` and `editor_note_*` stay on 晚点骨架). User feedback: prior output too "AI 味浓" — reference voice is khazix's daily aggregator (https://aihot.virxact.com) which carries depth in 1/3 the words for short shapes.
+> - AI HOT (https://aihot.virxact.com) integrated as a pre-curated source AND as must-cover input for the column generator. New `aihot-api` source kind, `aihot-selected` source row (hourly, curated=true, neverExclude=true), new `newsletters.aihot_daily_payload` + `aihot_daily_date` columns. Daily UI gets a footer attribution chip when AI HOT payload merged in.
+> - Authoritative spec for THIS section's voice contract is now `lib/llm/prompts/daily-column.md`; for `editor_analysis` voice it's `workers/enrich/prompt.ts` (`COMMENTARY_BREVITY_RULES` + `COMMENTARY_DEPTH_RULES`) + `modules/feed/runtime/policy/skills/editorial.skill.md` "Editor analysis style" section.
+> - Full design + decision log: `docs/aihot-integration/PLAN.md`.
+>
+> The historical voice journey (khazix → Stratechery → 虎嗅周报 → khazix again) is preserved in `HANDOFF-2026-04-25.md`. The sections below describe the original 2026-04-25 design; treat them as the structural spec (what the column produces), with voice having since rebased per the update above.
 
 ---
 
