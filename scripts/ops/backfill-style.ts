@@ -257,7 +257,10 @@ async function loadClusterCandidates(args: {
         inArray(clusters.eventTier, eventTiers),
         sql`${clusters.memberCount} >= 2`,
         or(isNull(clusters.commentaryAt), lt(clusters.commentaryAt, args.policyBumpAt)),
-        sql`COALESCE(${clusters.latestMemberAt}, ${clusters.firstSeenAt}) >= ${since}`,
+        // Cast the ISO string explicitly — drizzle's raw `sql` template doesn't
+        // see the column type the way `gte()` does, and postgres-js will refuse
+        // to bind a JS Date as a comparison RHS without a type hint.
+        sql`COALESCE(${clusters.latestMemberAt}, ${clusters.firstSeenAt}) >= ${since.toISOString()}::timestamptz`,
       ),
     )
     .orderBy(sql`${clusters.importance} DESC NULLS LAST`, desc(clusters.updatedAt));
