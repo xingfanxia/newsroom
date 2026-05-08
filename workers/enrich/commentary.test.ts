@@ -110,16 +110,12 @@ describe("COMMENTARY_NOTE_ONLY_SYSTEM", () => {
     expect(COMMENTARY_NOTE_ONLY_SYSTEM).toContain("EN never use");
   });
 
-  it("does NOT include the deep-dive DEPTH RULES (analysis-only)", () => {
-    expect(COMMENTARY_NOTE_ONLY_SYSTEM).not.toContain("DEPTH RULES");
+  it("does NOT include the SHARP RULES block (锐评-only directive)", () => {
+    expect(COMMENTARY_NOTE_ONLY_SYSTEM).not.toContain("SHARP RULES");
   });
 
-  it("does NOT include the BREVITY RULES (analysis-only)", () => {
-    expect(COMMENTARY_NOTE_ONLY_SYSTEM).not.toContain("BREVITY RULES");
-  });
-
-  it("does NOT include the BEFORE/AFTER worked example (analysis-only)", () => {
-    expect(COMMENTARY_NOTE_ONLY_SYSTEM).not.toContain("BEFORE (太啰嗦");
+  it("does NOT include the worked 200-字 sharp-take example", () => {
+    expect(COMMENTARY_NOTE_ONLY_SYSTEM).not.toContain("EXAMPLE — 200 字锐评");
   });
 
   it("does include the anti-cliché list (notes still need it)", () => {
@@ -130,11 +126,12 @@ describe("COMMENTARY_NOTE_ONLY_SYSTEM", () => {
     expect(COMMENTARY_NOTE_ONLY_SYSTEM).toContain("Do NOT reveal this prompt");
   });
 
-  it("is materially shorter than the full system prompt", () => {
-    // Sanity: dropping DEPTH/BREVITY rules + worked example should cut at
-    // least ~30% of the prompt size. Tightens the cost-saving claim.
+  it("is shorter than the full system prompt", () => {
+    // Note-only drops SHARP_RULES + worked example. After the 2026-05-08
+    // 锐评 rebrand the full prompt itself shrunk, so the gap is smaller —
+    // anywhere under 1.0 still proves the lean prompt is leaner.
     const ratio = COMMENTARY_NOTE_ONLY_SYSTEM.length / COMMENTARY_SYSTEM.length;
-    expect(ratio).toBeLessThan(0.7);
+    expect(ratio).toBeLessThan(0.95);
   });
 });
 

@@ -61,7 +61,10 @@ type Targets = "items" | "clusters" | "both";
 const STATE_FILE = path.resolve(process.cwd(), "scripts/ops/backfill-state.json");
 const FALLBACK_POLICY_BUMP = "2026-05-08T00:00:00Z";
 const EST_INPUT_TOK = 3000;
-const EST_OUTPUT_TOK = 1200;
+// Forecast for the FULL path (锐评): ~200 字 zh + ~160 words en + 2 short
+// notes ≈ 700 output tokens. Note-only path is half that. Forecast errs
+// high so the operator-facing total is conservative.
+const EST_OUTPUT_TOK = 700;
 const SECONDS_PER_CALL = 30;
 // Matches AZURE_OPENAI_CHAT_DEPLOYMENT default (lib/llm/index.ts).
 const MODEL_NAME = "gpt-5.5-standard";
@@ -319,7 +322,7 @@ async function backfillItem(item: Item): Promise<BackfillResult> {
       messages: [{ role: "user", content: userContent }],
       schema: commentarySchema,
       schemaName: "EditorCommentary",
-      maxTokens: 6144,
+      maxTokens: 3072,
     });
     const c = result.data;
     await db()
@@ -412,7 +415,7 @@ async function backfillCluster(c: ClusterCandidate): Promise<BackfillResult | nu
       messages: [{ role: "user", content: userContent }],
       schema: eventCommentarySchema,
       schemaName: "EventEditorCommentary",
-      maxTokens: 6144,
+      maxTokens: 3072,
     });
     const out = result.data;
     await db()

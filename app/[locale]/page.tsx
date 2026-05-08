@@ -7,7 +7,7 @@ import { Item } from "@/components/feed/item";
 import { RightRail } from "@/components/feed/right-rail";
 import { CalendarGrid } from "@/components/feed/calendar-grid";
 import { DayBreak } from "./_day-break";
-import { HomeFilters, type HomeTier, type SourcePreset } from "./_home-filters";
+import { HomeFilters, type HomeTier, type HomeView, type SourcePreset } from "./_home-filters";
 import { groupByDay } from "@/lib/feed/group-by-day";
 import { getFeaturedStories } from "@/lib/items/live";
 import {
@@ -41,6 +41,11 @@ function coerceSource(v: string | undefined): SourcePreset {
   return v && SOURCE_PRESETS.has(v as SourcePreset)
     ? (v as SourcePreset)
     : "all";
+}
+function coerceView(v: string | undefined): HomeView {
+  // Default flipped 2026-05-08: today's hot events, not the multi-day digest.
+  // Old behavior is reachable via ?view=daily — preserved for power users.
+  return v === "daily" ? "daily" : "today";
 }
 
 function presetToFilter(
@@ -77,6 +82,7 @@ export default async function HotNewsPage({
     source?: string;
     source_id?: string;
     date?: string;
+    view?: string;
   }>;
 }) {
   const [{ locale }, sp] = await Promise.all([params, searchParams]);
@@ -95,16 +101,25 @@ export default async function HotNewsPage({
   const sourcePreset = coerceSource(sp.source);
   const sourceFilter = sourceId ? { sourceId } : presetToFilter(sourcePreset);
   const activeDate = sp.date && DATE_RE.test(sp.date) ? sp.date : undefined;
+  // Default `today` (importance-sorted hot events). `daily` opts back into
+  // the multi-day 3-per-day digest. Calendar drill-in (activeDate) overrides
+  // both — that always shows the full archive for the picked day.
+  const homeView = coerceView(sp.view);
   // Day picked → show everything curated that day. Unfiltered top-featured
   // view bumps to 120 (was 40 and people kept asking where the rest went).
   const limit = activeDate ? 500 : 120;
 
   // Daily-highlights mode kicks in only when the user hasn't pinned a date,
-  // a specific source, or a non-default tier filter. Otherwise the user is
-  // intentionally drilling in (e.g., /zh?source=media) and expects the full
-  // chronological feed for that filter — not one item per day.
+  // a specific source, a non-default tier filter, AND has explicitly opted
+  // into ?view=daily. Otherwise the user is on the default ("今日热点")
+  // or drilling into a filter — both want hot-window/today semantics, not
+  // the multi-day digest.
   const dailyHighlights =
-    !activeDate && !sourceId && sourcePreset === "all" && tier === "featured";
+    !activeDate &&
+    !sourceId &&
+    sourcePreset === "all" &&
+    tier === "featured" &&
+    homeView === "daily";
 
   let stories: Story[] = [];
   try {
@@ -210,7 +225,7 @@ export default async function HotNewsPage({
           policyLabel={`policy ${policy.version}`}
         />
         <Ticker items={ticker} />
-        <HomeFilters tier={tier} source={sourcePreset} />
+        <HomeFilters tier={tier} source={sourcePreset} view={homeView} />
         <CalendarGrid
           days={days}
           active={activeDate}

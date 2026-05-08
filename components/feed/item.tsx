@@ -25,8 +25,9 @@ function formatTime(iso: string): { hh: string; date: string; ago: string } {
 }
 
 /**
- * Feed row — bilingual title, source meta, summary, tags, score ring, and an
- * expanding panel with 精选理由 / 编辑点评 / HKR breakdown / actions.
+ * Feed row — bilingual title, source meta, summary (一句话总结), tags, score
+ * ring, and an expanding panel with 精选理由 / 一句话点评 / 锐评 / HKR
+ * breakdown / actions.
  */
 export function Item({ story, locale }: Props) {
   const [open, setOpen] = useState(false);
@@ -47,9 +48,9 @@ export function Item({ story, locale }: Props) {
     ) : null;
 
   const reason = story.reasoning;
-  // Render note + analysis separately so the one-liner stance doesn't mask
-  // the multi-paragraph deep dive. Previously `note || analysis` meant a
-  // present note always hid the long-form analysis behind it.
+  // Render 一句话点评 (note) + 锐评 (analysis) separately so the one-liner
+  // stance doesn't mask the 200-字 sharp take. Previously `note || analysis`
+  // meant a present note always hid the longer take behind it.
   const editorNote = story.editorNote;
   const editorAnalysis = story.editorAnalysis;
   const hkrPass = story.hkr;
@@ -132,13 +133,13 @@ export function Item({ story, locale }: Props) {
           )}
           {editorNote && (
             <div className="kv tldr">
-              <div className="k e">{showZh ? "编辑点评" : "editor tl;dr"}</div>
+              <div className="k e">{showZh ? "一句话点评" : "editor take"}</div>
               <div className="v">{editorNote}</div>
             </div>
           )}
           {editorAnalysis && editorAnalysis !== editorNote && (
             <div className="kv analysis">
-              <div className="k">{showZh ? "深度解读" : "deep read"}</div>
+              <div className="k">{showZh ? "锐评" : "sharp"}</div>
               <div className="v">{editorAnalysis}</div>
             </div>
           )}

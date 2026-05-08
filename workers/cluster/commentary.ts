@@ -201,8 +201,9 @@ async function processOneCluster(candidate: ClusterCandidate): Promise<void> {
       messages: [{ role: "user", content: userPrompt }],
       schema: eventCommentarySchema,
       schemaName: "EventEditorCommentary",
-      // Same budget as per-item commentary — long-form prose in both zh + en.
-      maxTokens: 6144,
+      // 锐评 target: 200 字 zh + 160 words en + 2 short notes. 3072 fits
+      // comfortably with reasoning + JSON overhead.
+      maxTokens: 3072,
     });
     const c = result.data;
     await client
