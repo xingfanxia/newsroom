@@ -239,8 +239,9 @@ async function processOneCluster(candidate: ClusterCandidate): Promise<void> {
       .set({
         editorNoteZh: c.editorNoteZh,
         editorNoteEn: c.editorNoteEn,
-        // Leave editor_analysis_* unchanged — null on first commentary, or
-        // preserved from a prior featured-tier run if the event was demoted.
+        // Intentionally not setting editor_analysis_{zh,en} — preserves any
+        // value written by a prior featured/p1 run (or stays null on first
+        // commentary). Demotion semantics live elsewhere if/when added.
         commentaryAt: new Date(),
       })
       .where(

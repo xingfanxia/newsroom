@@ -170,7 +170,9 @@ async function generateOneCommentary(item: Item): Promise<void> {
         editorAnalysisEn: c.editorAnalysisEn,
         commentaryAt: new Date(),
       })
-      .where(eq(items.id, item.id));
+      // Idempotency guard — only write if still null. Mirrors the cluster
+      // path so two overlapping cron ticks can't double-bill an LLM call.
+      .where(and(eq(items.id, item.id), isNull(items.commentaryAt)));
   } else {
     // Note-only — tier='all'. Two short strings per locale, ≤ 200 chars each.
     const result = await generateStructured({
@@ -190,10 +192,12 @@ async function generateOneCommentary(item: Item): Promise<void> {
       .set({
         editorNoteZh: c.editorNoteZh,
         editorNoteEn: c.editorNoteEn,
-        // Leave editor_analysis_* unchanged — null on first commentary, or
-        // preserved from a prior featured-tier run if the item was demoted.
+        // Intentionally not setting editor_analysis_{zh,en} — preserves any
+        // value written by a prior featured/p1 run (or stays null on first
+        // commentary). Demotion semantics live elsewhere if/when added.
         commentaryAt: new Date(),
       })
-      .where(eq(items.id, item.id));
+      // Same idempotency guard as the full path.
+      .where(and(eq(items.id, item.id), isNull(items.commentaryAt)));
   }
 }

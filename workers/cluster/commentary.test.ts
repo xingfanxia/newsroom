@@ -392,20 +392,19 @@ describe("eventCommentaryNoteSchema", () => {
     expect(result.success).toBe(true);
   });
 
-  it("rejects analysis fields — schema only carries notes", () => {
+  it("strips analysis fields — schema only carries notes", () => {
     const result = eventCommentaryNoteSchema.safeParse({
       editorNoteZh: "短",
       editorNoteEn: "short",
       editorAnalysisZh: "should not be here",
       editorAnalysisEn: "should not be here",
     });
-    // zod default mode is "strip", so unknown fields don't fail parsing,
+    // zod default mode is "strip" — unknown fields don't fail parsing,
     // but they also don't appear in the parsed output.
+    expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data).not.toHaveProperty("editorAnalysisZh");
       expect(result.data).not.toHaveProperty("editorAnalysisEn");
-    } else {
-      expect(result.success).toBe(true); // surface a clear failure
     }
   });
 

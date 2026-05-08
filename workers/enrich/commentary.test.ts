@@ -65,12 +65,10 @@ describe("commentaryNoteSchema", () => {
       editorAnalysisZh: "should not appear",
       editorAnalysisEn: "should not appear",
     });
+    expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data).not.toHaveProperty("editorAnalysisZh");
       expect(result.data).not.toHaveProperty("editorAnalysisEn");
-    } else {
-      // surface clear failure if zod policy ever changes from "strip"
-      expect(result.success).toBe(true);
     }
   });
 });

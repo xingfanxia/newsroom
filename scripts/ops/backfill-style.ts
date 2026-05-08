@@ -277,7 +277,14 @@ async function loadClusterCandidates(args: {
 }
 
 // ── LLM workers (per-item / per-cluster) ─────────────────────────────
-async function backfillItem(item: Item): Promise<{ charCountZh: number; costUsd: number | null }> {
+type BackfillPath = "full" | "note";
+type BackfillResult = {
+  path: BackfillPath;
+  outputCharsZh: number;
+  costUsd: number | null;
+};
+
+async function backfillItem(item: Item): Promise<BackfillResult> {
   const tagBag = (item.tags ?? {}) as {
     capabilities?: string[];
     entities?: string[];
@@ -330,7 +337,7 @@ async function backfillItem(item: Item): Promise<{ charCountZh: number; costUsd:
       { inputTokens: result.inputTokens, outputTokens: result.outputTokens },
       pricing,
     );
-    return { charCountZh: c.editorAnalysisZh.length, costUsd: cost };
+    return { path: "full", outputCharsZh: c.editorAnalysisZh.length, costUsd: cost };
   } else {
     // tier='all' → note-only path. Don't overwrite any existing analysis.
     const result = await generateStructured({
@@ -357,12 +364,12 @@ async function backfillItem(item: Item): Promise<{ charCountZh: number; costUsd:
       { inputTokens: result.inputTokens, outputTokens: result.outputTokens },
       pricing,
     );
-    // Use note length as char count signal — we never produced an analysis.
-    return { charCountZh: c.editorNoteZh.length, costUsd: cost };
+    // Note length is the only output signal here — analysis was never produced.
+    return { path: "note", outputCharsZh: c.editorNoteZh.length, costUsd: cost };
   }
 }
 
-async function backfillCluster(c: ClusterCandidate): Promise<{ charCountZh: number; costUsd: number | null } | null> {
+async function backfillCluster(c: ClusterCandidate): Promise<BackfillResult | null> {
   const memberRows = await db()
     .select({
       id: items.id,
@@ -423,7 +430,7 @@ async function backfillCluster(c: ClusterCandidate): Promise<{ charCountZh: numb
       { inputTokens: result.inputTokens, outputTokens: result.outputTokens },
       pricing,
     );
-    return { charCountZh: out.editorAnalysisZh.length, costUsd: cost };
+    return { path: "full", outputCharsZh: out.editorAnalysisZh.length, costUsd: cost };
   } else {
     // event_tier='all' → note-only.
     const result = await generateStructured({
@@ -449,7 +456,7 @@ async function backfillCluster(c: ClusterCandidate): Promise<{ charCountZh: numb
       { inputTokens: result.inputTokens, outputTokens: result.outputTokens },
       pricing,
     );
-    return { charCountZh: out.editorNoteZh.length, costUsd: cost };
+    return { path: "note", outputCharsZh: out.editorNoteZh.length, costUsd: cost };
   }
 }
 
@@ -520,6 +527,8 @@ async function main(): Promise<void> {
   let cumulativeCost = state.cumulativeCostUsd;
   let itemsDone = 0;
   let clustersDone = 0;
+  let fullPathRuns = 0;
+  let notePathRuns = 0;
   let errors = 0;
   let aborted = false;
   let pendingSaves = 0;
@@ -572,8 +581,15 @@ async function main(): Promise<void> {
             const r = await backfillItem(item);
             cumulativeCost += r.costUsd ?? perCallCost ?? 0;
             itemsDone++;
+            if (r.path === "full") fullPathRuns++;
+            else notePathRuns++;
             state.doneItems.push(item.id);
-            await onComplete("item", item.id, `'${item.title.slice(0, 50)}' — generated ${r.charCountZh} 字 (zh)`);
+            const pathLabel = r.path === "full" ? "deep dive" : "note only";
+            await onComplete(
+              "item",
+              item.id,
+              `'${item.title.slice(0, 50)}' — generated ${r.outputCharsZh} 字 (zh, ${pathLabel})`,
+            );
           } catch (err) {
             errors++;
             console.error(`[err] item #${item.id}: ${err instanceof Error ? err.message : String(err)}`);
@@ -594,8 +610,14 @@ async function main(): Promise<void> {
             if (!r) return;
             cumulativeCost += r.costUsd ?? perCallCost ?? 0;
             clustersDone++;
+            if (r.path === "full") fullPathRuns++;
+            else notePathRuns++;
             state.doneClusters.push(c.id);
-            await onComplete("cluster", c.id, `members=${c.memberCount} — generated ${r.charCountZh} 字 (zh)`);
+            await onComplete(
+              "cluster",
+              c.id,
+              `members=${c.memberCount} — generated ${r.outputCharsZh} 字 (zh, ${r.path === "full" ? "deep dive" : "note only"})`,
+            );
           } catch (err) {
             errors++;
             console.error(`[err] cluster #${c.id}: ${err instanceof Error ? err.message : String(err)}`);
@@ -610,6 +632,8 @@ async function main(): Promise<void> {
   console.log(`\n── Summary ──`);
   console.log(`  items_done:      ${itemsDone}`);
   console.log(`  clusters_done:   ${clustersDone}`);
+  console.log(`  full deep dives: ${fullPathRuns}  (featured / p1 — note + analysis)`);
+  console.log(`  note-only runs:  ${notePathRuns}  (tier 'all' — note alone)`);
   console.log(`  total_cost_usd:  $${cumulativeCost.toFixed(4)}`);
   console.log(`  errors:          ${errors}`);
   console.log(`  state_file:      ${STATE_FILE}`);
