@@ -98,7 +98,9 @@ See [`.env.example`](./.env.example) for the complete template. On Vercel, most 
 | **Terminal design port** | Full ax-radar mock port: HKR rings, site-config panel, bilingual zh/en, 12 views on `<ViewShell>` | ✅ shipped (s7) |
 | **Saved collections + server tweaks** | Named bookmark folders with inbox fallback; cross-device tweak/watchlist persistence via `users.tweaks` jsonb | ✅ shipped (s7) |
 | **M5 — Low-follower viral + cluster UI** | Low-follower viral detector (X `search/all` quota), "also reported by N sources" chips | planned |
-| **AI HOT integration + voice rebase** | New `aihot-api` source (hourly pre-curated pool from https://aihot.virxact.com) + AI HOT structured daily merged into column generator + voice rebase (daily column → khazix narrative; editor_analysis → khazix-compressed 300-500 字) + cost-bounded backfill scripts | ✅ shipped (2026-05-08) |
+| **AI HOT integration + voice rebase** | New `aihot-api` source (hourly pre-curated pool from https://aihot.virxact.com) + AI HOT structured daily merged into column generator + voice rebase (daily column → khazix narrative; editor_analysis → khazix-compressed) + cost-bounded backfill scripts | ✅ shipped (2026-05-08) |
+| **Tier-gated commentary** | `editor_note_*` (一句话点评) runs for every non-excluded item / event; `editor_analysis_*` only for tier ∈ (featured, p1) — tier 'all' takes a note-only LLM call via `commentaryNoteSchema` (~85% smaller output) | ✅ shipped (2026-05-08) |
+| **Editorial taxonomy rebrand** | 深度解读 → 锐评 (200 字 cap, was 300-500 字 / 800 ceiling); summary tightened to 50-90 字 一句话总结; UI labels rebranded (编辑点评 → 一句话点评). Home page default flipped from multi-day "3 stories per day" digest to today's hot events; daily digest reachable via `?view=daily` toggle | ✅ shipped (2026-05-08) |
 
 Full blueprint + deviations in [`docs/architecture/ingestion.md`](./docs/architecture/ingestion.md). AI HOT integration design in [`docs/aihot-integration/PLAN.md`](./docs/aihot-integration/PLAN.md). Handoff notes in [`docs/HANDOFF.md`](./docs/HANDOFF.md).
 
@@ -163,7 +165,9 @@ bun run dev
 | **终端设计迁移** | 完整迁移 ax-radar 设计：HKR 环、站点配置面板、双语支持，12 个页面 | ✅ 已上线 (s7) |
 | **收藏夹 + 服务端配置** | 自定义收藏夹、收件箱兜底；跨设备的 `users.tweaks` 配置同步 | ✅ 已上线 (s7) |
 | **M5 — 低粉爆文 / 聚类 UI** | 低粉爆文探测（待 X 高级搜索）、"N 个信源都报道了" | 计划中 |
-| **AI HOT 接入 + 文风回 khazix** | 新增 `aihot-api` 信源类型（hourly 拉取卡兹克 https://aihot.virxact.com 精选池）+ 把他们的结构化日报作为 must-cover 基线 merge 进我们的 column generator + 文风 rebase（日报回到 khazix 叙事 / 深度解读用 khazix-compressed 300-500 字）+ 带成本上限的 backfill 脚本 | ✅ 已上线 (2026-05-08) |
+| **AI HOT 接入 + 文风回 khazix** | 新增 `aihot-api` 信源类型（hourly 拉取卡兹克 https://aihot.virxact.com 精选池）+ 把他们的结构化日报作为 must-cover 基线 merge 进我们的 column generator + 文风 rebase（日报回到 khazix 叙事） + 带成本上限的 backfill 脚本 | ✅ 已上线 (2026-05-08) |
+| **分级评论 (tier-gated commentary)** | `editor_note_*` (一句话点评) 对每条非 excluded 都生成；`editor_analysis_*` 只对 tier ∈ (featured, p1) 生成 — tier='all' 走 note-only LLM 调用 (`commentaryNoteSchema`，输出量减少约 85%) | ✅ 已上线 (2026-05-08) |
+| **编辑分层重命名** | 深度解读 → 锐评 (200 字硬上限, 原 300-500 字 / 800 字顶); summary 收紧到 50-90 字 一句话总结; UI 标签重命名 (编辑点评 → 一句话点评). 主页默认从多日"每日精选"切换到今日热点; 每日精选可通过 `?view=daily` toggle 找回 | ✅ 已上线 (2026-05-08) |
 
 完整蓝图与偏差记录见 [`docs/architecture/ingestion.md`](./docs/architecture/ingestion.md)。AI HOT 集成设计见 [`docs/aihot-integration/PLAN.md`](./docs/aihot-integration/PLAN.md)。会话交接记录见 [`docs/HANDOFF.md`](./docs/HANDOFF.md)。
 

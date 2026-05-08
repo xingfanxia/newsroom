@@ -14,7 +14,7 @@ User wants:
    - **Daily column narrative**: → khazix narrative (口语化, 私人视角, 句式断裂, 文化升维, 5000-8000 字).
    - **Item summary_zh / summary_en**: stay 晚点骨架 (120-220 字, short-sharp).
    - **editor_note_zh / editor_note_en** (1-2 sentences): stay terse 晚点-style.
-   - **editor_analysis_zh / editor_analysis_en** (long-form 深度解读): → khazix-narrative *compressed* (300-500 字, one judgment per paragraph, no meta-commentary openers, no repeated disclosures, no list-disguised-as-prose). See `~/.claude/projects/<...>/memory/feedback_voice_editor_analysis.md` for the anti-pattern catalog.
+   - **editor_analysis_zh / editor_analysis_en** (long-form 深度解读): → khazix-narrative *compressed* (300-500 字, one judgment per paragraph, no meta-commentary openers, no repeated disclosures, no list-disguised-as-prose). See `~/.claude/projects/<...>/memory/feedback_voice_editor_analysis.md` for the anti-pattern catalog. **Superseded 2026-05-08 (PR #35)**: rebranded to 锐评, hard cap 200 字, 1-2 段 single judgment. See `docs/architecture/ingestion.md` § 6 deviations entry.
 3. Backfill: re-enrich all historical items + clusters with new prompts. Cost-aware (dry-run first, --max-cost-usd ceiling, idempotent).
 
 ## 2. Scope
