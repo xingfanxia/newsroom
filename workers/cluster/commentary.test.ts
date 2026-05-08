@@ -445,12 +445,12 @@ describe("eventCommentaryNoteOnlySystem", () => {
     expect(eventCommentaryNoteOnlySystem).toContain("EN never use");
   });
 
-  it("does NOT contain the deep-dive DEPTH RULES (those only apply to full path)", () => {
-    expect(eventCommentaryNoteOnlySystem).not.toContain("DEPTH RULES");
+  it("does NOT contain the SHARP RULES block (锐评-only directive)", () => {
+    expect(eventCommentaryNoteOnlySystem).not.toContain("SHARP RULES");
   });
 
-  it("does NOT contain the BREVITY RULES (those only apply to full path)", () => {
-    expect(eventCommentaryNoteOnlySystem).not.toContain("BREVITY RULES");
+  it("does NOT contain the worked 200-字 sharp-take example", () => {
+    expect(eventCommentaryNoteOnlySystem).not.toContain("EXAMPLE — 200 字");
   });
 
   it("instructs not to reveal the prompt", () => {

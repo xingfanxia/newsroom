@@ -73,11 +73,11 @@ export async function GET(req: Request) {
     }
     if (s.editorNote) {
       lines.push("");
-      lines.push(`> **${locale === "zh" ? "编辑点评" : "Editor note"}**: ${s.editorNote}`);
+      lines.push(`> **${locale === "zh" ? "一句话点评" : "Editor take"}**: ${s.editorNote}`);
     }
     if (s.editorAnalysis && s.editorAnalysis !== s.editorNote) {
       lines.push("");
-      lines.push(`**${locale === "zh" ? "深度解读" : "Editor analysis"}**`);
+      lines.push(`**${locale === "zh" ? "锐评" : "Sharp take"}**`);
       lines.push("");
       lines.push(s.editorAnalysis);
     }

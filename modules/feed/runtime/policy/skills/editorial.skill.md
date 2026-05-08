@@ -87,43 +87,56 @@ Tag every story on three axes. Use the controlled vocabularies below. Pick up to
 
 ---
 
-## Summary style (Chinese)
+## Editorial taxonomy (2026-05-08 cutover)
 
-- 2–3 sentences, 120–220 characters.
-- First sentence: **what happened** — subject + verb + direct object. No metaphors.
-- Second sentence: **one concrete detail** — a number, a mechanism, a reproduction condition. Avoid listing features.
-- Optional third: **why it matters** to an industry-literate reader.
+Three layered editorial outputs per item / event. Each has a distinct role and length budget — readers should never confuse the layers.
 
-Style:
-- **NO marketing verbs**: never "赋能" / "助力" / "引领" / "重塑".
-- **NO filler openers**: never "近日" / "近期" / "随着 AI 的发展".
-- **NO bullet points** inside the summary.
-- Numbers: keep original (don't round 78.4 to 80).
-- Names: entity names stay in original language.
+| Layer | Field (DB) | UI label (zh / en) | Length | Voice | Tier scope |
+|---|---|---|---|---|---|
+| 一句话总结 | `summary_*` | (unlabeled abstract) | 50-90 字 single sentence | Factual, what happened | Every non-excluded item |
+| 一句话点评 | `editor_note_*` | 一句话点评 / editor take | ≤200 chars 1-2 sentences | Pointed take with stance | Every non-excluded item / event |
+| 锐评 | `editor_analysis_*` | 锐评 / sharp | 150-200 字 (1-2 段, ceiling 250) | Sharp commentary, one judgment | featured / p1 only |
+
+Old terminology that's been retired: "深度解读" / "deep read" (replaced by 锐评), "编辑点评" UI label (replaced by 一句话点评).
+
+---
+
+## 一句话总结 (summary) style
+
+- **One sentence, 50-90 characters (zh) / 50-90 words (en)**.
+- Subject + verb + direct object + a single concrete detail (number / mechanism / condition).
+- No metaphors. No bullet points. No filler openers (近日 / 近期 / 随着).
+- No marketing verbs (赋能 / 助力 / 引领 / revolutionize / unlock / empower).
+- Numbers stay original (don't round 78.4 to 80). Entity names stay in original language.
+- If body lacks a key fact, say "标题已给 X, 正文未披露 Y" / "the post does not disclose Y".
 
 If a Tavily-sourced context is provided, use it to correct errors and add one missing fact — never to inflate length.
 
 ---
 
-## Editor analysis style (深度解读, 短锐 deep-dive)
+## 锐评 (sharp take) style
 
-The `editor_analysis_zh` / `editor_analysis_en` field is the long-form take that surfaces on featured / p1 cards. It is **NOT a 长文** — it's a compressed deep dive. The actual prompt-driver lives in `workers/enrich/prompt.ts` (`COMMENTARY_BREVITY_RULES` + `COMMENTARY_DEPTH_RULES`) and `workers/cluster/prompt.ts` (mirror); this section is the canonical policy spec.
+The `editor_analysis_*` field — the sharp commentary that surfaces on featured / p1 cards. **NOT a deep dive**; it's a single-judgment take, 200 字 hard cap. The actual prompt-driver lives in `workers/enrich/prompt.ts` (`COMMENTARY_SHARP_RULES`) and `workers/cluster/prompt.ts` (mirror); this section is the canonical policy spec.
 
 ### Length
 
-- **目标 300-500 字 (zh) / 250-450 words (en) 是常态**
-- 素材极硬时放宽到 800 字 / 600 words **上限**
-- 信息稀薄（仅标题）时 200-400 字, 不硬撑
+- **目标 150-200 字 (zh) / 100-160 words (en) 是常态**
+- 素材极硬时放宽到 250 字 / 200 words **ceiling**, 不超
+- 信息稀薄 (仅标题) 时 80-120 字, 不硬撑
+
+### Structure
+
+锐评 = **一个尖锐论断 + 一处具体证据 + (可选) 一处外部对比或 pushback**. 1-2 段, 单一判断, 干净落地。
 
 ### Hard rules
 
-1. **一段一个判断** — 3-6 段, 每段 3-5 句, 6 句必拆
-2. **第一段 = 判断, 不是事实罗列, 不是 meta-commentary**
-3. **整篇 1 处外部对比就够** (从训练知识里拿一条具体竞品/历史/价格对位, 不确定时说 "我记得好像是 X, 但没核实")
-4. **整篇 1 处 pushback** (对叙事 / 对作者 / 对一致性)
-5. **`正文未披露 X / 标题未披露 Y` 整篇 ≤ 2 次** — 不同段不重复同句式
-6. **删冗余修饰**: "现在被用户感知到的核心能力" → "当前能力"; "立刻变成训练集群、推理补贴和人才价格" → "立刻变成算力和人才"
-7. **列点伪装的 prose 改连续判断**: 不写"中间还隔着 A、B、C、D 四道坎"——挑最强一条说
+1. **第一句 = 判断, 不是事实罗列, 不是 meta-commentary**
+2. **必须一个具体钩子**: 数字 / 价格 / 名字 / context window — never "新模型", always "GPT-5.4 mini"
+3. **可选 (但加分): 一处外部对比** (竞品对位 / 历史参照, 一句带出, 不展开)
+4. **可选 (但加分): 一处 pushback** (对 narrative 怀疑 / 对数字警觉 / 对作者打问号)
+5. **`正文未披露 X / 标题未披露 Y` 整篇 ≤ 1 次** — 其他换说法 (`金额没披露` / `pricing not given`)
+6. **删冗余修饰**: 形容词 / 副词 / 名物化结构能砍就砍
+7. **不要列点伪装**: 不写"中间还隔着 A、B、C、D 四道坎" — 挑最强一条说
 
 ### Anti-pattern openers (绝不再用)
 
@@ -149,20 +162,18 @@ Two output shapes, picked by tier (see "Tier gating" below):
 ```json
 // Full path — tier ∈ (featured, p1)
 {
-  "editorNoteZh": "≤200 字符 1-2 句锐评",
+  "editorNoteZh": "一句话点评 ≤200 字符",
   "editorNoteEn": "≤200 chars equivalent",
-  "editorAnalysisZh": "300-500 字, 3-6 段, 短锐 deep dive",
-  "editorAnalysisEn": "250-450 words, 3-6 paragraphs"
+  "editorAnalysisZh": "锐评 150-200 字, 1-2 段, 单一判断",
+  "editorAnalysisEn": "100-160 words, 1-2 paragraphs"
 }
 
 // Note-only path — tier = all
 {
-  "editorNoteZh": "≤200 字符 1-2 句锐评",
+  "editorNoteZh": "一句话点评 ≤200 字符",
   "editorNoteEn": "≤200 chars equivalent"
 }
 ```
-
-`editor_note` (短) 和 `summary_zh` (晚点骨架, 120-220 字) 不受 brevity 约束 — 它们各保各的 voice。
 
 ### Tier gating (which items get the deep dive)
 
@@ -175,7 +186,7 @@ Per item / per multi-source event:
 | `all` | ✅ | ❌ (skipped — note-only LLM call) |
 | `excluded` | ❌ | ❌ (filtered upstream) |
 
-Rationale: tier `all` items are kept in the feed as browseable signal but don't warrant the cost of a 300-500 字 deep dive. The one-liner is the floor every non-excluded item gets; the analysis is reserved for items that cleared HKR + score thresholds for `featured` / `p1`. Worker dispatch lives in `workers/enrich/commentary.ts` (per-item) and `workers/cluster/commentary.ts` (event-level); `scripts/ops/backfill-style.ts` mirrors the same gate.
+Rationale: tier `all` items are kept in the feed as browseable signal but don't warrant the cost of a 200 字 锐评. The one-liner (一句话点评) is the floor every non-excluded item gets; 锐评 is reserved for items that cleared HKR + score thresholds for `featured` / `p1`. Worker dispatch lives in `workers/enrich/commentary.ts` (per-item) and `workers/cluster/commentary.ts` (event-level); `scripts/ops/backfill-style.ts` mirrors the same gate.
 
 ---
 
@@ -190,6 +201,7 @@ _These are lessons from human feedback. Append here with timestamp when the iter
 - 2026-03-25 — Claude-specific updates currently score high because the audience is Claude-heavy. Keep +3 bump until a feedback shift.
 - 2026-05-08 — `editor_analysis` rebase to khazix-compressed: cap at 300-500 字 (zh) / 250-450 words (en), one judgment per paragraph, no meta-commentary openers (`先把缺口摆明` / `我的判断是` / `拿外部参照看`), `正文未披露` ≤ 2 occurrences. Reason: prior 800-1400 字 spec produced verbose output user flagged as "AI 味太浓"; reference voice is khazix's daily aggregator (AI HOT) which carries the same depth in 1/3 the words. Summary + editor_note unchanged (different voice contracts per content shape).
 - 2026-05-08 — Tier-gated commentary: `editor_note_*` now runs for every non-excluded item / event (一句话点评 for all), but `editor_analysis_*` is **only** generated for tier `featured` / `p1`. Tier `all` takes the lighter note-only LLM call (~85% smaller output). Reason: reader signal showed tier `all` items don't warrant deep dives — the one-liner is the floor everyone deserves, the analysis is reserved for items that already cleared HKR + score thresholds. Cluster path also extended to cover `event_tier='all'` (previously skipped entirely).
+- 2026-05-08 — Editorial rebrand: 深度解读 → 锐评 (200 字 hard cap, was 300-500 字 / 800 ceiling); summary tightened to 50-90 字 一句话总结 (was 120-220 字 2-3 sentences); 编辑点评 UI label → 一句话点评. Reason: the existing "deep dive" voice still produced 700-800 字 outputs even after the previous compression — readers wanted a sharper one-judgment take, not a paragraph essay. Three layered outputs now have crisp role separation: 一句话总结 (factual) / 一句话点评 (one-line take) / 锐评 (one-paragraph judgment). DB columns unchanged (only UI labels and prompt targets shifted).
 
 ---
 

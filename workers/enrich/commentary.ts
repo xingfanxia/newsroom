@@ -156,9 +156,10 @@ async function generateOneCommentary(item: Item): Promise<void> {
       messages: [{ role: "user", content: userContent }],
       schema: commentarySchema,
       schemaName: "EditorCommentary",
-      // Strong material targets 800 字 zh + 600 words en + 2 notes plus
-      // JSON + reasoning overhead. Headroom prevents mid-paragraph truncation.
-      maxTokens: 6144,
+      // 锐评 target: 200 字 zh + 160 words en + 2 short notes ≈ ~600 output
+      // tokens, plus JSON + reasoning. 3072 leaves comfortable headroom
+      // without paying for 6144 worth of unused cap on every call.
+      maxTokens: 3072,
     });
     const c = result.data;
     await client

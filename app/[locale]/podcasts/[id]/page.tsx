@@ -141,7 +141,7 @@ export default async function PodcastDetailPage({
                 marginBottom: 6,
               }}
             >
-              {locale === "zh" ? "编辑点评" : "editor note"}
+              {locale === "zh" ? "一句话点评" : "editor take"}
             </div>
             <p style={{ fontSize: 14, lineHeight: 1.7, color: "var(--fg-0)" }}>
               {story.editorNote}
@@ -162,7 +162,7 @@ export default async function PodcastDetailPage({
                 borderBottom: "1px dashed var(--border-1)",
               }}
             >
-              {locale === "zh" ? "深度解读" : "deep take"}
+              {locale === "zh" ? "锐评" : "sharp"}
             </h2>
             <div style={{ color: "var(--fg-1)", fontSize: 14, lineHeight: 1.75 }}>
               <Prose>{story.editorAnalysis}</Prose>
