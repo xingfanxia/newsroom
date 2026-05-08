@@ -37,16 +37,18 @@ import { generateStructured, profiles } from "@/lib/llm";
 import {
   COMMENTARY_SYSTEM,
   commentarySchema,
+  COMMENTARY_NOTE_ONLY_SYSTEM,
+  commentaryNoteSchema,
   commentaryUserPrompt,
-  type CommentaryOutput,
   type CAPABILITIES,
   type TOPICS,
 } from "@/workers/enrich/prompt";
 import {
   eventCommentarySchema,
   eventCommentarySystem,
+  eventCommentaryNoteSchema,
+  eventCommentaryNoteOnlySystem,
   eventCommentaryUserPrompt,
-  type EventCommentaryOutput,
   type EventMember,
 } from "@/workers/cluster/prompt";
 import { resolvePricing, computeCost } from "@/lib/llm/pricing";
@@ -229,6 +231,7 @@ interface ClusterCandidate {
   memberCount: number;
   importance: number | null;
   latestMemberAt: Date | null;
+  eventTier: string | null;
 }
 
 async function loadClusterCandidates(args: {
@@ -237,8 +240,13 @@ async function loadClusterCandidates(args: {
   policyBumpAt: Date;
   excludeIds: Set<number>;
 }): Promise<ClusterCandidate[]> {
-  // Cluster commentary only generated for featured/p1 (workers/cluster/commentary.ts).
-  const eventTiers = args.tiers.filter((t) => t === "featured" || t === "p1");
+  // 2026-05-08: cluster commentary now also covers event_tier='all' (note-only
+  // path, see workers/cluster/commentary.ts). Pass through whichever tiers
+  // the caller requested; the backfill function dispatches to the right
+  // schema per cluster.
+  const eventTiers = args.tiers.filter(
+    (t) => t === "featured" || t === "p1" || t === "all",
+  );
   if (eventTiers.length === 0) return [];
   const since = new Date(`${args.sinceDate}T00:00:00Z`);
   const rows = await db()
@@ -250,6 +258,7 @@ async function loadClusterCandidates(args: {
       memberCount: clusters.memberCount,
       importance: clusters.importance,
       latestMemberAt: clusters.latestMemberAt,
+      eventTier: clusters.eventTier,
     })
     .from(clusters)
     .where(
@@ -274,54 +283,83 @@ async function backfillItem(item: Item): Promise<{ charCountZh: number; costUsd:
     entities?: string[];
     topics?: string[];
   };
-  const result = await generateStructured({
-    ...profiles.enrich,
-    task: "commentary",
-    itemId: item.id,
-    system: COMMENTARY_SYSTEM,
-    messages: [
-      {
-        role: "user",
-        content: commentaryUserPrompt({
-          title: item.title,
-          body: item.body,
-          bodyMd: item.bodyMd,
-          summaryZh: item.summaryZh ?? "",
-          summaryEn: item.summaryEn ?? "",
-          tier: item.tier as "featured" | "p1" | "all",
-          importance: item.importance ?? 0,
-          tags: {
-            capabilities: (tagBag.capabilities ?? []) as Capability[],
-            entities: tagBag.entities ?? [],
-            topics: (tagBag.topics ?? []) as Topic[],
-          },
-          url: item.url,
-          source: item.sourceId,
-          publishedAt: item.publishedAt.toISOString(),
-        }),
-      },
-    ],
-    schema: commentarySchema,
-    schemaName: "EditorCommentary",
-    maxTokens: 6144,
+  const userContent = commentaryUserPrompt({
+    title: item.title,
+    body: item.body,
+    bodyMd: item.bodyMd,
+    summaryZh: item.summaryZh ?? "",
+    summaryEn: item.summaryEn ?? "",
+    tier: item.tier as "featured" | "p1" | "all",
+    importance: item.importance ?? 0,
+    tags: {
+      capabilities: (tagBag.capabilities ?? []) as Capability[],
+      entities: tagBag.entities ?? [],
+      topics: (tagBag.topics ?? []) as Topic[],
+    },
+    url: item.url,
+    source: item.sourceId,
+    publishedAt: item.publishedAt.toISOString(),
   });
-  const c: CommentaryOutput = result.data;
-  await db()
-    .update(items)
-    .set({
-      editorNoteZh: c.editorNoteZh,
-      editorNoteEn: c.editorNoteEn,
-      editorAnalysisZh: c.editorAnalysisZh,
-      editorAnalysisEn: c.editorAnalysisEn,
-      commentaryAt: new Date(),
-    })
-    .where(eq(items.id, item.id));
-  const pricing = await resolvePricing(result.model, result.provider);
-  const cost = computeCost(
-    { inputTokens: result.inputTokens, outputTokens: result.outputTokens },
-    pricing,
-  );
-  return { charCountZh: c.editorAnalysisZh.length, costUsd: cost };
+
+  const isFull = item.tier === "featured" || item.tier === "p1";
+
+  if (isFull) {
+    const result = await generateStructured({
+      ...profiles.enrich,
+      task: "commentary",
+      itemId: item.id,
+      system: COMMENTARY_SYSTEM,
+      messages: [{ role: "user", content: userContent }],
+      schema: commentarySchema,
+      schemaName: "EditorCommentary",
+      maxTokens: 6144,
+    });
+    const c = result.data;
+    await db()
+      .update(items)
+      .set({
+        editorNoteZh: c.editorNoteZh,
+        editorNoteEn: c.editorNoteEn,
+        editorAnalysisZh: c.editorAnalysisZh,
+        editorAnalysisEn: c.editorAnalysisEn,
+        commentaryAt: new Date(),
+      })
+      .where(eq(items.id, item.id));
+    const pricing = await resolvePricing(result.model, result.provider);
+    const cost = computeCost(
+      { inputTokens: result.inputTokens, outputTokens: result.outputTokens },
+      pricing,
+    );
+    return { charCountZh: c.editorAnalysisZh.length, costUsd: cost };
+  } else {
+    // tier='all' → note-only path. Don't overwrite any existing analysis.
+    const result = await generateStructured({
+      ...profiles.enrich,
+      task: "commentary",
+      itemId: item.id,
+      system: COMMENTARY_NOTE_ONLY_SYSTEM,
+      messages: [{ role: "user", content: userContent }],
+      schema: commentaryNoteSchema,
+      schemaName: "EditorCommentaryNote",
+      maxTokens: 1024,
+    });
+    const c = result.data;
+    await db()
+      .update(items)
+      .set({
+        editorNoteZh: c.editorNoteZh,
+        editorNoteEn: c.editorNoteEn,
+        commentaryAt: new Date(),
+      })
+      .where(eq(items.id, item.id));
+    const pricing = await resolvePricing(result.model, result.provider);
+    const cost = computeCost(
+      { inputTokens: result.inputTokens, outputTokens: result.outputTokens },
+      pricing,
+    );
+    // Use note length as char count signal — we never produced an analysis.
+    return { charCountZh: c.editorNoteZh.length, costUsd: cost };
+  }
 }
 
 async function backfillCluster(c: ClusterCandidate): Promise<{ charCountZh: number; costUsd: number | null } | null> {
@@ -346,46 +384,73 @@ async function backfillCluster(c: ClusterCandidate): Promise<{ charCountZh: numb
     memberRows[0];
   const truncatedBody = (richest.bodyMd ?? "").slice(0, 8000);
 
-  const result = await generateStructured({
-    ...profiles.enrich,
-    task: "event-commentary",
-    system: eventCommentarySystem,
-    messages: [
-      {
-        role: "user",
-        content: eventCommentaryUserPrompt({
-          canonicalTitleZh: c.canonicalTitleZh,
-          canonicalTitleEn: c.canonicalTitleEn,
-          memberCount: c.memberCount,
-          importance: c.importance,
-          members,
-          richestBodyMd: truncatedBody,
-          richestSourceId: richest.sourceId,
-          richestTitle: richest.title,
-        }),
-      },
-    ],
-    schema: eventCommentarySchema,
-    schemaName: "EventEditorCommentary",
-    maxTokens: 6144,
+  const userContent = eventCommentaryUserPrompt({
+    canonicalTitleZh: c.canonicalTitleZh,
+    canonicalTitleEn: c.canonicalTitleEn,
+    memberCount: c.memberCount,
+    importance: c.importance,
+    members,
+    richestBodyMd: truncatedBody,
+    richestSourceId: richest.sourceId,
+    richestTitle: richest.title,
   });
-  const out: EventCommentaryOutput = result.data;
-  await db()
-    .update(clusters)
-    .set({
-      editorNoteZh: out.editorNoteZh,
-      editorNoteEn: out.editorNoteEn,
-      editorAnalysisZh: out.editorAnalysisZh,
-      editorAnalysisEn: out.editorAnalysisEn,
-      commentaryAt: new Date(),
-    })
-    .where(eq(clusters.id, c.id));
-  const pricing = await resolvePricing(result.model, result.provider);
-  const cost = computeCost(
-    { inputTokens: result.inputTokens, outputTokens: result.outputTokens },
-    pricing,
-  );
-  return { charCountZh: out.editorAnalysisZh.length, costUsd: cost };
+
+  const isFull = c.eventTier === "featured" || c.eventTier === "p1";
+
+  if (isFull) {
+    const result = await generateStructured({
+      ...profiles.enrich,
+      task: "event-commentary",
+      system: eventCommentarySystem,
+      messages: [{ role: "user", content: userContent }],
+      schema: eventCommentarySchema,
+      schemaName: "EventEditorCommentary",
+      maxTokens: 6144,
+    });
+    const out = result.data;
+    await db()
+      .update(clusters)
+      .set({
+        editorNoteZh: out.editorNoteZh,
+        editorNoteEn: out.editorNoteEn,
+        editorAnalysisZh: out.editorAnalysisZh,
+        editorAnalysisEn: out.editorAnalysisEn,
+        commentaryAt: new Date(),
+      })
+      .where(eq(clusters.id, c.id));
+    const pricing = await resolvePricing(result.model, result.provider);
+    const cost = computeCost(
+      { inputTokens: result.inputTokens, outputTokens: result.outputTokens },
+      pricing,
+    );
+    return { charCountZh: out.editorAnalysisZh.length, costUsd: cost };
+  } else {
+    // event_tier='all' → note-only.
+    const result = await generateStructured({
+      ...profiles.enrich,
+      task: "event-commentary",
+      system: eventCommentaryNoteOnlySystem,
+      messages: [{ role: "user", content: userContent }],
+      schema: eventCommentaryNoteSchema,
+      schemaName: "EventEditorCommentaryNote",
+      maxTokens: 1024,
+    });
+    const out = result.data;
+    await db()
+      .update(clusters)
+      .set({
+        editorNoteZh: out.editorNoteZh,
+        editorNoteEn: out.editorNoteEn,
+        commentaryAt: new Date(),
+      })
+      .where(eq(clusters.id, c.id));
+    const pricing = await resolvePricing(result.model, result.provider);
+    const cost = computeCost(
+      { inputTokens: result.inputTokens, outputTokens: result.outputTokens },
+      pricing,
+    );
+    return { charCountZh: out.editorNoteZh.length, costUsd: cost };
+  }
 }
 
 // ── Main ─────────────────────────────────────────────────────────────
