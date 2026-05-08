@@ -37,16 +37,18 @@ import { generateStructured, profiles } from "@/lib/llm";
 import {
   COMMENTARY_SYSTEM,
   commentarySchema,
+  COMMENTARY_NOTE_ONLY_SYSTEM,
+  commentaryNoteSchema,
   commentaryUserPrompt,
-  type CommentaryOutput,
   type CAPABILITIES,
   type TOPICS,
 } from "@/workers/enrich/prompt";
 import {
   eventCommentarySchema,
   eventCommentarySystem,
+  eventCommentaryNoteSchema,
+  eventCommentaryNoteOnlySystem,
   eventCommentaryUserPrompt,
-  type EventCommentaryOutput,
   type EventMember,
 } from "@/workers/cluster/prompt";
 import { resolvePricing, computeCost } from "@/lib/llm/pricing";
@@ -229,6 +231,7 @@ interface ClusterCandidate {
   memberCount: number;
   importance: number | null;
   latestMemberAt: Date | null;
+  eventTier: string | null;
 }
 
 async function loadClusterCandidates(args: {
@@ -237,8 +240,13 @@ async function loadClusterCandidates(args: {
   policyBumpAt: Date;
   excludeIds: Set<number>;
 }): Promise<ClusterCandidate[]> {
-  // Cluster commentary only generated for featured/p1 (workers/cluster/commentary.ts).
-  const eventTiers = args.tiers.filter((t) => t === "featured" || t === "p1");
+  // 2026-05-08: cluster commentary now also covers event_tier='all' (note-only
+  // path, see workers/cluster/commentary.ts). Pass through whichever tiers
+  // the caller requested; the backfill function dispatches to the right
+  // schema per cluster.
+  const eventTiers = args.tiers.filter(
+    (t) => t === "featured" || t === "p1" || t === "all",
+  );
   if (eventTiers.length === 0) return [];
   const since = new Date(`${args.sinceDate}T00:00:00Z`);
   const rows = await db()
@@ -250,6 +258,7 @@ async function loadClusterCandidates(args: {
       memberCount: clusters.memberCount,
       importance: clusters.importance,
       latestMemberAt: clusters.latestMemberAt,
+      eventTier: clusters.eventTier,
     })
     .from(clusters)
     .where(
@@ -268,63 +277,99 @@ async function loadClusterCandidates(args: {
 }
 
 // ── LLM workers (per-item / per-cluster) ─────────────────────────────
-async function backfillItem(item: Item): Promise<{ charCountZh: number; costUsd: number | null }> {
+type BackfillPath = "full" | "note";
+type BackfillResult = {
+  path: BackfillPath;
+  outputCharsZh: number;
+  costUsd: number | null;
+};
+
+async function backfillItem(item: Item): Promise<BackfillResult> {
   const tagBag = (item.tags ?? {}) as {
     capabilities?: string[];
     entities?: string[];
     topics?: string[];
   };
-  const result = await generateStructured({
-    ...profiles.enrich,
-    task: "commentary",
-    itemId: item.id,
-    system: COMMENTARY_SYSTEM,
-    messages: [
-      {
-        role: "user",
-        content: commentaryUserPrompt({
-          title: item.title,
-          body: item.body,
-          bodyMd: item.bodyMd,
-          summaryZh: item.summaryZh ?? "",
-          summaryEn: item.summaryEn ?? "",
-          tier: item.tier as "featured" | "p1" | "all",
-          importance: item.importance ?? 0,
-          tags: {
-            capabilities: (tagBag.capabilities ?? []) as Capability[],
-            entities: tagBag.entities ?? [],
-            topics: (tagBag.topics ?? []) as Topic[],
-          },
-          url: item.url,
-          source: item.sourceId,
-          publishedAt: item.publishedAt.toISOString(),
-        }),
-      },
-    ],
-    schema: commentarySchema,
-    schemaName: "EditorCommentary",
-    maxTokens: 6144,
+  const userContent = commentaryUserPrompt({
+    title: item.title,
+    body: item.body,
+    bodyMd: item.bodyMd,
+    summaryZh: item.summaryZh ?? "",
+    summaryEn: item.summaryEn ?? "",
+    tier: item.tier as "featured" | "p1" | "all",
+    importance: item.importance ?? 0,
+    tags: {
+      capabilities: (tagBag.capabilities ?? []) as Capability[],
+      entities: tagBag.entities ?? [],
+      topics: (tagBag.topics ?? []) as Topic[],
+    },
+    url: item.url,
+    source: item.sourceId,
+    publishedAt: item.publishedAt.toISOString(),
   });
-  const c: CommentaryOutput = result.data;
-  await db()
-    .update(items)
-    .set({
-      editorNoteZh: c.editorNoteZh,
-      editorNoteEn: c.editorNoteEn,
-      editorAnalysisZh: c.editorAnalysisZh,
-      editorAnalysisEn: c.editorAnalysisEn,
-      commentaryAt: new Date(),
-    })
-    .where(eq(items.id, item.id));
-  const pricing = await resolvePricing(result.model, result.provider);
-  const cost = computeCost(
-    { inputTokens: result.inputTokens, outputTokens: result.outputTokens },
-    pricing,
-  );
-  return { charCountZh: c.editorAnalysisZh.length, costUsd: cost };
+
+  const isFull = item.tier === "featured" || item.tier === "p1";
+
+  if (isFull) {
+    const result = await generateStructured({
+      ...profiles.enrich,
+      task: "commentary",
+      itemId: item.id,
+      system: COMMENTARY_SYSTEM,
+      messages: [{ role: "user", content: userContent }],
+      schema: commentarySchema,
+      schemaName: "EditorCommentary",
+      maxTokens: 6144,
+    });
+    const c = result.data;
+    await db()
+      .update(items)
+      .set({
+        editorNoteZh: c.editorNoteZh,
+        editorNoteEn: c.editorNoteEn,
+        editorAnalysisZh: c.editorAnalysisZh,
+        editorAnalysisEn: c.editorAnalysisEn,
+        commentaryAt: new Date(),
+      })
+      .where(eq(items.id, item.id));
+    const pricing = await resolvePricing(result.model, result.provider);
+    const cost = computeCost(
+      { inputTokens: result.inputTokens, outputTokens: result.outputTokens },
+      pricing,
+    );
+    return { path: "full", outputCharsZh: c.editorAnalysisZh.length, costUsd: cost };
+  } else {
+    // tier='all' → note-only path. Don't overwrite any existing analysis.
+    const result = await generateStructured({
+      ...profiles.enrich,
+      task: "commentary",
+      itemId: item.id,
+      system: COMMENTARY_NOTE_ONLY_SYSTEM,
+      messages: [{ role: "user", content: userContent }],
+      schema: commentaryNoteSchema,
+      schemaName: "EditorCommentaryNote",
+      maxTokens: 1024,
+    });
+    const c = result.data;
+    await db()
+      .update(items)
+      .set({
+        editorNoteZh: c.editorNoteZh,
+        editorNoteEn: c.editorNoteEn,
+        commentaryAt: new Date(),
+      })
+      .where(eq(items.id, item.id));
+    const pricing = await resolvePricing(result.model, result.provider);
+    const cost = computeCost(
+      { inputTokens: result.inputTokens, outputTokens: result.outputTokens },
+      pricing,
+    );
+    // Note length is the only output signal here — analysis was never produced.
+    return { path: "note", outputCharsZh: c.editorNoteZh.length, costUsd: cost };
+  }
 }
 
-async function backfillCluster(c: ClusterCandidate): Promise<{ charCountZh: number; costUsd: number | null } | null> {
+async function backfillCluster(c: ClusterCandidate): Promise<BackfillResult | null> {
   const memberRows = await db()
     .select({
       id: items.id,
@@ -346,46 +391,73 @@ async function backfillCluster(c: ClusterCandidate): Promise<{ charCountZh: numb
     memberRows[0];
   const truncatedBody = (richest.bodyMd ?? "").slice(0, 8000);
 
-  const result = await generateStructured({
-    ...profiles.enrich,
-    task: "event-commentary",
-    system: eventCommentarySystem,
-    messages: [
-      {
-        role: "user",
-        content: eventCommentaryUserPrompt({
-          canonicalTitleZh: c.canonicalTitleZh,
-          canonicalTitleEn: c.canonicalTitleEn,
-          memberCount: c.memberCount,
-          importance: c.importance,
-          members,
-          richestBodyMd: truncatedBody,
-          richestSourceId: richest.sourceId,
-          richestTitle: richest.title,
-        }),
-      },
-    ],
-    schema: eventCommentarySchema,
-    schemaName: "EventEditorCommentary",
-    maxTokens: 6144,
+  const userContent = eventCommentaryUserPrompt({
+    canonicalTitleZh: c.canonicalTitleZh,
+    canonicalTitleEn: c.canonicalTitleEn,
+    memberCount: c.memberCount,
+    importance: c.importance,
+    members,
+    richestBodyMd: truncatedBody,
+    richestSourceId: richest.sourceId,
+    richestTitle: richest.title,
   });
-  const out: EventCommentaryOutput = result.data;
-  await db()
-    .update(clusters)
-    .set({
-      editorNoteZh: out.editorNoteZh,
-      editorNoteEn: out.editorNoteEn,
-      editorAnalysisZh: out.editorAnalysisZh,
-      editorAnalysisEn: out.editorAnalysisEn,
-      commentaryAt: new Date(),
-    })
-    .where(eq(clusters.id, c.id));
-  const pricing = await resolvePricing(result.model, result.provider);
-  const cost = computeCost(
-    { inputTokens: result.inputTokens, outputTokens: result.outputTokens },
-    pricing,
-  );
-  return { charCountZh: out.editorAnalysisZh.length, costUsd: cost };
+
+  const isFull = c.eventTier === "featured" || c.eventTier === "p1";
+
+  if (isFull) {
+    const result = await generateStructured({
+      ...profiles.enrich,
+      task: "event-commentary",
+      system: eventCommentarySystem,
+      messages: [{ role: "user", content: userContent }],
+      schema: eventCommentarySchema,
+      schemaName: "EventEditorCommentary",
+      maxTokens: 6144,
+    });
+    const out = result.data;
+    await db()
+      .update(clusters)
+      .set({
+        editorNoteZh: out.editorNoteZh,
+        editorNoteEn: out.editorNoteEn,
+        editorAnalysisZh: out.editorAnalysisZh,
+        editorAnalysisEn: out.editorAnalysisEn,
+        commentaryAt: new Date(),
+      })
+      .where(eq(clusters.id, c.id));
+    const pricing = await resolvePricing(result.model, result.provider);
+    const cost = computeCost(
+      { inputTokens: result.inputTokens, outputTokens: result.outputTokens },
+      pricing,
+    );
+    return { path: "full", outputCharsZh: out.editorAnalysisZh.length, costUsd: cost };
+  } else {
+    // event_tier='all' → note-only.
+    const result = await generateStructured({
+      ...profiles.enrich,
+      task: "event-commentary",
+      system: eventCommentaryNoteOnlySystem,
+      messages: [{ role: "user", content: userContent }],
+      schema: eventCommentaryNoteSchema,
+      schemaName: "EventEditorCommentaryNote",
+      maxTokens: 1024,
+    });
+    const out = result.data;
+    await db()
+      .update(clusters)
+      .set({
+        editorNoteZh: out.editorNoteZh,
+        editorNoteEn: out.editorNoteEn,
+        commentaryAt: new Date(),
+      })
+      .where(eq(clusters.id, c.id));
+    const pricing = await resolvePricing(result.model, result.provider);
+    const cost = computeCost(
+      { inputTokens: result.inputTokens, outputTokens: result.outputTokens },
+      pricing,
+    );
+    return { path: "note", outputCharsZh: out.editorNoteZh.length, costUsd: cost };
+  }
 }
 
 // ── Main ─────────────────────────────────────────────────────────────
@@ -455,6 +527,8 @@ async function main(): Promise<void> {
   let cumulativeCost = state.cumulativeCostUsd;
   let itemsDone = 0;
   let clustersDone = 0;
+  let fullPathRuns = 0;
+  let notePathRuns = 0;
   let errors = 0;
   let aborted = false;
   let pendingSaves = 0;
@@ -507,8 +581,15 @@ async function main(): Promise<void> {
             const r = await backfillItem(item);
             cumulativeCost += r.costUsd ?? perCallCost ?? 0;
             itemsDone++;
+            if (r.path === "full") fullPathRuns++;
+            else notePathRuns++;
             state.doneItems.push(item.id);
-            await onComplete("item", item.id, `'${item.title.slice(0, 50)}' — generated ${r.charCountZh} 字 (zh)`);
+            const pathLabel = r.path === "full" ? "deep dive" : "note only";
+            await onComplete(
+              "item",
+              item.id,
+              `'${item.title.slice(0, 50)}' — generated ${r.outputCharsZh} 字 (zh, ${pathLabel})`,
+            );
           } catch (err) {
             errors++;
             console.error(`[err] item #${item.id}: ${err instanceof Error ? err.message : String(err)}`);
@@ -529,8 +610,14 @@ async function main(): Promise<void> {
             if (!r) return;
             cumulativeCost += r.costUsd ?? perCallCost ?? 0;
             clustersDone++;
+            if (r.path === "full") fullPathRuns++;
+            else notePathRuns++;
             state.doneClusters.push(c.id);
-            await onComplete("cluster", c.id, `members=${c.memberCount} — generated ${r.charCountZh} 字 (zh)`);
+            await onComplete(
+              "cluster",
+              c.id,
+              `members=${c.memberCount} — generated ${r.outputCharsZh} 字 (zh, ${r.path === "full" ? "deep dive" : "note only"})`,
+            );
           } catch (err) {
             errors++;
             console.error(`[err] cluster #${c.id}: ${err instanceof Error ? err.message : String(err)}`);
@@ -545,6 +632,8 @@ async function main(): Promise<void> {
   console.log(`\n── Summary ──`);
   console.log(`  items_done:      ${itemsDone}`);
   console.log(`  clusters_done:   ${clustersDone}`);
+  console.log(`  full deep dives: ${fullPathRuns}  (featured / p1 — note + analysis)`);
+  console.log(`  note-only runs:  ${notePathRuns}  (tier 'all' — note alone)`);
   console.log(`  total_cost_usd:  $${cumulativeCost.toFixed(4)}`);
   console.log(`  errors:          ${errors}`);
   console.log(`  state_file:      ${STATE_FILE}`);

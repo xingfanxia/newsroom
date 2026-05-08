@@ -4,6 +4,11 @@
  * Runs after the main enrich batch so transient failures get retried
  * on the next tick instead of leaving holes.
  *
+ * Tier gating (2026-05-08): tier='all' takes the note-only path
+ * (commentaryNoteSchema, ~200-token output) so the cheap one-liner runs
+ * for every non-excluded item. Only featured/p1 pay for the full deep
+ * dive. Saves ~85% of output tokens on tier='all' items, which dominate.
+ *
  * Stage D skip: items that are members of a multi-source cluster
  * (cluster_id IS NOT NULL AND clusters.member_count >= 2) are excluded from
  * per-item commentary. Those events get event-level commentary from
@@ -19,8 +24,9 @@ import { generateStructured, profiles } from "@/lib/llm";
 import {
   commentarySchema,
   COMMENTARY_SYSTEM,
+  commentaryNoteSchema,
+  COMMENTARY_NOTE_ONLY_SYSTEM,
   commentaryUserPrompt,
-  type CommentaryOutput,
   type CAPABILITIES,
   type TOPICS,
 } from "./prompt";
@@ -87,57 +93,7 @@ export async function runCommentaryBackfill(): Promise<CommentaryBackfillReport>
     pending.map((item: Item) =>
       limit(async () => {
         try {
-          const tagBag = (item.tags ?? {}) as {
-            capabilities?: string[];
-            entities?: string[];
-            topics?: string[];
-          };
-          const result = await generateStructured({
-            ...profiles.enrich,
-            task: "commentary",
-            itemId: item.id,
-            system: COMMENTARY_SYSTEM,
-            messages: [
-              {
-                role: "user",
-                content: commentaryUserPrompt({
-                  title: item.title,
-                  body: item.body,
-                  bodyMd: item.bodyMd,
-                  summaryZh: item.summaryZh ?? "",
-                  summaryEn: item.summaryEn ?? "",
-                  tier: item.tier as "featured" | "p1" | "all",
-                  importance: item.importance ?? 0,
-                  tags: {
-                    capabilities: (tagBag.capabilities ?? []) as Capability[],
-                    entities: tagBag.entities ?? [],
-                    topics: (tagBag.topics ?? []) as Topic[],
-                  },
-                  url: item.url,
-                  source: item.sourceId,
-                  publishedAt: item.publishedAt.toISOString(),
-                }),
-              },
-            ],
-            schema: commentarySchema,
-            schemaName: "EditorCommentary",
-            // Strong material targets 800-1400 zh + 600-1100 en + 2 notes.
-            // Rough: 1400 zh ≈ 1500 tok, 1100 en ≈ 1400 tok, notes ≈ 200,
-            // plus JSON + reasoning overhead. Give headroom so the schema
-            // parser doesn't truncate mid-paragraph.
-            maxTokens: 6144,
-          });
-          const c: CommentaryOutput = result.data;
-          await client
-            .update(items)
-            .set({
-              editorNoteZh: c.editorNoteZh,
-              editorNoteEn: c.editorNoteEn,
-              editorAnalysisZh: c.editorAnalysisZh,
-              editorAnalysisEn: c.editorAnalysisEn,
-              commentaryAt: new Date(),
-            })
-            .where(eq(items.id, item.id));
+          await generateOneCommentary(item);
           generated++;
         } catch (err) {
           errors.push({
@@ -156,4 +112,92 @@ export async function runCommentaryBackfill(): Promise<CommentaryBackfillReport>
     durationMs: Date.now() - started,
     errors,
   };
+}
+
+// ── Per-item dispatcher ─────────────────────────────────────────────────
+// Picks the right schema + system prompt + token budget based on tier.
+// featured / p1 → full deep dive. all → note only (much cheaper).
+
+async function generateOneCommentary(item: Item): Promise<void> {
+  const tagBag = (item.tags ?? {}) as {
+    capabilities?: string[];
+    entities?: string[];
+    topics?: string[];
+  };
+
+  const userContent = commentaryUserPrompt({
+    title: item.title,
+    body: item.body,
+    bodyMd: item.bodyMd,
+    summaryZh: item.summaryZh ?? "",
+    summaryEn: item.summaryEn ?? "",
+    tier: item.tier as "featured" | "p1" | "all",
+    importance: item.importance ?? 0,
+    tags: {
+      capabilities: (tagBag.capabilities ?? []) as Capability[],
+      entities: tagBag.entities ?? [],
+      topics: (tagBag.topics ?? []) as Topic[],
+    },
+    url: item.url,
+    source: item.sourceId,
+    publishedAt: item.publishedAt.toISOString(),
+  });
+
+  const isFull = item.tier === "featured" || item.tier === "p1";
+  const client = db();
+
+  if (isFull) {
+    // Full deep dive — note + 300-500 字 analysis in both locales.
+    const result = await generateStructured({
+      ...profiles.enrich,
+      task: "commentary",
+      itemId: item.id,
+      system: COMMENTARY_SYSTEM,
+      messages: [{ role: "user", content: userContent }],
+      schema: commentarySchema,
+      schemaName: "EditorCommentary",
+      // Strong material targets 800 字 zh + 600 words en + 2 notes plus
+      // JSON + reasoning overhead. Headroom prevents mid-paragraph truncation.
+      maxTokens: 6144,
+    });
+    const c = result.data;
+    await client
+      .update(items)
+      .set({
+        editorNoteZh: c.editorNoteZh,
+        editorNoteEn: c.editorNoteEn,
+        editorAnalysisZh: c.editorAnalysisZh,
+        editorAnalysisEn: c.editorAnalysisEn,
+        commentaryAt: new Date(),
+      })
+      // Idempotency guard — only write if still null. Mirrors the cluster
+      // path so two overlapping cron ticks can't double-bill an LLM call.
+      .where(and(eq(items.id, item.id), isNull(items.commentaryAt)));
+  } else {
+    // Note-only — tier='all'. Two short strings per locale, ≤ 200 chars each.
+    const result = await generateStructured({
+      ...profiles.enrich,
+      task: "commentary",
+      itemId: item.id,
+      system: COMMENTARY_NOTE_ONLY_SYSTEM,
+      messages: [{ role: "user", content: userContent }],
+      schema: commentaryNoteSchema,
+      schemaName: "EditorCommentaryNote",
+      // 2 × 200-char fields + JSON + reasoning easily fits in 1024.
+      maxTokens: 1024,
+    });
+    const c = result.data;
+    await client
+      .update(items)
+      .set({
+        editorNoteZh: c.editorNoteZh,
+        editorNoteEn: c.editorNoteEn,
+        // Intentionally not setting editor_analysis_{zh,en} — preserves any
+        // value written by a prior featured/p1 run (or stays null on first
+        // commentary). Demotion semantics live elsewhere if/when added.
+        commentaryAt: new Date(),
+      })
+      // Same idempotency guard as the full path.
+      .where(and(eq(items.id, item.id), isNull(items.commentaryAt)));
+  }
 }

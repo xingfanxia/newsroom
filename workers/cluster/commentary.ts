@@ -2,15 +2,21 @@
  * Event-level commentary worker (Stage D).
  *
  * Generates editorial commentary for multi-member clusters where
- * member_count >= 2 and event_tier IN ('featured', 'p1').
+ * member_count >= 2 and event_tier IN ('featured', 'p1', 'all').
+ *
+ * Tier gating (2026-05-08): event_tier='all' takes the note-only path
+ * (eventCommentaryNoteSchema, ~200-token output) — the cheap one-liner
+ * runs for every non-excluded multi-source event. Featured/p1 still pay
+ * for the full deep dive. Mirrors workers/enrich/commentary.ts.
  *
  * Singletons (member_count = 1 or cluster_id IS NULL) continue to receive
  * per-item commentary from workers/enrich/commentary.ts — this worker is
  * intentionally exclusive to multi-source events.
  *
  * Candidate order: importance DESC NULLS LAST, updated_at DESC.
- * Cap: MAX_EVENT_COMMENTARY_PER_RUN per cron tick — commentary is the most
- * expensive LLM call in the pipeline (6144 max tokens, long-form prose).
+ * Cap: MAX_EVENT_COMMENTARY_PER_RUN per cron tick — note-only path is
+ * cheap, but we keep the same cap so a featured-heavy hour doesn't blow
+ * the per-tick budget.
  */
 import { and, desc, eq, inArray, isNull, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
@@ -19,8 +25,9 @@ import { generateStructured, profiles } from "@/lib/llm";
 import {
   eventCommentarySchema,
   eventCommentarySystem,
+  eventCommentaryNoteSchema,
+  eventCommentaryNoteOnlySystem,
   eventCommentaryUserPrompt,
-  type EventCommentaryOutput,
   type EventMember,
 } from "./prompt";
 
@@ -59,6 +66,8 @@ export async function runEventCommentaryBatch(): Promise<EventCommentaryReport> 
   const client = db();
 
   // ── Candidate query ──────────────────────────────────────────────────────
+  // Picks featured/p1/all multi-member events. Tier dispatched inside
+  // processOneCluster — featured/p1 → full schema; all → note-only.
   const candidates = await client
     .select({
       id: clusters.id,
@@ -67,11 +76,12 @@ export async function runEventCommentaryBatch(): Promise<EventCommentaryReport> 
       canonicalTitleEn: clusters.canonicalTitleEn,
       memberCount: clusters.memberCount,
       importance: clusters.importance,
+      eventTier: clusters.eventTier,
     })
     .from(clusters)
     .where(
       and(
-        inArray(clusters.eventTier, ["featured", "p1"]),
+        inArray(clusters.eventTier, ["featured", "p1", "all"]),
         sql`${clusters.memberCount} >= 2`,
         isNull(clusters.commentaryAt),
       ),
@@ -114,6 +124,7 @@ interface ClusterCandidate {
   canonicalTitleEn: string | null;
   memberCount: number;
   importance: number | null;
+  eventTier: string | null;
 }
 
 type MemberRow = {
@@ -178,35 +189,66 @@ async function processOneCluster(candidate: ClusterCandidate): Promise<void> {
     richestTitle: richest.title,
   });
 
-  const result = await generateStructured({
-    ...profiles.enrich,
-    task: "event-commentary",
-    system: eventCommentarySystem,
-    messages: [{ role: "user", content: userPrompt }],
-    schema: eventCommentarySchema,
-    schemaName: "EventEditorCommentary",
-    // Same budget as per-item commentary — long-form prose in both zh + en.
-    maxTokens: 6144,
-  });
+  const isFull =
+    candidate.eventTier === "featured" || candidate.eventTier === "p1";
 
-  const c: EventCommentaryOutput = result.data;
-
-  // Persist to clusters row
-  await client
-    .update(clusters)
-    .set({
-      editorNoteZh: c.editorNoteZh,
-      editorNoteEn: c.editorNoteEn,
-      editorAnalysisZh: c.editorAnalysisZh,
-      editorAnalysisEn: c.editorAnalysisEn,
-      commentaryAt: new Date(),
-    })
-    .where(
-      and(
-        eq(clusters.id, candidate.id),
-        // Idempotency guard: only write if still null — concurrent runs
-        // can't double-write.
-        isNull(clusters.commentaryAt),
-      ),
-    );
+  if (isFull) {
+    // Full deep dive — note + analysis, both locales.
+    const result = await generateStructured({
+      ...profiles.enrich,
+      task: "event-commentary",
+      system: eventCommentarySystem,
+      messages: [{ role: "user", content: userPrompt }],
+      schema: eventCommentarySchema,
+      schemaName: "EventEditorCommentary",
+      // Same budget as per-item commentary — long-form prose in both zh + en.
+      maxTokens: 6144,
+    });
+    const c = result.data;
+    await client
+      .update(clusters)
+      .set({
+        editorNoteZh: c.editorNoteZh,
+        editorNoteEn: c.editorNoteEn,
+        editorAnalysisZh: c.editorAnalysisZh,
+        editorAnalysisEn: c.editorAnalysisEn,
+        commentaryAt: new Date(),
+      })
+      .where(
+        and(
+          eq(clusters.id, candidate.id),
+          // Idempotency guard: only write if still null — concurrent runs
+          // can't double-write.
+          isNull(clusters.commentaryAt),
+        ),
+      );
+  } else {
+    // Note-only — event_tier='all'.
+    const result = await generateStructured({
+      ...profiles.enrich,
+      task: "event-commentary",
+      system: eventCommentaryNoteOnlySystem,
+      messages: [{ role: "user", content: userPrompt }],
+      schema: eventCommentaryNoteSchema,
+      schemaName: "EventEditorCommentaryNote",
+      maxTokens: 1024,
+    });
+    const c = result.data;
+    await client
+      .update(clusters)
+      .set({
+        editorNoteZh: c.editorNoteZh,
+        editorNoteEn: c.editorNoteEn,
+        // Intentionally not setting editor_analysis_{zh,en} — preserves any
+        // value written by a prior featured/p1 run (or stays null on first
+        // commentary). Demotion semantics live elsewhere if/when added.
+        commentaryAt: new Date(),
+      })
+      .where(
+        and(
+          eq(clusters.id, candidate.id),
+          isNull(clusters.commentaryAt),
+        ),
+      );
+  }
 }
