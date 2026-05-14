@@ -32,6 +32,7 @@ AX's AI RADAR is a dashboard for editors and analysts who cover the AI industry.
 | `/{locale}/saved` | 收藏 — **user-named collections** with inbox + tags + move/export MD |
 | `/{locale}/sources` | 信源 — grouped tables or card grid (`?view=cards`) |
 | `/{locale}/podcasts` | 播客 · 视频 — podcast/video feed with per-channel filter pills |
+| `/{locale}/agents` | Agent 接入 — 3-tab integration page (Skill / RSS / REST API). See [`docs/agent-access/`](./docs/agent-access/) |
 | `/{locale}/admin/usage` | 用量 — LLM spend cards (today / 7d / 30d) |
 | `/{locale}/admin/system` | 系统 — Detailed LLM cost + recent calls |
 | `/{locale}/admin/policy` | 精选策略 — **editable** markdown with live preview; commits new version |
@@ -101,8 +102,9 @@ See [`.env.example`](./.env.example) for the complete template. On Vercel, most 
 | **AI HOT integration + voice rebase** | New `aihot-api` source (hourly pre-curated pool from https://aihot.virxact.com) + AI HOT structured daily merged into column generator + voice rebase (daily column → khazix narrative; editor_analysis → khazix-compressed) + cost-bounded backfill scripts | ✅ shipped (2026-05-08) |
 | **Tier-gated commentary** | `editor_note_*` (一句话点评) runs for every non-excluded item / event; `editor_analysis_*` only for tier ∈ (featured, p1) — tier 'all' takes a note-only LLM call via `commentaryNoteSchema` (~85% smaller output) | ✅ shipped (2026-05-08) |
 | **Editorial taxonomy rebrand** | 深度解读 → 锐评 (200 字 cap, was 300-500 字 / 800 ceiling); summary tightened to 50-90 字 一句话总结; UI labels rebranded (编辑点评 → 一句话点评). Home page default flipped from multi-day "3 stories per day" digest to today's hot events; daily digest reachable via `?view=daily` toggle | ✅ shipped (2026-05-08) |
+| **Agent access — public mirror** | Anonymous `/api/public/*` mirror (8 read-only endpoints: feed / items / search / sources / events / daily / dailies) with IP rate limit + weak ETag + CORS. Discovery: hosted `/skill.md` (SKILL.md standard) + `/openapi.yaml` (OpenAPI 3.1) + `/robots.txt` + `/sitemap.xml`. Bilingual `/{locale}/agents` page with 3-tab UI (Skill / RSS / REST API). Bearer-gated `/api/v1/*` + `/api/mcp` retained for write actions + audit | ✅ shipped (2026-05-13, PR #36) |
 
-Full blueprint + deviations in [`docs/architecture/ingestion.md`](./docs/architecture/ingestion.md). AI HOT integration design in [`docs/aihot-integration/PLAN.md`](./docs/aihot-integration/PLAN.md). Handoff notes in [`docs/HANDOFF.md`](./docs/HANDOFF.md).
+Full blueprint + deviations in [`docs/architecture/ingestion.md`](./docs/architecture/ingestion.md). AI HOT integration design in [`docs/aihot-integration/PLAN.md`](./docs/aihot-integration/PLAN.md). Agent access surface in [`docs/agent-access/`](./docs/agent-access/). Handoff notes in [`docs/HANDOFF.md`](./docs/HANDOFF.md).
 
 ---
 
@@ -128,6 +130,7 @@ AX 的 AI 雷达是一款面向 AI 行业编辑和分析师的情报工作台，
 | `/{locale}/saved` | 收藏 — **自定义收藏夹**，支持收件箱、标签、移动、导出 Markdown |
 | `/{locale}/sources` | 信源 — 分组表格或卡片网格（`?view=cards`） |
 | `/{locale}/podcasts` | 播客 · 视频 — 节目流 + 频道过滤 |
+| `/{locale}/agents` | Agent 接入 — 3-tab 集成页面（Skill / RSS / REST API），见 [`docs/agent-access/`](./docs/agent-access/) |
 | `/{locale}/admin/usage` | 用量 — LLM 花费卡片（今日 / 7 天 / 30 天） |
 | `/{locale}/admin/iterations` | 策略迭代 — 指标卡片 + Agent 控制台 + Diff 预览 + **版本时间轴** |
 | `/{locale}/admin/policy` | 精选策略 — **可编辑** markdown，带实时预览，可直接提交新版本 |
@@ -168,8 +171,9 @@ bun run dev
 | **AI HOT 接入 + 文风回 khazix** | 新增 `aihot-api` 信源类型（hourly 拉取卡兹克 https://aihot.virxact.com 精选池）+ 把他们的结构化日报作为 must-cover 基线 merge 进我们的 column generator + 文风 rebase（日报回到 khazix 叙事） + 带成本上限的 backfill 脚本 | ✅ 已上线 (2026-05-08) |
 | **分级评论 (tier-gated commentary)** | `editor_note_*` (一句话点评) 对每条非 excluded 都生成；`editor_analysis_*` 只对 tier ∈ (featured, p1) 生成 — tier='all' 走 note-only LLM 调用 (`commentaryNoteSchema`，输出量减少约 85%) | ✅ 已上线 (2026-05-08) |
 | **编辑分层重命名** | 深度解读 → 锐评 (200 字硬上限, 原 300-500 字 / 800 字顶); summary 收紧到 50-90 字 一句话总结; UI 标签重命名 (编辑点评 → 一句话点评). 主页默认从多日"每日精选"切换到今日热点; 每日精选可通过 `?view=daily` toggle 找回 | ✅ 已上线 (2026-05-08) |
+| **Agent 接入 — 公开镜像** | 匿名 `/api/public/*` 只读镜像（8 个端点：feed / items / search / sources / events / daily / dailies）+ IP 限流 + 弱 ETag + CORS。发现层：托管 `/skill.md` (SKILL.md 标准) + `/openapi.yaml` (OpenAPI 3.1) + `/robots.txt` + `/sitemap.xml`。双语 `/{locale}/agents` 三 tab 页面 (Skill / RSS / REST API)。Bearer-gated `/api/v1/*` + `/api/mcp` 保留给写动作 + 审计 | ✅ 已上线 (2026-05-13, PR #36) |
 
-完整蓝图与偏差记录见 [`docs/architecture/ingestion.md`](./docs/architecture/ingestion.md)。AI HOT 集成设计见 [`docs/aihot-integration/PLAN.md`](./docs/aihot-integration/PLAN.md)。会话交接记录见 [`docs/HANDOFF.md`](./docs/HANDOFF.md)。
+完整蓝图与偏差记录见 [`docs/architecture/ingestion.md`](./docs/architecture/ingestion.md)。AI HOT 集成设计见 [`docs/aihot-integration/PLAN.md`](./docs/aihot-integration/PLAN.md)。Agent 接入设计见 [`docs/agent-access/`](./docs/agent-access/)。会话交接记录见 [`docs/HANDOFF.md`](./docs/HANDOFF.md)。
 
 ---
 

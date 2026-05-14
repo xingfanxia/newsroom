@@ -1,5 +1,13 @@
 # AX Radar — Agent / MCP Integration Plan (s9 design)
 
+> **Status (2026-05-13)**: bearer-gated tracks (`/api/v1/*` + `/api/mcp`)
+> described here are **shipped and stable**. A third track —
+> **anonymous public mirror** `/api/public/*` + hosted `/skill.md` +
+> `/openapi.yaml` — shipped 2026-05-13 (PR #36) to lower the integration
+> floor to zero auth. See [`agent-access/README.md`](./agent-access/README.md)
+> for the shipped public surface; this doc remains the canonical design
+> record for the bearer track.
+
 Drafted end of session 8 (2026-04-20). The ask: expose AX Radar's feed,
 saved collections, commentary, and source health to agents so Claude (and
 other tool-using LLMs) can read + write against the radar as if it were a
