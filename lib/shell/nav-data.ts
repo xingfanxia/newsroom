@@ -22,6 +22,7 @@ export const NAV_PRIMARY: NavItem[] = [
   { id: "xmonitor",   href: "/x-monitor",    label: "X monitor",  cjk: "X 监控" },
   { id: "saved",      href: "/saved",        label: "saved",      cjk: "收藏" },
   { id: "sources",    href: "/sources",      label: "sources",    cjk: "信源" },
+  { id: "agents",     href: "/agents",       label: "agent access", cjk: "Agent 接入" },
 ];
 
 export const NAV_ADMIN: NavItem[] = [
