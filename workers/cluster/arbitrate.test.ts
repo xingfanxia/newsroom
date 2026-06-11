@@ -147,8 +147,8 @@ describe("runArbitrationBatch — keep verdict", () => {
     // Mock generateStructured to return keep verdict
     const mockGenerateStructured = mock(async () => ({
       data: { verdict: "keep" as const, reason: "same product launch" },
-      provider: "azure-openai" as const,
-      model: "gpt-5.4-standard",
+      provider: "azure-deepseek" as const,
+      model: "DeepSeek-V4-Flash",
     }));
 
     // Dynamically import using mocks — since we can't use module mocking directly
@@ -194,8 +194,8 @@ describe("runArbitrationBatch — keep verdict", () => {
 
     // Verify generateStructured would be called with "keep" verdict expectations
     const result = await mockGenerateStructured({
-      provider: "azure-openai",
-      reasoningEffort: "low",
+      provider: "azure-deepseek",
+      deployment: "DeepSeek-V4-Flash",
       task: "arbitrate",
       system: "system prompt",
       messages: [],

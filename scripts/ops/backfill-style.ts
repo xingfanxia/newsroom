@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * Stage-4 commentary backfill — re-runs item-level + cluster-level commentary
- * with the NEW khazix-compressed prompts (300-500 字 zh / 250-450 en).
+ * with the friend-sharing prompts.
  *
  * Lifts the candidate-query patterns from `workers/enrich/commentary.ts` +
  * `workers/cluster/commentary.ts` directly (bypassing their MAX_PER_RUN caps)
@@ -34,6 +34,7 @@ import {
 import { db, closeDb } from "@/db/client";
 import { clusters, items, policyVersions, type Item } from "@/db/schema";
 import { generateStructured, profiles } from "@/lib/llm";
+import { generateChineseCommentary } from "@/workers/enrich/chinese";
 import {
   COMMENTARY_SYSTEM,
   commentarySchema,
@@ -52,6 +53,7 @@ import {
   type EventMember,
 } from "@/workers/cluster/prompt";
 import { resolvePricing, computeCost } from "@/lib/llm/pricing";
+import { treatmentForScore } from "@/workers/enrich/treatment";
 
 type Capability = (typeof CAPABILITIES)[number];
 type Topic = (typeof TOPICS)[number];
@@ -66,8 +68,7 @@ const EST_INPUT_TOK = 3000;
 // high so the operator-facing total is conservative.
 const EST_OUTPUT_TOK = 700;
 const SECONDS_PER_CALL = 30;
-// Matches AZURE_OPENAI_CHAT_DEPLOYMENT default (lib/llm/index.ts).
-const MODEL_NAME = "gpt-5.5-standard";
+const MODEL_NAME = "DeepSeek-V4-Pro";
 
 // ── CLI ──────────────────────────────────────────────────────────────
 interface Flags {
@@ -87,7 +88,7 @@ function die(msg: string): never {
 }
 
 function printUsage(): void {
-  console.log(`backfill-style.ts — re-run Stage-4 commentary with new khazix prompts
+  console.log(`backfill-style.ts — re-run Stage-4 commentary with friend-sharing prompts
 
 Flags:
   --dry-run                       print stats + cost forecast, no LLM calls
@@ -287,11 +288,47 @@ type BackfillResult = {
   costUsd: number | null;
 };
 
+function compactItemCommentaryPrompt(
+  item: Item,
+  tags: { capabilities: Capability[]; entities: string[]; topics: Topic[] },
+): string {
+  const payload = {
+    title: item.title,
+    source: item.sourceId,
+    url: item.url,
+    publishedAt: item.publishedAt.toISOString(),
+    tier: item.tier,
+    importance: item.importance ?? 0,
+    summaryZh: item.summaryZh ?? "",
+    summaryEn: item.summaryEn ?? "",
+    tags,
+    bodyOmitted:
+      "Compact retry: the original source body was omitted because the provider rejected the long prompt. Use only the title, summaries, source, tags, and score context.",
+  };
+  return `Backfill note-only editor commentary for one lower-priority feed item.
+
+Use the JSON context below. The body is intentionally omitted, so be explicit if the evidence is thin. Write like a smart friend sharing the link, not like a research memo.
+
+${JSON.stringify(payload, null, 2)}
+
+Follow the requested output schema exactly.`;
+}
+
+function compactErrorMessage(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err);
+  return raw.replace(/\s+/g, " ").slice(0, 180);
+}
+
 async function backfillItem(item: Item): Promise<BackfillResult> {
   const tagBag = (item.tags ?? {}) as {
     capabilities?: string[];
     entities?: string[];
     topics?: string[];
+  };
+  const normalizedTags = {
+    capabilities: (tagBag.capabilities ?? []) as Capability[],
+    entities: tagBag.entities ?? [],
+    topics: (tagBag.topics ?? []) as Topic[],
   };
   const userContent = commentaryUserPrompt({
     title: item.title,
@@ -301,17 +338,17 @@ async function backfillItem(item: Item): Promise<BackfillResult> {
     summaryEn: item.summaryEn ?? "",
     tier: item.tier as "featured" | "p1" | "all",
     importance: item.importance ?? 0,
-    tags: {
-      capabilities: (tagBag.capabilities ?? []) as Capability[],
-      entities: tagBag.entities ?? [],
-      topics: (tagBag.topics ?? []) as Topic[],
-    },
+    tags: normalizedTags,
     url: item.url,
     source: item.sourceId,
     publishedAt: item.publishedAt.toISOString(),
   });
 
   const isFull = item.tier === "featured" || item.tier === "p1";
+  const treatment = treatmentForScore({
+    importance: item.importance,
+    tier: item.tier,
+  });
 
   if (isFull) {
     const result = await generateStructured({
@@ -325,12 +362,19 @@ async function backfillItem(item: Item): Promise<BackfillResult> {
       maxTokens: 3072,
     });
     const c = result.data;
+    const zh = await generateChineseCommentary({
+      task: "commentary",
+      itemId: item.id,
+      userContent,
+      full: true,
+      treatment: "high",
+    });
     await db()
       .update(items)
       .set({
-        editorNoteZh: c.editorNoteZh,
+        editorNoteZh: zh.editorNoteZh,
         editorNoteEn: c.editorNoteEn,
-        editorAnalysisZh: c.editorAnalysisZh,
+        editorAnalysisZh: "editorAnalysisZh" in zh ? zh.editorAnalysisZh : c.editorAnalysisZh,
         editorAnalysisEn: c.editorAnalysisEn,
         commentaryAt: new Date(),
       })
@@ -343,21 +387,47 @@ async function backfillItem(item: Item): Promise<BackfillResult> {
     return { path: "full", outputCharsZh: c.editorAnalysisZh.length, costUsd: cost };
   } else {
     // tier='all' → note-only path. Don't overwrite any existing analysis.
-    const result = await generateStructured({
-      ...profiles.enrich,
-      task: "commentary",
-      itemId: item.id,
-      system: COMMENTARY_NOTE_ONLY_SYSTEM,
-      messages: [{ role: "user", content: userContent }],
-      schema: commentaryNoteSchema,
-      schemaName: "EditorCommentaryNote",
-      maxTokens: 1024,
+    const noteProfile = treatment === "fast" ? profiles.fastText : profiles.enrich;
+    const generateNote = (content: string, maxTokens = 1024) =>
+      generateStructured({
+        ...noteProfile,
+        task: "commentary",
+        itemId: item.id,
+        system: COMMENTARY_NOTE_ONLY_SYSTEM,
+        messages: [{ role: "user", content }],
+        schema: commentaryNoteSchema,
+        schemaName: "EditorCommentaryNote",
+        maxTokens,
+      });
+
+    let noteUserContent = userContent;
+    const result = await generateNote(noteUserContent).catch(async (err) => {
+      console.warn(
+        `[fallback] item #${item.id}: compact note prompt after provider error (${compactErrorMessage(err)})`,
+      );
+      noteUserContent = compactItemCommentaryPrompt(item, normalizedTags);
+      return generateNote(noteUserContent, 768);
     });
     const c = result.data;
+    const generateZhNote = (content: string) =>
+      generateChineseCommentary({
+        task: "commentary",
+        itemId: item.id,
+        userContent: content,
+        full: false,
+        treatment,
+      });
+    const zh = await generateZhNote(noteUserContent).catch(async (err) => {
+      console.warn(
+        `[fallback] item #${item.id}: compact Chinese note prompt after provider error (${compactErrorMessage(err)})`,
+      );
+      noteUserContent = compactItemCommentaryPrompt(item, normalizedTags);
+      return generateZhNote(noteUserContent);
+    });
     await db()
       .update(items)
       .set({
-        editorNoteZh: c.editorNoteZh,
+        editorNoteZh: zh.editorNoteZh,
         editorNoteEn: c.editorNoteEn,
         commentaryAt: new Date(),
       })
@@ -406,6 +476,10 @@ async function backfillCluster(c: ClusterCandidate): Promise<BackfillResult | nu
   });
 
   const isFull = c.eventTier === "featured" || c.eventTier === "p1";
+  const treatment = treatmentForScore({
+    importance: c.importance,
+    tier: c.eventTier,
+  });
 
   if (isFull) {
     const result = await generateStructured({
@@ -418,12 +492,18 @@ async function backfillCluster(c: ClusterCandidate): Promise<BackfillResult | nu
       maxTokens: 3072,
     });
     const out = result.data;
+    const zh = await generateChineseCommentary({
+      task: "event-commentary",
+      userContent,
+      full: true,
+      treatment: "high",
+    });
     await db()
       .update(clusters)
       .set({
-        editorNoteZh: out.editorNoteZh,
+        editorNoteZh: zh.editorNoteZh,
         editorNoteEn: out.editorNoteEn,
-        editorAnalysisZh: out.editorAnalysisZh,
+        editorAnalysisZh: "editorAnalysisZh" in zh ? zh.editorAnalysisZh : out.editorAnalysisZh,
         editorAnalysisEn: out.editorAnalysisEn,
         commentaryAt: new Date(),
       })
@@ -437,7 +517,7 @@ async function backfillCluster(c: ClusterCandidate): Promise<BackfillResult | nu
   } else {
     // event_tier='all' → note-only.
     const result = await generateStructured({
-      ...profiles.enrich,
+      ...(treatment === "fast" ? profiles.fastText : profiles.enrich),
       task: "event-commentary",
       system: eventCommentaryNoteOnlySystem,
       messages: [{ role: "user", content: userContent }],
@@ -446,10 +526,16 @@ async function backfillCluster(c: ClusterCandidate): Promise<BackfillResult | nu
       maxTokens: 1024,
     });
     const out = result.data;
+    const zh = await generateChineseCommentary({
+      task: "event-commentary",
+      userContent,
+      full: false,
+      treatment,
+    });
     await db()
       .update(clusters)
       .set({
-        editorNoteZh: out.editorNoteZh,
+        editorNoteZh: zh.editorNoteZh,
         editorNoteEn: out.editorNoteEn,
         commentaryAt: new Date(),
       })
@@ -492,7 +578,7 @@ async function main(): Promise<void> {
       : await loadClusterCandidates({ tiers: flags.tiers, sinceDate: flags.sinceDate, policyBumpAt, excludeIds: excludeClusters });
 
   // Forecast.
-  const pricing = await resolvePricing(MODEL_NAME, "azure-openai");
+  const pricing = await resolvePricing(MODEL_NAME, "azure-deepseek");
   const perCallCost = pricing
     ? computeCost({ inputTokens: EST_INPUT_TOK, outputTokens: EST_OUTPUT_TOK }, pricing)
     : null;

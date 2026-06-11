@@ -1,4 +1,41 @@
-# AX's AI RADAR — Session Handoff (2026-04-19/20, Session 8 complete)
+# AX's AI RADAR — Current Handoff
+
+## 2026-06-10 — DeepSeek treatment rebase, paper retirement, cluster cleanup
+
+Current production direction:
+- Prose/scoring defaults moved off GPT-5.5 and onto Azure AI Foundry DeepSeek.
+- High-value enrich/commentary/cluster/daily work uses `DeepSeek-V4-Pro`.
+- Low-value item treatment and cheap arbitration use `DeepSeek-V4-Flash`.
+- Azure OpenAI remains active for `text-embedding-3-large` embeddings and the `gpt-5.5-standard` compatibility/probe deployment.
+- The desired editorial voice is "send this to a smart friend": plain, specific, accurate, low translationese, and not memo/jargon-heavy.
+- Paper-only sources are retired. Do not re-add arXiv, Hugging Face Papers, Papers with Code, `hf-papers-takara`, `/papers`, `papers.xml`, or `ax-radar://papers`.
+
+Shipped code changes:
+- Added `azure-deepseek` provider support in `lib/llm/index.ts`, including Azure Responses-style endpoint normalization, structured JSON parsing, schema retry, and Flash-to-Pro fallback.
+- Added treatment routing in `workers/enrich/treatment.ts`; enrich/score/commentary/cluster paths now choose Pro vs Flash by item importance/tier.
+- Rewrote Chinese and daily prompts toward friend-sharing language in `workers/enrich/chinese.ts`, `workers/enrich/prompt.ts`, `workers/cluster/prompt.ts`, and `lib/llm/prompts/daily-column.md`.
+- Removed paper surfaces from catalog, navigation, sitemap, RSS, MCP, public skill, OpenAPI, and `/papers`.
+- Added `scripts/ops/cleanup-paper-sources.ts`, `scripts/ops/backfill-chinese.ts`, and `scripts/ops/backfill-daily-columns.ts`.
+- Added singleton reclustering so recent singleton items get another chance to join existing events before duplicate-cluster merge.
+
+Backfill/DB state verified on 2026-06-10:
+- Chinese backfill state: `enrich=14909`, `score=14909`, `commentary=6774`, `clusters=1660`.
+- Daily-column backfill: 51 historical daily rows regenerated and self-check-clean.
+- Paper cleanup: explicit retired paper sources and arXiv/paper-tagged source rows count `0` in DB after cleanup.
+- Empty clusters count `0`.
+
+Verification already run:
+- `bun test --env-file=.env.local tests/cluster/singletons.test.ts tests/cluster/merge.test.ts workers/cluster/arbitrate.test.ts tests/llm/deepseek-routing.test.ts tests/enrich/treatment.test.ts tests/enrich/friendly-style.test.ts` — 59 pass.
+- Earlier focused suite — 148 pass.
+- `bun run build` — passed, route list has no `/papers`.
+- Dry runs after backfill: `backfill-style`, `backfill-chinese`, `backfill-daily-columns`, and `cleanup-paper-sources` all returned zero pending targets.
+
+Known caveat:
+- `bunx tsc --noEmit` still fails because repo test typing does not expose `bun:test` types and an existing `tests/auth/feedback-schema.test.ts` Drizzle nullable fixture issue remains. `next build` type-checking passes.
+
+---
+
+# Archived Notes — Session Handoff (2026-04-19/20, Session 8 complete)
 
 > Read this first before resuming. Prior sessions: s1-3 = M0-M2 + RSS/commentary/newsletter/i18n/HKR/bilingual; s4 = Jina body fetch + 晚点 prompts + YT transcripts + `/podcasts`; s5 = M3 auth+feedback+admin-gate + podcast detail + CRON_SECRET; s6 = M4 editorial agent + X ingestion + password gate + 20 broken sources disabled; **s7** = 2026 backfill (+2907 items) + full terminal-aesthetic port of 12 views + named saved-collections + server tweaks sync + 12/14 design-mock divergences closed. **s8 (this one)** = bug triage + admin rebuild + pagination/calendar + YouTube full-coverage pipeline + cleanup of 15 dead sources. Shipped **9 commits** on main (no PR branching this session).
 

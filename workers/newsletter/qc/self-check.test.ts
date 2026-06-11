@@ -52,7 +52,7 @@ describe("runColumnSelfCheck", () => {
     expect(hit?.snippet.length).toBeLessThanOrEqual(50);
   });
 
-  it("does not flag '首先 / 其次 / 最后' anymore (was khazix-only constraint)", () => {
+  it("does not flag '首先 / 其次 / 最后' anymore", () => {
     const result = runColumnSelfCheck({
       title: "title",
       summary_md: "1. x [#1]",

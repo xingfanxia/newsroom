@@ -78,7 +78,7 @@ async function main() {
       (s) =>
         !args.skip.has(s.id) &&
         (args.only ? args.only.has(s.id) : true) &&
-        // x-api has its own backfill path (not via Wayback / arxiv)
+        // x-api has its own backfill path (not via Wayback)
         s.kind !== "x-api",
     );
   } else {

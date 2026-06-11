@@ -17,7 +17,6 @@ const PRIMARY_ROUTES = [
   "/agents",
   "/daily",
   "/curated",
-  "/papers",
   "/podcasts",
   "/all",
   "/sources",

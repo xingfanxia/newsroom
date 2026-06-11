@@ -96,7 +96,7 @@ function buildServer(user: SessionUser): McpServer {
     {
       title: "Browse the AX Radar feed",
       description:
-        "Return curated items from the AX Radar timeline. Each row is a single editorial card: a singleton article OR a multi-source EVENT (multiple publishers covering the same real-world story merged into one card). When `coverage > 1` the row is an event — use ax_radar_event_members to see all the sources covering it. `view=today` is the importance-sorted hot feed (热点聚合) — what matters today, including events still developing. `view=archive` (default) is the chronological calendar timeline keyed on the lead's published_at. `tier=featured` is today's signal, `tier=all` spans everything non-excluded. Set `curated_only=true` for the operator-curated AX严选 stream (hand-picked publishers like 鸭哥/grapeot, 群聊日报). Use `exclude_source_tags='arxiv,paper'` to drop research-paper feeds from a news view, or `include_source_tags='arxiv,paper'` for the 论文 tab.",
+        "Return curated items from the AX Radar timeline. Each row is a single editorial card: a singleton article OR a multi-source EVENT (multiple publishers covering the same real-world story merged into one card). When `coverage > 1` the row is an event — use ax_radar_event_members to see all the sources covering it. `view=today` is the importance-sorted hot feed (热点聚合) — what matters today, including events still developing. `view=archive` (default) is the chronological calendar timeline keyed on the lead's published_at. `tier=featured` is today's signal, `tier=all` spans everything non-excluded. Set `curated_only=true` for the operator-curated AX严选 stream (hand-picked publishers like 鸭哥/grapeot, 群聊日报). Use source_id/source_group/source_kind or source tag filters when you need a narrower slice.",
       inputSchema: {
         tier: z.enum(["featured", "p1", "all"]).optional(),
         view: z.enum(["today", "archive"]).optional(),
@@ -331,7 +331,7 @@ function buildServer(user: SessionUser): McpServer {
     {
       title: "List monitored sources + live health",
       description:
-        "Return the 59-source catalog (podcasts, newsletters, vendor blogs, research feeds, X handles, ...) with current health: status, consecutive failures, last success, total items ingested. Useful for answering 'do we even watch X?' before phrasing a broader query.",
+        "Return the 52-source catalog (podcasts, newsletters, vendor blogs, deep-report feeds, X handles, ...) with current health: status, consecutive failures, last success, total items ingested. Useful for answering 'do we even watch X?' before phrasing a broader query.",
       inputSchema: {},
     },
     async () => {
@@ -493,7 +493,7 @@ function buildServer(user: SessionUser): McpServer {
     {
       title: "Today's hot events (热点聚合)",
       description:
-        "Today's importance-sorted hot feed — same as the homepage 热点聚合 tab. Multi-source events ranked by editorial importance, plus today's high-signal singletons. Research papers (arxiv/HF Papers) are excluded — see ax-radar://papers for those. Cheapest way to ask 'what should I know this morning?'.",
+        "Today's importance-sorted hot feed — same as the homepage 热点聚合 tab. Multi-source events ranked by editorial importance, plus today's high-signal singletons. Cheapest way to ask 'what should I know this morning?'.",
       mimeType: "text/markdown",
     },
     async (uri) => {
@@ -503,7 +503,6 @@ function buildServer(user: SessionUser): McpServer {
         limit: 30,
         includeSourceGroup: true,
         view: "today",
-        excludeSourceTags: ["arxiv", "paper"],
       });
       const today = new Date().toISOString().slice(0, 10);
       return {
@@ -513,7 +512,7 @@ function buildServer(user: SessionUser): McpServer {
             mimeType: "text/markdown",
             text: storyMarkdown(
               `AX Radar — 热点聚合 · ${today}`,
-              `${stories.length} item(s). Tier = featured + p1. Importance-sorted. Papers excluded.`,
+              `${stories.length} item(s). Tier = featured + p1. Importance-sorted.`,
               stories,
             ),
           },
@@ -556,40 +555,6 @@ function buildServer(user: SessionUser): McpServer {
     },
   );
 
-  server.registerResource(
-    "papers",
-    "ax-radar://papers",
-    {
-      title: "Recent research papers (论文)",
-      description:
-        "Latest items from arxiv + HuggingFace Papers feeds. Same as the homepage 论文 tab.",
-      mimeType: "text/markdown",
-    },
-    async (uri) => {
-      const stories = await getFeaturedStories({
-        tier: "all",
-        locale: "en",
-        limit: 30,
-        includeSourceGroup: true,
-        includeSourceTags: ["arxiv", "paper"],
-      });
-      const today = new Date().toISOString().slice(0, 10);
-      return {
-        contents: [
-          {
-            uri: uri.href,
-            mimeType: "text/markdown",
-            text: storyMarkdown(
-              `AX Radar — 论文 · ${today}`,
-              `${stories.length} paper(s) from arxiv + HF Papers.`,
-              stories,
-            ),
-          },
-        ],
-      };
-    },
-  );
-
   // ── Daily column resources ─────────────────────────────────────
   function dateKey(d: Date): string {
     return d.toISOString().slice(0, 10);
@@ -613,7 +578,7 @@ function buildServer(user: SessionUser): McpServer {
     {
       title: "Latest daily AI column",
       description:
-        "The most recent daily AI column written by the AX Radar editorial bot in 卡兹克 voice. Title format: 'AX 的 AI 日报 · YYYY-MM-DD'. Body has a 5-item numbered exec summary (skim layer) and a 2000-4000 字 long-form narrative (deep layer with personal takes + cultural 升维). Selection draws from today's 严选 ∪ top hot items, papers excluded. Cron writes one per day at ~9pm PT.",
+        "The most recent daily AI column written in a clear, friend-sharing voice. Title format: 'AX 的 AI 日报 · YYYY-MM-DD'. Body has a short skim layer and a 2500-4500 字 narrative that explains what happened, why it matters, and where to be cautious. Selection draws from today's 严选 ∪ top hot items. Cron writes one per day at ~9pm PT.",
       mimeType: "text/markdown",
     },
     async (uri) => {

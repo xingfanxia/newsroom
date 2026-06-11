@@ -16,8 +16,6 @@ describe("activeNavId", () => {
     expect(activeNavId("/en/curated")).toBe("curated");
     expect(activeNavId("/en/x-monitor")).toBe("xmonitor");
     expect(activeNavId("/en/all")).toBe("all");
-    expect(activeNavId("/en/papers")).toBe("papers");
-    expect(activeNavId("/zh/papers")).toBe("papers");
     expect(activeNavId("/en/daily")).toBe("daily");
     expect(activeNavId("/zh/daily")).toBe("daily");
   });
@@ -53,9 +51,9 @@ describe("activeNavId", () => {
 });
 
 describe("nav data shape", () => {
-  it("exposes 9 primary nav items (including papers + daily tabs)", () => {
+  it("exposes 9 primary nav items without a papers tab", () => {
     expect(NAV_PRIMARY).toHaveLength(9);
-    expect(NAV_PRIMARY.find((n) => n.id === "papers")).toBeDefined();
+    expect(NAV_PRIMARY.find((n) => n.id === "papers")).toBeUndefined();
     expect(NAV_PRIMARY.find((n) => n.id === "daily")).toBeDefined();
   });
 

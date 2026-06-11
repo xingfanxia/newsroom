@@ -13,16 +13,14 @@
  */
 const SKILL_MARKDOWN = `---
 name: ax-radar
-description: 用最自然的中文 / 英文一句话拿到 AX Radar (https://news.ax0x.ai) 的精选 AI 动态、AX 严选、AI 论文、每日 AI 日报、多源事件覆盖。匿名免费,无需 token,无需配 MCP server。
+description: 用最自然的中文 / 英文一句话拿到 AX Radar (https://news.ax0x.ai) 的精选 AI 动态、AX 严选、每日 AI 日报、多源事件覆盖。匿名免费,无需 token,无需配 MCP server。
 triggers:
   - 今天 AI 圈
   - AI 日报
   - 看下精选条目
-  - 最近 AI 论文
   - 最近 OpenAI 发布
   - 这一周 AI 圈
   - what's new in AI today
-  - latest AI papers
   - AX Radar
 license: MIT
 homepage: https://news.ax0x.ai/zh/agents
@@ -31,22 +29,21 @@ api: https://news.ax0x.ai/openapi.yaml
 
 # AX Radar — Skill
 
-把 AX Radar 的精选 AI 信号、AX 严选、论文流、每日 AI 日报接进任意 Agent。**匿名免费**——HTTP GET 就能拿数据,不需要 API Key、不需要配 MCP server。
+把 AX Radar 的精选 AI 信号、AX 严选、每日 AI 日报接进任意 Agent。**匿名免费**——HTTP GET 就能拿数据,不需要 API Key、不需要配 MCP server。
 
-> Bring AX Radar's curated AI signal, hand-picked editor stream, papers feed, and daily AI column into any agent. **Free + anonymous** — plain HTTP GET, no API key, no MCP setup.
+> Bring AX Radar's curated AI signal, hand-picked editor stream, and daily AI column into any agent. **Free + anonymous** — plain HTTP GET, no API key, no MCP setup.
 
 ## 用户意图 → 调用端点 / Intent → Endpoint
 
-Skill 根据用户提问关键词智能分流。默认走 **精选 + view=today**；只有用户明确说"日报"才走 \`/daily\`,明确说"论文"才走论文流,明确说"全部"才走 \`tier=all\`。
+Skill 根据用户提问关键词智能分流。默认走 **精选 + view=today**；只有用户明确说"日报"才走 \`/daily\`,明确说"全部"才走 \`tier=all\`。
 
 | 用户意图 / Intent | 调用端点 / Endpoint |
 |---|---|
-| 默认 / 宽问题 ("今天 AI 圈","what's new today") | \`GET /api/public/feed?tier=featured&view=today&exclude_source_tags=arxiv,paper\` |
+| 默认 / 宽问题 ("今天 AI 圈","what's new today") | \`GET /api/public/feed?tier=featured&view=today\` |
 | 明确说"日报" / "daily column" | \`GET /api/public/daily\` |
 | 指定日期日报 ("昨天的日报") | \`GET /api/public/daily/{YYYY-MM-DD}\` |
 | 日报归档 / discovery ("哪些日期有日报") | \`GET /api/public/dailies?take=30\` |
 | "AX 严选 / 严选" / "curated only" | \`GET /api/public/feed?curated_only=true&tier=all\` |
-| "论文 / arxiv / papers" | \`GET /api/public/feed?include_source_tags=arxiv,paper\` |
 | "全部 / 完整 / all" | \`GET /api/public/feed?tier=all\` |
 | "最近 N 天" 时间窗 | \`GET /api/public/feed?date_from={ISO}\` |
 | 关键词搜索 ("OpenAI 最近发的","Anthropic news") | \`GET /api/public/search?q={keyword}\` |
@@ -62,7 +59,6 @@ Skill 根据用户提问关键词智能分流。默认走 **精选 + view=today*
 - "看下精选条目" → feed (default)
 - "最近 OpenAI 有什么发布" → /search?q=OpenAI
 - "AI 模型发布列表" → feed?include_source_tags=ai-model (or filter client-side)
-- "最近一周的 AI 论文" → feed?include_source_tags=arxiv,paper&date_from=...
 - "找一下 autonomous coding agent 相关的" → /search?q=...&mode=semantic
 - "AX Radar 都从哪些源拉" → /sources
 
@@ -121,7 +117,7 @@ curl -H 'If-None-Match: W/"public-feed-xxxxxxxxxxxxxxxx"' \\
 - \`date\` / \`date_from\` / \`date_to\` = filter by published_at
 - \`source_id\` / \`source_group\` / \`source_kind\` = filter by source
 - \`curated_only\` = true | false (AX 严选 tab)
-- \`include_source_tags\` / \`exclude_source_tags\` = comma list (e.g. "arxiv,paper")
+- \`include_source_tags\` / \`exclude_source_tags\` = comma list
 - \`limit\` = 1..100, default 40
 - \`offset\` = ≥0, default 0
 - \`locale\` = zh | en, default en (controls which language's title/summary returns)

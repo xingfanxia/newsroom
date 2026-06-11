@@ -135,8 +135,6 @@ export default async function HotNewsPage({
       //   - Otherwise (tab/source drill-in) → today view (trending events
       //     with hot-window + start-of-yesterday rescue, see lib/items/live.ts)
       view: activeDate || dailyHighlights ? "archive" : "today",
-      // Papers live on /papers — keep them out of the news feed.
-      excludeSourceTags: ["arxiv", "paper"],
       // Default home (no filter): up to 3 stories per day at importance >= 80.
       // Surfaces the day's notable events (Apple CEO transition, GPT-5.5 release,
       // Google→Anthropic $40B + secondary stories like DRAM shortages, OpenAI
@@ -187,10 +185,8 @@ export default async function HotNewsPage({
     getPolicySummary().catch(() => ({ version: "v1", lastIterAt: null })),
     getRecentTickerItems(locale as "zh" | "en").catch(() => []),
     // Calendar must apply the SAME filters as the feed — otherwise the cell
-    // count over-promises (e.g., a day whose lead items are all arxiv shows
-    // a non-zero count but the home feed's excludeSourceTags renders empty).
+    // count can over-promise items that will not render after filtering.
     getDayCounts(60, {
-      excludeSourceTags: ["arxiv", "paper"],
       tier: "featured",
     }).catch(() => []),
   ]);
@@ -261,4 +257,3 @@ export default async function HotNewsPage({
     </ViewShell>
   );
 }
-

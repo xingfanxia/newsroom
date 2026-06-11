@@ -44,3 +44,5 @@ next-env.d.ts
 
 # ops / backfill runtime state (resumable)
 scripts/ops/backfill-state.json
+scripts/ops/backfill-chinese-state.json
+scripts/ops/backfill-daily-columns-state.json

@@ -195,58 +195,6 @@ export const sourceCatalog: Source[] = [
     notes:
       "Atom feed — RSS <summary> is only the first ~500 chars; the real post is at the <link> URL. Jina Reader fetches the full page on the body-fetch stage.",
   },
-
-  // ── Research ────────────────────────────────────────────────────
-  {
-    id: "arxiv-cs-ai",
-    name: { en: "arXiv · cs.AI", zh: "arXiv · cs.AI" },
-    url: "http://export.arxiv.org/api/query?search_query=cat:cs.AI&sortBy=submittedDate&sortOrder=descending",
-    kind: "atom",
-    group: "research",
-    locale: "en",
-    cadence: "daily",
-    priority: 1,
-    tags: ["arxiv", "paper"],
-    enabled: true,
-  },
-  {
-    id: "arxiv-cs-cl",
-    name: { en: "arXiv · cs.CL", zh: "arXiv · cs.CL" },
-    url: "http://export.arxiv.org/api/query?search_query=cat:cs.CL&sortBy=submittedDate&sortOrder=descending",
-    kind: "atom",
-    group: "research",
-    locale: "en",
-    cadence: "daily",
-    priority: 2,
-    tags: ["arxiv", "nlp"],
-    enabled: true,
-  },
-  {
-    id: "huggingface-papers",
-    name: { en: "HuggingFace Papers", zh: "HuggingFace 每日论文" },
-    url: "https://huggingface.co/papers",
-    kind: "scrape",
-    group: "research",
-    locale: "en",
-    cadence: "daily",
-    priority: 2,
-    tags: ["paper", "digest"],
-    enabled: false,
-    notes: "Disabled 2026-04-18 — kind='scrape' not implemented.",
-  },
-  {
-    id: "paperswithcode",
-    name: { en: "Papers With Code Trending", zh: "Papers With Code 热门" },
-    url: "https://paperswithcode.com/latest",
-    kind: "scrape",
-    group: "research",
-    locale: "en",
-    cadence: "daily",
-    priority: 3,
-    tags: ["paper"],
-    enabled: false,
-  },
-
   // ── Social ───────────────────────────────────────────────────────
   // ── X (Twitter) — pay-per-tweet via X API v2, one source per handle so
   //    each account gets its own health + since_id cursor. Hourly cadence
@@ -736,37 +684,6 @@ export const sourceCatalog: Source[] = [
     enabled: true,
     notes: "Bill Bishop's newsletter — highest signal on China-tech policy",
   },
-
-  // ── Additional research feeds ───────────────────────────────────
-  {
-    id: "arxiv-cs-lg",
-    name: { en: "arXiv · cs.LG", zh: "arXiv · cs.LG" },
-    url: "https://rss.arxiv.org/rss/cs.LG",
-    kind: "atom",
-    group: "research",
-    locale: "en",
-    cadence: "daily",
-    priority: 2,
-    tags: ["arxiv", "ml"],
-    enabled: true,
-  },
-  {
-    id: "hf-papers-takara",
-    name: {
-      en: "HuggingFace Papers (takara mirror)",
-      zh: "HuggingFace 论文 · takara 镜像",
-    },
-    url: "https://papers.takara.ai/api/feed",
-    kind: "rss",
-    group: "research",
-    locale: "en",
-    cadence: "daily",
-    priority: 2,
-    tags: ["paper", "digest"],
-    enabled: true,
-    notes: "Community-run daily-papers bridge; easier than the HF scrape",
-  },
-
   // ── AI HOT (2026-05-08) ──────────────────────────────────────────
   // Pre-curated AI digest aggregator (https://aihot.virxact.com) by 卡兹克.
   // Their `mode=selected` pool is hand-curated; we ingest hourly with curated=true

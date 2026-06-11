@@ -17,8 +17,8 @@ export function AgentsTabs() {
     <div style={{ marginTop: 16 }}>
       <p style={leadStyle(lang)}>
         {lang === "zh"
-          ? "让 Claude Code、RSS reader、任意 Agent 直接读到 AX Radar 的精选 AI 信号、AX 严选、AI 论文、每日 AI 日报。匿名免费、无需 token。"
-          : "Bring AX Radar's curated AI signal, hand-picked editor stream, papers, and daily AI columns into Claude Code, any RSS reader, or any agent. Free + anonymous — no token required."}
+          ? "让 Claude Code、RSS reader、任意 Agent 直接读到 AX Radar 的精选 AI 信号、AX 严选、每日 AI 日报。匿名免费、无需 token。"
+          : "Bring AX Radar's curated AI signal, hand-picked editor stream, and daily AI columns into Claude Code, any RSS reader, or any agent. Free + anonymous — no token required."}
       </p>
 
       <TabNav tab={tab} setTab={setTab} lang={lang} />
@@ -199,7 +199,7 @@ function SkillPane({ lang }: { lang: Lang }) {
           lang === "zh" ? "看一下今天的 AI 日报" : "show me today's AI column",
           lang === "zh" ? "最近 OpenAI 有什么发布" : "what did OpenAI ship recently",
           lang === "zh" ? "看下精选条目" : "show featured items",
-          lang === "zh" ? "最近一周的 AI 论文" : "AI papers from last week",
+          lang === "zh" ? "最近 Anthropic 有什么发布" : "what did Anthropic ship recently",
           lang === "zh" ? "AI 模型发布列表" : "list of AI model releases",
           lang === "zh" ? "最近 3 天 AI 行业动态" : "AI industry news, last 3 days",
           lang === "zh" ? "AX Radar 都从哪些源拉" : "which sources does AX Radar cover",
@@ -256,10 +256,6 @@ function SkillPane({ lang }: { lang: Lang }) {
             "GET /api/public/feed?curated_only=true",
           ],
           [
-            lang === "zh" ? "论文 / arxiv" : 'papers / arxiv',
-            "GET /api/public/feed?include_source_tags=arxiv,paper",
-          ],
-          [
             lang === "zh" ? "全部 / 完整" : 'all / complete',
             "GET /api/public/feed?tier=all",
           ],
@@ -308,8 +304,8 @@ function RssPane({ lang }: { lang: Lang }) {
       url: `${SITE}/api/rss/today.xml`,
       desc:
         lang === "zh"
-          ? "今日 AI 行业要闻,自动聚合多源覆盖,论文已排除。"
-          : "Today's AI news, multi-source events, papers excluded.",
+          ? "今日 AI 行业要闻,自动聚合多源覆盖。"
+          : "Today's AI news and multi-source events.",
       badge: lang === "zh" ? "推荐订阅" : "recommended",
     },
     {
@@ -326,16 +322,8 @@ function RssPane({ lang }: { lang: Lang }) {
       url: `${SITE}/api/rss/daily.xml`,
       desc:
         lang === "zh"
-          ? "每日 9pm PT 一篇 AI 日报,卡兹克风格 2500-4500 字编辑长文。"
-          : "Daily 9pm PT — 2500-4500-word editorial column in 卡兹克 voice.",
-    },
-    {
-      title: lang === "zh" ? "AX Radar — 论文" : "AX Radar — papers",
-      url: `${SITE}/api/rss/papers.xml`,
-      desc:
-        lang === "zh"
-          ? "arXiv + HuggingFace Papers 论文流。"
-          : "arXiv + HuggingFace Papers feed.",
+          ? "每日 9pm PT 一篇 AI 日报,像朋友分享一样讲清楚当天重点。"
+          : "Daily 9pm PT — a clear editorial column that reads like sharing the day's signal with a friend.",
     },
     {
       title:
@@ -369,7 +357,7 @@ function RssPane({ lang }: { lang: Lang }) {
           : "RSS · ANY READER SUBSCRIBES"
       }
       heading={
-        lang === "zh" ? "六条 feed,按需订阅" : "Six feeds, pick what you need"
+        lang === "zh" ? "五条 feed,按需订阅" : "Five feeds, pick what you need"
       }
       lang={lang}
     >
@@ -597,17 +585,12 @@ function ApiPane({ lang }: { lang: Lang }) {
 
       <ExampleBlock
         title={lang === "zh" ? "今日热点精选(默认)" : "Today's featured (default)"}
-        code={`curl '${SITE}/api/public/feed?tier=featured&view=today&exclude_source_tags=arxiv,paper&limit=20'`}
+        code={`curl '${SITE}/api/public/feed?tier=featured&view=today&limit=20'`}
       />
 
       <ExampleBlock
         title={lang === "zh" ? "AX 严选" : "Curated only"}
         code={`curl '${SITE}/api/public/feed?curated_only=true&tier=all&limit=30'`}
-      />
-
-      <ExampleBlock
-        title={lang === "zh" ? "最近一周的论文" : "Papers from last week"}
-        code={`curl '${SITE}/api/public/feed?include_source_tags=arxiv,paper&date_from=2026-05-06T00:00:00Z'`}
       />
 
       <ExampleBlock

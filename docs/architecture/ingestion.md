@@ -1,7 +1,7 @@
 # AI·HOT — Data Ingestion & AI Pipeline Architecture
 
 > Blueprint for how raw feeds become curated, scored, summarized, tagged stories — and how editor feedback rewrites the curation policy.
-> **Status**: M0 + M1 + M2 shipped. M3 (feedback) next. See Section 6 for milestone progress and deviations from this blueprint.
+> **Status as of 2026-06-10**: ingestion, enrich/score/cluster, feedback, editorial agent, public API/MCP, AI HOT daily columns, DeepSeek treatment routing, and paper-source retirement have shipped. See Section 6 for milestone progress and deviations from the original blueprint.
 
 ---
 
@@ -24,7 +24,7 @@
        ▼
  ┌─────────────────┐
  │  POLICY AGENT   │ → writes → editorial.skill.md (versioned in DB + git)
- │ (Claude SDK)    │
+ │ (agent runtime) │
  └─────────────────┘
 ```
 
@@ -35,7 +35,7 @@ Each arrow is a durable step: a failed enrich doesn't re-fetch; a failed score d
 ## 2. Components
 
 ### 2.1 Source catalog (`lib/sources/catalog.ts`)
-A typed registry. Source entry shape (current as of 2026-05-08):
+A typed registry. Source entry shape (current as of 2026-06-10):
 
 ```ts
 type Source = {
@@ -59,6 +59,8 @@ Grouping for the `信源` UI: same enum as `group` above.
 
 **Adapter-routed kinds** (`x-api`, `aihot-api`): `url` field is informational; the fetcher dispatches by `kind` to a dedicated adapter (`workers/fetcher/x-api.ts`, `workers/fetcher/aihot.ts`) that owns the API contract. See §2.9 for AI HOT integration.
 
+**Paper-source retirement (2026-06-10)**: arXiv, Hugging Face Papers, Papers with Code, and similar paper-only feeds were removed from the catalog and cleaned from the database. The `research` group remains in the enum for deep-report feeds such as independent technical blogs and research-report newsletters; it no longer means "paper feed".
+
 ### 2.2 Fetcher worker (`workers/fetcher/`)
 **Responsibility**: pull new items from a source, dedupe by `(source_id, external_id)`, write raw payload to `raw_items` table.
 
@@ -80,17 +82,21 @@ Converts `raw_items` → `items`:
 - Canonical URL resolution (follows redirects, strips UTM).
 
 ### 2.4 Enricher (LLM)
-Per item, parallel LLM calls with 30s budget:
+Per item, parallel LLM calls with a 30s budget. The pipeline now chooses a treatment tier before calling the model:
 
-1. **Summary** — 2–3 sentence Chinese abstract.
-   - Prompt: *"用中文生成 2–3 句的新闻摘要，突出关键事实、数字、实体；避免营销语言。"*
-   - Model: `claude-haiku-4-5` (fast, cheap). Cache by content hash.
-2. **Tags** — structured output `{ capabilities: [], entities: [], topics: [] }`.
+1. **Treatment** — `workers/enrich/treatment.ts` classifies items as `high` or `fast`.
+   - `high`: featured/P1 or importance >= 72, routed to DeepSeek V4 Pro.
+   - `fast`: lower-value items, routed to DeepSeek V4 Flash with shorter output.
+2. **Summary and commentary** — bilingual, friend-readable prose that keeps facts/numbers intact without translationese or memo jargon.
+   - Prompt source: `workers/enrich/prompt.ts`, `workers/enrich/chinese.ts`, and `workers/cluster/prompt.ts`.
+   - Model: Azure AI Foundry `DeepSeek-V4-Pro` for high treatment; `DeepSeek-V4-Flash` for fast treatment.
+   - Cache by content hash / enrichment version.
+3. **Tags** — structured output `{ capabilities: [], entities: [], topics: [] }`.
    - Capability axis: `Agent`, `RAG`, `多模态`, `推理`, `安全/对齐`, `性能优化`, ...
    - Entity axis: `Anthropic`, `OpenAI`, `Google`, `小米`, `字节`, `Nvidia`, ...
    - Topic axis: `产品更新`, `发表成果`, `融资`, `合作`, `政策`, `开源`, `事故`, ...
-3. **Source-kind** — e.g., `官网动态 (RSS·排除企业/客户案例)`, `Research (发表成果·网页)` — classified once per source, cached.
-4. **Embedding** — `voyage-3` or `text-embedding-3-large`; store as pgvector column for later clustering.
+4. **Source-kind** — e.g., `官网动态 (RSS·排除企业/客户案例)`, `深度报告 (独立博客/研究报告)` — classified once per source, cached.
+5. **Embedding** — Azure OpenAI `text-embedding-3-large`; store as pgvector column for later clustering.
 
 All enrichments cached by `(item_id, enricher_version)` so enricher-version bumps re-run only once globally.
 
@@ -99,7 +105,7 @@ Separate pass after enrich, because policy can change without re-enriching:
 
 - **Input**: item + current `editorial.skill.md` (the policy).
 - **Output**: `{ importance: int(0, 100), reasoning: string, tier: "featured" | "all" | "P1" | "excluded" }`.
-- Model: `claude-sonnet-4-6` (quality > speed, ~1 call per item).
+- Model: Azure AI Foundry DeepSeek V4 Pro for high treatment and DeepSeek V4 Flash for low-value treatment, with Pro fallback when Flash output fails schema validation.
 - Cached by `(item_id, policy_version)`.
 
 ### 2.6 Deduper / Clusterer
@@ -116,7 +122,7 @@ Postgres (Vercel Postgres / Neon / Supabase) with schema:
 ```
 sources          (id, name_en, name_zh, url, kind, locale, cadence, priority, enabled, ...)
 raw_items        (id, source_id, external_id, payload_jsonb, fetched_at)
-items            (id, source_id, title, summary_zh, summary_en, url, published_at, embedding vector(1024))
+items            (id, source_id, title, summary_zh, summary_en, url, published_at, embedding halfvec(3072))
 item_tags        (item_id, axis, tag) — composite PK
 item_scores      (item_id, policy_version, importance, tier, reasoning)
 clusters         (id, lead_item_id, member_item_ids int[])
@@ -126,12 +132,12 @@ iteration_runs   (id, started_at, finished_at, parent_version, new_version, feed
 users            (id, email, role "editor" | "admin" | "reader")
 ```
 
-### 2.8 Editorial Agent (Claude Agent SDK)
+### 2.8 Editorial Agent
 The star of the system. Runs when an editor clicks `开始生成新草稿`.
 
 **Flow**:
 1. Load all unprocessed feedback since `policy_versions.current.committed_at`.
-2. Spin up a Claude Agent session with tools:
+2. Spin up an agent session with tools:
    - `read_file(path)` → returns contents of `editorial.skill.md`.
    - `write_draft(content)` → stages a proposed new `editorial.skill.md`.
    - `get_feedback_sample(verdict, limit)` → returns curated feedback rows.
@@ -214,23 +220,24 @@ Seed watchlist (v0): `@sama`, `@AndrewYNg`, `@ylecun`, `@drjimfan`, `@karpathy`,
 |---|---|---|
 | **M0 — Shell** | Next.js 16 + next-intl v4 + Tailwind v4 + UI from screenshots + mock fixtures | ✅ shipped |
 | **M1 — Read-only ingestion** | Supabase Postgres + drizzle, 41 sources seeded, RSS/Atom/RSSHub fetcher with SSRF guard, normalizer with canonical URL + sha256 dedup, 4 cron routes + `信源` live | ✅ shipped |
-| **M2 — Enrich + Score + Cluster** | Vercel AI SDK v6 + Azure OpenAI (standard for enrich at low reasoning + score at high reasoning), `text-embedding-3-large` native 3072-dim via `halfvec` + HNSW cosine, cluster dedup at 0.88/48h, `热点资讯` live feed with fallback ladder. Ultra-review: 3 CRITICAL + 7 HIGH all fixed. | ✅ shipped |
-| **M3 — Feedback + Auth** | `feedback` table + Supabase Auth magic-link + real metrics on `策略迭代` page + `POST /api/feedback` | ⏳ next |
-| **M4 — Editorial agent** | Agent SDK session reads feedback, diffs `editorial.skill.md`, streams to console, versioned rollout. Uses `azure-openai-pro` @ `xhigh` reasoning. | planned |
+| **M2 — Enrich + Score + Cluster** | Vercel AI SDK v6 + DeepSeek V4 Pro/Flash for prose/scoring, Azure OpenAI `text-embedding-3-large` native 3072-dim via `halfvec` + HNSW cosine, cluster dedup at 0.88/48h, `热点资讯` live feed with fallback ladder. Ultra-review: 3 CRITICAL + 7 HIGH all fixed. | ✅ shipped |
+| **M3 — Feedback + Auth** | `feedback` table + admin gate + real metrics on `策略迭代` page + `POST /api/feedback` | ✅ shipped |
+| **M4 — Editorial agent** | Agent session reads feedback, diffs `editorial.skill.md`, streams to console, versioned rollout | ✅ shipped |
 | **M5 — X monitor + Low-follower + cluster UI** | X watchlist via Apify/X API v2, viral-score detector, "also reported by N sources" chips | planned |
 
 ### Deviations from original blueprint (what actually shipped vs. what Section 2 specified)
 
 - **Clustering path (§2.6)**: implemented as its own cron (`/api/cron/cluster`) not baked into enrich. Widened neighbor search (§2.6 said "lead_item_id only"; we search all enriched) so same-batch siblings merge without a two-pass fix. Atomic row claim via `WHERE clustered_at IS NULL RETURNING` prevents double-counting.
 - **Embeddings (§2.4)**: `voyage-3 / text-embedding-3-large` — we picked **text-embedding-3-large native 3072 dims** stored as `halfvec(3072)` (not truncated to 1536 via Matryoshka). Same storage as `vector(1536)`, full quality, fits pgvector HNSW's 4000-dim cap.
-- **Scoring model (§2.5)**: "Sonnet 4.6" placeholder → shipped as **Azure `gpt-5.4-standard` at `reasoning_effort: high`**. Pro is faster/cheaper at comparable quality for rubric tasks; pro reserved for the lower-volume M4 agent.
+- **Scoring model (§2.5)**: "Sonnet 4.6" placeholder → shipped first as Azure GPT, then moved on 2026-06-10 to **Azure AI Foundry DeepSeek V4 Pro/Flash**. High-value items use Pro; lower-value items use Flash to avoid spending heavy tokens on throwaway content.
 - **LLM SDK choice**: original plan assumed direct vendor SDKs — migrated to **Vercel AI SDK v6** + `@ai-sdk/{anthropic,google,azure,openai}` for unified `generateText` / `generateObject` / `embed` across providers.
 - **Prompt injection defense** (not in original §2): XML-fence untrusted content + system-prompt framing + control-sequence neutralization (added per security review).
 - **Cron timing**: enrich every 15 min, cluster every 30 min, catch-up normalize every 6 h.
-- **AI HOT integration (2026-05-08)**: added pre-curated source `aihot-selected` (kind `aihot-api`) ingesting hourly from https://aihot.virxact.com; merge their structured `/api/public/daily` report into our daily column generator as a must-cover baseline (`newsletters.aihot_daily_payload` + `aihot_daily_date`). Voice prompts rebased — daily column from 虎嗅周报 → khazix narrative. Full design: `docs/aihot-integration/PLAN.md`. New env vars: `AIHOT_API_BASE_URL` + `AIHOT_API_USER_AGENT` (both with safe defaults). Operator scripts: `scripts/ops/backfill-style.ts` (cost-bounded re-enrich) + `scripts/ops/import-aihot-daily-history.ts` (180-day daily history import).
+- **AI HOT integration (2026-05-08, voice refreshed 2026-06-10)**: added pre-curated source `aihot-selected` (kind `aihot-api`) ingesting hourly from https://aihot.virxact.com; merge their structured `/api/public/daily` report into our daily column generator as a must-cover baseline (`newsletters.aihot_daily_payload` + `aihot_daily_date`). Voice prompts now target a friend-sharing style: plain, useful, accurate, and low on AI/memo flavor. Full design: `docs/aihot-integration/PLAN.md`. New env vars: `AIHOT_API_BASE_URL` + `AIHOT_API_USER_AGENT` (both with safe defaults). Operator scripts: `scripts/ops/backfill-style.ts` (cost-bounded re-enrich) + `scripts/ops/import-aihot-daily-history.ts` (180-day daily history import).
 - **Tier-gated commentary (2026-05-08, PR #34)**: Stage-4 commentary now branches by tier instead of running the full schema for every non-excluded item. `editor_note_*` (一句话点评) runs for every non-excluded item / event; `editor_analysis_*` **only** runs for tier `featured` / `p1`. Tier `all` items take the lighter `commentaryNoteSchema` LLM call (`COMMENTARY_NOTE_ONLY_SYSTEM`, ~85% smaller output). Cluster commentary path also extended to cover `event_tier='all'`. Worker dispatch in `workers/enrich/commentary.ts` + `workers/cluster/commentary.ts`; backfill mirror in `scripts/ops/backfill-style.ts`.
 - **Editorial taxonomy rebrand + home default flip (2026-05-08, PR #35)**: `editor_analysis_*` rebranded `深度解读` → `锐评` with 200 字 hard cap (was 300-500 字 / 800 ceiling); `summary_*` tightened from 120-220 字 multi-sentence to 50-90 字 一句话总结; UI label `编辑点评` → `一句话点评`. Three layered editorial outputs now have crisp role separation — see policy spec `modules/feed/runtime/policy/skills/editorial.skill.md` § "Editorial taxonomy". Concurrently the homepage default flipped from multi-day "3 stories per day" digest to today's hot events (importance-sorted hot-window); daily digest reachable via `?view=daily` toggle in HomeFilters. `maxTokens` dropped 6144 → 3072 in commentary workers (200-字 fits comfortably). DB columns unchanged — only prompts, UI labels, and worker token budgets shifted. Editorial policy bumped to v2 in `policy_versions` table to make the new commentary_at threshold actionable for backfills.
 - **Agent access — public anonymous mirror (2026-05-13, PR #36)**: opened a third integration track alongside bearer-gated `/api/v1/*` + `/api/mcp`. Eight new read-only endpoints under `/api/public/*` (feed / items / search / sources / events / daily / daily-by-date / dailies) — anonymous, IP-rate-limited (`lib/rate-limit/public.ts`), weak ETag + If-None-Match → 304 (`lib/api/public-helpers.ts`), CORS open, LLM-internal fields stripped (raw reasoning, per-axis HKR `reasonsZh/En`). Discovery: hosted `/skill.md` (SKILL.md standard, installable into any SKILL-aware agent), `/openapi.yaml` (OpenAPI 3.1), `/robots.txt` (allow public surfaces, disallow admin/v1/cron), `/sitemap.xml` (Next.js metadata files `app/robots.ts` + `app/sitemap.ts`). New bilingual page `/{locale}/agents` with 3 tabs (Skill / RSS / REST API) modeled on AI HOT's `/agent-access`. Full surface and contributor guide in [`docs/agent-access/README.md`](../agent-access/README.md). No schema changes. No env-vars added.
+- **DeepSeek treatment routing + paper-source retirement (2026-06-10)**: added `azure-deepseek` provider support for Azure AI Foundry Responses-style endpoints, schema-aware JSON parsing for DeepSeek structured output, Pro/Flash treatment tiers, and friend-readable zh/en prompts. Backfilled Chinese summaries, score reasoning, commentary, clusters, and 51 daily columns. Removed paper-only sources from catalog, `/papers`, RSS/MCP/API discovery, and historical DB rows; `scripts/ops/cleanup-paper-sources.ts` now verifies the retired paper-source set is empty.
 
 ---
 

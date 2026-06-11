@@ -32,7 +32,6 @@ const disables: { id: string; note: string }[] = [
   { id: "thepaper-feedx", note: "Disabled 2026-04-18 — feedx mirror stale 4 months. Revisit if needed." },
   // Unsupported `kind` — can't fetch until adapter lands
   { id: "anthropic-news", note: "Disabled 2026-04-18 — kind='scrape' not implemented in the fetcher." },
-  { id: "huggingface-papers", note: "Disabled 2026-04-18 — kind='scrape' not implemented." },
   { id: "hf-trending-models", note: "Disabled 2026-04-18 — kind='api' not implemented (HF trending API adapter TBD)." },
   { id: "deepseek-hf", note: "Disabled 2026-04-18 — kind='scrape' not implemented." },
   { id: "qwen-hf", note: "Disabled 2026-04-18 — kind='scrape' not implemented." },

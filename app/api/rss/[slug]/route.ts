@@ -21,18 +21,13 @@ const FEED_META: Record<
   },
   today: {
     title: "AX Radar — 热点聚合",
-    description: "今日 AI 行业要闻，自动聚合多源覆盖，论文已排除。",
+    description: "今日 AI 行业要闻，自动聚合多源覆盖。",
     route: "/zh",
   },
   curated: {
     title: "AX Radar — AX 严选",
     description: "操作员手选信源，鸭哥/grapeot, AI 群聊日报, 阮一峰等。",
     route: "/zh/curated",
-  },
-  papers: {
-    title: "AX Radar — 论文",
-    description: "arXiv + HF Papers 等 AI 论文流。",
-    route: "/zh/papers",
   },
 };
 
@@ -57,7 +52,7 @@ export async function GET(
   const xml =
     slug === "daily"
       ? await renderDailyFeed(meta, slug)
-      : await renderLaneFeed(slug as "today" | "curated" | "papers", meta);
+      : await renderLaneFeed(slug as "today" | "curated", meta);
 
   return new Response(xml, {
     headers: {
@@ -129,17 +124,13 @@ type LaneRow = {
 };
 
 async function renderLaneFeed(
-  slug: "today" | "curated" | "papers",
+  slug: "today" | "curated",
   meta: { title: string; description: string; route: string },
 ): Promise<string> {
   const client = db();
 
   const filterSql =
-    slug === "curated"
-      ? sql`s.curated = true AND NOT (s.tags && ARRAY['arxiv','paper']::text[])`
-      : slug === "papers"
-        ? sql`(s.tags && ARRAY['arxiv','paper']::text[])`
-        : sql`NOT (s.tags && ARRAY['arxiv','paper']::text[])`;
+    slug === "curated" ? sql`s.curated = true` : sql`TRUE`;
 
   const rows = (await client.execute(sql`
     SELECT i.id, i.title_zh, i.title_en, i.title, i.summary_zh, i.summary_en,

@@ -30,6 +30,8 @@ import {
   type CAPABILITIES,
   type TOPICS,
 } from "./prompt";
+import { generateChineseCommentary } from "./chinese";
+import { treatmentForScore } from "./treatment";
 
 type Capability = (typeof CAPABILITIES)[number];
 type Topic = (typeof TOPICS)[number];
@@ -144,6 +146,10 @@ async function generateOneCommentary(item: Item): Promise<void> {
   });
 
   const isFull = item.tier === "featured" || item.tier === "p1";
+  const treatment = treatmentForScore({
+    importance: item.importance,
+    tier: item.tier,
+  });
   const client = db();
 
   if (isFull) {
@@ -162,12 +168,19 @@ async function generateOneCommentary(item: Item): Promise<void> {
       maxTokens: 3072,
     });
     const c = result.data;
+    const zh = await generateChineseCommentary({
+      task: "commentary",
+      itemId: item.id,
+      userContent,
+      full: true,
+      treatment: "high",
+    });
     await client
       .update(items)
       .set({
-        editorNoteZh: c.editorNoteZh,
+        editorNoteZh: zh.editorNoteZh,
         editorNoteEn: c.editorNoteEn,
-        editorAnalysisZh: c.editorAnalysisZh,
+        editorAnalysisZh: "editorAnalysisZh" in zh ? zh.editorAnalysisZh : c.editorAnalysisZh,
         editorAnalysisEn: c.editorAnalysisEn,
         commentaryAt: new Date(),
       })
@@ -177,7 +190,7 @@ async function generateOneCommentary(item: Item): Promise<void> {
   } else {
     // Note-only — tier='all'. Two short strings per locale, ≤ 200 chars each.
     const result = await generateStructured({
-      ...profiles.enrich,
+      ...(treatment === "fast" ? profiles.fastText : profiles.enrich),
       task: "commentary",
       itemId: item.id,
       system: COMMENTARY_NOTE_ONLY_SYSTEM,
@@ -188,10 +201,17 @@ async function generateOneCommentary(item: Item): Promise<void> {
       maxTokens: 1024,
     });
     const c = result.data;
+    const zh = await generateChineseCommentary({
+      task: "commentary",
+      itemId: item.id,
+      userContent,
+      full: false,
+      treatment,
+    });
     await client
       .update(items)
       .set({
-        editorNoteZh: c.editorNoteZh,
+        editorNoteZh: zh.editorNoteZh,
         editorNoteEn: c.editorNoteEn,
         // Intentionally not setting editor_analysis_{zh,en} — preserves any
         // value written by a prior featured/p1 run (or stays null on first

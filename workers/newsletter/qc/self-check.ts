@@ -5,16 +5,14 @@
  * editorial review (L4 活人感 cannot be automated reliably).
  *
  * Voice history (latest at top):
- * - 2026-05-08: rebased back to khazix narrative. AI HOT (https://aihot.virxact.com)
- *   is the reference voice. The earlier "professional newsletter with personality"
- *   (Stratechery / 虎嗅周报) framing has been retired. Banned-phrase list expanded
- *   with khazix-specific anti-patterns (meta-commentary openers, repeated-
- *   disclosure padding). Per-paragraph length check added to L2.
- * - 2026-04-25 (retired): khazix → Stratechery → 虎嗅周报 (rebased twice).
+ * - 2026-06-10: rebased to friend-sharing voice: plain, specific, accurate,
+ *   and low on translationese / report-speak.
+ * - 2026-05-08 (retired): khazix narrative with AI HOT as the reference voice.
+ * - 2026-04-25 (retired): Stratechery / 虎嗅周报 framing.
  *
  * The L1 phrases here are universal corporate-AI-slop clichés (说白了 /
  * 综上所述 / 本质上) — they're bad in any register. L2 catches structural
- * violations specific to the khazix-narrative format.
+ * violations specific to the current friend-sharing format.
  */
 
 const L1_BANNED_PHRASES = [
@@ -36,7 +34,7 @@ const L1_BANNED_PHRASES = [
   "随着AI的",
   "众所周知",
   "毋庸置疑",
-  // Marketing verbs (banned in khazix voice)
+  // Marketing verbs
   "赋能",
   "助力",
   "引领",
@@ -52,8 +50,8 @@ const L1_BANNED_PHRASES = [
 ];
 
 // Meta-commentary openers — these signal "I'm about to discuss X" instead of
-// directly giving the judgment. Khazix voice wants the judgment itself, never
-// the meta-narration. Detection: phrase appears at the start of a paragraph
+// directly giving the judgment. The current voice wants the judgment itself,
+// not the meta-narration. Detection: phrase appears at the start of a paragraph
 // (after \n\n or as the first sentence of summary_md/narrative_md).
 const L2_META_COMMENTARY_OPENERS = [
   "先把这几个缺口摆明",
@@ -70,8 +68,8 @@ const L2_META_COMMENTARY_OPENERS = [
 ];
 
 // Phrases that, when used multiple times, signal repeated-disclosure padding.
-// Khazix-compressed allows ≤ 2 occurrences across the full draft per the
-// editorial.skill.md "Editor analysis style" section.
+// The friend-sharing voice allows a few disclosures across a full daily, but
+// repeated "body did not disclose X" padding makes the column unreadable.
 const L2_REPEAT_THRESHOLD_PHRASES = [
   "正文未披露",
   "正文没披露",
@@ -84,8 +82,8 @@ const L2_REPEAT_THRESHOLD_PHRASES = [
 
 const L2_REPEAT_MAX_OCCURRENCES = 4; // daily column spans 6-10 sections; ≤4 leaves headroom while still catching padding
 
-// Maximum sentences per paragraph. Khazix voice rule — > 6 sentences is too
-// dense, must be split. Sentences detected by 。 / ！/ ？/ . / ! / ?
+// Maximum sentences per paragraph. > 6 sentences is too dense for the current
+// voice and must be split. Sentences detected by 。 / ！/ ？/ . / ! / ?
 const L2_MAX_SENTENCES_PER_PARAGRAPH = 6;
 
 export type ColumnDraft = {

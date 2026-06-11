@@ -8,6 +8,7 @@ import { describe, expect, it } from "bun:test";
 import {
   utcYmdFromDate,
   renderAihotDailyForPrompt,
+  stripPaperFromAihotDaily,
 } from "@/workers/newsletter/aihot-daily";
 import type { AihotDailyReport } from "@/lib/sources/aihot";
 
@@ -105,5 +106,44 @@ describe("renderAihotDailyForPrompt", () => {
     const noFlashes: AihotDailyReport = { ...minimalPayload, flashes: [] };
     const out = renderAihotDailyForPrompt(noFlashes);
     expect(out).toContain("flashes:\n  (none)");
+  });
+
+  it("strips AI HOT paper sections before prompt rendering", () => {
+    const payload: AihotDailyReport = {
+      ...minimalPayload,
+      lead: { title: "Paper item", leadParagraph: "Academic detail." },
+      sections: [
+        ...minimalPayload.sections,
+        {
+          label: "论文研究",
+          items: [
+            {
+              title: "Paper item",
+              summary: "A benchmark result.",
+              sourceUrl: "https://example.com/p",
+              sourceName: "Example",
+            },
+          ],
+        },
+      ],
+      flashes: [
+        ...minimalPayload.flashes,
+        {
+          title: "Paper item",
+          sourceName: "Example",
+          sourceUrl: "https://example.com/p",
+          publishedAt: "2026-05-07T08:00:00.000Z",
+        },
+      ],
+    };
+
+    const stripped = stripPaperFromAihotDaily(payload);
+    expect(stripped?.lead).toBeNull();
+    expect(stripped?.sections.map((s) => s.label)).not.toContain("论文研究");
+    expect(stripped?.flashes.map((f) => f.title)).not.toContain("Paper item");
+
+    const out = renderAihotDailyForPrompt(payload);
+    expect(out).not.toContain("论文研究");
+    expect(out).not.toContain("Paper item");
   });
 });

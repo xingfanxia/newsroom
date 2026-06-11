@@ -24,11 +24,9 @@
  *   source_kind      = rss | atom | api | rsshub | scrape | x-api
  *   curated_only     = true → only sources flagged curated=true (AX严选 tab)
  *   exclude_source_tags = comma-separated tag list. Excludes sources whose
- *                         tags overlap any of these. Useful: "arxiv,paper" to
- *                         filter out research-paper feeds.
+ *                         tags overlap any of these.
  *   include_source_tags = comma-separated tag list. Inverse of exclude_source_tags;
- *                         only returns items whose source tags overlap. Useful:
- *                         "arxiv,paper" to fetch the 论文 tab.
+ *                         only returns items whose source tags overlap.
  *   limit            = 1..500, default 40
  *   offset           = ≥0, default 0
  *   locale           = zh | en (default en)

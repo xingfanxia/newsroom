@@ -18,7 +18,9 @@ import {
   scoreUserPrompt,
   type ScoreOutput,
 } from "./prompt";
+import { generateChineseScoreRationale } from "./chinese";
 import { loadPolicy } from "./policy";
+import { treatmentForScore, type EnrichTreatment } from "./treatment";
 
 const CONCURRENCY = 30;
 const MAX_PER_RUN = 300;
@@ -80,39 +82,30 @@ export async function runScoreBackfill(): Promise<ScoreBackfillReport> {
             entities?: string[];
             topics?: string[];
           };
-          const result = await generateStructured({
-            ...profiles.score,
-            task: "score",
-            itemId: item.id,
-            system: scoreSystem(policy.content),
-            messages: [
-              {
-                role: "user",
-                content: scoreUserPrompt({
-                  title: item.title,
-                  summaryZh: item.summaryZh ?? item.title,
-                  tags: {
-                    capabilities: (tagBag.capabilities ?? []) as [],
-                    entities: tagBag.entities ?? [],
-                    topics: (tagBag.topics ?? []) as [],
-                  },
-                  url: item.url,
-                  source: item.sourceId,
-                  publishedAt: item.publishedAt.toISOString(),
-                  bodyMd: item.bodyMd,
-                }),
-              },
-            ],
-            schema: scoreSchema,
-            schemaName: "EditorialScore",
-            maxTokens: 2048,
+          const tags = {
+            capabilities: (tagBag.capabilities ?? []) as [],
+            entities: tagBag.entities ?? [],
+            topics: (tagBag.topics ?? []) as [],
+          };
+          let s = await scoreItem({
+            item,
+            policyContent: policy.content,
+            tags,
+            treatment: "fast",
           });
-          const s: ScoreOutput = result.data;
           // Mirror enrichOne: YT sources never go to 'excluded' — floor at
           // 'all' so the backfill can't drop hand-picked podcasts off the feed.
           const isYoutube = item.sourceId.endsWith("-yt");
-          const finalTier =
-            isYoutube && s.tier === "excluded" ? "all" : s.tier;
+          let finalTier = isYoutube && s.tier === "excluded" ? "all" : s.tier;
+          if (treatmentForScore({ importance: s.importance, tier: finalTier }) === "high") {
+            s = await scoreItem({
+              item,
+              policyContent: policy.content,
+              tags,
+              treatment: "high",
+            });
+            finalTier = isYoutube && s.tier === "excluded" ? "all" : s.tier;
+          }
           await client
             .update(items)
             .set({
@@ -141,5 +134,58 @@ export async function runScoreBackfill(): Promise<ScoreBackfillReport> {
     errored: errors.length,
     durationMs: Date.now() - started,
     errors,
+  };
+}
+
+async function scoreItem(args: {
+  item: typeof items.$inferSelect;
+  policyContent: string;
+  tags: {
+    capabilities: [];
+    entities: string[];
+    topics: [];
+  };
+  treatment: EnrichTreatment;
+}): Promise<ScoreOutput> {
+  const { item, policyContent, tags, treatment } = args;
+  const result = await generateStructured({
+    ...(treatment === "fast" ? profiles.fastText : profiles.score),
+    task: "score",
+    itemId: item.id,
+    system: scoreSystem(policyContent),
+    messages: [
+      {
+        role: "user",
+        content: scoreUserPrompt({
+          title: item.title,
+          summaryZh: item.summaryZh ?? item.title,
+          tags,
+          url: item.url,
+          source: item.sourceId,
+          publishedAt: item.publishedAt.toISOString(),
+          bodyMd: item.bodyMd,
+        }),
+      },
+    ],
+    schema: scoreSchema,
+    schemaName: "EditorialScore",
+    maxTokens: 2048,
+  });
+  const scored: ScoreOutput = result.data;
+  const zh = await generateChineseScoreRationale({
+    title: item.title,
+    summaryZh: item.summaryZh ?? item.title,
+    tags,
+    score: scored,
+    itemId: item.id,
+    treatment,
+  });
+  return {
+    ...scored,
+    reasoningZh: zh.reasoningZh,
+    hkr: {
+      ...scored.hkr,
+      reasonsZh: zh.hkrReasonsZh,
+    },
   };
 }

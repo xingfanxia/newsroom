@@ -267,24 +267,26 @@ describe("eventCommentarySchema", () => {
     expect(result.success).toBe(true);
   });
 
-  it("rejects editorNoteZh longer than 200 chars", () => {
+  it("truncates editorNoteZh longer than 200 chars", () => {
     const result = eventCommentarySchema.safeParse({
       editorNoteZh: "x".repeat(201),
       editorNoteEn: "short",
       editorAnalysisZh: "analysis zh",
       editorAnalysisEn: "analysis en",
     });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.editorNoteZh.length).toBe(200);
   });
 
-  it("rejects editorNoteEn longer than 200 chars", () => {
+  it("truncates editorNoteEn longer than 200 chars", () => {
     const result = eventCommentarySchema.safeParse({
       editorNoteZh: "短评",
       editorNoteEn: "x".repeat(201),
       editorAnalysisZh: "analysis zh",
       editorAnalysisEn: "analysis en",
     });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.editorNoteEn.length).toBe(200);
   });
 
   it("accepts editorNoteZh exactly at 200 chars", () => {
@@ -417,12 +419,13 @@ describe("eventCommentaryNoteSchema", () => {
     ).toBe(false);
   });
 
-  it("rejects editorNoteZh longer than 200 chars", () => {
+  it("truncates editorNoteZh longer than 200 chars", () => {
     const result = eventCommentaryNoteSchema.safeParse({
       editorNoteZh: "x".repeat(201),
       editorNoteEn: "short",
     });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.editorNoteZh.length).toBe(200);
   });
 });
 

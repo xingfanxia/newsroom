@@ -46,6 +46,7 @@ export async function fetchAihotForSource(input: {
 
   const feedItems: FeedItem[] = [];
   for (const item of response.items) {
+    if (item.category === "paper") continue;
     const fi = aihotItemToFeedItem(item);
     if (fi) feedItems.push(fi);
   }

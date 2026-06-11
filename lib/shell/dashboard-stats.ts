@@ -98,7 +98,7 @@ export type DayBucket = { date: string; count: number };
 /**
  * Calendar-grid counts. Must agree exactly with the per-page feed filters
  * in lib/items/live.ts — clicking a calendar cell must return the items
- * the count promised. Each page (home / all / papers / curated) passes
+ * the count promised. Each page (home / all / curated) passes
  * its own filter slice so the cell number matches what'll render.
  *
  * Bucket anchor = lead item's published_at:

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { runClusterBatch } from "@/workers/cluster";
 import { runArbitrationBatch } from "@/workers/cluster/arbitrate";
 import { runMergeBatch } from "@/workers/cluster/merge";
+import { runSingletonReclusterBatch } from "@/workers/cluster/singletons";
 import { runCanonicalTitleBatch } from "@/workers/cluster/canonical-title";
 import { runEventCommentaryBatch } from "@/workers/cluster/commentary";
 import { verifyCron } from "../_auth";
@@ -12,6 +13,7 @@ import { verifyCron } from "../_auth";
 // Operators can run scripts/migrations/merge-near-duplicate-clusters.ts
 // with --hours 72 or --all for wider sweeps.
 const MERGE_RECENCY_HOURS = 6;
+const SINGLETON_RECLUSTER_RECENCY_HOURS = 72;
 
 export const maxDuration = 800;
 export const dynamic = "force-dynamic";
@@ -45,6 +47,14 @@ export async function GET(req: Request) {
 
   // Stage A: assign unclustered items to nearest-neighbor clusters.
   const cluster = await safeStage("cluster", () => runClusterBatch());
+  // Stage A.5: recheck recent singleton clusters that Stage A will never see
+  // again (`clustered_at IS NULL` no longer holds). This repairs same-event
+  // cards that became singletons before a matching cluster existed.
+  const singletonRecluster = await safeStage("singleton-recluster", () =>
+    runSingletonReclusterBatch({
+      recencyHours: SINGLETON_RECLUSTER_RECENCY_HOURS,
+    }),
+  );
   // Stage B: Haiku arbitrator decides keep-or-split for unverified clusters.
   // Locks survivors via verified_at + cluster_verified_at so Stage A won't
   // re-merge what was split.
@@ -73,6 +83,7 @@ export async function GET(req: Request) {
     kind: "cluster",
     at: new Date().toISOString(),
     cluster,
+    singletonRecluster,
     arbitrate,
     merge,
     canonicalTitles,

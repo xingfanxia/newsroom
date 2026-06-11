@@ -5,7 +5,8 @@ export type LLMProvider =
   | "anthropic"
   | "gemini"
   | "azure-openai"
-  | "azure-openai-pro";
+  | "azure-openai-pro"
+  | "azure-deepseek";
 
 export type ReasoningEffort = "minimal" | "low" | "medium" | "high" | "xhigh";
 
@@ -35,9 +36,9 @@ export type GenerateTextRequest = {
   provider?: LLMProvider;
   /** Override the default deployment for this provider (mainly for Azure). */
   deployment?: string;
-  /** GPT-5 family reasoning effort. Provider-specific allowed values:
-   *   - gpt-5.4-standard: minimal | low | medium | high
-   *   - gpt-5.4-pro:      medium | high | xhigh
+  /** Reasoning effort. Provider-specific allowed values:
+   *   - gpt-5.5-standard: minimal | low | medium | high
+   *   - azure-openai-pro: medium | high | xhigh
    */
   reasoningEffort?: ReasoningEffort;
   system?: string;

@@ -29,14 +29,12 @@ describe("selectDailyColumnPool", () => {
     expect(result.windowEnd.toISOString()).toBe("2099-01-01T12:00:00.000Z");
   });
 
-  it("excludes papers (arxiv/paper source tags) when pool is non-empty", async () => {
+  it("returns source tags for callers that need to inspect source mix", async () => {
     const now = new Date();
     const result = await selectDailyColumnPool(now);
     if (result.rows.length === 0) return; // skip if dev DB has no signal
     for (const row of result.rows) {
-      const tags = row.sourceTags ?? [];
-      expect(tags).not.toContain("arxiv");
-      expect(tags).not.toContain("paper");
+      expect(row.sourceTags == null || Array.isArray(row.sourceTags)).toBe(true);
     }
   });
 

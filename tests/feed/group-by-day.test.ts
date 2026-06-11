@@ -81,7 +81,6 @@ describe("page.tsx callers pass dayKey strings (not Date objects)", () => {
   const pages = [
     "app/[locale]/page.tsx",
     "app/[locale]/all/page.tsx",
-    "app/[locale]/papers/page.tsx",
     "app/[locale]/curated/page.tsx",
     "app/[locale]/podcasts/page.tsx",
     "app/[locale]/x-monitor/page.tsx",

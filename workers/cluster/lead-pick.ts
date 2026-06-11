@@ -18,7 +18,7 @@
  *   ───────────────────┼──────┼─────────────────────────────────────────────
  *   vendor-official    |  100 | source of truth for vendor announcements
  *   media              |   80 | major editorial outlets (Bloomberg/FT/HN/Verge/TC)
- *   research           |   80 | arXiv / paper feeds
+ *   research           |   80 | deep-report feeds / independent technical analysis
  *   newsletter         |   50 |
  *   policy             |   50 |
  *   market             |   50 |

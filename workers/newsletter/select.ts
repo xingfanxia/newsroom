@@ -1,5 +1,5 @@
 /**
- * Daily column selection: today's 严选 ∪ top 15 of 热点聚合, papers excluded,
+ * Daily column selection: today's 严选 ∪ top 15 of 热点聚合,
  * deduped by cluster (one event = one row), capped at 20 unique items.
  *
  * Window: rolling 24h ending at the cron-firing hour, snapped for idempotency
@@ -140,7 +140,6 @@ export async function selectDailyColumnPool(
     WHERE s.curated = true
       AND i.published_at >= ${start.toISOString()}::timestamptz
       AND i.published_at <  ${end.toISOString()}::timestamptz
-      AND NOT (s.tags && ARRAY['arxiv','paper']::text[])
       AND i.enriched_at IS NOT NULL
     ORDER BY i.importance DESC NULLS LAST, i.published_at DESC
   `)) as unknown as RawRow[];
@@ -162,7 +161,6 @@ export async function selectDailyColumnPool(
     LEFT JOIN clusters c ON c.id = i.cluster_id
     WHERE i.published_at >= ${start.toISOString()}::timestamptz
       AND i.published_at <  ${end.toISOString()}::timestamptz
-      AND NOT (s.tags && ARRAY['arxiv','paper']::text[])
       AND i.enriched_at IS NOT NULL
     ORDER BY i.importance DESC NULLS LAST, i.published_at DESC
     LIMIT ${HOT_TOP_N}

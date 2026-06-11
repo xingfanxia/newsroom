@@ -42,20 +42,22 @@ describe("commentaryNoteSchema", () => {
     ).toBe(false);
   });
 
-  it("rejects editorNoteZh longer than 200 chars", () => {
+  it("truncates editorNoteZh longer than 200 chars", () => {
     const result = commentaryNoteSchema.safeParse({
       editorNoteZh: "x".repeat(201),
       editorNoteEn: "short",
     });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.editorNoteZh.length).toBe(200);
   });
 
-  it("rejects editorNoteEn longer than 200 chars", () => {
+  it("truncates editorNoteEn longer than 200 chars", () => {
     const result = commentaryNoteSchema.safeParse({
       editorNoteZh: "短",
       editorNoteEn: "x".repeat(201),
     });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.editorNoteEn.length).toBe(200);
   });
 
   it("does not surface analysis fields when they leak through", () => {

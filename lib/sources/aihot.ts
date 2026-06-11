@@ -20,10 +20,10 @@ const ITEM_CATEGORIES = [
   "ai-models",
   "ai-products",
   "industry",
-  "paper",
   "tip",
 ] as const;
 type ItemCategory = (typeof ITEM_CATEGORIES)[number];
+type AihotApiItemCategory = ItemCategory | "paper";
 
 export type AihotSectionLabel =
   | "模型发布/更新"
@@ -58,7 +58,7 @@ export type AihotItem = {
   source: string;
   publishedAt: string | null;
   summary: string | null;
-  category: ItemCategory | null;
+  category: AihotApiItemCategory | null;
 };
 
 export type AihotItemsResponse = {

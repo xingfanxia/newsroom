@@ -19,7 +19,12 @@ import {
   type EnrichOutput,
   type ScoreOutput,
 } from "./prompt";
+import {
+  generateChineseEnrichment,
+  generateChineseScoreRationale,
+} from "./chinese";
 import { loadPolicy } from "./policy";
+import { treatmentForScore, type EnrichTreatment } from "./treatment";
 
 // Enrich does stages 1-3 (summary + tags → embed → score). Commentary used
 // to be stage 4 here but was failing silently with Azure's "No object
@@ -138,11 +143,57 @@ async function enrichOne(
 ): Promise<void> {
   const client = db();
 
-  // ── Stage 1: summary + tags (low reasoning, fast) ──
-  let enriched: EnrichOutput;
+  let enriched = await generateEnrichment(item, "fast");
+  let embedding = await generateEmbedding(item, enriched);
+  let scored = await generateScore(item, enriched, policy, "fast");
+
+  // Operator-flagged sources (sources.never_exclude) keep tier floored at
+  // "all" regardless of scorer verdict. YouTube channels and community
+  // digests (ai-chatgroup-daily) are the primary cases: interesting by
+  // virtue of being hand-added to the allow-list. Low importance still
+  // sorts them below curated AI content — they just stay browseable.
+  const finalTier =
+    neverExcludeSet.has(item.sourceId) && scored.tier === "excluded"
+      ? "all"
+      : scored.tier;
+
+  let effectiveTier = finalTier;
+  if (treatmentForScore({ importance: scored.importance, tier: finalTier }) === "high") {
+    const upgraded = await regenerateHighValueItem(item, policy, neverExcludeSet);
+    enriched = upgraded.enriched;
+    embedding = upgraded.embedding;
+    scored = upgraded.scored;
+    effectiveTier = upgraded.finalTier;
+  }
+
+  // ── Stage 4: persist (commentary runs in a separate worker) ──
+  await client
+    .update(items)
+    .set({
+      titleZh: enriched.titleZh,
+      titleEn: enriched.titleEn,
+      summaryZh: enriched.summaryZh,
+      summaryEn: enriched.summaryEn,
+      tags: enriched.tags,
+      importance: scored.importance,
+      tier: effectiveTier,
+      hkr: scored.hkr,
+      reasoningZh: scored.reasoningZh,
+      reasoningEn: scored.reasoningEn,
+      embedding,
+      enrichedAt: new Date(),
+      policyVersion: policy.version,
+    })
+    .where(and(eq(items.id, item.id), isNull(items.enrichedAt)));
+}
+
+async function generateEnrichment(
+  item: Item,
+  treatment: EnrichTreatment,
+): Promise<EnrichOutput> {
   try {
     const result = await generateStructured({
-      ...profiles.enrich,
+      ...(treatment === "fast" ? profiles.fastText : profiles.enrich),
       task: "enrich",
       itemId: item.id,
       system: ENRICH_SYSTEM,
@@ -162,26 +213,50 @@ async function enrichOne(
       schemaName: "Enrichment",
       maxTokens: 1500,
     });
-    enriched = result.data;
+    const enriched = result.data;
+    const zh = await generateChineseEnrichment({
+      title: item.title,
+      body: item.body,
+      bodyMd: item.bodyMd,
+      url: item.url,
+      source: item.sourceId,
+      titleEn: enriched.titleEn,
+      summaryEn: enriched.summaryEn,
+      itemId: item.id,
+      treatment,
+    });
+    return {
+      ...enriched,
+      titleZh: zh.titleZh,
+      summaryZh: zh.summaryZh,
+    };
   } catch (err) {
     throw tag(err, "enrich");
   }
+}
 
-  // ── Stage 2: embedding (Azure text-embedding-3-large) ──
-  let embedding: number[];
+async function generateEmbedding(
+  item: Item,
+  enriched: EnrichOutput,
+): Promise<number[]> {
   try {
     const eText = `${item.title}\n\n${enriched.summaryZh}`;
     const result = await embed({ value: eText, task: "embed", itemId: item.id });
-    embedding = result.embedding;
+    return result.embedding;
   } catch (err) {
     throw tag(err, "embed");
   }
+}
 
-  // ── Stage 3: score (high reasoning) ──
-  let scored: ScoreOutput;
+async function generateScore(
+  item: Item,
+  enriched: EnrichOutput,
+  policy: PolicyT,
+  treatment: EnrichTreatment,
+): Promise<ScoreOutput> {
   try {
     const result = await generateStructured({
-      ...profiles.score,
+      ...(treatment === "fast" ? profiles.fastText : profiles.score),
       task: "score",
       itemId: item.id,
       system: scoreSystem(policy.content),
@@ -203,40 +278,46 @@ async function enrichOne(
       schemaName: "EditorialScore",
       maxTokens: 2048,
     });
-    scored = result.data;
+    const scored = result.data;
+    const zh = await generateChineseScoreRationale({
+      title: item.title,
+      summaryZh: enriched.summaryZh,
+      tags: enriched.tags,
+      score: scored,
+      itemId: item.id,
+      treatment,
+    });
+    return {
+      ...scored,
+      reasoningZh: zh.reasoningZh,
+      hkr: {
+        ...scored.hkr,
+        reasonsZh: zh.hkrReasonsZh,
+      },
+    };
   } catch (err) {
     throw tag(err, "score");
   }
+}
 
-  // Operator-flagged sources (sources.never_exclude) keep tier floored at
-  // "all" regardless of scorer verdict. YouTube channels and community
-  // digests (ai-chatgroup-daily) are the primary cases: interesting by
-  // virtue of being hand-added to the allow-list. Low importance still
-  // sorts them below curated AI content — they just stay browseable.
+async function regenerateHighValueItem(
+  item: Item,
+  policy: PolicyT,
+  neverExcludeSet: Set<string>,
+): Promise<{
+  enriched: EnrichOutput;
+  embedding: number[];
+  scored: ScoreOutput;
+  finalTier: ScoreOutput["tier"];
+}> {
+  const enriched = await generateEnrichment(item, "high");
+  const embedding = await generateEmbedding(item, enriched);
+  const scored = await generateScore(item, enriched, policy, "high");
   const finalTier =
     neverExcludeSet.has(item.sourceId) && scored.tier === "excluded"
       ? "all"
       : scored.tier;
-
-  // ── Stage 4: persist (commentary runs in a separate worker) ──
-  await client
-    .update(items)
-    .set({
-      titleZh: enriched.titleZh,
-      titleEn: enriched.titleEn,
-      summaryZh: enriched.summaryZh,
-      summaryEn: enriched.summaryEn,
-      tags: enriched.tags,
-      importance: scored.importance,
-      tier: finalTier,
-      hkr: scored.hkr,
-      reasoningZh: scored.reasoningZh,
-      reasoningEn: scored.reasoningEn,
-      embedding,
-      enrichedAt: new Date(),
-      policyVersion: policy.version,
-    })
-    .where(and(eq(items.id, item.id), isNull(items.enrichedAt)));
+  return { enriched, embedding, scored, finalTier };
 }
 
 function tag(err: unknown, stage: string): Error {

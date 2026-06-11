@@ -15,7 +15,7 @@ import { and, eq, isNull, or, sql, exists } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { clusters, items, sources, clusterSplits } from "@/db/schema";
-import { generateStructured } from "@/lib/llm";
+import { generateStructured, profiles } from "@/lib/llm";
 import {
   recomputeEventImportance,
   approximateTierForImportance,
@@ -201,10 +201,9 @@ async function arbitrateOne(
     publishedAt: r.publishedAt.toISOString(),
   }));
 
-  // Call Haiku — use enrich profile (azure-openai + low reasoning = fast + cheap)
+  // Low-value arbitration runs on DeepSeek Flash; high-value prose uses Pro.
   const llmResult = await generateStructured({
-    provider: "azure-openai",
-    reasoningEffort: "low",
+    ...profiles.fastText,
     task: "arbitrate",
     system: arbitrateSystem,
     messages: [

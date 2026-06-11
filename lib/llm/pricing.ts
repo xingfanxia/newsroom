@@ -12,8 +12,8 @@
  * Model name matching is fuzzy:
  *   1. exact match on the full model string
  *   2. exact match after stripping common provider prefixes ("azure/", "openai/")
- *   3. prefix match on Azure deployment names (e.g. "gpt-5.4-standard" →
- *      first row whose key startsWith "gpt-5.4")
+ *   3. prefix match on Azure deployment names (e.g. "gpt-5.5-standard" →
+ *      first row whose key startsWith "gpt-5.5")
  *   4. fallback to the hardcoded table
  */
 import type { LLMProvider } from "./types";
@@ -50,11 +50,17 @@ let inFlight: Promise<Cache> | null = null;
 /**
  * Fallback prices for the models we rely on. Keep in sync with our provider
  * contracts; used when the LiteLLM fetch fails or the model isn't indexed.
- * Values are per-token (USD). Azure standard rates are lifted from the public
- * pricing page; pro reasoning is estimated from GPT-5 pro pricing family.
+ * Values are per-token (USD). Azure OpenAI fallback rates are estimates; main
+ * prose/scoring traffic now uses DeepSeek V4 Pro/Flash below.
  */
 const FALLBACK: Record<string, ModelPricing> = {
-  // GPT-5.4 family (Azure — estimate based on o-series pricing patterns)
+  // GPT-5.5 compatibility deployment (Azure — estimate).
+  "gpt-5.5-standard": {
+    inputCostPerToken: 0.0000025,
+    outputCostPerToken: 0.00001,
+    cachedInputCostPerToken: 0.00000125,
+  },
+  // Legacy names retained so old llm_usage rows still price correctly.
   "gpt-5.4-standard": {
     inputCostPerToken: 0.0000025,
     outputCostPerToken: 0.00001,
@@ -64,6 +70,16 @@ const FALLBACK: Record<string, ModelPricing> = {
     inputCostPerToken: 0.000015,
     outputCostPerToken: 0.00006,
     cachedInputCostPerToken: 0.0000075,
+  },
+  // Azure AI Foundry DeepSeek deployment. Placeholder until LiteLLM has a
+  // matching row for the exact Azure deployment name.
+  "DeepSeek-V4-Pro": {
+    inputCostPerToken: 0.000001,
+    outputCostPerToken: 0.000002,
+  },
+  "DeepSeek-V4-Flash": {
+    inputCostPerToken: 0.0000002,
+    outputCostPerToken: 0.0000004,
   },
   // Embedding
   "text-embedding-3-large": {
@@ -140,11 +156,11 @@ export async function resolvePricing(
     const p = rowToPricing(rows[stripped]);
     if (p) return p;
   }
-  // 3. prefix match for Azure deployments (e.g. "gpt-5.4-standard" → "gpt-5.4")
+  // 3. prefix match for Azure deployments (e.g. "gpt-5.5-standard" → "gpt-5.5")
   const candidateKey = Object.keys(rows).find(
     (k) =>
       stripped.startsWith(k) &&
-      // avoid matching every "gpt-" row for "gpt-5.4-standard"
+      // avoid matching every "gpt-" row for "gpt-5.5-standard"
       (k.includes("-") || k.length >= 6),
   );
   if (candidateKey) {

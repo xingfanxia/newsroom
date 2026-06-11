@@ -72,13 +72,15 @@ export async function fetchAihotDailyForDate(
     .limit(1);
 
   if (cached.length > 0 && cached[0]!.payload) {
-    return cached[0]!.payload as unknown as AihotDailyReport;
+    return stripPaperFromAihotDaily(
+      cached[0]!.payload as unknown as AihotDailyReport,
+    );
   }
 
   // ── 2. Live fetch ───────────────────────────────────────────────
   try {
     const payload = await fetchDailyByDate(dateUtcYmd);
-    return payload; // null on 404 — that's fine, propagate
+    return stripPaperFromAihotDaily(payload); // null on 404 — that's fine, propagate
   } catch (err) {
     if (err instanceof AihotError) {
       console.warn(
@@ -103,7 +105,7 @@ export async function fetchAihotDailyForDate(
  */
 export async function fetchAihotDailyLatest(): Promise<AihotDailyReport | null> {
   try {
-    return await fetchDailyLatest();
+    return stripPaperFromAihotDaily(await fetchDailyLatest());
   } catch (err) {
     if (err instanceof AihotError) {
       console.warn(
@@ -127,6 +129,7 @@ export async function fetchAihotDailyLatest(): Promise<AihotDailyReport | null> 
 export function renderAihotDailyForPrompt(
   payload: AihotDailyReport | null,
 ): string {
+  payload = stripPaperFromAihotDaily(payload);
   if (!payload) return "";
 
   const leadBlock = payload.lead
@@ -160,4 +163,23 @@ ${sectionsBlock}
 flashes:
 ${flashesBlock || "  (none)"}
 </aihot-daily>`;
+}
+
+export function stripPaperFromAihotDaily(
+  payload: AihotDailyReport | null,
+): AihotDailyReport | null {
+  if (!payload) return null;
+
+  const paperTitles = new Set<string>();
+  const sections = payload.sections.filter((sec) => {
+    if (sec.label !== "论文研究") return true;
+    for (const item of sec.items) paperTitles.add(item.title);
+    return false;
+  });
+
+  const lead =
+    payload.lead && paperTitles.has(payload.lead.title) ? null : payload.lead;
+  const flashes = payload.flashes.filter((f) => !paperTitles.has(f.title));
+
+  return { ...payload, lead, sections, flashes };
 }

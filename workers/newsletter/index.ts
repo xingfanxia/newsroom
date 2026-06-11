@@ -8,8 +8,8 @@
  *   4. LLM produces {headline, overview, highlights, commentary}
  *   5. Upsert into newsletters table, one row per (kind, locale, periodStart)
  *
- * Uses profiles.agent (Azure Pro at xhigh reasoning) — this is the most
- * editorial-judgment-heavy call in the product, so it earns the pro tier.
+ * Uses profiles.score. That profile currently routes to DeepSeek V4 Pro so
+ * newsletters share the same friend-readable prose direction as item enrich.
  */
 import { z } from "zod";
 import { and, desc, gte, lt, isNotNull, sql } from "drizzle-orm";
@@ -229,9 +229,8 @@ type DraftArgs = {
 };
 
 async function generateDraft(args: DraftArgs): Promise<NewsletterOutput> {
-  // profiles.score (standard + high) — pro + xhigh was 3× slower per call
-  // and occasionally timed out on the newsletter-sized prompt. Upgrade via
-  // AIHOT_NEWSLETTER_PROFILE=agent once Azure quota is stable.
+  // profiles.score routes to DeepSeek V4 Pro. The older Azure Pro agent path
+  // was slower on newsletter-sized prompts and is kept for policy iteration.
   const result = await generateStructured({
     ...profiles.score,
     task: "newsletter",

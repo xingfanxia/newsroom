@@ -2,9 +2,8 @@
  * Regression: the calendar grid (getDayCounts) and the per-page feed
  * (getFeaturedStories) must apply the SAME source-tag / curated / tier
  * filters. Otherwise a calendar cell can over-promise — e.g., the home
- * page on 2026-04-27 showed `27 (6)` because all 6 lead items were arxiv
- * papers, but the home feed excludes arxiv → user clicks the cell and
- * sees an empty feed.
+ * feed and calendar filters must stay paired; otherwise users click a
+ * non-zero calendar cell and see an empty feed.
  *
  * Pure source-string test — asserts the SQL composes the expected filter
  * expressions and each page wires its filters into the calendar call.
@@ -66,10 +65,6 @@ describe("page calendars pass the same filters as their feed", () => {
     resolve(__dirname, "../../app/[locale]/page.tsx"),
     "utf8",
   );
-  const papersSrc = readFileSync(
-    resolve(__dirname, "../../app/[locale]/papers/page.tsx"),
-    "utf8",
-  );
   const curatedSrc = readFileSync(
     resolve(__dirname, "../../app/[locale]/curated/page.tsx"),
     "utf8",
@@ -78,18 +73,9 @@ describe("page calendars pass the same filters as their feed", () => {
   // [\s\S]*? is the cross-target-compatible substitute for `.` with the `s`
   // (dotAll) flag — the project targets ES2017 and `s` is ES2018+. Lazy
   // quantifier so the match doesn't stretch past the closing brace.
-  it("home /zh — getDayCounts passes excludeSourceTags=['arxiv','paper'] and tier='featured'", () => {
-    expect(homeSrc).toMatch(
-      /getDayCounts\(\s*60\s*,\s*\{[\s\S]*?excludeSourceTags:\s*\[\s*"arxiv"\s*,\s*"paper"\s*\][\s\S]*?\}/,
-    );
+  it("home /zh — getDayCounts passes tier='featured'", () => {
     expect(homeSrc).toMatch(
       /getDayCounts\(\s*60\s*,\s*\{[\s\S]*?tier:\s*"featured"[\s\S]*?\}/,
-    );
-  });
-
-  it("papers /zh/papers — getDayCounts passes includeSourceTags=PAPER_TAGS", () => {
-    expect(papersSrc).toMatch(
-      /getDayCounts\(\s*60\s*,\s*\{[\s\S]*?includeSourceTags:\s*PAPER_TAGS[\s\S]*?\}/,
     );
   });
 

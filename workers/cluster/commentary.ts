@@ -30,6 +30,8 @@ import {
   eventCommentaryUserPrompt,
   type EventMember,
 } from "./prompt";
+import { generateChineseCommentary } from "@/workers/enrich/chinese";
+import { treatmentForScore } from "@/workers/enrich/treatment";
 
 export const MAX_EVENT_COMMENTARY_PER_RUN = 8;
 
@@ -191,6 +193,10 @@ async function processOneCluster(candidate: ClusterCandidate): Promise<void> {
 
   const isFull =
     candidate.eventTier === "featured" || candidate.eventTier === "p1";
+  const treatment = treatmentForScore({
+    importance: candidate.importance,
+    tier: candidate.eventTier,
+  });
 
   if (isFull) {
     // Full deep dive — note + analysis, both locales.
@@ -206,12 +212,18 @@ async function processOneCluster(candidate: ClusterCandidate): Promise<void> {
       maxTokens: 3072,
     });
     const c = result.data;
+    const zh = await generateChineseCommentary({
+      task: "event-commentary",
+      userContent: userPrompt,
+      full: true,
+      treatment: "high",
+    });
     await client
       .update(clusters)
       .set({
-        editorNoteZh: c.editorNoteZh,
+        editorNoteZh: zh.editorNoteZh,
         editorNoteEn: c.editorNoteEn,
-        editorAnalysisZh: c.editorAnalysisZh,
+        editorAnalysisZh: "editorAnalysisZh" in zh ? zh.editorAnalysisZh : c.editorAnalysisZh,
         editorAnalysisEn: c.editorAnalysisEn,
         commentaryAt: new Date(),
       })
@@ -226,7 +238,7 @@ async function processOneCluster(candidate: ClusterCandidate): Promise<void> {
   } else {
     // Note-only — event_tier='all'.
     const result = await generateStructured({
-      ...profiles.enrich,
+      ...(treatment === "fast" ? profiles.fastText : profiles.enrich),
       task: "event-commentary",
       system: eventCommentaryNoteOnlySystem,
       messages: [{ role: "user", content: userPrompt }],
@@ -235,10 +247,16 @@ async function processOneCluster(candidate: ClusterCandidate): Promise<void> {
       maxTokens: 1024,
     });
     const c = result.data;
+    const zh = await generateChineseCommentary({
+      task: "event-commentary",
+      userContent: userPrompt,
+      full: false,
+      treatment,
+    });
     await client
       .update(clusters)
       .set({
-        editorNoteZh: c.editorNoteZh,
+        editorNoteZh: zh.editorNoteZh,
         editorNoteEn: c.editorNoteEn,
         // Intentionally not setting editor_analysis_{zh,en} — preserves any
         // value written by a prior featured/p1 run (or stays null on first

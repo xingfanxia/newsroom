@@ -32,7 +32,7 @@ describe("authorityScore — group ladder", () => {
     expect(m).toBeGreaterThan(s);
   });
 
-  it("research ties media (papers are source of truth like vendor blogs)", () => {
+  it("research ties media (deep-report feeds are high-authority context)", () => {
     const r = authorityScore(candidate({ itemId: 1, sourceGroup: "research" }));
     const m = authorityScore(candidate({ itemId: 2, sourceGroup: "media" }));
     expect(r).toBe(m);
@@ -57,8 +57,8 @@ describe("authorityScore — priority offset", () => {
   });
 
   it("priority=1 media (HN/Bloomberg/FT, score 100) ties vendor-official priority=2 (score 100)", () => {
-    // The rationale for the ladder: hand-picked top media (priority=1) is the
-    // editorial paper of record; default-priority vendor-official is also high
+    // The rationale for the ladder: hand-picked top media (priority=1) is a
+    // strong editorial source; default-priority vendor-official is also high
     // but operator hasn't elevated it. Treat as equal — let importance tiebreak.
     const m = authorityScore(
       candidate({ itemId: 1, sourceGroup: "media", sourcePriority: 1 }),

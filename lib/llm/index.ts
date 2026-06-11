@@ -91,6 +91,10 @@ function azureClient() {
 }
 
 let cachedAzureChat: ReturnType<typeof createOpenAI> | null = null;
+function normalizeOpenAICompatibleBaseURL(endpoint: string): string {
+  return endpoint.replace(/\/+$/, "").replace(/\/responses$/i, "");
+}
+
 function azureChatClient() {
   // Standard chat lives on the AI Foundry "project" Responses-API endpoint
   // (ax-useast-resource as of gpt-5.5). Same shape as PRO (createOpenAI +
@@ -105,7 +109,7 @@ function azureChatClient() {
   }
   cachedAzureChat ??= createOpenAI({
     apiKey,
-    baseURL: endpoint,
+    baseURL: normalizeOpenAICompatibleBaseURL(endpoint),
     headers: { "api-key": apiKey },
   });
   return cachedAzureChat;
@@ -132,6 +136,32 @@ function azureProClient() {
     headers: { "api-key": apiKey },
   });
   return cachedAzurePro;
+}
+
+let cachedAzureDeepSeek: ReturnType<typeof createOpenAI> | null = null;
+function azureDeepSeekClient() {
+  const apiKey = process.env.AZURE_DEEPSEEK_API_KEY;
+  const endpoint = process.env.AZURE_DEEPSEEK_ENDPOINT;
+  if (!apiKey || !endpoint) {
+    throw new LLMError(
+      "azure-deepseek",
+      "AZURE_DEEPSEEK_API_KEY and AZURE_DEEPSEEK_ENDPOINT must be set",
+    );
+  }
+  cachedAzureDeepSeek ??= createOpenAI({
+    apiKey,
+    baseURL: normalizeOpenAICompatibleBaseURL(endpoint),
+    headers: { "api-key": apiKey },
+  });
+  return cachedAzureDeepSeek;
+}
+
+function deepSeekProDeployment(): string {
+  return process.env.AZURE_DEEPSEEK_DEPLOYMENT ?? "DeepSeek-V4-Pro";
+}
+
+function deepSeekFlashDeployment(): string {
+  return process.env.AZURE_DEEPSEEK_FLASH_DEPLOYMENT ?? "DeepSeek-V4-Flash";
 }
 
 // ── Model resolvers ─────────────────────────────────────────────
@@ -163,12 +193,20 @@ function modelFor(
           "gpt-5.5-standard",
       );
     case "azure-openai-pro":
-      // .responses() uses Azure's new Responses API — reasoning-native,
-      // what gpt-5.4-pro is designed for.
-      return azureProClient().responses(
-        opts?.deployment ??
-          process.env.AZURE_OPENAI_PRO_DEPLOYMENT ??
-          "gpt-5.4-pro-standard",
+      // .responses() uses Azure's Responses API for the optional agent profile.
+      {
+        const deployment = opts?.deployment ?? process.env.AZURE_OPENAI_PRO_DEPLOYMENT;
+        if (!deployment) {
+          throw new LLMError(
+            "azure-openai-pro",
+            "AZURE_OPENAI_PRO_DEPLOYMENT must be set",
+          );
+        }
+        return azureProClient().responses(deployment);
+      }
+    case "azure-deepseek":
+      return azureDeepSeekClient().responses(
+        opts?.deployment ?? deepSeekProDeployment(),
       );
     default:
       throw new LLMError(provider, `unknown provider: ${provider}`);
@@ -191,8 +229,9 @@ function resolveProvider(
   return env ?? "anthropic";
 }
 
-function reasoningProviderOptions(effort?: ReasoningEffort) {
+function reasoningProviderOptions(provider: LLMProvider, effort?: ReasoningEffort) {
   if (!effort) return undefined;
+  if (provider === "azure-deepseek") return undefined;
   return {
     openai: { reasoningEffort: effort },
   } as const;
@@ -215,7 +254,12 @@ function applyAzureFoundryWorkaround<T extends ChatLike>(
   provider: LLMProvider,
   req: T,
 ): T {
-  if (provider !== "azure-openai" || !req.system) return req;
+  if (
+    (provider !== "azure-openai" && provider !== "azure-deepseek") ||
+    !req.system
+  ) {
+    return req;
+  }
   const merged = `${req.system}\n\n---\n\n`;
   const [first, ...rest] = req.messages;
   const firstContent = typeof first?.content === "string" ? first.content : "";
@@ -228,6 +272,167 @@ function applyAzureFoundryWorkaround<T extends ChatLike>(
       ? [newFirst, ...rest]
       : [newFirst, ...req.messages];
   return { ...req, system: undefined, messages: newMessages } as T;
+}
+
+function parseJsonObject(text: string): unknown {
+  const stripped = text
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+  try {
+    return JSON.parse(stripped);
+  } catch {
+    const start = stripped.indexOf("{");
+    const end = stripped.lastIndexOf("}");
+    if (start >= 0 && end > start) {
+      return JSON.parse(stripped.slice(start, end + 1));
+    }
+    throw new Error("could not parse JSON object from model response");
+  }
+}
+
+type JsonSchemaObject = {
+  type?: string | string[];
+  properties?: Record<string, JsonSchemaObject>;
+  items?: JsonSchemaObject;
+  enum?: unknown[];
+  anyOf?: JsonSchemaObject[];
+  oneOf?: JsonSchemaObject[];
+  $ref?: string;
+};
+
+function schemaExample(schema: z.ZodTypeAny): string {
+  try {
+    const jsonSchema = z.toJSONSchema(schema, {
+      io: "input",
+    }) as JsonSchemaObject;
+    return JSON.stringify(exampleFromJsonSchema(jsonSchema), null, 2);
+  } catch {
+    return "{}";
+  }
+}
+
+function exampleFromJsonSchema(schema: JsonSchemaObject): unknown {
+  const type = Array.isArray(schema.type) ? schema.type[0] : schema.type;
+  if (schema.enum && schema.enum.length > 0) return schema.enum[0];
+  if (schema.anyOf?.length) return exampleFromJsonSchema(schema.anyOf[0]!);
+  if (schema.oneOf?.length) return exampleFromJsonSchema(schema.oneOf[0]!);
+  if (type === "object" || schema.properties) {
+    const out: Record<string, unknown> = {};
+    for (const [key, child] of Object.entries(schema.properties ?? {})) {
+      out[key] = exampleFromJsonSchema(child);
+    }
+    return out;
+  }
+  if (type === "array") return [];
+  if (type === "number" || type === "integer") return 0;
+  if (type === "boolean") return false;
+  return "";
+}
+
+function normalizeForJsonSchema(
+  value: unknown,
+  schema: JsonSchemaObject,
+): unknown {
+  const type = Array.isArray(schema.type) ? schema.type[0] : schema.type;
+  if (schema.anyOf?.length) return normalizeForJsonSchema(value, schema.anyOf[0]!);
+  if (schema.oneOf?.length) return normalizeForJsonSchema(value, schema.oneOf[0]!);
+  if (type === "object" || schema.properties) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+    const input = value as Record<string, unknown>;
+    const out: Record<string, unknown> = { ...input };
+    for (const [key, child] of Object.entries(schema.properties ?? {})) {
+      if (key in input) {
+        out[key] = normalizeForJsonSchema(input[key], child);
+      }
+    }
+    return out;
+  }
+  if (type === "array") {
+    return Array.isArray(value) ? value : value == null ? value : [value];
+  }
+  if (type === "string") {
+    return coerceStringValue(value);
+  }
+  return value;
+}
+
+function coerceStringValue(value: unknown): unknown {
+  if (typeof value === "string") return value;
+  if (value == null) return value;
+  if (Array.isArray(value)) {
+    const strings = value.filter((v): v is string => typeof v === "string");
+    return strings.length > 0 ? strings.join("\n") : value;
+  }
+  if (typeof value !== "object") return value;
+
+  const obj = value as Record<string, unknown>;
+  for (const key of [
+    "text",
+    "value",
+    "content",
+    "note",
+    "summary",
+    "title",
+    "reason",
+    "analysis",
+    "zh",
+    "en",
+  ]) {
+    if (typeof obj[key] === "string") return obj[key];
+  }
+  const first = findFirstString(obj);
+  return first ?? value;
+}
+
+function findFirstString(value: unknown): string | null {
+  if (typeof value === "string") return value;
+  if (!value || typeof value !== "object") return null;
+  if (Array.isArray(value)) {
+    for (const child of value) {
+      const found = findFirstString(child);
+      if (found) return found;
+    }
+    return null;
+  }
+  for (const child of Object.values(value as Record<string, unknown>)) {
+    const found = findFirstString(child);
+    if (found) return found;
+  }
+  return null;
+}
+
+function parseStructuredJson<T extends z.ZodTypeAny>(
+  schema: T,
+  text: string,
+): z.infer<T> {
+  const raw = parseJsonObject(text);
+  const direct = schema.safeParse(raw);
+  if (direct.success) return direct.data as z.infer<T>;
+
+  try {
+    const jsonSchema = z.toJSONSchema(schema, {
+      io: "input",
+    }) as JsonSchemaObject;
+    const normalized = normalizeForJsonSchema(raw, jsonSchema);
+    const repaired = schema.safeParse(normalized);
+    if (repaired.success) return repaired.data as z.infer<T>;
+  } catch {
+    // Fall through and throw the original Zod error for a useful path.
+  }
+
+  throw direct.error;
+}
+
+function deepSeekStructuredInstruction(
+  schema: z.ZodTypeAny,
+  schemaName?: string,
+): string {
+  return `Return only one valid JSON object${schemaName ? ` named ${schemaName}` : ""}.
+Use exactly this JSON shape. Replace the empty strings with final prose. Do not wrap string fields in objects. Do not add markdown or explanation.
+
+${schemaExample(schema)}`;
 }
 
 // ── Public API ──────────────────────────────────────────────────
@@ -245,7 +450,7 @@ export async function generateText(
       system: adjusted.system,
       messages: adjusted.messages,
       maxOutputTokens: req.maxTokens ?? 2048,
-      providerOptions: reasoningProviderOptions(req.reasoningEffort),
+      providerOptions: reasoningProviderOptions(provider, req.reasoningEffort),
       ...(req.temperature !== undefined
         ? { temperature: req.temperature }
         : {}),
@@ -288,6 +493,71 @@ export async function generateStructured<T extends z.ZodTypeAny>(
   const adjusted = applyAzureFoundryWorkaround(provider, req);
   const started = Date.now();
   try {
+    if (provider === "azure-deepseek") {
+      const instruction = deepSeekStructuredInstruction(
+        req.schema,
+        req.schemaName,
+      );
+      const requestedDeployment = req.deployment ?? deepSeekProDeployment();
+      const candidateModels =
+        requestedDeployment === deepSeekFlashDeployment()
+          ? [model, modelFor(provider, { deployment: deepSeekProDeployment() })]
+          : [model];
+      let lastError: unknown = null;
+      let totalInputTokens = 0;
+      let totalOutputTokens = 0;
+      for (const candidateModel of candidateModels) {
+        for (let attempt = 0; attempt < 2; attempt++) {
+          try {
+            const result = await aiGenerateText({
+              model: candidateModel,
+              system: adjusted.system,
+              messages: [
+                ...adjusted.messages,
+                {
+                  role: "user",
+                  content:
+                    attempt === 0
+                      ? instruction
+                      : `Your previous response was invalid. Return ONLY valid JSON for this exact shape, with every value as the correct primitive type:\n\n${schemaExample(req.schema)}`,
+                },
+              ],
+              maxOutputTokens: req.maxTokens ?? 2048,
+              temperature: req.temperature ?? 0,
+            });
+            totalInputTokens += result.usage?.inputTokens ?? 0;
+            totalOutputTokens += result.usage?.outputTokens ?? 0;
+            recordUsage({
+              provider,
+              model: modelId(candidateModel),
+              task: req.task,
+              itemId: req.itemId,
+              tokens: {
+                inputTokens: result.usage?.inputTokens,
+                outputTokens: result.usage?.outputTokens,
+                cachedInputTokens: extractCachedTokens(result.providerMetadata),
+                reasoningTokens: extractReasoningTokens(result.providerMetadata),
+              },
+              durationMs: Date.now() - started,
+            });
+            const parsed = parseStructuredJson(req.schema, result.text);
+            return {
+              data: parsed as z.infer<T>,
+              provider,
+              model: modelId(candidateModel),
+              inputTokens: totalInputTokens || undefined,
+              outputTokens: totalOutputTokens || undefined,
+            };
+          } catch (err) {
+            lastError = err;
+          }
+        }
+      }
+      throw lastError instanceof Error
+        ? lastError
+        : new Error(String(lastError));
+    }
+
     const result = await aiGenerateObject({
       model,
       system: adjusted.system,
@@ -296,7 +566,7 @@ export async function generateStructured<T extends z.ZodTypeAny>(
       schemaName: req.schemaName,
       schemaDescription: req.schemaDescription,
       maxOutputTokens: req.maxTokens ?? 2048,
-      providerOptions: reasoningProviderOptions(req.reasoningEffort),
+      providerOptions: reasoningProviderOptions(provider, req.reasoningEffort),
       ...(req.temperature !== undefined
         ? { temperature: req.temperature }
         : {}),
@@ -339,7 +609,7 @@ export function streamText(req: GenerateTextRequest) {
     system: adjusted.system,
     messages: adjusted.messages,
     maxOutputTokens: req.maxTokens ?? 2048,
-    providerOptions: reasoningProviderOptions(req.reasoningEffort),
+    providerOptions: reasoningProviderOptions(provider, req.reasoningEffort),
     ...(req.temperature !== undefined
       ? { temperature: req.temperature }
       : {}),
@@ -432,26 +702,39 @@ export async function embedMany(
 // instead of hand-wiring provider+deployment+effort each time.
 
 export const profiles = {
-  /** Deterministic summarization / tagging. Cheap + fast. */
+  /** High-value summarization / tagging. DeepSeek V4 Pro handles both locales. */
   enrich: {
-    provider: "azure-openai" as const,
+    provider: "azure-deepseek" as const,
+    deployment: deepSeekProDeployment(),
     reasoningEffort: "low" as const,
   },
-  /** Editorial scoring. Reasoning-grade quality without pro's latency —
-   *  standard + high is ~3x faster than pro + medium at ~95% of the quality
-   *  on deterministic rubric tasks. */
+  /** High-value editorial scoring + recommendation rationale. */
   score: {
-    provider: "azure-openai" as const,
-    reasoningEffort: "high" as const,
+    provider: "azure-deepseek" as const,
+    deployment: deepSeekProDeployment(),
+    reasoningEffort: "low" as const,
   },
   /** M4 policy-iteration agent. Deepest reasoning. */
   agent: {
     provider: "azure-openai-pro" as const,
     reasoningEffort: "xhigh" as const,
   },
+  /** Chinese prose generation. Same DeepSeek Pro deployment as high-value EN. */
+  zhText: {
+    provider: "azure-deepseek" as const,
+    deployment: deepSeekProDeployment(),
+    reasoningEffort: "low" as const,
+  },
+  /** Low-value bilingual prose and scoring. Same Azure DeepSeek endpoint/key,
+   *  cheaper deployment, no separate English GPT-5.5 pass. */
+  fastText: {
+    provider: "azure-deepseek" as const,
+    deployment: deepSeekFlashDeployment(),
+    reasoningEffort: "low" as const,
+  },
 } satisfies Record<
   string,
-  { provider: LLMProvider; reasoningEffort: ReasoningEffort }
+  { provider: LLMProvider; deployment?: string; reasoningEffort: ReasoningEffort }
 >;
 
 // ── Diagnostics ─────────────────────────────────────────────────
@@ -472,9 +755,13 @@ export function availableProviders(): LLMProvider[] {
   }
   if (
     process.env.AZURE_OPENAI_PRO_API_KEY &&
-    process.env.AZURE_OPENAI_PRO_ENDPOINT
+    process.env.AZURE_OPENAI_PRO_ENDPOINT &&
+    process.env.AZURE_OPENAI_PRO_DEPLOYMENT
   ) {
     out.push("azure-openai-pro");
+  }
+  if (process.env.AZURE_DEEPSEEK_API_KEY && process.env.AZURE_DEEPSEEK_ENDPOINT) {
+    out.push("azure-deepseek");
   }
   return out;
 }

@@ -29,10 +29,10 @@ const fixtures: { verdict: "up" | "down"; note: string }[] = [
   { verdict: "up", note: "小米/百度/阿里发布新模型，该给高分，别歧视国产" },
   { verdict: "down", note: "Sora 已经不是热点了，这类 how-to 应该降权" },
   { verdict: "down", note: "CVE 逆向、底层调优之类的过于技术" },
-  { verdict: "down", note: "AI + 理论物理的论文，离我们受众太远" },
+  { verdict: "down", note: "AI + 理论物理的内容，离我们受众太远" },
   { verdict: "up", note: "Claude 电脑控制这类 agent 能力，现在节点应该 90+" },
   { verdict: "up", note: "" },
-  { verdict: "down", note: "学术向的 benchmark paper，不是大家关心的" },
+  { verdict: "down", note: "学术向 benchmark 内容，不是大家关心的" },
   { verdict: "down", note: "云厂商的「在 X Cloud 上用 AI」案例，纯广告" },
 ];
 

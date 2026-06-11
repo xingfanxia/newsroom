@@ -42,12 +42,9 @@ export type FeedQuery = {
    *  nav tab — operator hand-picks publishers worth surfacing even if the
    *  scorer's tier is low. */
   curatedOnly?: boolean;
-  /** Drop any source whose tags overlap this list. The home (热点聚合) feed
-   *  uses this to keep arxiv/paper content out of the news view — papers
-   *  live on the dedicated /papers tab. Postgres `&&` overlap operator. */
+  /** Drop any source whose tags overlap this list. Postgres `&&` overlap operator. */
   excludeSourceTags?: string[];
-  /** Inverse of excludeSourceTags — only return items whose source tags
-   *  overlap this list. Powers the /papers tab. */
+  /** Inverse of excludeSourceTags — only return items whose source tags overlap this list. */
   includeSourceTags?: string[];
   /** Event-aggregation view semantics (see docs/aggregation/DESIGN.md §7).
    *   'today'   = trending: events with firstSeenAt today OR latestMemberAt
@@ -534,4 +531,3 @@ export async function countFeaturedStories(q: FeedQuery = {}): Promise<number> {
     .where(buildFeedWhere(q));
   return row?.c ?? 0;
 }
-

@@ -12,8 +12,8 @@ info:
   description: |
     Anonymous read-only API for AX Radar (https://news.ax0x.ai) — AI intelligence
     radar with curated featured items, hand-picked editor stream (AX 严选),
-    research papers (arxiv/HF), multi-source event clustering, and daily
-    AI columns in 卡兹克 voice.
+    multi-source event clustering, and daily AI columns in a clear editorial
+    voice.
 
     **No auth required.** Per-IP rate limit + weak ETag.
     Mirrors the bearer-gated /api/v1/* surface read-only, with LLM-internal
@@ -30,7 +30,7 @@ servers:
     description: production
 tags:
   - name: feed
-    description: Browse the radar — featured / curated / papers / events
+    description: Browse the radar — featured / curated / events
   - name: items
     description: Full item detail
   - name: search
@@ -51,7 +51,7 @@ paths:
         Returns the importance-sorted feed of curated AI items. Each row is
         a singleton article OR a multi-source EVENT (use \`cluster_id\` +
         \`/events/{id}/members\` to drill in). Default returns today's hot
-        signal (\`tier=featured\`, \`view=today\`, papers excluded).
+        signal (\`tier=featured\`, \`view=today\`).
       parameters:
         - { name: tier, in: query, schema: { type: string, enum: [featured, p1, all], default: featured } }
         - { name: view, in: query, schema: { type: string, enum: [today, archive], default: archive } }
@@ -63,7 +63,7 @@ paths:
         - { name: source_group, in: query, schema: { type: string, enum: [vendor-official, media, newsletter, research, social, product, podcast, policy, market] } }
         - { name: source_kind, in: query, schema: { type: string, enum: [rss, atom, api, rsshub, scrape, x-api, aihot-api] } }
         - { name: curated_only, in: query, schema: { type: string, enum: ['true', 'false', '1', '0'] }, description: "Limit to AX 严选 / curated sources only" }
-        - { name: include_source_tags, in: query, schema: { type: string }, description: "Comma-separated tag list, e.g. 'arxiv,paper'" }
+        - { name: include_source_tags, in: query, schema: { type: string }, description: "Comma-separated source tag list" }
         - { name: exclude_source_tags, in: query, schema: { type: string } }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 40 } }
         - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
@@ -143,7 +143,7 @@ paths:
     get:
       tags: [sources]
       summary: Source catalog + live health
-      description: 59+ sources monitored — podcasts / newsletters / vendor blogs / research feeds / X handles. Use to answer "is X covered?" before filtering a feed query.
+      description: 52 sources monitored — podcasts / newsletters / vendor blogs / deep-report feeds / X handles. Use to answer "is X covered?" before filtering a feed query.
       responses:
         '200':
           description: OK
@@ -183,9 +183,10 @@ paths:
       tags: [daily]
       summary: Latest daily AI column
       description: |
-        卡兹克-voice daily column. Cron writes one per day at ~9pm PT covering
-        the prior 24h. Returns: title (≤20 字), theme tag (≤8 字), summary_md
-        (numbered 1-5 list with backlinks), narrative_md (2000-4000 字 long-form).
+        Daily AI column in a clear, friend-sharing editorial voice. Cron writes
+        one per day at ~9pm PT covering the prior 24h. Returns: title (≤20 字),
+        theme tag (≤8 字), summary_md (numbered 1-5 list with backlinks),
+        narrative_md (2500-4500 字 narrative).
       parameters:
         - { name: locale, in: query, schema: { type: string, enum: [zh, en], default: zh }, description: "Only zh is generated today" }
       responses:
@@ -450,10 +451,10 @@ components:
         generated_at: { type: string, format: date-time }
         window_start: { type: string, format: date-time }
         window_end: { type: string, format: date-time }
-        title: { type: string, nullable: true, description: "≤20 字 卡兹克-voice headline" }
+        title: { type: string, nullable: true, description: "≤20 字 headline" }
         theme_tag: { type: string, nullable: true, description: "≤8 字 day theme" }
         summary_md: { type: string, nullable: true, description: "Numbered 1-5 markdown list, 50-100 字 per entry" }
-        narrative_md: { type: string, nullable: true, description: "2000-4000 字 long-form narrative" }
+        narrative_md: { type: string, nullable: true, description: "2500-4500 字 narrative" }
         featured_item_ids: { type: array, items: { type: integer } }
         item_ids: { type: array, items: { type: integer } }
         story_count: { type: integer }

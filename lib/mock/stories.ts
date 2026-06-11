@@ -121,12 +121,12 @@ export const mockStories: Story[] = [
     featured: false,
     title: "ByteDance Doubao team publishes composable tool-agent framework",
     summary:
-      "MosaicAgent (arXiv preprint): tool calls decomposed into atomic ops scheduled over a graph. Reports +11% average lift over ReAct on ToolBench.",
+      "MosaicAgent breaks tool calls into atomic operations scheduled over a graph. The team reports +11% average lift over ReAct on ToolBench.",
     tags: ["Agent", "ByteDance", "Research release"],
     importance: 70,
     tier: "all",
     publishedAt: hoursAgo(60, 30),
-    url: "https://arxiv.org/abs/2604.00123",
+    url: "https://www.volcengine.com/blog/mosaic-agent",
     locale: "zh",
   },
 ];
