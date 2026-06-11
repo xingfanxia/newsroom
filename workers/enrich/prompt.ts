@@ -77,6 +77,132 @@ export const TOPICS = [
   "Commentary",
 ] as const;
 
+type Capability = (typeof CAPABILITIES)[number];
+type Topic = (typeof TOPICS)[number];
+
+function canonicalKey(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const key = value
+    .trim()
+    .toLowerCase()
+    .replace(/[_-]+/g, " ")
+    .replace(/\s*\/\s*/g, "/")
+    .replace(/\s+/g, " ");
+  return key || null;
+}
+
+function normalizeEnumArray<T extends string>(
+  value: unknown,
+  allowed: readonly T[],
+  aliases: Record<string, T>,
+): T[] {
+  const values = Array.isArray(value)
+    ? value
+    : typeof value === "string"
+      ? [value]
+      : [];
+  const exact = new Map(allowed.map((entry) => [canonicalKey(entry), entry]));
+  const out: T[] = [];
+  for (const raw of values) {
+    const key = canonicalKey(raw);
+    if (!key) continue;
+    const normalized = aliases[key] ?? exact.get(key);
+    if (normalized && !out.includes(normalized)) out.push(normalized);
+  }
+  return out;
+}
+
+const CAPABILITY_ALIASES: Record<string, Capability> = {
+  agents: "Agent",
+  "intelligent agent": "Agent",
+  "ai agent": "Agent",
+  智能体: "Agent",
+  检索: "RAG",
+  外挂资料库: "RAG",
+  推理: "Reasoning",
+  多模态: "Multimodal",
+  "image generation": "Vision",
+  "image model": "Vision",
+  image: "Vision",
+  "text rendering": "Vision",
+  "high resolution": "Vision",
+  图像生成: "Vision",
+  视觉: "Vision",
+  speech: "Audio",
+  voice: "Audio",
+  语音: "Audio",
+  音频: "Audio",
+  coding: "Code",
+  programming: "Code",
+  "code generation": "Code",
+  编程: "Code",
+  代码: "Code",
+  robot: "Robotics",
+  robots: "Robotics",
+  机器人: "Robotics",
+  embeddings: "Embedding",
+  vector: "Embedding",
+  向量: "Embedding",
+  "fine tuning": "Fine-tuning",
+  finetuning: "Fine-tuning",
+  微调: "Fine-tuning",
+  "inference optimization": "Inference-opt",
+  "speed improvement": "Inference-opt",
+  latency: "Inference-opt",
+  performance: "Inference-opt",
+  加速: "Inference-opt",
+  安全: "Safety",
+  对齐: "Alignment",
+  可解释性: "Interpretability",
+  eval: "Benchmarking",
+  evaluation: "Benchmarking",
+  benchmark: "Benchmarking",
+  基准: "Benchmarking",
+  工具: "Tools",
+  记忆: "Memory",
+};
+
+const TOPIC_ALIASES: Record<string, Topic> = {
+  "product announcement": "Product update",
+  "model update": "Product update",
+  "default model change": "Product update",
+  release: "Product update",
+  update: "Product update",
+  产品更新: "Product update",
+  模型更新: "Product update",
+  "research paper": "Research release",
+  paper: "Research release",
+  研究发布: "Research release",
+  financing: "Funding",
+  investment: "Funding",
+  融资: "Funding",
+  regulation: "Policy",
+  government: "Policy",
+  政策: "Policy",
+  监管: "Policy",
+  "open-source": "Open source",
+  opensource: "Open source",
+  开源: "Open source",
+  safety: "Safety/alignment",
+  alignment: "Safety/alignment",
+  安全: "Safety/alignment",
+  安全对齐: "Safety/alignment",
+  outage: "Incident",
+  "security incident": "Incident",
+  事故: "Incident",
+  collaboration: "Partnership",
+  合作: "Partnership",
+  hiring: "Personnel",
+  layoff: "Personnel",
+  人事: "Personnel",
+  eval: "Benchmark",
+  evaluation: "Benchmark",
+  基准: "Benchmark",
+  opinion: "Commentary",
+  analysis: "Commentary",
+  评论: "Commentary",
+};
+
 export const enrichSchema = z.object({
   titleZh: z
     .string()
@@ -100,8 +226,10 @@ export const enrichSchema = z.object({
     ),
   tags: z.object({
     capabilities: z
-      .array(z.enum(CAPABILITIES))
-      .max(3)
+      .preprocess(
+        (value) => normalizeEnumArray(value, CAPABILITIES, CAPABILITY_ALIASES),
+        z.array(z.enum(CAPABILITIES)).max(3),
+      )
       .describe(
         `Up to 3 canonical English capability IDs from: ${CAPABILITIES.join(", ")}. Empty array if none apply. Do NOT output Chinese translations — the UI localizes these for display.`,
       ),
@@ -112,8 +240,10 @@ export const enrichSchema = z.object({
         "Up to 3 named organizations or people mentioned. Use the most common English rendering when it exists (Anthropic / OpenAI / Xiaomi / ByteDance / Dario Amodei), otherwise original form.",
       ),
     topics: z
-      .array(z.enum(TOPICS))
-      .max(3)
+      .preprocess(
+        (value) => normalizeEnumArray(value, TOPICS, TOPIC_ALIASES),
+        z.array(z.enum(TOPICS)).max(3),
+      )
       .describe(
         `Up to 3 canonical English topic IDs from: ${TOPICS.join(", ")}. Do NOT output Chinese — UI localizes.`,
       ),

@@ -47,9 +47,29 @@ export type EnrichReport = {
   errors: { itemId: number; stage: string; code: string }[];
 };
 
-export async function runEnrichBatch(): Promise<EnrichReport> {
+export type EnrichBatchOptions = {
+  limit?: number;
+  concurrency?: number;
+  windowStart?: Date;
+  windowEnd?: Date;
+};
+
+export async function runEnrichBatch(
+  opts: EnrichBatchOptions = {},
+): Promise<EnrichReport> {
   const started = Date.now();
   const client = db();
+  const filters = [isNull(items.enrichedAt)];
+  if (opts.windowStart) {
+    filters.push(
+      sql`${items.publishedAt} >= ${opts.windowStart.toISOString()}::timestamptz`,
+    );
+  }
+  if (opts.windowEnd) {
+    filters.push(
+      sql`${items.publishedAt} < ${opts.windowEnd.toISOString()}::timestamptz`,
+    );
+  }
 
   // Priority order:
   //   1. items that were previously tiered non-excluded (featured/p1/all)
@@ -61,7 +81,7 @@ export async function runEnrichBatch(): Promise<EnrichReport> {
   const pending = await client
     .select()
     .from(items)
-    .where(isNull(items.enrichedAt))
+    .where(and(...filters))
     .orderBy(
       sql`CASE
         WHEN ${items.tier} IN ('featured','p1','all') THEN 0
@@ -71,7 +91,7 @@ export async function runEnrichBatch(): Promise<EnrichReport> {
       END`,
       desc(items.publishedAt),
     )
-    .limit(MAX_PER_RUN);
+    .limit(opts.limit ?? MAX_PER_RUN);
 
   if (pending.length === 0) {
     return {
@@ -93,7 +113,7 @@ export async function runEnrichBatch(): Promise<EnrichReport> {
     .where(eq(sources.neverExclude, true));
   const neverExcludeSet = new Set(neverExcludeRows.map((r) => r.id));
 
-  const limit = pLimit(CONCURRENCY);
+  const limit = pLimit(opts.concurrency ?? CONCURRENCY);
   const errors: { itemId: number; stage: string; code: string }[] = [];
   let enriched = 0;
 

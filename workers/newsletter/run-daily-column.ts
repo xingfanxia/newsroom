@@ -35,7 +35,7 @@ const dailyColumnSchema = z.object({
     .string()
     .min(2500)
     .describe("5-8 个 ## 小节, 每节 250-700 字，像给朋友解释当天重点"),
-  featured_item_ids: z.array(z.number()).min(1).transform((ids) => ids.slice(0, 3)),
+  featured_item_ids: z.array(z.number()).transform((ids) => ids.slice(0, 3)),
   theme_tag: z.string().min(1).transform((s) =>
     s.length > 30 ? `${s.slice(0, 27)}...` : s,
   ),
@@ -114,6 +114,10 @@ export async function runDailyColumn(
   const title = normalizeDailyOutputText(draft.title);
   const summaryMd = normalizeDailyOutputText(draft.summary_md);
   const narrativeMd = splitDenseParagraphs(normalizeDailyOutputText(draft.narrative_md));
+  const featuredItemIds = normalizeFeaturedItemIds(
+    draft.featured_item_ids,
+    pool.rows,
+  );
   const qc = runColumnSelfCheck({
     title,
     summary_md: summaryMd,
@@ -130,7 +134,7 @@ export async function runDailyColumn(
       columnTitle: title,
       columnSummaryMd: summaryMd,
       columnNarrativeMd: narrativeMd,
-      columnFeaturedItemIds: draft.featured_item_ids,
+      columnFeaturedItemIds: featuredItemIds,
       columnThemeTag: draft.theme_tag,
       itemIds: pool.rows.map((r) => r.id),
       storyCount: pool.rows.length,
@@ -143,7 +147,7 @@ export async function runDailyColumn(
         columnTitle: title,
         columnSummaryMd: summaryMd,
         columnNarrativeMd: narrativeMd,
-        columnFeaturedItemIds: draft.featured_item_ids,
+        columnFeaturedItemIds: featuredItemIds,
         columnThemeTag: draft.theme_tag,
         itemIds: pool.rows.map((r) => r.id),
         storyCount: pool.rows.length,
@@ -172,6 +176,19 @@ export async function runDailyColumn(
     qcHits: qc.hits.length,
     durationMs: Date.now() - started,
   };
+}
+
+export function normalizeFeaturedItemIds(
+  modelIds: number[],
+  rows: Pick<SelectedRow, "id">[],
+): number[] {
+  const poolIds = new Set(rows.map((r) => r.id));
+  const selected = modelIds
+    .filter((id) => poolIds.has(id))
+    .filter((id, index, ids) => ids.indexOf(id) === index)
+    .slice(0, 3);
+  if (selected.length > 0) return selected;
+  return rows.slice(0, 3).map((r) => r.id);
 }
 
 /**
