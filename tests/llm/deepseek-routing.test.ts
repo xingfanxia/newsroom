@@ -43,6 +43,18 @@ describe("Azure DeepSeek routing", () => {
     expect(llmSrc).not.toMatch(/enrich:\s*\{[\s\S]*?provider:\s*"azure-openai"/);
     expect(llmSrc).not.toMatch(/score:\s*\{[\s\S]*?provider:\s*"azure-openai"/);
   });
+
+  it("normalizes legacy AZURE_OPENAI_API_VERSION=v1 before embedding calls", () => {
+    expect(llmSrc).toContain("normalizeAzureApiVersion");
+    expect(llmSrc).toContain('raw === "v1"');
+    expect(llmSrc).toContain('"2024-12-01-preview"');
+  });
+
+  it("sets a bounded timeout on LLM and embedding provider calls", () => {
+    expect(llmSrc).toContain("LLM_CALL_TIMEOUT_MS");
+    expect(llmSrc).toContain("llmCallTimeoutMs()");
+    expect(llmSrc).toContain("timeout: llmCallTimeoutMs()");
+  });
 });
 
 describe("Chinese-only schemas", () => {

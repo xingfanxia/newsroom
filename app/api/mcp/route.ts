@@ -440,7 +440,7 @@ function buildServer(user: SessionUser): McpServer {
       description:
         "Return recent LLM cost + token usage for a time window. Useful for chatty agents to budget check before firing a batch. Fields: calls, cost_usd, input/output/reasoning tokens, plus per-task breakdown.",
       inputSchema: {
-        window: z.enum(["today", "week", "month"]).optional(),
+        window: z.enum(["today", "week", "month", "all"]).optional(),
       },
     },
     async ({ window }) => {

@@ -1,5 +1,30 @@
 # AX's AI RADAR — Current Handoff
 
+## 2026-06-11 — Enrich spend guardrails, usage all-time/model labels
+
+Current production direction:
+- `/admin/usage` and `/api/v1/usage/summary` report `today`, `week`, `month`, and `all` windows.
+- Task spend rows include per-model/provider breakdowns; recent calls show model labels.
+- Enrich workers must claim rows before LLM calls. Do not reintroduce plain `WHERE enriched_at IS NULL LIMIT n` worker selection for spend-bearing work.
+
+Incident root cause:
+- Backfill plus the 15-minute enrich cron left overlapping workers selecting the same `enriched_at IS NULL` rows. The final `UPDATE ... WHERE enriched_at IS NULL` kept storage idempotent, but duplicate workers still paid for repeated `score`, `enrich`, and `embed` calls.
+- Stuck rows amplified the issue: DeepSeek schema overflows and a local Azure embedding API-version drift caused retry loops before rows could become enriched.
+
+Shipped code changes:
+- Added `items.enrich_claimed_at`, `items.enrich_attempts`, and `items.enrich_error` plus a manual migration.
+- `runEnrichBatch` now uses `FOR UPDATE SKIP LOCKED`, stale-claim retry, max attempts, failure recording, and lower default per-tick caps.
+- Prompt schemas now truncate/cap overlong arrays and rationale strings instead of failing after successful model output.
+- Azure embedding API version is normalized when env accidentally contains `v1`; LLM generate/embed calls have a default 90s timeout.
+- Usage admin/API/MCP gained all-time totals and model breakdowns.
+
+Verification:
+- Manual DB migration applied to production database and columns verified.
+- Focused test suite for enrich claim locking, prompt schema tolerance, usage stats, DeepSeek routing, cron split, and daily-column tests passed.
+- `bun run build` passed.
+- Targeted ESLint over touched files and `git diff --check` passed.
+- Full `bun run lint` still has unrelated pre-existing failures outside this change set.
+
 ## 2026-06-10 — DeepSeek treatment rebase, paper retirement, cluster cleanup
 
 Current production direction:

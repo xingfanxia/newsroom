@@ -1,5 +1,5 @@
 import pLimit from "p-limit";
-import { and, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items, sources } from "@/db/schema";
 import type { Item } from "@/db/schema";
@@ -32,12 +32,13 @@ import { treatmentForScore, type EnrichTreatment } from "./treatment";
 // because each worker waited on a 20-40s commentary call. It's now a
 // separate worker (workers/enrich/commentary.ts) that runs in parallel
 // at its own concurrency, and retries independently.
-// Azure standard tier is at 10M TPM / 100K RPM — well above anything we
-// generate. Bottleneck is per-item wall-clock (score stage is ~30s w/ high
-// reasoning); fan out widely so one cron tick drains the backlog instead
-// of dripping 4 items at a time.
-const CONCURRENCY = 40;
-const MAX_PER_RUN = 200;
+// Keep cron throughput bounded. Backfills can opt into higher values via
+// EnrichBatchOptions, but the scheduled worker should not be able to spend
+// thousands of LLM calls in one burst.
+const CONCURRENCY = 10;
+const MAX_PER_RUN = 60;
+const CLAIM_STALE_MINUTES = 45;
+const MAX_ATTEMPTS = 3;
 
 export type EnrichReport = {
   processed: number;
@@ -50,6 +51,7 @@ export type EnrichReport = {
 export type EnrichBatchOptions = {
   limit?: number;
   concurrency?: number;
+  maxAttempts?: number;
   windowStart?: Date;
   windowEnd?: Date;
 };
@@ -59,39 +61,7 @@ export async function runEnrichBatch(
 ): Promise<EnrichReport> {
   const started = Date.now();
   const client = db();
-  const filters = [isNull(items.enrichedAt)];
-  if (opts.windowStart) {
-    filters.push(
-      sql`${items.publishedAt} >= ${opts.windowStart.toISOString()}::timestamptz`,
-    );
-  }
-  if (opts.windowEnd) {
-    filters.push(
-      sql`${items.publishedAt} < ${opts.windowEnd.toISOString()}::timestamptz`,
-    );
-  }
-
-  // Priority order:
-  //   1. items that were previously tiered non-excluded (featured/p1/all)
-  //      and are now unenriched — these are the curated cards readers see
-  //      AND we usually reset them deliberately to re-run with new prompts.
-  //   2. items that have bodyMd (Jina already fetched) — they'll benefit
-  //      from a richer enrichment than a title-only item.
-  //   3. most-recent-first by publishedAt.
-  const pending = await client
-    .select()
-    .from(items)
-    .where(and(...filters))
-    .orderBy(
-      sql`CASE
-        WHEN ${items.tier} IN ('featured','p1','all') THEN 0
-        WHEN ${items.bodyMd} IS NOT NULL THEN 1
-        WHEN ${items.tier} = 'excluded' THEN 3
-        ELSE 2
-      END`,
-      desc(items.publishedAt),
-    )
-    .limit(opts.limit ?? MAX_PER_RUN);
+  const pending = await claimPendingEnrichItems(client, opts);
 
   if (pending.length === 0) {
     return {
@@ -132,6 +102,7 @@ export async function runEnrichBatch(
                 : "unknown";
           const stage =
             (err as { stage?: string } | undefined)?.stage ?? "unknown";
+          await markEnrichFailure(item.id, stage, code, err);
           errors.push({ itemId: item.id, stage, code });
         }
       }),
@@ -145,6 +116,91 @@ export async function runEnrichBatch(
     durationMs: Date.now() - started,
     errors,
   };
+}
+
+async function claimPendingEnrichItems(
+  client: ReturnType<typeof db>,
+  opts: EnrichBatchOptions,
+): Promise<Item[]> {
+  const limit = opts.limit ?? MAX_PER_RUN;
+  const maxAttempts = opts.maxAttempts ?? MAX_ATTEMPTS;
+  const filters = [
+    sql`${items.enrichedAt} IS NULL`,
+    sql`coalesce(${items.enrichAttempts}, 0) < ${maxAttempts}`,
+    sql`(
+      ${items.enrichClaimedAt} IS NULL
+      OR ${items.enrichClaimedAt} < now() - (${CLAIM_STALE_MINUTES} * interval '1 minute')
+    )`,
+  ];
+  if (opts.windowStart) {
+    filters.push(
+      sql`${items.publishedAt} >= ${opts.windowStart.toISOString()}::timestamptz`,
+    );
+  }
+  if (opts.windowEnd) {
+    filters.push(
+      sql`${items.publishedAt} < ${opts.windowEnd.toISOString()}::timestamptz`,
+    );
+  }
+
+  // Priority order:
+  //   1. items that were previously tiered non-excluded (featured/p1/all)
+  //      and are now unenriched — these are the curated cards readers see
+  //      AND we usually reset them deliberately to re-run with new prompts.
+  //   2. items that have bodyMd (Jina already fetched) — they'll benefit
+  //      from a richer enrichment than a title-only item.
+  //   3. most-recent-first by publishedAt.
+  const claimedRows = await client.execute(sql`
+    WITH candidates AS (
+      SELECT ${items.id} AS id
+      FROM ${items}
+      WHERE ${and(...filters)}
+      ORDER BY
+        CASE
+          WHEN ${items.tier} IN ('featured','p1','all') THEN 0
+          WHEN ${items.bodyMd} IS NOT NULL THEN 1
+          WHEN ${items.tier} = 'excluded' THEN 3
+          ELSE 2
+        END,
+        ${items.publishedAt} DESC
+      LIMIT ${limit}
+      FOR UPDATE SKIP LOCKED
+    ),
+    claimed AS (
+      UPDATE ${items}
+      SET
+        enrich_claimed_at = now(),
+        enrich_attempts = coalesce(enrich_attempts, 0) + 1,
+        enrich_error = NULL
+      WHERE ${items.id} IN (SELECT id FROM candidates)
+      RETURNING ${items.id} AS id
+    )
+    SELECT id FROM claimed
+  `);
+
+  const ids = claimedRows.map((r) => Number((r as { id: number }).id));
+  if (ids.length === 0) return [];
+
+  const rows = await client.select().from(items).where(inArray(items.id, ids));
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  return ids.map((id) => byId.get(id)).filter((row): row is Item => Boolean(row));
+}
+
+async function markEnrichFailure(
+  itemId: number,
+  stage: string,
+  code: string,
+  err: unknown,
+): Promise<void> {
+  const message = err instanceof Error ? err.message : String(err);
+  const enrichError = `${stage}:${code}: ${message}`.slice(0, 500);
+  await db()
+    .update(items)
+    .set({
+      enrichClaimedAt: new Date(),
+      enrichError,
+    })
+    .where(and(eq(items.id, itemId), isNull(items.enrichedAt)));
 }
 
 type PolicyT = Awaited<ReturnType<typeof loadPolicy>>;
@@ -202,6 +258,9 @@ async function enrichOne(
       reasoningEn: scored.reasoningEn,
       embedding,
       enrichedAt: new Date(),
+      enrichClaimedAt: null,
+      enrichAttempts: 0,
+      enrichError: null,
       policyVersion: policy.version,
     })
     .where(and(eq(items.id, item.id), isNull(items.enrichedAt)));

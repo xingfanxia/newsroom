@@ -17,7 +17,12 @@ async function main() {
 
   const updated = await c
     .update(items)
-    .set({ enrichedAt: null })
+    .set({
+      enrichedAt: null,
+      enrichClaimedAt: null,
+      enrichAttempts: 0,
+      enrichError: null,
+    })
     .where(isNotNull(items.enrichedAt))
     .returning({ id: items.id });
   console.log("reset rows:", updated.length);

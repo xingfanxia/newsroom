@@ -6,14 +6,14 @@
  * before spending real money.
  *
  * Fields are all lifetime-to-date counters scoped to the specified window.
- * Window = today | week | month (default week).
+ * Window = today | week | month | all (default week).
  */
 import { z } from "zod";
 import { requireApiToken } from "@/lib/auth/api-token";
 import { breakdownByTask, totalsByWindow } from "@/lib/llm/stats";
 
 const querySchema = z.object({
-  window: z.enum(["today", "week", "month"]).optional().default("week"),
+  window: z.enum(["today", "week", "month", "all"]).optional().default("week"),
 });
 
 export async function GET(req: Request) {
@@ -48,6 +48,12 @@ export async function GET(req: Request) {
         task: t.task,
         calls: t.calls,
         cost_usd: t.costUsd,
+        models: t.models.map((m) => ({
+          provider: m.provider,
+          model: m.model,
+          calls: m.calls,
+          cost_usd: m.costUsd,
+        })),
       })),
     });
   } catch (err) {

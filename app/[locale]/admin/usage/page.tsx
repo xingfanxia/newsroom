@@ -14,13 +14,14 @@ import {
 
 export const dynamic = "force-dynamic";
 
-const RANGES = ["today", "week", "month"] as const;
+const RANGES = ["today", "week", "month", "all"] as const;
 type Range = (typeof RANGES)[number];
 
 const RANGE_LABEL: Record<Range, { en: string; zh: string }> = {
   today: { en: "today", zh: "今日" },
   week: { en: "past 7d", zh: "近 7 天" },
   month: { en: "past 30d", zh: "近 30 天" },
+  all: { en: "all-time", zh: "全量" },
 };
 
 const MONTHLY_CAP_USD = Number(process.env.USAGE_MONTHLY_CAP_USD ?? 1000);
@@ -28,9 +29,9 @@ const MONTHLY_CAP_USD = Number(process.env.USAGE_MONTHLY_CAP_USD ?? 1000);
 /**
  * /admin/usage — full LLM-spend view matching the design demo.
  *
- * Rendered server-side with `?range=today|week|month` driving the selected
+ * Rendered server-side with `?range=today|week|month|all` driving the selected
  * window. All data backed by the real llm_usage table: totals for today/
- * week/month, cost by task with share %, cost by model, 30d daily-spend
+ * week/month/all, cost by task with share %, cost by model, 30d daily-spend
  * sparkline, and the 25 most recent calls.
  */
 export default async function UsagePage({
@@ -47,12 +48,13 @@ export default async function UsagePage({
     ? (sp.range as Range)
     : "week";
 
-  const [selected, today, week, month, byTask, byModel, recent, daily, stats] =
+  const [selected, today, week, month, all, byTask, byModel, recent, daily, stats] =
     await Promise.all([
       totalsByWindow(range),
       totalsByWindow("today").catch(() => null),
       totalsByWindow("week").catch(() => null),
       totalsByWindow("month").catch(() => null),
+      totalsByWindow("all").catch(() => null),
       breakdownByTask(range).catch(() => []),
       breakdownByModel(range).catch(() => []),
       recentCalls(25).catch(() => []),
@@ -313,18 +315,19 @@ export default async function UsagePage({
         </div>
 
         {/* Quick totals across windows */}
-        {today && week && month && (
+        {today && week && month && all && (
           <div
             style={{
               marginTop: 16,
               display: "grid",
-              gridTemplateColumns: "repeat(3, 1fr)",
+              gridTemplateColumns: "repeat(4, 1fr)",
               gap: 10,
             }}
           >
             <MiniSpend label={zh ? "今日" : "today"} totals={today} />
             <MiniSpend label={zh ? "近 7 天" : "7d"} totals={week} />
             <MiniSpend label={zh ? "近 30 天" : "30d"} totals={month} />
+            <MiniSpend label={zh ? "全量" : "all-time"} totals={all} />
           </div>
         )}
 
@@ -353,6 +356,7 @@ export default async function UsagePage({
                 <thead>
                   <tr>
                     <th>{zh ? "任务" : "task"}</th>
+                    <th>{zh ? "模型" : "model"}</th>
                     <th className="right">{zh ? "次数" : "calls"}</th>
                     <th className="right">{zh ? "输入" : "input"}</th>
                     <th className="right">{zh ? "输出" : "output"}</th>
@@ -363,7 +367,7 @@ export default async function UsagePage({
                 <tbody>
                   {byTask.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="muted" style={{ padding: 20 }}>
+                      <td colSpan={7} className="muted" style={{ padding: 20 }}>
                         {zh ? "窗口内无活动" : "no activity in window"}
                       </td>
                     </tr>
@@ -379,6 +383,17 @@ export default async function UsagePage({
                             }}
                           >
                             {t.task ?? "untagged"}
+                          </td>
+                          <td
+                            className="muted"
+                            style={{
+                              fontFamily: "var(--font-mono)",
+                              fontSize: 10.5,
+                              maxWidth: 180,
+                              whiteSpace: "normal",
+                            }}
+                          >
+                            {formatTaskModels(t.models)}
                           </td>
                           <td className="right">{formatNumber(t.calls)}</td>
                           <td className="right">
@@ -488,6 +503,7 @@ export default async function UsagePage({
                   <tr>
                     <th>{zh ? "时间" : "time"}</th>
                     <th>{zh ? "任务" : "task"}</th>
+                    <th>{zh ? "模型" : "model"}</th>
                     <th className="right">in</th>
                     <th className="right">out</th>
                     <th className="right">dur</th>
@@ -497,7 +513,7 @@ export default async function UsagePage({
                 <tbody>
                   {recent.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="muted" style={{ padding: 20 }}>
+                      <td colSpan={7} className="muted" style={{ padding: 20 }}>
                         {zh ? "无调用记录" : "no calls recorded yet"}
                       </td>
                     </tr>
@@ -511,6 +527,17 @@ export default async function UsagePage({
                           <span className={`pill-s ${taskPillColor(c.task)}`}>
                             {c.task ?? "—"}
                           </span>
+                        </td>
+                        <td
+                          className="muted"
+                          style={{
+                            fontFamily: "var(--font-mono)",
+                            fontSize: 10,
+                            maxWidth: 150,
+                            whiteSpace: "normal",
+                          }}
+                        >
+                          {c.model}
                         </td>
                         <td className="right">
                           <span className="muted">
@@ -760,6 +787,16 @@ function formatNumber(n: number): string {
   if (n < 1000) return n.toString();
   if (n < 1_000_000) return `${(n / 1000).toFixed(1)}K`;
   return `${(n / 1_000_000).toFixed(2)}M`;
+}
+
+function formatTaskModels(
+  models: { model: string; calls: number; provider: string }[],
+): string {
+  if (models.length === 0) return "—";
+  return models
+    .slice(0, 2)
+    .map((m) => `${m.model} ${formatNumber(m.calls)}`)
+    .join(" · ");
 }
 
 function formatShortDate(iso: string): string {

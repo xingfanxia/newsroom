@@ -82,7 +82,9 @@ Converts `raw_items` → `items`:
 - Canonical URL resolution (follows redirects, strips UTM).
 
 ### 2.4 Enricher (LLM)
-Per item, parallel LLM calls with a 30s budget. The pipeline now chooses a treatment tier before calling the model:
+Before spending LLM tokens, each worker atomically claims pending rows in Postgres (`FOR UPDATE SKIP LOCKED`) and records `enrich_claimed_at`, `enrich_attempts`, and `enrich_error`. Claims become retryable after the stale window, but rows stop after the max-attempt cap until an operator reset clears those fields. This prevents overlapping cron ticks or manual backfills from repeatedly charging the same stuck item.
+
+Per item, parallel LLM calls run with a bounded per-call timeout (default 90s; `LLM_CALL_TIMEOUT_MS` override). The pipeline now chooses a treatment tier before calling the model:
 
 1. **Treatment** — `workers/enrich/treatment.ts` classifies items as `high` or `fast`.
    - `high`: featured/P1 or importance >= 72, routed to DeepSeek V4 Pro.
@@ -98,7 +100,7 @@ Per item, parallel LLM calls with a 30s budget. The pipeline now chooses a treat
 4. **Source-kind** — e.g., `官网动态 (RSS·排除企业/客户案例)`, `深度报告 (独立博客/研究报告)` — classified once per source, cached.
 5. **Embedding** — Azure OpenAI `text-embedding-3-large`; store as pgvector column for later clustering.
 
-All enrichments cached by `(item_id, enricher_version)` so enricher-version bumps re-run only once globally.
+All enrichments cached by `(item_id, enricher_version)` so enricher-version bumps re-run only once globally. Operator reset scripts clear the claim fields only when intentionally requeueing items.
 
 ### 2.5 Scorer (LLM, policy-driven)
 Separate pass after enrich, because policy can change without re-enriching:
@@ -233,6 +235,7 @@ Seed watchlist (v0): `@sama`, `@AndrewYNg`, `@ylecun`, `@drjimfan`, `@karpathy`,
 - **LLM SDK choice**: original plan assumed direct vendor SDKs — migrated to **Vercel AI SDK v6** + `@ai-sdk/{anthropic,google,azure,openai}` for unified `generateText` / `generateObject` / `embed` across providers.
 - **Prompt injection defense** (not in original §2): XML-fence untrusted content + system-prompt framing + control-sequence neutralization (added per security review).
 - **Cron timing**: enrich every 15 min, cluster every 30 min, catch-up normalize every 6 h.
+- **Enrich claim/backoff guardrail (2026-06-11)**: the enrich cron now claims work in Postgres before LLM calls and stores retry state on `items`. This closes the gap where overlapping cron/manual backfill runs could all select the same `enriched_at IS NULL` rows and waste spend even if the final write was idempotent.
 - **AI HOT integration (2026-05-08, voice refreshed 2026-06-10)**: added pre-curated source `aihot-selected` (kind `aihot-api`) ingesting hourly from https://aihot.virxact.com; merge their structured `/api/public/daily` report into our daily column generator as a must-cover baseline (`newsletters.aihot_daily_payload` + `aihot_daily_date`). Voice prompts now target a friend-sharing style: plain, useful, accurate, and low on AI/memo flavor. Full design: `docs/aihot-integration/PLAN.md`. New env vars: `AIHOT_API_BASE_URL` + `AIHOT_API_USER_AGENT` (both with safe defaults). Operator scripts: `scripts/ops/backfill-style.ts` (cost-bounded re-enrich) + `scripts/ops/import-aihot-daily-history.ts` (180-day daily history import).
 - **Tier-gated commentary (2026-05-08, PR #34)**: Stage-4 commentary now branches by tier instead of running the full schema for every non-excluded item. `editor_note_*` (一句话点评) runs for every non-excluded item / event; `editor_analysis_*` **only** runs for tier `featured` / `p1`. Tier `all` items take the lighter `commentaryNoteSchema` LLM call (`COMMENTARY_NOTE_ONLY_SYSTEM`, ~85% smaller output). Cluster commentary path also extended to cover `event_tier='all'`. Worker dispatch in `workers/enrich/commentary.ts` + `workers/cluster/commentary.ts`; backfill mirror in `scripts/ops/backfill-style.ts`.
 - **Editorial taxonomy rebrand + home default flip (2026-05-08, PR #35)**: `editor_analysis_*` rebranded `深度解读` → `锐评` with 200 字 hard cap (was 300-500 字 / 800 ceiling); `summary_*` tightened from 120-220 字 multi-sentence to 50-90 字 一句话总结; UI label `编辑点评` → `一句话点评`. Three layered editorial outputs now have crisp role separation — see policy spec `modules/feed/runtime/policy/skills/editorial.skill.md` § "Editorial taxonomy". Concurrently the homepage default flipped from multi-day "3 stories per day" digest to today's hot events (importance-sorted hot-window); daily digest reachable via `?view=daily` toggle in HomeFilters. `maxTokens` dropped 6144 → 3072 in commentary workers (200-字 fits comfortably). DB columns unchanged — only prompts, UI labels, and worker token budgets shifted. Editorial policy bumped to v2 in `policy_versions` table to make the new commentary_at threshold actionable for backfills.

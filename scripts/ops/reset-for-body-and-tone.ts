@@ -44,7 +44,12 @@ async function main() {
   // 2. enriched_at reset — triggers full re-pipeline (enrich+embed+score+commentary)
   const enrichedReset = await c
     .update(items)
-    .set({ enrichedAt: null })
+    .set({
+      enrichedAt: null,
+      enrichClaimedAt: null,
+      enrichAttempts: 0,
+      enrichError: null,
+    })
     .where(isNotNull(items.enrichedAt))
     .returning({ id: items.id });
   console.log("enriched_at reset:", enrichedReset.length);

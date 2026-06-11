@@ -33,8 +33,8 @@ AX's AI RADAR is a dashboard for editors and analysts who cover the AI industry.
 | `/{locale}/sources` | 信源 — grouped tables or card grid (`?view=cards`) |
 | `/{locale}/podcasts` | 播客 · 视频 — podcast/video feed with per-channel filter pills |
 | `/{locale}/agents` | Agent 接入 — 3-tab integration page (Skill / RSS / REST API). See [`docs/agent-access/`](./docs/agent-access/) |
-| `/{locale}/admin/usage` | 用量 — LLM spend cards (today / 7d / 30d) |
-| `/{locale}/admin/system` | 系统 — Detailed LLM cost + recent calls |
+| `/{locale}/admin/usage` | 用量 — LLM spend cards (today / 7d / 30d / all-time), task/model breakdowns, and recent-call model labels |
+| `/{locale}/admin/system` | 系统 — Source health, queues, cron status, and recent errors |
 | `/{locale}/admin/policy` | 精选策略 — **editable** markdown with live preview; commits new version |
 | `/{locale}/admin/iterations` | 策略迭代 — metric cards + agent console + diff preview + **version timeline** |
 | `/{locale}/admin/users` | 用户 (coming soon) |
@@ -60,7 +60,7 @@ Terminal-forward command-center aesthetic — green/orange/blue accents on a nea
 
 ### Data ingestion & AI pipeline
 
-Blueprint in [`docs/architecture/ingestion.md`](./docs/architecture/ingestion.md). Source catalog in [`lib/sources/catalog.ts`](./lib/sources/catalog.ts). Editorial policy lives at [`modules/feed/runtime/policy/skills/editorial.skill.md`](./modules/feed/runtime/policy/skills/editorial.skill.md).
+Blueprint in [`docs/architecture/ingestion.md`](./docs/architecture/ingestion.md). Source catalog in [`lib/sources/catalog.ts`](./lib/sources/catalog.ts). Editorial policy lives at [`modules/feed/runtime/policy/skills/editorial.skill.md`](./modules/feed/runtime/policy/skills/editorial.skill.md). Enrichment workers claim rows in Postgres before spending LLM tokens and cap retry attempts, so overlapping cron/backfill runs do not repeatedly process the same stuck item.
 
 ### Local setup
 
@@ -86,6 +86,7 @@ See [`.env.example`](./.env.example) for the complete template. On Vercel, most 
 - **Azure OpenAI chat compatibility** (`AZURE_OPENAI_CHAT_*`) — points at the Responses API deployment `gpt-5.5-standard`; retained for compatibility/probes.
 - **Azure DeepSeek** (`AZURE_DEEPSEEK_*`) — primary prose/scoring provider, with `DeepSeek-V4-Pro` and `DeepSeek-V4-Flash` deployments.
 - **Task routing** (`AIHOT_ENRICH_PROVIDER` / `_SCORE_PROVIDER` / `_EMBED_PROVIDER`) — enrich/score default to `azure-deepseek`; embeddings default to `azure-openai`.
+- **LLM safety knobs** (`LLM_CALL_TIMEOUT_MS`) — optional per-call timeout override; default is 90s.
 - **Fallback providers** (`ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `TAVILY_API_KEY`) — wired but unused by M2.
 
 ### Roadmap status
@@ -105,6 +106,7 @@ See [`.env.example`](./.env.example) for the complete template. On Vercel, most 
 | **AI HOT integration + daily voice rebase** | New `aihot-api` source (hourly pre-curated pool from https://aihot.virxact.com) + AI HOT structured daily merged into column generator + friend-sharing daily/commentary voice + cost-bounded backfill scripts | ✅ shipped (2026-05-08, voice refreshed 2026-06-10) |
 | **Tier-gated commentary** | `editor_note_*` (一句话点评) runs for every non-excluded item / event; `editor_analysis_*` only for tier ∈ (featured, p1) — tier 'all' takes a note-only LLM call via `commentaryNoteSchema` (~85% smaller output) | ✅ shipped (2026-05-08) |
 | **DeepSeek treatment rebase + paper retirement** | DeepSeek V4 Pro/Flash importance-tiered treatment, friend-readable zh/en prose prompts, Chinese/daily backfills, and complete retirement of paper sources/routes/RSS/MCP/DB rows | ✅ shipped (2026-06-10) |
+| **LLM usage guardrails + observability** | Enrich claim/backoff fields prevent duplicate cron/backfill LLM spend; usage admin/API now include all-time totals plus task/model breakdowns and recent-call model labels | ✅ shipped (2026-06-11) |
 | **Editorial taxonomy rebrand** | 深度解读 → 锐评 (200 字 cap, was 300-500 字 / 800 ceiling); summary tightened to 50-90 字 一句话总结; UI labels rebranded (编辑点评 → 一句话点评). Home page default flipped from multi-day "3 stories per day" digest to today's hot events; daily digest reachable via `?view=daily` toggle | ✅ shipped (2026-05-08) |
 | **Agent access — public mirror** | Anonymous `/api/public/*` mirror (8 read-only endpoints: feed / items / search / sources / events / daily / dailies) with IP rate limit + weak ETag + CORS. Discovery: hosted `/skill.md` (SKILL.md standard) + `/openapi.yaml` (OpenAPI 3.1) + `/robots.txt` + `/sitemap.xml`. Bilingual `/{locale}/agents` page with 3-tab UI (Skill / RSS / REST API). Bearer-gated `/api/v1/*` + `/api/mcp` retained for write actions + audit | ✅ shipped (2026-05-13, PR #36) |
 
@@ -135,7 +137,7 @@ AX 的 AI 雷达是一款面向 AI 行业编辑和分析师的情报工作台，
 | `/{locale}/sources` | 信源 — 分组表格或卡片网格（`?view=cards`） |
 | `/{locale}/podcasts` | 播客 · 视频 — 节目流 + 频道过滤 |
 | `/{locale}/agents` | Agent 接入 — 3-tab 集成页面（Skill / RSS / REST API），见 [`docs/agent-access/`](./docs/agent-access/) |
-| `/{locale}/admin/usage` | 用量 — LLM 花费卡片（今日 / 7 天 / 30 天） |
+| `/{locale}/admin/usage` | 用量 — LLM 花费卡片（今日 / 7 天 / 30 天 / 全量）、任务/模型拆分、最近调用模型 |
 | `/{locale}/admin/iterations` | 策略迭代 — 指标卡片 + Agent 控制台 + Diff 预览 + **版本时间轴** |
 | `/{locale}/admin/policy` | 精选策略 — **可编辑** markdown，带实时预览，可直接提交新版本 |
 
@@ -175,6 +177,7 @@ bun run dev
 | **AI HOT 接入 + 日报文风重写** | 新增 `aihot-api` 信源类型（hourly 拉取卡兹克 https://aihot.virxact.com 精选池）+ 把他们的结构化日报作为 must-cover 基线 merge 进我们的 column generator + 日报/点评改成朋友分享口吻 + 带成本上限的 backfill 脚本 | ✅ 已上线 (2026-05-08，文风 2026-06-10 刷新) |
 | **分级评论 (tier-gated commentary)** | `editor_note_*` (一句话点评) 对每条非 excluded 都生成；`editor_analysis_*` 只对 tier ∈ (featured, p1) 生成 — tier='all' 走 note-only LLM 调用 (`commentaryNoteSchema`，输出量减少约 85%) | ✅ 已上线 (2026-05-08) |
 | **DeepSeek 分层处理 + 论文源退役** | DeepSeek V4 Pro/Flash 按重要度分层处理，中英文都改成朋友分享口吻；中文内容、分数理由、点评、聚类、51 期日报已回填；论文源、论文路由、RSS/MCP/API 暴露和 DB 历史行已清理 | ✅ 已上线 (2026-06-10) |
+| **LLM 用量护栏 + 可观测性** | enrich worker 先在 Postgres claim 再花 token，并带退避/重试上限；用量后台/API 增加全量总计、任务/模型拆分、最近调用模型标签 | ✅ 已上线 (2026-06-11) |
 | **编辑分层重命名** | 深度解读 → 锐评 (200 字硬上限, 原 300-500 字 / 800 字顶); summary 收紧到 50-90 字 一句话总结; UI 标签重命名 (编辑点评 → 一句话点评). 主页默认从多日"每日精选"切换到今日热点; 每日精选可通过 `?view=daily` toggle 找回 | ✅ 已上线 (2026-05-08) |
 | **Agent 接入 — 公开镜像** | 匿名 `/api/public/*` 只读镜像（8 个端点：feed / items / search / sources / events / daily / dailies）+ IP 限流 + 弱 ETag + CORS。发现层：托管 `/skill.md` (SKILL.md 标准) + `/openapi.yaml` (OpenAPI 3.1) + `/robots.txt` + `/sitemap.xml`。双语 `/{locale}/agents` 三 tab 页面 (Skill / RSS / REST API)。Bearer-gated `/api/v1/*` + `/api/mcp` 保留给写动作 + 审计 | ✅ 已上线 (2026-05-13, PR #36) |
 

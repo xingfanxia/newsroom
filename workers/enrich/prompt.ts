@@ -95,6 +95,7 @@ function normalizeEnumArray<T extends string>(
   value: unknown,
   allowed: readonly T[],
   aliases: Record<string, T>,
+  max = 3,
 ): T[] {
   const values = Array.isArray(value)
     ? value
@@ -108,8 +109,36 @@ function normalizeEnumArray<T extends string>(
     if (!key) continue;
     const normalized = aliases[key] ?? exact.get(key);
     if (normalized && !out.includes(normalized)) out.push(normalized);
+    if (out.length >= max) break;
   }
   return out;
+}
+
+function normalizeStringArray(value: unknown, max = 3): string[] {
+  const values = Array.isArray(value)
+    ? value
+    : typeof value === "string"
+      ? [value]
+      : [];
+  const out: string[] = [];
+  for (const raw of values) {
+    if (typeof raw !== "string") continue;
+    const normalized = raw.trim();
+    if (!normalized || out.includes(normalized)) continue;
+    out.push(normalized);
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+function boundedString(max: number) {
+  return z.preprocess(
+    (value) =>
+      typeof value === "string" && value.length > max
+        ? `${value.slice(0, Math.max(0, max - 3))}...`
+        : value,
+    z.string().max(max),
+  );
 }
 
 const CAPABILITY_ALIASES: Record<string, Capability> = {
@@ -234,8 +263,10 @@ export const enrichSchema = z.object({
         `Up to 3 canonical English capability IDs from: ${CAPABILITIES.join(", ")}. Empty array if none apply. Do NOT output Chinese translations — the UI localizes these for display.`,
       ),
     entities: z
-      .array(z.string())
-      .max(3)
+      .preprocess(
+        (value) => normalizeStringArray(value),
+        z.array(z.string()).max(3),
+      )
       .describe(
         "Up to 3 named organizations or people mentioned. Use the most common English rendering when it exists (Anthropic / OpenAI / Xiaomi / ByteDance / Dario Amodei), otherwise original form.",
       ),
@@ -358,21 +389,15 @@ export const scoreSchema = z.object({
         ),
       reasonsZh: z
         .object({
-          h: z
-            .string()
-            .max(80)
+          h: boundedString(80)
             .describe(
               "≤80 字符，像给朋友解释。H 命中就说哪里让人想点开；没命中就说为什么普通。不要术语腔。",
             ),
-          k: z
-            .string()
-            .max(80)
+          k: boundedString(80)
             .describe(
               "≤80 字符。K 命中就说新增了哪个数字/机制；没命中就说正文没说清什么。先让人读懂。",
             ),
-          r: z
-            .string()
-            .max(80)
+          r: boundedString(80)
             .describe(
               "≤80 字符。R 命中就说戳中了哪类从业者焦虑或兴趣；没命中就说这条为什么难引发讨论。",
             ),
@@ -380,24 +405,20 @@ export const scoreSchema = z.object({
         .describe("Per-axis ZH rationale — shown in chip tooltips + '精选理由' block."),
       reasonsEn: z
         .object({
-          h: z.string().max(100).describe("≤100 chars. Same rule as reasonsZh.h in English."),
-          k: z.string().max(100).describe("≤100 chars. Same rule as reasonsZh.k in English."),
-          r: z.string().max(100).describe("≤100 chars. Same rule as reasonsZh.r in English."),
+          h: boundedString(100).describe("≤100 chars. Same rule as reasonsZh.h in English."),
+          k: boundedString(100).describe("≤100 chars. Same rule as reasonsZh.k in English."),
+          r: boundedString(100).describe("≤100 chars. Same rule as reasonsZh.r in English."),
         })
         .describe("Per-axis EN rationale."),
     })
     .describe(
       "HKR rubric — booleans + per-axis bilingual reasons. Featured requires >=2; p1 requires all 3.",
     ),
-  reasoningZh: z
-    .string()
-    .max(280)
+  reasoningZh: boundedString(280)
     .describe(
       "中文推荐理由（1-3 句，≤280 字符）。像发给朋友解释为什么推/不推：一句总判断 + 1-2 个事实依据。少用抽象名词，术语要翻译成人话。",
     ),
-  reasoningEn: z
-    .string()
-    .max(280)
+  reasoningEn: boundedString(280)
     .describe(
       "English recommendation reason (1-3 short sentences, ≤280 chars). Sound like a friend explaining why this is worth or not worth a click. Keep the score logic accurate, but use plain words.",
     ),

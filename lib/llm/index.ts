@@ -42,6 +42,13 @@ export type {
 } from "./types";
 export { LLMError } from "./types";
 
+const DEFAULT_LLM_CALL_TIMEOUT_MS = 90_000;
+
+function llmCallTimeoutMs(): number {
+  const raw = Number(process.env.LLM_CALL_TIMEOUT_MS);
+  return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_LLM_CALL_TIMEOUT_MS;
+}
+
 // ── Provider clients (lazy, singleton per provider) ─────────────
 
 let cachedAnthropic: ReturnType<typeof createAnthropic> | null = null;
@@ -67,13 +74,19 @@ function googleClient() {
 }
 
 let cachedAzure: ReturnType<typeof createAzure> | null = null;
+export function normalizeAzureApiVersion(raw: string | undefined): string {
+  if (!raw || raw === "v1") return "2024-12-01-preview";
+  return raw;
+}
+
 function azureClient() {
   // Embeddings-only (legacy chat-completions deployments still resolve here too,
   // but production chat traffic moved to azureChatClient as of gpt-5.5).
   const apiKey = process.env.AZURE_OPENAI_API_KEY;
   const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
-  const apiVersion =
-    process.env.AZURE_OPENAI_API_VERSION ?? "2024-12-01-preview";
+  const apiVersion = normalizeAzureApiVersion(
+    process.env.AZURE_OPENAI_API_VERSION,
+  );
   if (!apiKey || !endpoint) {
     throw new LLMError(
       "azure-openai",
@@ -449,6 +462,7 @@ export async function generateText(
       model,
       system: adjusted.system,
       messages: adjusted.messages,
+      timeout: llmCallTimeoutMs(),
       maxOutputTokens: req.maxTokens ?? 2048,
       providerOptions: reasoningProviderOptions(provider, req.reasoningEffort),
       ...(req.temperature !== undefined
@@ -522,6 +536,7 @@ export async function generateStructured<T extends z.ZodTypeAny>(
                       : `Your previous response was invalid. Return ONLY valid JSON for this exact shape, with every value as the correct primitive type:\n\n${schemaExample(req.schema)}`,
                 },
               ],
+              timeout: llmCallTimeoutMs(),
               maxOutputTokens: req.maxTokens ?? 2048,
               temperature: req.temperature ?? 0,
             });
@@ -565,6 +580,7 @@ export async function generateStructured<T extends z.ZodTypeAny>(
       schema: req.schema,
       schemaName: req.schemaName,
       schemaDescription: req.schemaDescription,
+      timeout: llmCallTimeoutMs(),
       maxOutputTokens: req.maxTokens ?? 2048,
       providerOptions: reasoningProviderOptions(provider, req.reasoningEffort),
       ...(req.temperature !== undefined
@@ -608,6 +624,7 @@ export function streamText(req: GenerateTextRequest) {
     model,
     system: adjusted.system,
     messages: adjusted.messages,
+    timeout: llmCallTimeoutMs(),
     maxOutputTokens: req.maxTokens ?? 2048,
     providerOptions: reasoningProviderOptions(provider, req.reasoningEffort),
     ...(req.temperature !== undefined
@@ -640,7 +657,11 @@ export async function embed(req: EmbedRequest): Promise<EmbedResult> {
   const model = embeddingModelFor(provider);
   const started = Date.now();
   try {
-    const result = await aiEmbed({ model, value: req.value });
+    const result = await aiEmbed({
+      model,
+      value: req.value,
+      abortSignal: AbortSignal.timeout(llmCallTimeoutMs()),
+    });
     const resolvedModel = modelId(model as unknown as LanguageModel);
     recordUsage({
       provider,
@@ -672,7 +693,11 @@ export async function embedMany(
   const model = embeddingModelFor(provider);
   const started = Date.now();
   try {
-    const result = await aiEmbedMany({ model, values: req.values });
+    const result = await aiEmbedMany({
+      model,
+      values: req.values,
+      abortSignal: AbortSignal.timeout(llmCallTimeoutMs()),
+    });
     const resolvedModel = modelId(model as unknown as LanguageModel);
     recordUsage({
       provider,

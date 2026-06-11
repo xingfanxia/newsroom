@@ -334,6 +334,11 @@ export const items = pgTable(
     reasoningZh: text("reasoning_zh"),
     reasoningEn: text("reasoning_en"),
     enrichedAt: timestamp("enriched_at", { withTimezone: true }),
+    /** Claim/backoff guard for the enrich worker. Prevents overlapping cron
+     * invocations from spending LLM calls on the same unenriched row. */
+    enrichClaimedAt: timestamp("enrich_claimed_at", { withTimezone: true }),
+    enrichAttempts: integer("enrich_attempts").notNull().default(0),
+    enrichError: text("enrich_error"),
     policyVersion: text("policy_version"),
     // ── Editorial commentary (R7) — only populated for tier in (featured, p1) ──
     /** 1-2 sentence executive take (≤160 chars). */
@@ -362,6 +367,9 @@ export const items = pgTable(
     tierIdx: index("items_tier_idx").on(t.tier, t.publishedAt),
     unenrichedIdx: index("items_unenriched_idx")
       .on(t.enrichedAt)
+      .where(sql`${t.enrichedAt} IS NULL`),
+    enrichClaimIdx: index("items_enrich_claim_idx")
+      .on(t.enrichClaimedAt)
       .where(sql`${t.enrichedAt} IS NULL`),
     unfetchedBodyIdx: index("items_unfetched_body_idx")
       .on(t.bodyFetchedAt)

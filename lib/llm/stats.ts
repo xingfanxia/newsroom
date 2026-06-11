@@ -5,7 +5,7 @@ import { db } from "@/db/client";
 import { sql, desc } from "drizzle-orm";
 import { llmUsage } from "@/db/schema";
 
-type WindowKey = "today" | "week" | "month" | "all";
+export type WindowKey = "today" | "week" | "month" | "all";
 
 function windowClause(w: WindowKey) {
   switch (w) {
@@ -76,6 +76,14 @@ export type TaskBreakdown = {
   inputTokens: number;
   outputTokens: number;
   costUsd: number;
+  models: TaskModelBreakdown[];
+};
+
+export type TaskModelBreakdown = {
+  provider: string;
+  model: string;
+  calls: number;
+  costUsd: number;
 };
 
 export async function breakdownByTask(
@@ -84,22 +92,46 @@ export async function breakdownByTask(
   const client = db();
   const result = await client.execute(sql`
     SELECT
-      task,
+      task, provider, model,
       count(*)::int AS calls,
       coalesce(sum(input_tokens), 0)::int AS input_tokens,
       coalesce(sum(output_tokens), 0)::int AS output_tokens,
       coalesce(sum(cost_usd), 0)::float AS cost_usd
     FROM llm_usage WHERE ${windowClause(w)}
-    GROUP BY task
+    GROUP BY task, provider, model
     ORDER BY cost_usd DESC
   `);
-  return asRows(result).map((r) => ({
-    task: (r.task as string | null) ?? null,
-    calls: Number(r.calls ?? 0),
-    inputTokens: Number(r.input_tokens ?? 0),
-    outputTokens: Number(r.output_tokens ?? 0),
-    costUsd: Number(r.cost_usd ?? 0),
-  }));
+  const byTask = new Map<string, TaskBreakdown>();
+  for (const r of asRows(result)) {
+    const task = (r.task as string | null) ?? null;
+    const key = task ?? "untagged";
+    const calls = Number(r.calls ?? 0);
+    const inputTokens = Number(r.input_tokens ?? 0);
+    const outputTokens = Number(r.output_tokens ?? 0);
+    const costUsd = Number(r.cost_usd ?? 0);
+    const existing =
+      byTask.get(key) ??
+      ({
+        task,
+        calls: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        costUsd: 0,
+        models: [],
+      } satisfies TaskBreakdown);
+    existing.calls += calls;
+    existing.inputTokens += inputTokens;
+    existing.outputTokens += outputTokens;
+    existing.costUsd += costUsd;
+    existing.models.push({
+      provider: String(r.provider),
+      model: String(r.model),
+      calls,
+      costUsd,
+    });
+    byTask.set(key, existing);
+  }
+  return Array.from(byTask.values()).sort((a, b) => b.costUsd - a.costUsd);
 }
 
 export type ModelBreakdown = {
