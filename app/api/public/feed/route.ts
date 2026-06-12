@@ -28,7 +28,7 @@ import {
   publicError,
   publicJson,
 } from "@/lib/api/public-helpers";
-import type { Story } from "@/lib/types";
+import { toPublicApiItem } from "@/lib/api/public-items";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -67,34 +67,6 @@ function parseTagList(s: string | undefined): string[] | undefined {
   if (!s) return undefined;
   const tags = s.split(",").map((t) => t.trim()).filter(Boolean);
   return tags.length > 0 ? tags : undefined;
-}
-
-/** Public item shape — strip LLM internals + per-axis HKR reasons. */
-function toPublicItem(s: Story, locale: "zh" | "en") {
-  const isEvent = (s.coverage ?? 0) > 1 && s.clusterId != null;
-  return {
-    id: s.id,
-    title: s.title,
-    summary: s.summary,
-    publisher: s.source.publisher,
-    source_id: s.sourceId,
-    source_group: s.source.groupCode ?? null,
-    source_kind: s.source.kindCode,
-    tier: s.tier,
-    importance: s.importance,
-    hkr: s.hkr ? { h: s.hkr.h, k: s.hkr.k, r: s.hkr.r } : null,
-    tags: s.tags,
-    url: s.url,
-    published_at: s.publishedAt,
-    has_commentary: Boolean(s.editorNote || s.editorAnalysis),
-    cluster_id: s.clusterId ?? null,
-    coverage: s.coverage ?? null,
-    canonical_title: isEvent
-      ? (locale === "zh" ? s.canonicalTitleZh : s.canonicalTitleEn) ?? null
-      : null,
-    first_seen_at: s.firstSeenAt ?? null,
-    latest_member_at: s.latestMemberAt ?? null,
-  };
 }
 
 export async function GET(req: Request) {
@@ -155,7 +127,7 @@ export async function GET(req: Request) {
 
     return publicJson(
       {
-        items: stories.map((s) => toPublicItem(s, q.locale)),
+        items: stories.map((s) => toPublicApiItem(s, q.locale)),
         total,
         limit: q.limit,
         offset: q.offset,

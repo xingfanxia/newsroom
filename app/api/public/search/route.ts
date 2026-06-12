@@ -5,7 +5,7 @@
  * `mode=semantic` — embeds q via Azure text-embedding-3-large and ranks by
  *   pgvector cosine distance. Each hit gets a `distance` field (smaller = closer).
  *
- * Same field stripping as /api/public/feed.
+ * Same item shape and field stripping as /api/public/feed.
  */
 import { z } from "zod";
 import {
@@ -22,7 +22,7 @@ import {
   publicError,
   publicJson,
 } from "@/lib/api/public-helpers";
-import type { Story } from "@/lib/types";
+import { toPublicApiItem } from "@/lib/api/public-items";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -44,30 +44,6 @@ const querySchema = z.object({
   offset: z.coerce.number().int().min(0).optional().default(0),
   locale: z.enum(["zh", "en"]).optional().default("en"),
 });
-
-function toPublicItem(s: Story, locale: "zh" | "en") {
-  const isEvent = (s.coverage ?? 0) > 1 && s.clusterId != null;
-  return {
-    id: s.id,
-    title: s.title,
-    summary: s.summary,
-    publisher: s.source.publisher,
-    source_id: s.sourceId,
-    source_group: s.source.groupCode ?? null,
-    source_kind: s.source.kindCode,
-    tier: s.tier,
-    importance: s.importance,
-    hkr: s.hkr ? { h: s.hkr.h, k: s.hkr.k, r: s.hkr.r } : null,
-    tags: s.tags,
-    url: s.url,
-    published_at: s.publishedAt,
-    cluster_id: s.clusterId ?? null,
-    coverage: s.coverage ?? null,
-    canonical_title: isEvent
-      ? (locale === "zh" ? s.canonicalTitleZh : s.canonicalTitleEn) ?? null
-      : null,
-  };
-}
 
 export async function GET(req: Request) {
   // Semantic search has measurable LLM cost — tighter limit than feed.
@@ -120,7 +96,7 @@ export async function GET(req: Request) {
           mode: "semantic",
           q: p.q,
           items: result.items.map((s) => ({
-            ...toPublicItem(s, p.locale),
+            ...toPublicApiItem(s, p.locale),
             distance: s.distance,
           })),
           total: result.total,
@@ -156,7 +132,7 @@ export async function GET(req: Request) {
       {
         mode: p.mode,
         q: p.q,
-        items: stories.map((s) => toPublicItem(s, p.locale)),
+        items: stories.map((s) => toPublicApiItem(s, p.locale)),
         total: stories.length,
         limit: p.limit,
         offset: p.offset,
