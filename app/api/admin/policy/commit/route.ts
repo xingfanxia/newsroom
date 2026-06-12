@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getSessionUser } from "@/lib/auth/session";
+import { requireAdminForRoute } from "@/lib/api/admin-auth";
 import { commitSkillVersion } from "@/lib/policy/skill";
 
 const bodySchema = z.object({
@@ -18,10 +18,10 @@ const bodySchema = z.object({
  * owned by the agent and carries proposal metadata. This one is direct.
  */
 export async function POST(req: Request) {
-  const user = await getSessionUser();
-  if (!user) {
-    return NextResponse.json({ ok: false, error: "auth_required" }, { status: 401 });
-  }
+  const auth = await requireAdminForRoute();
+  if (!auth.ok) return auth.response;
+  const user = auth.admin;
+
   let raw: unknown;
   try {
     raw = await req.json();

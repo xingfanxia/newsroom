@@ -17,7 +17,7 @@ Shipped cleanup:
 - Updated README / `.env.example` / architecture docs so Tavily is not advertised as wired, cron docs match the current split route set, and cluster docs match the 0.75 / 72h runtime.
 - Aligned `/admin/system` queue telemetry with worker predicates: item commentary now counts only singleton/unclustered item candidates, event commentary is shown as its own queue, and the cron table derives schedules from `vercel.json`.
 - Shared `/api/admin/iterations/[id]` route-id parsing through `lib/policy/iterations.ts` so fetch/apply/reject stay behaviorally aligned.
-- Shared admin auth JSON-error mapping for `/api/admin/iterations/*` through `lib/api/admin-auth.ts`.
+- Shared admin auth JSON-error mapping for protected `/api/admin/*` data routes through `lib/api/admin-auth.ts`.
 - Stopped a cluster-cron arbitration loop: Stage A and singleton-recluster now
   skip clusters already rejected for the item in `cluster_splits`, preventing
   the same fuzzy join from being re-added and re-split every tick; after three

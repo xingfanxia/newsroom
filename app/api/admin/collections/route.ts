@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getSessionUser, upsertAppUser } from "@/lib/auth/session";
+import { upsertAppUser } from "@/lib/auth/session";
+import { requireAdminForRoute } from "@/lib/api/admin-auth";
 import {
   createCollection,
   listCollections,
@@ -15,10 +16,10 @@ import {
 
 /** GET — list user's collections (used on the saved page + move dialog). */
 export async function GET() {
-  const user = await getSessionUser();
-  if (!user) {
-    return NextResponse.json({ ok: false, error: "auth_required" }, { status: 401 });
-  }
+  const auth = await requireAdminForRoute();
+  if (!auth.ok) return auth.response;
+  const user = auth.admin;
+
   await upsertAppUser(user);
   const collections = await listCollections(user.id);
   return NextResponse.json({ ok: true, collections });
@@ -26,10 +27,10 @@ export async function GET() {
 
 /** POST — create a new collection. */
 export async function POST(req: Request) {
-  const user = await getSessionUser();
-  if (!user) {
-    return NextResponse.json({ ok: false, error: "auth_required" }, { status: 401 });
-  }
+  const auth = await requireAdminForRoute();
+  if (!auth.ok) return auth.response;
+  const user = auth.admin;
+
   await upsertAppUser(user);
 
   let raw: unknown;
@@ -68,10 +69,10 @@ export async function POST(req: Request) {
 
 /** PATCH — rename / pin / unpin. */
 export async function PATCH(req: Request) {
-  const user = await getSessionUser();
-  if (!user) {
-    return NextResponse.json({ ok: false, error: "auth_required" }, { status: 401 });
-  }
+  const auth = await requireAdminForRoute();
+  if (!auth.ok) return auth.response;
+  const user = auth.admin;
+
   let raw: unknown;
   try {
     raw = await req.json();
@@ -108,10 +109,10 @@ export async function PATCH(req: Request) {
 
 /** DELETE — remove a collection. Saves get reparented to inbox (SET NULL). */
 export async function DELETE(req: Request) {
-  const user = await getSessionUser();
-  if (!user) {
-    return NextResponse.json({ ok: false, error: "auth_required" }, { status: 401 });
-  }
+  const auth = await requireAdminForRoute();
+  if (!auth.ok) return auth.response;
+  const user = auth.admin;
+
   let raw: unknown;
   try {
     raw = await req.json();
