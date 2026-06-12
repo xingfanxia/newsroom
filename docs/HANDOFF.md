@@ -326,8 +326,9 @@ browser-verified. Open DevTools responsive mode + walk through `/`,
 `/saved`, `/sources`, `/admin/iterations`.
 
 ### Deferred
-- **#9 `/low-follower` route** — still blocked on X Pro tier for
-  `/2/tweets/search/all`. Either pay or delete the route.
+- **#9 low-follower viral** — feature deferred; the route has been deleted.
+  Do not recreate it until source APIs make follower/impression data
+  affordable and the product decision is revisited.
 - **Tweaks PATCH floods** — rapid theme/accent scrubbing fires 10+
   PATCH requests in a second. Add 500ms debounce.
 - **Policy editor loses drafts on tab close** — no `beforeunload` handler.

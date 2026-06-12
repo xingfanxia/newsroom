@@ -101,7 +101,8 @@ See [`.env.example`](./.env.example) for the complete template. On Vercel, most 
 | **Content backfill** | Fill 2026 historical items from Wayback Machine + X historical (+2907 new items) | ✅ shipped (s7) |
 | **Terminal design port** | Full ax-radar mock port: HKR rings, site-config panel, bilingual zh/en, 12 views on `<ViewShell>` | ✅ shipped (s7) |
 | **Saved collections + server tweaks** | Named bookmark folders with inbox fallback; cross-device tweak/watchlist persistence via `users.tweaks` jsonb | ✅ shipped (s7) |
-| **M5 — Low-follower viral + cluster UI** | Low-follower viral detector (X `search/all` quota), "also reported by N sources" chips | planned |
+| **Cross-source event UI** | "Also reported by N sources" chips, canonical event titles, and event-level drawer/card data | ✅ shipped |
+| **M5 — Low-follower viral** | Low-follower viral detector once source APIs make follower/impression data affordable | planned |
 | **AI HOT integration + daily voice rebase** | New `aihot-api` source (hourly pre-curated pool from https://aihot.virxact.com) + AI HOT structured daily merged into column generator + friend-sharing daily/commentary voice + cost-bounded backfill scripts | ✅ shipped (2026-05-08, voice refreshed 2026-06-10) |
 | **Tier-gated commentary** | `editor_note_*` (一句话点评) runs for every non-excluded item / event; `editor_analysis_*` only for tier ∈ (featured, p1) — tier 'all' takes a note-only LLM call via `commentaryNoteSchema` (~85% smaller output) | ✅ shipped (2026-05-08) |
 | **DeepSeek treatment rebase + paper retirement** | DeepSeek V4 Pro/Flash importance-tiered treatment, friend-readable zh/en prose prompts, Chinese/daily backfills, and complete retirement of paper sources/routes/RSS/MCP/DB rows | ✅ shipped (2026-06-10) |
@@ -136,8 +137,10 @@ AX 的 AI 雷达是一款面向 AI 行业编辑和分析师的情报工作台，
 | `/{locale}/podcasts` | 播客 · 视频 — 节目流 + 频道过滤 |
 | `/{locale}/agents` | Agent 接入 — 3-tab 集成页面（Skill / RSS / REST API），见 [`docs/agent-access/`](./docs/agent-access/) |
 | `/{locale}/admin/usage` | 用量 — LLM 花费卡片（今日 / 7 天 / 30 天 / 全量）、任务/模型拆分、最近调用模型 |
+| `/{locale}/admin/system` | 系统 — 信源健康、队列、cron 状态和近期错误 |
 | `/{locale}/admin/iterations` | 策略迭代 — 指标卡片 + Agent 控制台 + Diff 预览 + **版本时间轴** |
 | `/{locale}/admin/policy` | 精选策略 — **可编辑** markdown，带实时预览，可直接提交新版本 |
+| `/{locale}/admin/users` | 用户管理（coming soon，当前单用户模式） |
 
 ### 技术栈
 
