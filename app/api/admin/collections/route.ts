@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { getSessionUser, upsertAppUser } from "@/lib/auth/session";
 import {
   createCollection,
@@ -7,19 +6,12 @@ import {
   updateCollection,
   deleteCollection,
 } from "@/lib/items/collections";
-
-const createSchema = z.object({
-  name: z.string().min(1).max(64),
-  nameCjk: z.string().max(64).optional().nullable(),
-  pinned: z.boolean().optional(),
-});
-const updateSchema = z.object({
-  id: z.number().int().positive(),
-  name: z.string().min(1).max(64).optional(),
-  nameCjk: z.string().max(64).optional().nullable(),
-  pinned: z.boolean().optional(),
-});
-const deleteSchema = z.object({ id: z.number().int().positive() });
+import {
+  adminCollectionCreateBodySchema,
+  adminCollectionUpdateBodySchema,
+  collectionDeleteBodySchema,
+  isDuplicateCollectionNameError,
+} from "@/lib/api/collection-requests";
 
 /** GET — list user's collections (used on the saved page + move dialog). */
 export async function GET() {
@@ -46,7 +38,7 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 });
   }
-  const parsed = createSchema.safeParse(raw);
+  const parsed = adminCollectionCreateBodySchema.safeParse(raw);
   if (!parsed.success) {
     return NextResponse.json(
       { ok: false, error: "invalid_body", issues: parsed.error.issues },
@@ -56,14 +48,11 @@ export async function POST(req: Request) {
   try {
     const collection = await createCollection({
       userId: user.id,
-      name: parsed.data.name,
-      nameCjk: parsed.data.nameCjk ?? null,
-      pinned: parsed.data.pinned ?? false,
+      ...parsed.data,
     });
     return NextResponse.json({ ok: true, collection });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (msg.includes("duplicate") || msg.includes("unique")) {
+    if (isDuplicateCollectionNameError(err)) {
       return NextResponse.json(
         { ok: false, error: "duplicate_name" },
         { status: 409 },
@@ -89,7 +78,7 @@ export async function PATCH(req: Request) {
   } catch {
     return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 });
   }
-  const parsed = updateSchema.safeParse(raw);
+  const parsed = adminCollectionUpdateBodySchema.safeParse(raw);
   if (!parsed.success) {
     return NextResponse.json(
       { ok: false, error: "invalid_body", issues: parsed.error.issues },
@@ -99,10 +88,7 @@ export async function PATCH(req: Request) {
   try {
     const ok = await updateCollection({
       userId: user.id,
-      id: parsed.data.id,
-      name: parsed.data.name,
-      nameCjk: parsed.data.nameCjk ?? undefined,
-      pinned: parsed.data.pinned,
+      ...parsed.data,
     });
     if (!ok) {
       return NextResponse.json(
@@ -132,7 +118,7 @@ export async function DELETE(req: Request) {
   } catch {
     return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 });
   }
-  const parsed = deleteSchema.safeParse(raw);
+  const parsed = collectionDeleteBodySchema.safeParse(raw);
   if (!parsed.success) {
     return NextResponse.json(
       { ok: false, error: "invalid_body" },
