@@ -13,10 +13,6 @@
  *   tier / view / hot_window_hours / date{,_from,_to} / source_{id,group,kind}
  *   curated_only / include_source_tags / exclude_source_tags / limit / offset / locale
  */
-import {
-  countFeaturedStories,
-  getFeaturedStories,
-} from "@/lib/items/live";
 import { publicRateLimit } from "@/lib/rate-limit/public";
 import {
   computeEtag,
@@ -26,6 +22,7 @@ import {
   publicError,
   publicJson,
 } from "@/lib/api/public-helpers";
+import { runFeedQuery } from "@/lib/api/feed-results";
 import { toPublicApiItem } from "@/lib/api/public-items";
 import {
   feedQueryFromParams,
@@ -56,18 +53,15 @@ export async function GET(req: Request) {
   const feedQuery = feedQueryFromParams(q);
 
   try {
-    const [stories, total] = await Promise.all([
-      getFeaturedStories(feedQuery),
-      countFeaturedStories(feedQuery),
-    ]);
+    const result = await runFeedQuery(feedQuery);
 
     const etag = computeEtag(
       "public-feed",
       etagSignal({
-        count: stories.length,
-        total,
-        first_id: stories[0]?.id ?? "",
-        latest_at: stories[0]?.publishedAt ?? "",
+        count: result.items.length,
+        total: result.total,
+        first_id: result.items[0]?.id ?? "",
+        latest_at: result.items[0]?.publishedAt ?? "",
         qs: url.search,
       }),
     );
@@ -75,11 +69,11 @@ export async function GET(req: Request) {
 
     return publicJson(
       {
-        items: stories.map((s) => toPublicApiItem(s, q.locale)),
-        total,
-        limit: q.limit,
-        offset: q.offset,
-        view: q.view,
+        items: result.items.map((s) => toPublicApiItem(s, q.locale)),
+        total: result.total,
+        limit: result.limit,
+        offset: result.offset,
+        view: result.view,
       },
       etag,
     );

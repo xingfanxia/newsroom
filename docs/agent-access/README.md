@@ -47,6 +47,7 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 - **`lib/rate-limit/public.ts`** — parameterized IP token-bucket. Each route picks `{ family, windowMs, max }`. Family-isolated so `/feed` polling doesn't burn `/search` budget.
 - **`lib/api/public-helpers.ts`** — `computeEtag`, `ifNoneMatch`, `notModified`, `publicJson`, `publicError`, `publicHeaders`. Every route returns CORS + cache headers via these.
 - **`lib/api/feed-query-params.ts`** — shared feed/search query schemas and snake_case-to-`FeedQuery` mapping for public + bearer-gated surfaces; route files only choose auth/rate-limit and per-surface limit ceilings.
+- **`lib/api/feed-results.ts`** — shared feed execution for `/api/public/feed` and `/api/v1/feed`; route files own auth/rate-limit/ETag and serializers, while this helper owns paired item + `total` queries and pagination defaults.
 - **`lib/api/search-results.ts`** — shared lexical/semantic search execution for `/api/public/search` and `/api/v1/search`; route files own auth/rate-limit/ETag and serializers, while this helper owns lexical `total` counts and semantic filter mapping.
 - **`lib/api/source-catalog.ts`** — shared source catalog query + serializers used by `/api/public/sources`, `/api/v1/sources`, and MCP `ax_radar_sources`, with public/v1/MCP each owning only its exposure policy.
 - **`lib/api/public-items.ts`** — shared anonymous feed/search item serializer. It keeps the public `FeedItem` shape aligned across `/api/public/feed` and `/api/public/search`.
@@ -80,7 +81,8 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 - `tests/api/public-helpers.test.ts` — ETag determinism, family isolation, headers, CORS
 - `tests/api/public-ratelimit.test.ts` — threshold, IP isolation, family isolation, IPv4/IPv6 header fallback
 - `tests/api/feed-query-params.test.ts` — shared feed/search parameter defaults, max-limit ceilings, tag parsing, and `FeedQuery` mapping
-- `tests/api/feed-query-source.test.ts` — feed/search routes stay wired to shared query schemas and search execution
+- `tests/api/feed-query-source.test.ts` — feed/search routes stay wired to shared query schemas and shared execution helpers
+- `tests/api/public-feed.test.ts` — public feed reports a stable full-match `total` across page sizes
 - `tests/api/public-search.test.ts` — public lexical search reports a stable full-match `total` across page sizes
 - `tests/api/source-catalog.test.ts` — public, v1, and MCP source catalog serialization contracts
 - `tests/api/source-catalog-source.test.ts` — source routes and OpenAPI stay wired to the shared source catalog module
@@ -106,6 +108,7 @@ Run these with `bun test tests/api/public-*.test.ts tests/api/feed-query-*.test.
 - **Rate limiter is Vercel-instance-local** — buckets don't survive cold starts. Treated as "discourage hammering" not "airtight cap." Real abuse defense lives at the CDN/WAF layer.
 - **Field stripping is centralized for feed/search and item-detail surfaces** — `toPublicApiItem` strips HKR reasons for feed/search, while `toPublicItemDetail` strips detail-only LLM internals (`reasoning`, `body_rss`, HKR reasons). If adding a new domain field, update the relevant serializer and OpenAPI schema together.
 - **Feed/search query parsing is centralized** — `/api/public/feed`, `/api/public/search`, `/api/v1/feed`, and `/api/v1/search` share `lib/api/feed-query-params.ts`; only public/v1 max limits differ.
+- **Feed execution is centralized for public + v1** — `/api/public/feed` and `/api/v1/feed` both call `runFeedQuery`; route files keep only auth/rate-limit/ETag and item serialization while the helper keeps item rows and `total` counts paired.
 - **Search execution is centralized for public + v1** — `/api/public/search` and `/api/v1/search` both call `runSearchQuery`; lexical mode counts the full filtered match set for pagination, while semantic mode shares the same source/date/tier filter mapping.
 - **Source catalog serialization is centralized** — `/api/public/sources`, `/api/v1/sources`, and MCP `ax_radar_sources` share `lib/api/source-catalog.ts`; public strips operational diagnostics, v1 keeps them, MCP keeps a compact flat shape.
 - **Bearer agent item serialization is shared across REST + MCP** — `/api/v1/feed`, `/api/v1/search`, MCP `ax_radar_feed`, and MCP `ax_radar_search` all use `toAgentApiItem`; `/api/v1/saved` extends it via `toSavedAgentApiItem`.

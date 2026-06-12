@@ -32,10 +32,7 @@
  *   locale           = zh | en (default en)
  */
 import { requireApiToken } from "@/lib/auth/api-token";
-import {
-  countFeaturedStories,
-  getFeaturedStories,
-} from "@/lib/items/live";
+import { runFeedQuery } from "@/lib/api/feed-results";
 import { toAgentApiItem } from "@/lib/api/v1-items";
 import {
   feedQueryFromParams,
@@ -59,16 +56,13 @@ export async function GET(req: Request) {
   const feedQuery = feedQueryFromParams(q);
 
   try {
-    const [stories, total] = await Promise.all([
-      getFeaturedStories(feedQuery),
-      countFeaturedStories(feedQuery),
-    ]);
+    const result = await runFeedQuery(feedQuery);
     return Response.json({
-      items: stories.map((s) => toAgentApiItem(s, q.locale)),
-      total,
-      limit: q.limit,
-      offset: q.offset,
-      view: q.view,
+      items: result.items.map((s) => toAgentApiItem(s, q.locale)),
+      total: result.total,
+      limit: result.limit,
+      offset: result.offset,
+      view: result.view,
     });
   } catch (err) {
     console.error("[api/v1/feed] failed", err);

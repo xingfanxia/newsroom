@@ -26,6 +26,9 @@ Shipped cleanup:
 - Shared public/v1 search execution through `lib/api/search-results.ts`;
   route handlers now own only auth/rate-limit/ETag/serialization, while the
   helper owns lexical full-match totals and semantic source/date/tier filters.
+- Shared public/v1 feed execution through `lib/api/feed-results.ts`;
+  route handlers now own only auth/rate-limit/ETag/serialization, while the
+  helper owns paired item + full-match total queries and pagination defaults.
 - Shared hourly/daily/weekly fetch+normalize sequencing through `workers/fetcher/pipeline.ts`, with HTTP route wiring in `app/api/cron/_fetch-bucket-route.ts` and local cron scripts using the same helper.
 - Shared article body + YouTube transcript prefetch sequencing through
   `workers/fetcher/content-prefetch.ts`, so `/api/cron/article-body` and
@@ -62,7 +65,7 @@ Verification:
 - `bun run code:dead:exports` — passed.
 - `bun run code:dead:types` — passed.
 - `bun run lint` — passed with no warnings.
-- `bun test --env-file=.env.local` — 614 pass, 1 skip, 0 fail.
+- `bun test --env-file=.env.local` — 616 pass, 1 skip, 0 fail.
 - `bun run build` — passed.
 - `git diff --check` — passed.
 

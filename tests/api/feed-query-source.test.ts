@@ -54,4 +54,17 @@ describe("feed/search route query parsing source wiring", () => {
       expect(source).not.toContain("total: stories.length");
     }
   });
+
+  test("feed routes share execution so totals and defaults cannot drift", () => {
+    for (const path of [
+      "app/api/v1/feed/route.ts",
+      "app/api/public/feed/route.ts",
+    ] as const) {
+      const source = read(path);
+
+      expect(source).toContain("@/lib/api/feed-results");
+      expect(source).not.toContain("getFeaturedStories");
+      expect(source).not.toContain("countFeaturedStories");
+    }
+  });
 });
