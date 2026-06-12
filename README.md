@@ -27,7 +27,6 @@ AX's AI RADAR is a dashboard for editors and analysts who cover the AI industry.
 |---|---|
 | `/{locale}` | 热点资讯 / Hot News — curated timeline with HKR rings + tier/source filters + auto-scroll ticker |
 | `/{locale}/all` | 全部 / All Posts — everything non-excluded, same source filter |
-| `/{locale}/low-follower` | 低粉爆文 (coming-soon — blocked on X search API tier) |
 | `/{locale}/x-monitor` | X 监控 — 7 tracked handles with per-handle sidebar + firehose feed |
 | `/{locale}/saved` | 收藏 — **user-named collections** with inbox + tags + move/export MD |
 | `/{locale}/sources` | 信源 — grouped tables or card grid (`?view=cards`) |
@@ -131,7 +130,6 @@ AX 的 AI 雷达是一款面向 AI 行业编辑和分析师的情报工作台，
 |---|---|
 | `/{locale}` | 热点资讯 — HKR 分数环 + 等级/信源过滤 + 自动滚动头条 |
 | `/{locale}/all` | 全部 — 所有未排除的内容，共用信源过滤 |
-| `/{locale}/low-follower` | 低粉爆文（即将推出 — 待 X 高级搜索配额） |
 | `/{locale}/x-monitor` | X 监控 — 7 个账号侧栏 + 时间线 |
 | `/{locale}/saved` | 收藏 — **自定义收藏夹**，支持收件箱、标签、移动、导出 Markdown |
 | `/{locale}/sources` | 信源 — 分组表格或卡片网格（`?view=cards`） |

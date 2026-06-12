@@ -64,22 +64,30 @@ Grouping for the `信源` UI: same enum as `group` above.
 ### 2.2 Fetcher worker (`workers/fetcher/`)
 **Responsibility**: pull new items from a source, dedupe by `(source_id, external_id)`, write raw payload to `raw_items` table.
 
-- Runs on **Vercel Cron** (free-tier) OR a dedicated **Upstash QStash** queue for granular cadence.
+- Runs on **Vercel Cron** route handlers declared in `vercel.json`.
 - Each source has `cadence` → scheduler bucket.
 - RSS/Atom parsing via `fast-xml-parser`.
-- Scrape sources use `@vercel/edge-rate-limit` + `linkedom` for DOM traversal.
 - RSSHub routes hit `https://rsshub.app/{route}` (public instance) or self-hosted fallback.
-- X/Twitter uses **Apify `x-crawler` actor** OR X API v2 if budget allows.
+- Supported fetch kinds are `rss`, `atom`, `rsshub`, `x-api`, and
+  `aihot-api`; other catalog kinds remain visible in source health as
+  `pending` until an adapter is implemented.
+- X/Twitter uses the `workers/fetcher/x-api.ts` X API v2 adapter with
+  `source_health.last_external_id` as the incremental cursor.
 - WeChat (微信公众号) uses RSSHub `/wechat/mp/msgalbum/{biz}` — requires persistent cookie.
 
-**Output**: `raw_items` row — `{ id, source_id, external_id, url, title, raw_html, raw_text, published_at, fetched_at }`.
+**Output**: `raw_items` row — `{ id, source_id, external_id, url, title, raw_payload, published_at, fetched_at, normalized_at }`.
 
 ### 2.3 Normalizer
 Converts `raw_items` → `items`:
-- HTML → clean text (Readability.js via `@mozilla/readability`).
-- Author extraction.
-- Publication-timestamp parsing (per-source template).
-- Canonical URL resolution (follows redirects, strips UTM).
+- Extracts body text from structured `raw_payload` fields such as
+  `content:encoded`, `content`, `description`, and `summary`.
+- Strips HTML snippets to plain text with `linkedom` plus a regex fallback.
+  Full article markdown is fetched later by the article-body worker, not by
+  normalizer-time Readability extraction.
+- Uses the fetcher-provided `published_at` timestamp, falling back to the
+  current insert time only when the raw row lacks a timestamp.
+- Canonicalizes the URL locally by stripping fragments and tracking params;
+  it does not follow redirects.
 
 ### 2.4 Enricher (LLM)
 Before spending LLM tokens, each worker atomically claims pending rows in Postgres (`FOR UPDATE SKIP LOCKED`) and records `enrich_claimed_at`, `enrich_attempts`, and `enrich_error`. Claims become retryable after the stale window, but rows stop after the max-attempt cap until an operator reset clears those fields. This prevents overlapping cron ticks or manual backfills from repeatedly charging the same stuck item.
@@ -187,6 +195,10 @@ RSSHub is rate-limited; we cache aggressively (TTL 1h for most, 4h for low-caden
 
 ## 4. Low-follower viral detection (`低粉爆文`)
 
+**Deferred blueprint**: this route/feed is not shipped. The earlier
+`/{locale}/low-follower` page was removed, and the feature stays blocked on
+affordable source APIs for follower/impression data.
+
 A distinct feed that surfaces posts with **high engagement relative to author reach**. Signal definition:
 
 ```
@@ -209,14 +221,14 @@ Threshold tuning is per-platform. Initial: surface if `virality_score > 1.5` AND
 
 ## 5. X monitoring (`X监控`)
 
-A curated watchlist of researchers + labs whose tweets we always want to see (not score-gated).
+A curated set of enabled X handles stored as normal `sources` rows.
 
-- Stored as `x_watchlist` table: `(handle, reason, active)`.
-- Fetched via Apify actor `x-scraper` every 15 min or X API v2 `users/{id}/tweets`.
-- Displayed chronologically, grouped by author.
-- Feedback on a tweet can promote it to the main `热点资讯` feed.
-
-Seed watchlist (v0): `@sama`, `@AndrewYNg`, `@ylecun`, `@drjimfan`, `@karpathy`, `@_akhaliq`, `@jxmnop`, `@suchenzang`, `@erichartford`, `@tri_dao`, Chinese researchers list TBD.
+- Source rows use `kind='x-api'`; there is no separate watchlist table.
+- Fetched by `workers/fetcher/x-api.ts` via X API v2 `users/{id}/tweets`,
+  with replies/retweets excluded and `source_health.last_external_id` used
+  as `since_id`.
+- Stored in the same `raw_items`/`items` pipeline as RSS/API sources.
+- UI: `/{locale}/x-monitor` lists enabled X handles and their item feed.
 
 ---
 
@@ -229,7 +241,8 @@ Seed watchlist (v0): `@sama`, `@AndrewYNg`, `@ylecun`, `@drjimfan`, `@karpathy`,
 | **M2 — Enrich + Score + Cluster** | Vercel AI SDK v6 + DeepSeek V4 Pro/Flash for prose/scoring, Azure OpenAI `text-embedding-3-large` native 3072-dim via `halfvec` + HNSW cosine, cluster dedup at 0.75 similarity / 72h, `热点资讯` live feed with fallback ladder. Ultra-review: 3 CRITICAL + 7 HIGH all fixed. | ✅ shipped |
 | **M3 — Feedback + Auth** | `feedback` table + admin gate + real metrics on `策略迭代` page + `POST /api/feedback` | ✅ shipped |
 | **M4 — Editorial agent** | Agent session reads feedback, diffs `editorial.skill.md`, streams to console, versioned rollout | ✅ shipped |
-| **M5 — X monitor + Low-follower + cluster UI** | X watchlist via Apify/X API v2, viral-score detector, "also reported by N sources" chips | planned |
+| **X monitor + cluster UI** | X API v2 handle sources plus cross-source event chips/drawer | ✅ shipped |
+| **M5 — Low-follower viral** | Viral-score detector for low-follower posts once source APIs make follower/impression data affordable | planned |
 
 ### Deviations from original blueprint (what actually shipped vs. what Section 2 specified)
 

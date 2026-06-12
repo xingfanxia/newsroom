@@ -1,6 +1,10 @@
 # AI HOT Integration + Voice Rebase — PLAN
 
-**Status**: planned 2026-05-08. Implementation in progress.
+**Status**: shipped. This document is retained as the design record for the
+2026-05-08 AI HOT integration and voice rebase; current runtime behavior is
+summarized in `docs/architecture/ingestion.md` and implemented in
+`lib/sources/aihot.ts`, `workers/fetcher/aihot.ts`, and
+`workers/newsletter/aihot-daily.ts`.
 **Tier**: 4 (schema + cross-cutting voice change + LLM full backfill).
 **Engine**: superpowers cycle, wave-based parallel implementation.
 
