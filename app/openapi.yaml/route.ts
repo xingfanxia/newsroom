@@ -387,7 +387,7 @@ components:
               - type: object
                 properties:
                   distance: { type: number, description: "Cosine distance — semantic mode only. Smaller = closer." }
-        total: { type: integer }
+        total: { type: integer, description: "Total matches for the filtered query; lexical mode keeps this stable across limit/offset pages." }
         limit: { type: integer }
         offset: { type: integer }
         latency_ms: { type: integer, description: "Semantic mode only" }

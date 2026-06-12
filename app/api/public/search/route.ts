@@ -7,8 +7,6 @@
  *
  * Same item shape and field stripping as /api/public/feed.
  */
-import { getFeaturedStories } from "@/lib/items/live";
-import { semanticSearch } from "@/lib/items/semantic-search";
 import { publicRateLimit } from "@/lib/rate-limit/public";
 import {
   computeEtag,
@@ -21,8 +19,8 @@ import {
 import { toPublicApiItem } from "@/lib/api/public-items";
 import {
   publicSearchQueryParamSchema,
-  searchFeedQueryFromParams,
 } from "@/lib/api/feed-query-params";
+import { runSearchQuery } from "@/lib/api/search-results";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -56,18 +54,8 @@ export async function GET(req: Request) {
   });
 
   try {
-    if (p.mode === "semantic") {
-      const started = Date.now();
-      const result = await semanticSearch(p.q, {
-        locale: p.locale,
-        limit: p.limit,
-        sourceId: p.source_id,
-        sourceGroup: p.source_group,
-        sourceKind: p.source_kind,
-        dateFrom: p.date_from,
-        dateTo: p.date_to,
-        includeExcluded: p.tier === "all",
-      });
+    const result = await runSearchQuery(p);
+    if (result.mode === "semantic") {
       const etag = computeEtag(
         "public-search",
         `${baseSignal}|total=${result.total}|first=${result.items[0]?.id ?? ""}`,
@@ -76,35 +64,33 @@ export async function GET(req: Request) {
       return publicJson(
         {
           mode: "semantic",
-          q: p.q,
+          q: result.q,
           items: result.items.map((s) => ({
             ...toPublicApiItem(s, p.locale),
             distance: s.distance,
           })),
           total: result.total,
-          limit: p.limit,
-          offset: 0,
-          latency_ms: Date.now() - started,
+          limit: result.limit,
+          offset: result.offset,
+          latency_ms: result.latencyMs,
         },
         etag,
       );
     }
 
-    const feedQuery = searchFeedQueryFromParams(p);
-    const stories = await getFeaturedStories(feedQuery);
     const etag = computeEtag(
       "public-search",
-      `${baseSignal}|n=${stories.length}|first=${stories[0]?.id ?? ""}`,
+      `${baseSignal}|total=${result.total}|first=${result.items[0]?.id ?? ""}`,
     );
     if (ifNoneMatch(req, etag)) return notModified(etag);
     return publicJson(
       {
-        mode: p.mode,
-        q: p.q,
-        items: stories.map((s) => toPublicApiItem(s, p.locale)),
-        total: stories.length,
-        limit: p.limit,
-        offset: p.offset,
+        mode: result.mode,
+        q: result.q,
+        items: result.items.map((s) => toPublicApiItem(s, p.locale)),
+        total: result.total,
+        limit: result.limit,
+        offset: result.offset,
       },
       etag,
     );

@@ -39,4 +39,19 @@ describe("feed/search route query parsing source wiring", () => {
       "publicSearchQueryParamSchema.safeParse",
     );
   });
+
+  test("search routes share execution so lexical totals and semantic options cannot drift", () => {
+    for (const path of [
+      "app/api/v1/search/route.ts",
+      "app/api/public/search/route.ts",
+    ] as const) {
+      const source = read(path);
+
+      expect(source).toContain("@/lib/api/search-results");
+      expect(source).not.toContain("@/lib/items/semantic-search");
+      expect(source).not.toContain("getFeaturedStories");
+      expect(source).not.toContain("countFeaturedStories");
+      expect(source).not.toContain("total: stories.length");
+    }
+  });
 });

@@ -23,16 +23,9 @@
  *   locale       = zh | en (default en)
  */
 import { requireApiToken } from "@/lib/auth/api-token";
-import {
-  countFeaturedStories,
-  getFeaturedStories,
-} from "@/lib/items/live";
-import { semanticSearch } from "@/lib/items/semantic-search";
 import { toAgentApiItem } from "@/lib/api/v1-items";
-import {
-  searchFeedQueryFromParams,
-  v1SearchQueryParamSchema,
-} from "@/lib/api/feed-query-params";
+import { v1SearchQueryParamSchema } from "@/lib/api/feed-query-params";
+import { runSearchQuery } from "@/lib/api/search-results";
 
 export async function GET(req: Request) {
   const auth = await requireApiToken(req);
@@ -49,56 +42,31 @@ export async function GET(req: Request) {
   }
   const p = parsed.data;
 
-  if (p.mode === "semantic") {
-    try {
-      const started = Date.now();
-      const result = await semanticSearch(p.q, {
-        locale: p.locale,
-        limit: p.limit,
-        sourceId: p.source_id,
-        sourceGroup: p.source_group,
-        sourceKind: p.source_kind,
-        dateFrom: p.date_from,
-        dateTo: p.date_to,
-        // Semantic search defaults to spanning everything, including
-        // excluded-tier items, because intent often conflicts with
-        // curator heuristics (an "excluded" interview can be exactly
-        // what the agent is hunting for).
-        includeExcluded: p.tier === "all",
-      });
+  try {
+    const result = await runSearchQuery(p);
+    if (result.mode === "semantic") {
       return Response.json({
         mode: "semantic",
-        q: p.q,
+        q: result.q,
         items: result.items.map((s) => ({
           ...toAgentApiItem(s, p.locale),
           distance: s.distance,
         })),
         total: result.total,
-        limit: p.limit,
-        offset: 0,
+        limit: result.limit,
+        offset: result.offset,
         embedding_dims: result.embeddingDims,
-        latency_ms: Date.now() - started,
+        latency_ms: result.latencyMs,
       });
-    } catch (err) {
-      console.error("[api/v1/search semantic] failed", err);
-      return Response.json({ error: "server_error" }, { status: 500 });
     }
-  }
 
-  const feedQuery = searchFeedQueryFromParams(p);
-
-  try {
-    const [stories, total] = await Promise.all([
-      getFeaturedStories(feedQuery),
-      countFeaturedStories(feedQuery),
-    ]);
     return Response.json({
-      mode: p.mode,
-      q: p.q,
-      items: stories.map((s) => toAgentApiItem(s, p.locale)),
-      total,
-      limit: p.limit,
-      offset: p.offset,
+      mode: result.mode,
+      q: result.q,
+      items: result.items.map((s) => toAgentApiItem(s, p.locale)),
+      total: result.total,
+      limit: result.limit,
+      offset: result.offset,
     });
   } catch (err) {
     console.error("[api/v1/search] failed", err);
