@@ -8,8 +8,10 @@
  * Unknown cluster_id returns 200 with empty members[] so consumer agents can
  * degrade without a special error path — same convention as v1.
  */
-import { z } from "zod";
-import { toEventMemberApiItems } from "@/lib/api/event-members";
+import {
+  parseEventMemberRouteParams,
+  toEventMemberApiItems,
+} from "@/lib/api/event-members";
 import { getEventMembers } from "@/lib/items/live";
 import { publicRateLimit } from "@/lib/rate-limit/public";
 import {
@@ -24,9 +26,6 @@ import {
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const idSchema = z.coerce.number().int().positive();
-const localeSchema = z.enum(["zh", "en"]).default("en");
-
 export async function GET(
   req: Request,
   ctx: { params: Promise<{ id: string }> },
@@ -39,26 +38,25 @@ export async function GET(
   if (limited) return limited;
 
   const { id: idRaw } = await ctx.params;
-  const parsedId = idSchema.safeParse(idRaw);
-  if (!parsedId.success) return publicError("invalid_id", 400);
-
   const url = new URL(req.url);
-  const parsedLocale = localeSchema.safeParse(
-    url.searchParams.get("locale") ?? "en",
-  );
-  if (!parsedLocale.success) return publicError("invalid_locale", 400);
+  const parsed = parseEventMemberRouteParams({
+    rawId: idRaw,
+    rawLocale: url.searchParams.get("locale"),
+    defaultLocale: "en",
+  });
+  if (!parsed.ok) return publicError(parsed.error, 400);
 
   try {
-    const members = await getEventMembers(parsedId.data, parsedLocale.data);
+    const members = await getEventMembers(parsed.clusterId, parsed.locale);
     const body = {
-      cluster_id: parsedId.data,
+      cluster_id: parsed.clusterId,
       members: toEventMemberApiItems(members),
       total: members.length,
     };
     const etag = computeEtag(
       "public-event",
       etagSignal({
-        cluster_id: parsedId.data,
+        cluster_id: parsed.clusterId,
         n: members.length,
         last_at: members[members.length - 1]?.publishedAt ?? "",
       }),

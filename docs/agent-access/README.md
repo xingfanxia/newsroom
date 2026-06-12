@@ -52,7 +52,7 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 - **`lib/api/v1-items.ts`** — shared bearer-gated agent item serializer used by `/api/v1/feed`, `/api/v1/search`, `/api/v1/saved`, and MCP feed/search tools.
 - **`lib/api/story-item-fields.ts`** — shared flat Story field helpers used by both anonymous public serializers and bearer-gated `/api/v1/*` serializers, with each surface still owning its HKR exposure policy.
 - **`lib/api/item-detail.ts`** — shared full-detail item query + serializers used by `/api/public/items/{id}` and `/api/v1/items/{id}`. The v1 serializer keeps raw reasoning + RSS body; the public serializer strips LLM internals and uses an event-aware ETag signal.
-- **`lib/api/event-members.ts`** — shared event-member item serializer used by UI-internal, public, v1, and MCP event-member surfaces.
+- **`lib/api/event-members.ts`** — shared event-member route param parsing and item serializer used by UI-internal, public, v1, and MCP event-member surfaces.
 - **`lib/api/daily-columns.ts`** — shared daily-column query, REST serializers, ETag signals, date-window helpers, and MCP markdown renderer used by the public daily endpoints, site daily pages, `/api/rss/daily.xml`, and MCP daily resources.
 - **`lib/api/collection-requests.ts`** — shared saved-collection request schemas and duplicate-name detection used by cookie-gated `/api/admin/collections` and bearer-gated `/api/v1/collections`; each route still owns its auth and response envelope.
 - **`lib/tweaks.ts` + `lib/api/tweak-requests.ts`** — shared tweak option contracts, defaults, PATCH validation, and DB patch construction used by the client site-config provider, cookie-gated `/api/tweaks`, and bearer-gated `/api/v1/tweaks`.
@@ -85,7 +85,8 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 - `tests/api/public-items.test.ts` — anonymous feed/search item shape, HKR reason stripping, locale-specific event title fields
 - `tests/api/item-detail.test.ts` — public/v1 full-detail item shape, public HKR stripping, and event-aware ETag signal
 - `tests/api/item-detail-source.test.ts` — public/v1 item detail routes stay wired to the shared detail module
-- `tests/api/event-members.test.ts` — shared event-member item shape used by REST + MCP event coverage surfaces
+- `tests/api/event-members.test.ts` — shared event-member route param parsing and item shape used by REST + MCP event coverage surfaces
+- `tests/api/event-members-source.test.ts` — UI/public/v1 event-member routes stay wired to shared parsing + serialization helpers
 - `tests/api/daily-columns.test.ts` — daily-column REST serializers, ETag signals, UTC date windows, and MCP markdown renderer
 - `tests/api/daily-columns-source.test.ts` — public daily routes and MCP daily resources stay wired to the shared daily-column module
 - `tests/api/collection-requests.test.ts` — shared saved-collection request schemas for admin camelCase bodies and v1 snake_case bodies
@@ -96,7 +97,7 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 - `tests/api/v1-saved-source.test.ts` — `/api/v1/saved` stays wired to the shared saved-item serializer and owner-aware collection helper
 - `tests/items/collections.test.ts` — saved collection assignment rejects cross-owner collection ids
 
-Run these with `bun test tests/api/public-*.test.ts tests/api/feed-query-*.test.ts tests/api/source-catalog*.test.ts tests/api/item-detail*.test.ts tests/api/event-members.test.ts tests/api/daily-columns*.test.ts tests/api/collection*.test.ts tests/api/tweak*.test.ts tests/api/mcp-contract-source.test.ts tests/api/v1-saved-source.test.ts tests/items/collections.test.ts`.
+Run these with `bun test tests/api/public-*.test.ts tests/api/feed-query-*.test.ts tests/api/source-catalog*.test.ts tests/api/item-detail*.test.ts tests/api/event-members*.test.ts tests/api/daily-columns*.test.ts tests/api/collection*.test.ts tests/api/tweak*.test.ts tests/api/mcp-contract-source.test.ts tests/api/v1-saved-source.test.ts tests/items/collections.test.ts`.
 
 ## Operational notes
 
@@ -108,7 +109,7 @@ Run these with `bun test tests/api/public-*.test.ts tests/api/feed-query-*.test.
 - **Saved collection assignment is owner-aware** — `/api/v1/saved`, MCP `ax_radar_save`, and browser move actions all delegate to `assignSavedItemCollection` so a user cannot attach a save to another user's collection id.
 - **Saved collection request validation is shared across auth surfaces** — `/api/admin/collections` accepts browser camelCase bodies while `/api/v1/collections` accepts agent snake_case bodies, but both normalize through `lib/api/collection-requests.ts` before calling `lib/items/collections.ts`.
 - **Tweak validation is shared across browser + agent surfaces** — `lib/tweaks.ts` owns site-config option values and defaults, while `/api/tweaks` and `/api/v1/tweaks` both parse PATCH bodies and build DB patches through `lib/api/tweak-requests.ts`.
-- **Event-member serialization is shared across surfaces** — `/api/events/*`, `/api/public/events/*`, `/api/v1/events/*`, and MCP `ax_radar_event_members` all use `toEventMemberApiItems`.
+- **Event-member parsing + serialization is shared across surfaces** — `/api/events/*`, `/api/public/events/*`, and `/api/v1/events/*` parse `cluster_id` + `locale` through `parseEventMemberRouteParams`; those routes and MCP `ax_radar_event_members` all use `toEventMemberApiItems`.
 - **Daily-column serialization is centralized across REST, RSS, site pages, and MCP** — `lib/api/daily-columns.ts` owns `newsletters` queries where `kind='daily' AND column_title IS NOT NULL`, public JSON shape, ETag signals, UTC date-window lookup, RSS/page row listing, and MCP markdown rendering. The legacy structured-digest rows (where `headline IS NOT NULL`) ship separately via `/api/feed/newsletter/{locale}/rss.xml`.
 
 ## Related

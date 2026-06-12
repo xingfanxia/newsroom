@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  parseEventMemberRouteParams,
   toEventMemberApiItem,
   toEventMemberApiItems,
 } from "@/lib/api/event-members";
@@ -24,6 +25,54 @@ const expectedKeys = [
 ];
 
 describe("event member API serialization", () => {
+  test("parses shared route params with per-surface locale defaults", () => {
+    expect(
+      parseEventMemberRouteParams({
+        rawId: "42",
+        rawLocale: null,
+        defaultLocale: "zh",
+      }),
+    ).toEqual({ ok: true, clusterId: 42, locale: "zh" });
+    expect(
+      parseEventMemberRouteParams({
+        rawId: "42",
+        rawLocale: null,
+        defaultLocale: "en",
+      }),
+    ).toEqual({ ok: true, clusterId: 42, locale: "en" });
+    expect(
+      parseEventMemberRouteParams({
+        rawId: "42",
+        rawLocale: "en",
+        defaultLocale: "zh",
+      }),
+    ).toEqual({ ok: true, clusterId: 42, locale: "en" });
+  });
+
+  test("rejects invalid route ids and locale query values", () => {
+    expect(
+      parseEventMemberRouteParams({
+        rawId: "0",
+        rawLocale: null,
+        defaultLocale: "zh",
+      }),
+    ).toEqual({ ok: false, error: "invalid_id" });
+    expect(
+      parseEventMemberRouteParams({
+        rawId: "42",
+        rawLocale: "",
+        defaultLocale: "zh",
+      }),
+    ).toEqual({ ok: false, error: "invalid_locale" });
+    expect(
+      parseEventMemberRouteParams({
+        rawId: "42",
+        rawLocale: "ja",
+        defaultLocale: "zh",
+      }),
+    ).toEqual({ ok: false, error: "invalid_locale" });
+  });
+
   test("serializes the shared event members item contract", () => {
     const item = toEventMemberApiItem(member);
 

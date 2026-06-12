@@ -15,31 +15,29 @@
  * Returns empty members array (not 404) for unknown cluster ids so the UI's
  * drawer can degrade gracefully without a separate error path.
  */
-import { z } from "zod";
-import { toEventMemberApiItems } from "@/lib/api/event-members";
+import {
+  parseEventMemberRouteParams,
+  toEventMemberApiItems,
+} from "@/lib/api/event-members";
 import { getEventMembers } from "@/lib/items/live";
-
-const idSchema = z.coerce.number().int().positive();
-const localeSchema = z.enum(["zh", "en"]).default("zh");
 
 export async function GET(
   req: Request,
   ctx: { params: Promise<{ id: string }> },
 ) {
   const { id: idRaw } = await ctx.params;
-  const parsedId = idSchema.safeParse(idRaw);
-  if (!parsedId.success) {
-    return Response.json({ error: "invalid_id" }, { status: 400 });
-  }
-
   const url = new URL(req.url);
-  const parsedLocale = localeSchema.safeParse(url.searchParams.get("locale") ?? "zh");
-  if (!parsedLocale.success) {
-    return Response.json({ error: "invalid_locale" }, { status: 400 });
+  const parsed = parseEventMemberRouteParams({
+    rawId: idRaw,
+    rawLocale: url.searchParams.get("locale"),
+    defaultLocale: "zh",
+  });
+  if (!parsed.ok) {
+    return Response.json({ error: parsed.error }, { status: 400 });
   }
 
   try {
-    const members = await getEventMembers(parsedId.data, parsedLocale.data);
+    const members = await getEventMembers(parsed.clusterId, parsed.locale);
     return Response.json({
       members: toEventMemberApiItems(members),
       total: members.length,
