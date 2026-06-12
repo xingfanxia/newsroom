@@ -24,6 +24,12 @@ Shipped cleanup:
 - Shared article body + YouTube transcript prefetch sequencing through
   `workers/fetcher/content-prefetch.ts`, so `/api/cron/article-body` and
   `bun scripts/ops/run-cron.ts body` use the same production path.
+- Added an enrich claim readiness gate: normal web items must have
+  `body_fetched_at` set before `runEnrichBatch` can claim them, while
+  X/Twitter status URLs remain exempt because their adapter already stores
+  full tweet text. This prevents the `fetch-hourly :17` / `enrich :20`
+  cron ordering from spending LLM tokens before article-body has a chance
+  to run.
 - Shared the full cluster Stage A/A.5/B/B+/C/D sequence through `workers/cluster/pipeline.ts`, so `/api/cron/cluster` and `bun scripts/ops/run-cron.ts cluster` no longer drift.
 - Stopped a cluster-cron arbitration loop: Stage A and singleton-recluster now
   skip clusters already rejected for the item in `cluster_splits`, preventing

@@ -96,6 +96,12 @@ Converts `raw_items` → `items`:
 ### 2.4 Enricher (LLM)
 Before spending LLM tokens, each worker atomically claims pending rows in Postgres (`FOR UPDATE SKIP LOCKED`) and records `enrich_claimed_at`, `enrich_attempts`, and `enrich_error`. Claims become retryable after the stale window, but rows stop after the max-attempt cap until an operator reset clears those fields. This prevents overlapping cron ticks or manual backfills from repeatedly charging the same stuck item.
 
+The enrich claim query also waits for body prefetch to finish before spending
+LLM tokens on normal web articles: non-X/Twitter rows require
+`body_fetched_at IS NOT NULL`. X/Twitter status URLs are exempt because the
+X adapter writes full tweet text into `items.body` and the article-body worker
+intentionally skips auth-walled X pages.
+
 Per item, parallel LLM calls run with a bounded per-call timeout (default 90s; `LLM_CALL_TIMEOUT_MS` override). The pipeline now chooses a treatment tier before calling the model:
 
 1. **Treatment** — `workers/enrich/treatment.ts` classifies items as `high` or `fast`.

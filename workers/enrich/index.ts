@@ -39,6 +39,11 @@ const CONCURRENCY = 10;
 const MAX_PER_RUN = 60;
 const CLAIM_STALE_MINUTES = 45;
 const MAX_ATTEMPTS = 3;
+const BODY_PREFETCH_READY_SQL = sql`(
+  ${items.bodyFetchedAt} IS NOT NULL
+  OR ${items.canonicalUrl} ILIKE '%x.com/%/status/%'
+  OR ${items.canonicalUrl} ILIKE '%twitter.com/%/status/%'
+)`;
 
 export type EnrichReport = {
   processed: number;
@@ -126,6 +131,7 @@ async function claimPendingEnrichItems(
   const maxAttempts = opts.maxAttempts ?? MAX_ATTEMPTS;
   const filters = [
     sql`${items.enrichedAt} IS NULL`,
+    BODY_PREFETCH_READY_SQL,
     sql`coalesce(${items.enrichAttempts}, 0) < ${maxAttempts}`,
     sql`(
       ${items.enrichClaimedAt} IS NULL
@@ -147,8 +153,8 @@ async function claimPendingEnrichItems(
   //   1. items that were previously tiered non-excluded (featured/p1/all)
   //      and are now unenriched — these are the curated cards readers see
   //      AND we usually reset them deliberately to re-run with new prompts.
-  //   2. items that have bodyMd (Jina already fetched) — they'll benefit
-  //      from a richer enrichment than a title-only item.
+  //   2. items that have bodyMd (Jina/article-body already fetched) —
+  //      they'll benefit from a richer enrichment than a title-only item.
   //   3. most-recent-first by publishedAt.
   const claimedRows = await client.execute(sql`
     WITH candidates AS (
