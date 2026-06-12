@@ -9,8 +9,7 @@ import {
   type WindowKey,
   type WindowTotals,
 } from "@/lib/llm/stats";
-
-export const USAGE_WINDOWS = ["today", "week", "month", "all"] as const;
+export { USAGE_WINDOWS } from "@/lib/llm/stats";
 
 export type UsageSummaryApi = {
   window: WindowKey;

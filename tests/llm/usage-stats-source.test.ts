@@ -20,9 +20,12 @@ describe("usage stats surfaces", () => {
   const summary = readFileSync(resolve(root, "lib/api/usage-summary.ts"), "utf8");
 
   it("supports an all-time usage window across admin, API, and MCP surfaces", () => {
+    expect(stats).toContain("export const USAGE_WINDOWS");
     expect(stats).toContain('"all"');
-    expect(page).toContain('"all"');
-    expect(summary).toContain('"all"');
+    expect(page).toContain("USAGE_WINDOWS");
+    expect(page).not.toContain('const RANGES = ["today", "week", "month", "all"]');
+    expect(summary).toContain("USAGE_WINDOWS");
+    expect(summary).not.toContain('export const USAGE_WINDOWS = ["today", "week", "month", "all"]');
     expect(route).toContain("USAGE_WINDOWS");
     expect(mcp).toContain("USAGE_WINDOWS");
   });

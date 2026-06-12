@@ -9,15 +9,14 @@ import {
   breakdownByModel,
   recentCalls,
   dailySpend,
+  USAGE_WINDOWS,
+  type WindowKey,
   type WindowTotals,
 } from "@/lib/llm/stats";
 
 export const dynamic = "force-dynamic";
 
-const RANGES = ["today", "week", "month", "all"] as const;
-type Range = (typeof RANGES)[number];
-
-const RANGE_LABEL: Record<Range, { en: string; zh: string }> = {
+const RANGE_LABEL: Record<WindowKey, { en: string; zh: string }> = {
   today: { en: "today", zh: "今日" },
   week: { en: "past 7d", zh: "近 7 天" },
   month: { en: "past 30d", zh: "近 30 天" },
@@ -44,8 +43,10 @@ export default async function UsagePage({
   const [{ locale }, sp] = await Promise.all([params, searchParams]);
   setRequestLocale(locale);
   const zh = locale === "zh";
-  const range: Range = (RANGES as readonly string[]).includes(sp.range ?? "")
-    ? (sp.range as Range)
+  const range: WindowKey = (USAGE_WINDOWS as readonly string[]).includes(
+    sp.range ?? "",
+  )
+    ? (sp.range as WindowKey)
     : "week";
 
   const [selected, today, week, month, all, byTask, byModel, recent, daily, stats] =
@@ -112,7 +113,7 @@ export default async function UsagePage({
           style={{ display: "flex", gap: 8, margin: "12px 0 4px", flexWrap: "wrap" }}
         >
           <div className="fil-grp" style={{ display: "flex", gap: 6 }}>
-            {RANGES.map((r) => (
+            {USAGE_WINDOWS.map((r) => (
               <Link
                 key={r}
                 href={`?range=${r}`}

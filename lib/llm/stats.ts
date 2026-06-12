@@ -5,7 +5,8 @@ import { db } from "@/db/client";
 import { sql, desc } from "drizzle-orm";
 import { llmUsage } from "@/db/schema";
 
-export type WindowKey = "today" | "week" | "month" | "all";
+export const USAGE_WINDOWS = ["today", "week", "month", "all"] as const;
+export type WindowKey = (typeof USAGE_WINDOWS)[number];
 
 function windowClause(w: WindowKey) {
   switch (w) {

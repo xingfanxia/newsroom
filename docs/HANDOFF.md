@@ -33,6 +33,9 @@ Shipped cleanup:
   `lib/api/usage-summary.ts`; `/api/v1/usage/summary` and MCP
   `ax_radar_usage` now share the same totals, `by_task`, `by_model`, and
   `recent_calls` contract.
+- Shared usage window keys through `USAGE_WINDOWS` in `lib/llm/stats.ts`, so
+  the admin usage page, v1 usage summary, and MCP usage tool cannot drift on
+  the `today|week|month|all` window set.
 - Shared hourly/daily/weekly fetch+normalize sequencing through `workers/fetcher/pipeline.ts`, with HTTP route wiring in `app/api/cron/_fetch-bucket-route.ts` and local cron scripts using the same helper.
 - Shared article body + YouTube transcript prefetch sequencing through
   `workers/fetcher/content-prefetch.ts`, so `/api/cron/article-body` and
