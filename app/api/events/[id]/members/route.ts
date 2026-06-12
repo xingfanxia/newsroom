@@ -16,6 +16,7 @@
  * drawer can degrade gracefully without a separate error path.
  */
 import { z } from "zod";
+import { toEventMemberApiItems } from "@/lib/api/event-members";
 import { getEventMembers } from "@/lib/items/live";
 
 const idSchema = z.coerce.number().int().positive();
@@ -40,14 +41,7 @@ export async function GET(
   try {
     const members = await getEventMembers(parsedId.data, parsedLocale.data);
     return Response.json({
-      members: members.map((m) => ({
-        source_id: m.sourceId,
-        source_name: m.sourceName,
-        title: m.title,
-        url: m.url,
-        published_at: m.publishedAt,
-        importance: m.importance,
-      })),
+      members: toEventMemberApiItems(members),
       total: members.length,
     });
   } catch (err) {

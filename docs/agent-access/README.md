@@ -48,6 +48,7 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 - **`lib/api/public-helpers.ts`** — `computeEtag`, `ifNoneMatch`, `notModified`, `publicJson`, `publicError`, `publicHeaders`. Every route returns CORS + cache headers via these.
 - **`lib/api/public-items.ts`** — shared anonymous feed/search item serializer. It keeps the public `FeedItem` shape aligned across `/api/public/feed` and `/api/public/search`.
 - **`lib/api/story-item-fields.ts`** — shared flat Story field helpers used by both anonymous public serializers and bearer-gated `/api/v1/*` serializers, with each surface still owning its HKR exposure policy.
+- **`lib/api/event-members.ts`** — shared event-member item serializer used by UI-internal, public, v1, and MCP event-member surfaces.
 
 ## Adding a new public endpoint
 
@@ -71,13 +72,15 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 - `tests/api/public-helpers.test.ts` — ETag determinism, family isolation, headers, CORS
 - `tests/api/public-ratelimit.test.ts` — threshold, IP isolation, family isolation, IPv4/IPv6 header fallback
 - `tests/api/public-items.test.ts` — anonymous feed/search item shape, HKR reason stripping, locale-specific event title fields
+- `tests/api/event-members.test.ts` — shared event-member item shape used by REST + MCP event coverage surfaces
 
-Both run via `bun test tests/api/public-*.test.ts`.
+Run these with `bun test tests/api/public-*.test.ts tests/api/event-members.test.ts`.
 
 ## Operational notes
 
 - **Rate limiter is Vercel-instance-local** — buckets don't survive cold starts. Treated as "discourage hammering" not "airtight cap." Real abuse defense lives at the CDN/WAF layer.
 - **Field stripping is centralized for feed/search items** — `toPublicApiItem` strips HKR reasons once and is shared by `/api/public/feed` and `/api/public/search`. Detail endpoints still own their nested payload shape; if adding a new domain field, update the relevant serializer and OpenAPI schema together.
+- **Event-member serialization is shared across surfaces** — `/api/events/*`, `/api/public/events/*`, `/api/v1/events/*`, and MCP `ax_radar_event_members` all use `toEventMemberApiItems`.
 - **Daily-column endpoints** read from `newsletters` table where `kind='daily' AND column_title IS NOT NULL`. The legacy structured-digest rows (where `headline IS NOT NULL`) ship separately via `/api/feed/newsletter/{locale}/rss.xml`.
 
 ## Related

@@ -9,6 +9,7 @@
  * degrade without a special error path — same convention as v1.
  */
 import { z } from "zod";
+import { toEventMemberApiItems } from "@/lib/api/event-members";
 import { getEventMembers } from "@/lib/items/live";
 import { publicRateLimit } from "@/lib/rate-limit/public";
 import {
@@ -51,14 +52,7 @@ export async function GET(
     const members = await getEventMembers(parsedId.data, parsedLocale.data);
     const body = {
       cluster_id: parsedId.data,
-      members: members.map((m) => ({
-        source_id: m.sourceId,
-        source_name: m.sourceName,
-        title: m.title,
-        url: m.url,
-        published_at: m.publishedAt,
-        importance: m.importance,
-      })),
+      members: toEventMemberApiItems(members),
       total: members.length,
     };
     const etag = computeEtag(

@@ -51,6 +51,7 @@ import {
 } from "@/lib/items/live";
 import { semanticSearch } from "@/lib/items/semantic-search";
 import { getItemDetail } from "@/lib/items/detail";
+import { toEventMemberApiItems } from "@/lib/api/event-members";
 import { applyFeedbackToggle } from "@/lib/feedback/toggle";
 import { listCollections } from "@/lib/items/collections";
 import { totalsByWindow } from "@/lib/llm/stats";
@@ -190,14 +191,7 @@ function buildServer(user: SessionUser): McpServer {
       const members = await getEventMembers(cluster_id, locale ?? "en");
       return text({
         cluster_id,
-        members: members.map((m) => ({
-          source_id: m.sourceId,
-          source_name: m.sourceName,
-          title: m.title,
-          url: m.url,
-          published_at: m.publishedAt,
-          importance: m.importance,
-        })),
+        members: toEventMemberApiItems(members),
         total: members.length,
       });
     },
