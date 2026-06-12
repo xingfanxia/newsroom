@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { runArticleBodyFetch } from "@/workers/fetcher/article-body";
-import { runYoutubeTranscriptFetch } from "@/workers/fetcher/youtube-transcript";
+import { runContentPrefetch } from "@/workers/fetcher/content-prefetch";
 import { verifyCron } from "../_auth";
 
 // Article body / transcript prefetch — split out of /api/cron/enrich so
@@ -16,14 +15,11 @@ export async function GET(req: Request) {
   const deny = verifyCron(req);
   if (deny) return deny;
 
-  const [articleBody, youtubeTranscript] = await Promise.all([
-    runArticleBodyFetch(),
-    runYoutubeTranscriptFetch(),
-  ]);
+  const report = await runContentPrefetch();
   return NextResponse.json({
     kind: "article-body",
     at: new Date().toISOString(),
-    articleBody,
-    youtubeTranscript,
+    articleBody: report.articleBody,
+    youtubeTranscript: report.youtubeTranscript,
   });
 }

@@ -21,6 +21,9 @@ Shipped cleanup:
 - Shared cookie-session auth JSON-error mapping for required-session user routes (`/api/feedback*`, `/api/tweaks`) through `lib/api/session-auth.ts`.
 - Shared mutating route JSON body parsing and Zod error-envelope handling through `lib/api/json-body.ts`.
 - Shared hourly/daily/weekly fetch+normalize sequencing through `workers/fetcher/pipeline.ts`, with HTTP route wiring in `app/api/cron/_fetch-bucket-route.ts` and local cron scripts using the same helper.
+- Shared article body + YouTube transcript prefetch sequencing through
+  `workers/fetcher/content-prefetch.ts`, so `/api/cron/article-body` and
+  `bun scripts/ops/run-cron.ts body` use the same production path.
 - Shared the full cluster Stage A/A.5/B/B+/C/D sequence through `workers/cluster/pipeline.ts`, so `/api/cron/cluster` and `bun scripts/ops/run-cron.ts cluster` no longer drift.
 - Stopped a cluster-cron arbitration loop: Stage A and singleton-recluster now
   skip clusters already rejected for the item in `cluster_splits`, preventing
@@ -39,7 +42,7 @@ Verification:
 - `bun run code:dead` — passed.
 - `bun run code:dead:exports` — passed.
 - `bun run lint` — passed with no warnings.
-- `bun test --env-file=.env.local` — 505 pass, 0 fail.
+- `bun test --env-file=.env.local` — 607 pass, 1 skip, 0 fail.
 - `bun run build` — passed.
 - `git diff --check` — passed.
 

@@ -25,8 +25,11 @@ describe("split enrich cron — each worker has its own route", () => {
     const path = resolve(root, "app/api/cron/article-body/route.ts");
     expect(existsSync(path)).toBe(true);
     const src = readFileSync(path, "utf8");
-    expect(src).toContain("runArticleBodyFetch");
-    expect(src).toContain("runYoutubeTranscriptFetch");
+    expect(src).toContain("runContentPrefetch");
+    expect(src).toContain("articleBody: report.articleBody");
+    expect(src).toContain("youtubeTranscript: report.youtubeTranscript");
+    expect(src).not.toContain("runArticleBodyFetch");
+    expect(src).not.toContain("runYoutubeTranscriptFetch");
     // Must NOT chain enrich/commentary/score-backfill
     expect(src).not.toContain("runEnrichBatch");
     expect(src).not.toContain("runScoreBackfill");

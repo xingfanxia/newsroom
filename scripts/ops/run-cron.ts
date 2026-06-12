@@ -9,7 +9,7 @@ import { runNormalizer } from "@/workers/normalizer";
 import { runEnrichBatch } from "@/workers/enrich";
 import { runClusterPipeline } from "@/workers/cluster/pipeline";
 import { runFetchAndNormalize } from "@/workers/fetcher/pipeline";
-import { runArticleBodyFetch } from "@/workers/fetcher/article-body";
+import { runContentPrefetch } from "@/workers/fetcher/content-prefetch";
 import { runYoutubeTranscriptFetch } from "@/workers/fetcher/youtube-transcript";
 
 const USAGE =
@@ -48,8 +48,8 @@ async function main() {
     return;
   }
   if (kind === "body") {
-    const b = await runArticleBodyFetch();
-    console.log(JSON.stringify({ body: b }, null, 2));
+    const report = await runContentPrefetch();
+    console.log(JSON.stringify(report, null, 2));
     return;
   }
   if (kind === "yt") {
