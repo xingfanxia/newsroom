@@ -9,6 +9,8 @@ describe("admin system stats source wiring", () => {
   it("derives cron schedules from vercel.json", () => {
     expect(source).toContain('import vercelConfig from "@/vercel.json"');
     expect(source).toContain("vercelConfig as { crons?: VercelCronConfig[] }");
+    expect(source).toContain("cadenceMinutesFromCron(c.schedule)");
+    expect(source).not.toContain("CRON_CADENCE_MINUTES_BY_PATH");
     expect(source).not.toContain('{ name: "newsletter-daily", schedule: "11 9 * * *"');
   });
 
