@@ -2,17 +2,13 @@ import type { Story } from "@/lib/types";
 import {
   toApiItemCommonFields,
   toApiItemEventFields,
+  toPublicHkr,
   type ApiItemCommonFields,
   type ApiItemEventFields,
+  type PublicHkr,
 } from "@/lib/api/story-item-fields";
 
-type PublicHkr = { h: boolean; k: boolean; r: boolean };
-
 export type PublicApiItem = ApiItemCommonFields<PublicHkr> & ApiItemEventFields;
-
-function toPublicHkr(hkr: Story["hkr"]): PublicHkr | null {
-  return hkr ? { h: hkr.h, k: hkr.k, r: hkr.r } : null;
-}
 
 /**
  * Shared anonymous /api/public item contract.

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { toPublicApiItem } from "@/lib/api/public-items";
+import { toPublicHkr } from "@/lib/api/story-item-fields";
 import type { Story } from "@/lib/types";
 
 const baseStory: Story = {
@@ -113,5 +114,20 @@ describe("toPublicApiItem", () => {
     expect(item.canonical_title).toBeNull();
     expect(item.first_seen_at).toBeNull();
     expect(item.latest_member_at).toBeNull();
+  });
+});
+
+describe("toPublicHkr", () => {
+  test("strips HKR reasons and normalizes missing values", () => {
+    expect(toPublicHkr(null)).toBeNull();
+    expect(
+      toPublicHkr({
+        h: true,
+        k: false,
+        r: true,
+        reasonsZh: { h: "标题", k: "知识", r: "影响" },
+        reasonsEn: { h: "headline", k: "knowledge", r: "resonance" },
+      }),
+    ).toEqual({ h: true, k: false, r: true });
   });
 });

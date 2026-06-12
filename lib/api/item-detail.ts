@@ -2,10 +2,10 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clusters, items, sources } from "@/db/schema";
 import { etagSignal } from "@/lib/api/public-helpers";
+import { toPublicHkr, type PublicHkr } from "@/lib/api/story-item-fields";
 import type { Story } from "@/lib/types";
 
 type Hkr = Story["hkr"];
-type PublicHkr = { h: boolean; k: boolean; r: boolean };
 
 type DetailTags = {
   capabilities: string[];
@@ -177,11 +177,6 @@ function detailTags(tags: unknown): DetailTags {
   };
 }
 
-function publicHkr(hkr: Hkr | null): PublicHkr | null {
-  if (!hkr) return null;
-  return { h: Boolean(hkr.h), k: Boolean(hkr.k), r: Boolean(hkr.r) };
-}
-
 function isEvent(row: ItemDetailRow): boolean {
   return row.clusterId != null && (row.clusterMemberCount ?? 0) > 1;
 }
@@ -272,7 +267,7 @@ export function toV1ItemDetail(row: ItemDetailRow): V1ItemDetail {
 export function toPublicItemDetail(row: ItemDetailRow): PublicItemDetail {
   return {
     ...baseDetail(row),
-    hkr: publicHkr((row.hkr as Hkr) ?? null),
+    hkr: toPublicHkr((row.hkr as Hkr) ?? null),
     event: detailEvent(row, `/api/public/events/${row.clusterId}/members`),
   };
 }

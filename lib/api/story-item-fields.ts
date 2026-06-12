@@ -1,5 +1,7 @@
 import type { Story } from "@/lib/types";
 
+export type PublicHkr = { h: boolean; k: boolean; r: boolean };
+
 export type ApiItemCommonFields<Hkr> = {
   id: string;
   title: string;
@@ -24,6 +26,13 @@ export type ApiItemEventFields = {
   first_seen_at: string | null;
   latest_member_at: string | null;
 };
+
+export function toPublicHkr(
+  hkr: Story["hkr"] | null | undefined,
+): PublicHkr | null {
+  if (!hkr) return null;
+  return { h: Boolean(hkr.h), k: Boolean(hkr.k), r: Boolean(hkr.r) };
+}
 
 export function toApiItemCommonFields<Hkr>(
   story: Story,
