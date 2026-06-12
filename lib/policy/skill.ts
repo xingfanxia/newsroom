@@ -108,24 +108,6 @@ export async function listSkillVersions(name: string) {
     .orderBy(desc(policyVersions.version));
 }
 
-/** Full content of one committed version — for diff base lookups. */
-export async function getSkillVersion(
-  name: string,
-  version: number,
-): Promise<ActiveSkill | null> {
-  const [row] = await db()
-    .select()
-    .from(policyVersions)
-    .where(
-      and(
-        eq(policyVersions.skillName, name),
-        eq(policyVersions.version, version),
-      ),
-    )
-    .limit(1);
-  return row ? fromRow(row) : null;
-}
-
 /**
  * Commit a new version atomically. Computes next version = max + 1 and
  * inserts. Returns the committed row. Caller is responsible for any cache

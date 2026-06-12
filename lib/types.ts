@@ -1,5 +1,3 @@
-export type Locale = "zh" | "en";
-
 export type SourceKind =
   | "rss"
   | "atom"
@@ -130,4 +128,3 @@ export type DiffLine =
   | { kind: "remove"; content: string }
   | { kind: "context"; content: string }
   | { kind: "meta"; content: string };
-

@@ -12,9 +12,6 @@ export type SavedCollection = {
   createdAt: string;
 };
 
-/** Virtual "inbox" collection id — represents uncategorized (collection_id IS NULL) saves. */
-export const INBOX_COLLECTION = "inbox" as const;
-
 /**
  * List all named collections for a user + running save counts.
  * Pinned collections surface first. Unrelated to the virtual `inbox` bucket,

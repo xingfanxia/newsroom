@@ -17,7 +17,7 @@ export type RateLimitConfig = {
 };
 
 /** Sensible default — matches AI HOT's 600r/min/IP. */
-export const PUBLIC_RL_DEFAULT: RateLimitConfig = {
+const PUBLIC_RL_DEFAULT: RateLimitConfig = {
   family: "public-default",
   windowMs: 60_000,
   max: 600,

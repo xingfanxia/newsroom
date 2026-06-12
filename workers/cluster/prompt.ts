@@ -279,8 +279,6 @@ export const eventCommentarySchema = z.object({
     ),
 });
 
-export type EventCommentaryOutput = z.infer<typeof eventCommentarySchema>;
-
 // ── System prompt ─────────────────────────────────────────────────────────
 
 export const eventCommentarySystem = `You're the senior editor for AX's AI RADAR. Audience: AI practitioners checking a daily feed. Write like a smart friend sharing a link: clear, grounded, conversational, and useful.
@@ -342,8 +340,6 @@ export const eventCommentaryNoteSchema = z.object({
       "English one-line take (≤200 chars, 2 sentences OK). Not a summary. Write what you'd text another AI person about why this multi-source event matters and where to discount it. Forbid: it is worth noting / what this means / paradigm shift / 'the real thing to watch is'.",
     ),
 });
-export type EventCommentaryNoteOutput = z.infer<typeof eventCommentaryNoteSchema>;
-
 export const eventCommentaryNoteOnlySystem = `You're the senior editor for AX's AI RADAR. Audience: AI practitioners checking a daily feed.
 
 This event scored "all" tier — multiple sources covered it, but it didn't clear the bar for a full deep-dive. Produce ONLY the one-line take:

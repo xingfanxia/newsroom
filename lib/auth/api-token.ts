@@ -17,7 +17,7 @@ import { db } from "@/db/client";
 import { apiTokens } from "@/db/schema";
 import type { SessionUser } from "./session";
 
-export const API_TOKEN_HEADER = "authorization";
+const API_TOKEN_HEADER = "authorization";
 
 /** Canonical hash — used at mint, at verify, never in logs. */
 export function hashToken(token: string): string {
@@ -28,7 +28,7 @@ export function hashToken(token: string): string {
  * Parse `Authorization: Bearer <token>` from a request. Returns the token
  * string on success, null if the header is missing or malformed.
  */
-export function extractBearer(headers: Headers): string | null {
+function extractBearer(headers: Headers): string | null {
   const raw = headers.get(API_TOKEN_HEADER);
   if (!raw) return null;
   const match = /^Bearer\s+([A-Za-z0-9_\-]+)$/.exec(raw.trim());
@@ -40,7 +40,7 @@ export function extractBearer(headers: Headers): string | null {
  * null on miss / revoked. Bumps last_used_at as a fire-and-forget side
  * effect so we never block the request on the bookkeeping UPDATE.
  */
-export async function verifyApiToken(
+async function verifyApiToken(
   token: string,
 ): Promise<SessionUser | null> {
   if (!token) return null;

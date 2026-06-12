@@ -251,31 +251,3 @@ async function fetchJinaMarkdown(url: string): Promise<JinaResult> {
     clearTimeout(timer);
   }
 }
-
-/**
- * Ops helper — reset body_fetched_at to NULL for rows that failed the
- * initial fetch so the next cron tick retries them. Call sparingly.
- */
-export async function resetFailedFetches(): Promise<number> {
-  const client = db();
-  const result = await client
-    .update(items)
-    .set({ bodyFetchedAt: null })
-    .where(and(isNotNull(items.bodyFetchedAt), isNull(items.bodyMd)))
-    .returning({ id: items.id });
-  return result.length;
-}
-
-/**
- * Ops helper — reset body_fetched_at for ALL items so a full re-fetch runs.
- * Use only when Jina output format changed or we want to redo everything.
- */
-export async function resetAllFetches(): Promise<number> {
-  const client = db();
-  const result = await client
-    .update(items)
-    .set({ bodyFetchedAt: null })
-    .where(sql`true`)
-    .returning({ id: items.id });
-  return result.length;
-}

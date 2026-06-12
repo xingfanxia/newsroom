@@ -55,7 +55,7 @@ export class ForbiddenError extends Error {
   }
 }
 
-export async function requireUser(): Promise<SessionUser> {
+async function requireUser(): Promise<SessionUser> {
   const user = await getSessionUser();
   if (!user) throw new UnauthorizedError();
   return user;

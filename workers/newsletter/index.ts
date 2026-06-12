@@ -18,7 +18,7 @@ import { items, newsletters } from "@/db/schema";
 import { generateStructured, profiles } from "@/lib/llm";
 
 export type NewsletterKind = "daily" | "monthly";
-export type NewsletterLocale = "zh" | "en";
+type NewsletterLocale = "zh" | "en";
 
 const DAILY_TOP_N = 25;
 const MONTHLY_TOP_N = 75;
@@ -68,7 +68,7 @@ type NewsletterOutput = z.infer<typeof newsletterSchema>;
  *   re-runs within the same hour coalesce into the same row.
  * Monthly: rolling past 30 days from `now`.
  */
-export function computeWindow(
+function computeWindow(
   kind: NewsletterKind,
   now: Date = new Date(),
 ): { start: Date; end: Date } {
@@ -325,4 +325,3 @@ ${lines.join("\n\n")}
 
 // Daily column writer (replaces runNewsletterBatch("daily") for new format).
 export { runDailyColumn } from "./run-daily-column";
-export type { DailyColumnReport } from "./run-daily-column";

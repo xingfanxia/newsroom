@@ -1,7 +1,6 @@
 import {
   generateText as aiGenerateText,
   generateObject as aiGenerateObject,
-  streamText as aiStreamText,
   embed as aiEmbed,
   embedMany as aiEmbedMany,
   type LanguageModel,
@@ -74,7 +73,7 @@ function googleClient() {
 }
 
 let cachedAzure: ReturnType<typeof createAzure> | null = null;
-export function normalizeAzureApiVersion(raw: string | undefined): string {
+function normalizeAzureApiVersion(raw: string | undefined): string {
   if (!raw || raw === "v1") return "2024-12-01-preview";
   return raw;
 }
@@ -614,23 +613,6 @@ export async function generateStructured<T extends z.ZodTypeAny>(
       err,
     );
   }
-}
-
-export function streamText(req: GenerateTextRequest) {
-  const provider = resolveProvider(req.provider);
-  const model = modelFor(provider, { deployment: req.deployment });
-  const adjusted = applyAzureFoundryWorkaround(provider, req);
-  return aiStreamText({
-    model,
-    system: adjusted.system,
-    messages: adjusted.messages,
-    timeout: llmCallTimeoutMs(),
-    maxOutputTokens: req.maxTokens ?? 2048,
-    providerOptions: reasoningProviderOptions(provider, req.reasoningEffort),
-    ...(req.temperature !== undefined
-      ? { temperature: req.temperature }
-      : {}),
-  });
 }
 
 // ── Embeddings ──────────────────────────────────────────────────

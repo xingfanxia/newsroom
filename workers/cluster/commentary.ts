@@ -33,7 +33,7 @@ import {
 import { generateChineseCommentary } from "@/workers/enrich/chinese";
 import { treatmentForScore } from "@/workers/enrich/treatment";
 
-export const MAX_EVENT_COMMENTARY_PER_RUN = 8;
+const MAX_EVENT_COMMENTARY_PER_RUN = 8;
 
 export type EventCommentaryReport = {
   processed: number;

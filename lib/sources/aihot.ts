@@ -25,7 +25,7 @@ const ITEM_CATEGORIES = [
 type ItemCategory = (typeof ITEM_CATEGORIES)[number];
 type AihotApiItemCategory = ItemCategory | "paper";
 
-export type AihotSectionLabel =
+type AihotSectionLabel =
   | "模型发布/更新"
   | "产品发布/更新"
   | "行业动态"
@@ -68,7 +68,7 @@ export type AihotItemsResponse = {
   items: AihotItem[];
 };
 
-export type AihotDailySection = {
+type AihotDailySection = {
   label: AihotSectionLabel;
   items: Array<{
     title: string;
@@ -236,10 +236,6 @@ export async function fetchItems(
 // ── public API: dailies ──────────────────────────────────────────────────
 
 const YYYY_MM_DD = /^\d{4}-\d{2}-\d{2}$/;
-
-export async function fetchDailyLatest(): Promise<AihotDailyReport> {
-  return await aihotFetch<AihotDailyReport>("/api/public/daily");
-}
 
 export async function fetchDailyByDate(
   date: string,

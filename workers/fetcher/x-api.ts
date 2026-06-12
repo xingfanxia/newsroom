@@ -149,7 +149,7 @@ async function xFetch<T>(path: string, params?: URLSearchParams): Promise<T> {
 }
 
 /** Resolve a handle (e.g. "dotey") to its numeric user ID. Cached. */
-export async function resolveUserId(handle: string): Promise<string> {
+async function resolveUserId(handle: string): Promise<string> {
   const key = handle.toLowerCase();
   const cached = userIdCache.get(key);
   if (cached) return cached;
@@ -163,7 +163,7 @@ export async function resolveUserId(handle: string): Promise<string> {
   return body.data.id;
 }
 
-export type FetchTimelineOptions = {
+type FetchTimelineOptions = {
   userId: string;
   /** If set, X only returns tweets newer than this ID. Keeps spend low. */
   sinceId?: string | null;
@@ -176,14 +176,14 @@ export type FetchTimelineOptions = {
   paginationToken?: string;
 };
 
-export type TimelineResult = {
+type TimelineResult = {
   tweets: XTweet[];
   newestId: string | null;
   nextToken: string | null;
 };
 
 /** Pull a user's recent original posts, excluding retweets + replies. */
-export async function fetchUserTimeline(
+async function fetchUserTimeline(
   opts: FetchTimelineOptions,
 ): Promise<TimelineResult> {
   const params = new URLSearchParams();

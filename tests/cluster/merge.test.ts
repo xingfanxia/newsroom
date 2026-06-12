@@ -42,7 +42,7 @@ describe("Merge thresholds", () => {
   });
 
   it("MERGE_TIME_OVERLAP_HOURS = 72 (item-level published_at overlap)", () => {
-    expect(mergeSrc).toContain("export const MERGE_TIME_OVERLAP_HOURS = 72;");
+    expect(mergeSrc).toContain("const MERGE_TIME_OVERLAP_HOURS = 72;");
   });
 
   it("documents the calibration warning for embedding-model swaps", () => {

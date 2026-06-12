@@ -5,12 +5,13 @@
 Current maintenance direction:
 - Start docs navigation from `docs/README.md`; historical plans/handoffs are useful context, not current implementation instructions.
 - `bun run lint` is expected to be clean with zero warnings.
-- `bun run code:dead` is the low-noise Knip gate for unused files/dependencies/unresolved imports and should exit cleanly. Use `bun run code:dead:exports` separately for manual export-boundary review.
+- `bun run code:dead` is the low-noise Knip gate for unused files/dependencies/unresolved imports and should exit cleanly. `bun run code:dead:exports` checks value exports and should also stay clean. `bun run code:dead:types` is the remaining manual queue for type-only contract candidates.
 - `upsertAppUser(user)` upserts the effective user row, including API-token users, before FK-owned mutations.
 
 Shipped cleanup:
 - Added repo-specific `knip.json` entry/project patterns for Next routes, tests, workers, scripts, and config files.
 - Removed unused UI/source-row components, the unused Tavily integration stub, and unused direct package dependencies.
+- Removed/de-exported unused internal value exports across auth, i18n navigation, policy, rate-limit, utility, worker, X API, newsletter, normalizer, and cluster modules.
 - Replaced stale `tsx` operator-script hints with `bun`.
 - Updated README / `.env.example` / architecture docs so Tavily is not advertised as wired, cron docs match the current split route set, and cluster docs match the 0.75 / 72h runtime.
 - Moved render-local helper components out of `components/shell/tweaks.tsx`.
@@ -19,10 +20,11 @@ Shipped cleanup:
 - Removed unused imports/locals across app, tests, scripts, and workers.
 - Updated stale prompt tests to match the current friend-readable daily-column voice.
 - Added `docs/README.md` routing and archive banners for completed daily-column design/plan/handoff docs.
-- Updated `docs/reports/code-quality/dead-code-analysis.md` with current Knip commands, cleanup results, and remaining export-review queue.
+- Updated `docs/reports/code-quality/dead-code-analysis.md` with current Knip commands, cleanup results, and remaining type-review queue.
 
 Verification:
 - `bun run code:dead` — passed.
+- `bun run code:dead:exports` — passed.
 - `bun run lint` — passed with no warnings.
 - `bun test --env-file=.env.local` — 505 pass, 0 fail.
 - `bun run build` — passed.

@@ -13,13 +13,12 @@ import { z } from "zod";
 
 export const MIN_FEEDBACK_TO_ITERATE = 5;
 
-export const agentFeedbackItemSchema = z.object({
-  verdict: z.enum(["up", "down"]),
-  title: z.string(),
-  note: z.string(),
-  createdAt: z.string(),
-});
-export type AgentFeedbackItem = z.infer<typeof agentFeedbackItemSchema>;
+export type AgentFeedbackItem = {
+  verdict: "up" | "down";
+  title: string;
+  note: string;
+  createdAt: string;
+};
 
 const didNotChangeItem = z.object({
   item: z.string().min(8).max(240),

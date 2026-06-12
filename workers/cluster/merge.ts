@@ -53,7 +53,7 @@ import { items, clusters } from "@/db/schema";
 export const MERGE_MIN_DISTANCE = 0.25;
 export const MERGE_MEAN_DISTANCE = 0.2;
 export const MERGE_PAIRS_WITHIN_FRACTION = 0.5;
-export const MERGE_TIME_OVERLAP_HOURS = 72;
+const MERGE_TIME_OVERLAP_HOURS = 72;
 
 export type MergeReport = {
   candidatePairs: number;
@@ -267,7 +267,7 @@ export async function runMergeBatch(opts: MergeOpts): Promise<MergeReport> {
  *
  * Returns the number of items moved (0 if loser was already empty).
  */
-export async function mergeClusters(
+async function mergeClusters(
   winnerId: number,
   loserId: number,
 ): Promise<number> {

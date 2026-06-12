@@ -25,7 +25,7 @@ import { arbitrateSystem, arbitrateUserPrompt } from "./prompt";
 /** Drizzle transaction client — same shape as the top-level db() client. */
 type DbTx = Parameters<Parameters<ReturnType<typeof db>["transaction"]>[0]>[0];
 
-export const MAX_ARBITRATIONS_PER_RUN = 15;
+const MAX_ARBITRATIONS_PER_RUN = 15;
 
 export type ArbitrationReport = {
   processed: number;

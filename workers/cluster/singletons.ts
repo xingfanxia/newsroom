@@ -16,7 +16,7 @@ import { clusters, items } from "@/db/schema";
 
 export const SINGLETON_RECLUSTER_SIMILARITY_THRESHOLD = 0.75;
 export const SINGLETON_RECLUSTER_WINDOW_HOURS = 72;
-export const MAX_SINGLETON_RECLUSTERS_PER_RUN = 150;
+const MAX_SINGLETON_RECLUSTERS_PER_RUN = 150;
 
 export type SingletonReclusterReport = {
   processed: number;

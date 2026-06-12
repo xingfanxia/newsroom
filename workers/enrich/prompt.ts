@@ -506,7 +506,6 @@ export const commentarySchema = z.object({
       "English commentary (target 120-220 words, 1-3 short paragraphs). Explain it like you're sending the link to a smart friend: what to think, what supports it, and what is still missing.",
     ),
 });
-export type CommentaryOutput = z.infer<typeof commentarySchema>;
 
 const FRIEND_COMMENTARY_RULES = `
 **朋友式点评规则**
@@ -644,7 +643,6 @@ export const commentaryNoteSchema = z.object({
       "English one-line take (≤200 chars, 1-2 short sentences). What you'd text a friend with the link.",
     ),
 });
-export type CommentaryNoteOutput = z.infer<typeof commentaryNoteSchema>;
 
 export const COMMENTARY_NOTE_ONLY_SYSTEM = `You're the senior editor for AX's AI RADAR. Audience: AI practitioners checking a daily feed.
 

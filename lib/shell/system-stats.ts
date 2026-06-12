@@ -18,7 +18,7 @@ import { and, eq, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items, rawItems, sources, sourceHealth } from "@/db/schema";
 
-export type SystemService = {
+type SystemService = {
   id: string;
   name: string;
   status: "healthy" | "degraded" | "error" | "idle";
@@ -29,7 +29,7 @@ export type SystemService = {
   note?: string | null;
 };
 
-export type SystemQueue = {
+type SystemQueue = {
   name: string;
   depth: number;
   rate: string; // events/min estimate
@@ -37,7 +37,7 @@ export type SystemQueue = {
   driftS: number;
 };
 
-export type SystemError = {
+type SystemError = {
   t: string; // short time label (HH:MM)
   level: "error" | "warn" | "info";
   svc: string;
@@ -45,7 +45,7 @@ export type SystemError = {
   msg: string;
 };
 
-export type SystemCron = {
+type SystemCron = {
   name: string;
   schedule: string;
   next: string; // relative eg "in 23m"

@@ -5,8 +5,6 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export type Dict<T = unknown> = Record<string, T>;
-
 export function formatRelative(
   date: Date,
   locale: "zh" | "en",
@@ -20,15 +18,4 @@ export function formatRelative(
   if (hr < 24) return { kind: "hours", value: hr };
   const d = Math.floor(diff / 86400);
   return { kind: "days", value: d };
-}
-
-export function formatDateHeader(date: Date, locale: "zh" | "en"): string {
-  if (locale === "zh") {
-    return `${date.getMonth() + 1}月${date.getDate()}日`;
-  }
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
-
-export function formatTime(date: Date): string {
-  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }

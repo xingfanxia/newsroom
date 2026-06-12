@@ -36,8 +36,3 @@ export function rssRateLimit(req: Request): Response | null {
   bucket.count++;
   return null;
 }
-
-/** Test-only — clear all buckets between tests. */
-export function __resetRateLimitBuckets(): void {
-  buckets.clear();
-}

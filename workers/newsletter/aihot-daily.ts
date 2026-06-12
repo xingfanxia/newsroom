@@ -28,7 +28,6 @@ import { db } from "@/db/client";
 import { newsletters } from "@/db/schema";
 import {
   fetchDailyByDate,
-  fetchDailyLatest,
   AihotError,
   type AihotDailyReport,
 } from "@/lib/sources/aihot";
@@ -89,31 +88,6 @@ export async function fetchAihotDailyForDate(
     } else {
       console.warn(
         `[aihot-daily] unexpected failure for ${dateUtcYmd}:`,
-        err instanceof Error ? err.message : err,
-      );
-    }
-    return null;
-  }
-}
-
-/**
- * Fetch (or read from cache) the latest AI HOT daily — convenience wrapper
- * over fetchDailyLatest with the same graceful-null contract.
- *
- * Note: latest endpoint can't use the cache lookup (we don't know the date
- * until response). Falls back to date-keyed cache after first call.
- */
-export async function fetchAihotDailyLatest(): Promise<AihotDailyReport | null> {
-  try {
-    return stripPaperFromAihotDaily(await fetchDailyLatest());
-  } catch (err) {
-    if (err instanceof AihotError) {
-      console.warn(
-        `[aihot-daily] latest fetch AihotError(${err.code}): ${err.message}`,
-      );
-    } else {
-      console.warn(
-        `[aihot-daily] latest fetch failed:`,
         err instanceof Error ? err.message : err,
       );
     }

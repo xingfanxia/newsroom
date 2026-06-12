@@ -6,7 +6,7 @@ import { generateStructured, LLMError } from "@/lib/llm";
 import { canonicalTitleSystem, canonicalTitleUserPrompt } from "./prompt";
 import { pickBestLead, type SourceGroup } from "./lead-pick";
 
-export const MAX_TITLES_PER_RUN = 15;
+const MAX_TITLES_PER_RUN = 15;
 
 export type CanonicalTitleReport = {
   processed: number;

@@ -708,12 +708,3 @@ export const sourceCatalog: Source[] = [
       "Hourly pull of AI HOT's mode=selected pool. Pre-curated by 卡兹克; our scorer should not demote below 'all'. Daily-report path is separate (workers/newsletter/aihot-daily.ts).",
   },
 ];
-
-export function sourcesByGroup() {
-  const byGroup = new Map<string, Source[]>();
-  for (const s of sourceCatalog) {
-    if (!byGroup.has(s.group)) byGroup.set(s.group, []);
-    byGroup.get(s.group)!.push(s);
-  }
-  return byGroup;
-}

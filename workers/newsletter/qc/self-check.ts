@@ -92,7 +92,7 @@ export type ColumnDraft = {
   narrative_md: string;
 };
 
-export type SelfCheckHit = {
+type SelfCheckHit = {
   layer: "l1" | "l2";
   rule: string;
   snippet: string;
