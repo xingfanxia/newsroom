@@ -15,6 +15,7 @@ Shipped cleanup:
 - Removed/de-exported unused internal type-only exports in the LLM usage and facade modules.
 - Replaced stale `tsx` operator-script hints with `bun`.
 - Updated README / `.env.example` / architecture docs so Tavily is not advertised as wired, cron docs match the current split route set, and cluster docs match the 0.75 / 72h runtime.
+- Aligned `/admin/system` queue telemetry with worker predicates: item commentary now counts only singleton/unclustered item candidates, event commentary is shown as its own queue, and the cron table derives schedules from `vercel.json`.
 - Moved render-local helper components out of `components/shell/tweaks.tsx`.
 - Reworked effect async loading in `SignalDrawer` and `TweaksProvider` to satisfy React lint rules without disabling them.
 - Replaced an internal raw `<a>` with locale-aware `next/link`.

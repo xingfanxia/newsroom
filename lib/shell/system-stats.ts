@@ -9,14 +9,16 @@
  *    `last_success_at`. Plus synthetic rows for the pipeline workers
  *    (normalizer, enricher, commentary) derived from recent write activity.
  *  - **queues**: pending normalization depth, unenriched items, item rows
- *    missing commentary.
+ *    missing singleton commentary, and multi-member events missing
+ *    event-level commentary.
  *  - **cron**: mirrors `vercel.json` schedules.
  *  - **errors**: joins `source_health.last_error` with the failing source
  *    for an error-log view.
  */
 import { and, eq, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { items, rawItems, sources, sourceHealth } from "@/db/schema";
+import { clusters, items, rawItems, sources, sourceHealth } from "@/db/schema";
+import vercelConfig from "@/vercel.json";
 
 type SystemService = {
   id: string;
@@ -65,16 +67,37 @@ export type SystemSnapshot = {
   };
 };
 
-const VERCEL_CRONS = [
-  { name: "fetch-hourly", schedule: "17 * * * *", minutes: 60 },
-  { name: "fetch-daily", schedule: "23 4 * * *", minutes: 60 * 24 },
-  { name: "fetch-weekly", schedule: "43 5 * * 1", minutes: 60 * 24 * 7 },
-  { name: "normalize", schedule: "37 */6 * * *", minutes: 60 * 6 },
-  { name: "enrich", schedule: "*/15 * * * *", minutes: 15 },
-  { name: "cluster", schedule: "*/30 * * * *", minutes: 30 },
-  { name: "newsletter-daily", schedule: "11 9 * * *", minutes: 60 * 24 },
-  { name: "newsletter-monthly", schedule: "37 9 1 * *", minutes: 60 * 24 * 30 },
-];
+type VercelCronConfig = {
+  path: string;
+  schedule: string;
+};
+
+const CRON_CADENCE_MINUTES_BY_PATH: Record<string, number> = {
+  "/api/cron/fetch-hourly": 60,
+  "/api/cron/fetch-daily": 60 * 24,
+  "/api/cron/fetch-weekly": 60 * 24 * 7,
+  "/api/cron/normalize": 60 * 6,
+  "/api/cron/article-body": 15,
+  "/api/cron/enrich": 15,
+  "/api/cron/commentary": 30,
+  "/api/cron/score-backfill": 60,
+  "/api/cron/cluster": 30,
+  "/api/cron/newsletter-daily": 60 * 24,
+  "/api/cron/newsletter-monthly": 60 * 24 * 30,
+};
+
+const VERCEL_CRONS = ((vercelConfig as { crons?: VercelCronConfig[] }).crons ?? [])
+  .map((c) => ({
+    name: c.path.replace(/^\/api\/cron\//, ""),
+    schedule: c.schedule,
+    minutes: CRON_CADENCE_MINUTES_BY_PATH[c.path] ?? null,
+  }));
+
+function cadenceLabel(minutes: number | null): string {
+  if (!minutes) return "configured";
+  if (minutes >= 60) return `${Math.round(minutes / 60)}h`;
+  return `${minutes}m`;
+}
 
 function ago(date: Date | null): string {
   if (!date) return "never";
@@ -168,10 +191,28 @@ export async function getSystemSnapshot(): Promise<SystemSnapshot> {
   const [itemsRow] = await client
     .select({
       unenriched: sql<number>`count(*) filter (where ${items.enrichedAt} is null)::int`,
-      uncomm: sql<number>`count(*) filter (where ${items.tier} in ('featured','p1') and ${items.commentaryAt} is null)::int`,
+      itemCommentaryPending: sql<number>`count(*) filter (
+        where ${items.tier} in ('featured','p1','all')
+          and ${items.commentaryAt} is null
+          and (
+            ${items.clusterId} is null
+            or coalesce(${clusters.memberCount}, 1) < 2
+          )
+      )::int`,
       unscored: sql<number>`count(*) filter (where ${items.importance} is null)::int`,
     })
-    .from(items);
+    .from(items)
+    .leftJoin(clusters, eq(items.clusterId, clusters.id));
+
+  const [clustersRow] = await client
+    .select({
+      eventCommentaryPending: sql<number>`count(*) filter (
+        where ${clusters.eventTier} in ('featured','p1','all')
+          and ${clusters.memberCount} >= 2
+          and ${clusters.commentaryAt} is null
+      )::int`,
+    })
+    .from(clusters);
 
   const queues: SystemQueue[] = [
     {
@@ -190,8 +231,15 @@ export async function getSystemSnapshot(): Promise<SystemSnapshot> {
     },
     {
       name: "commentary",
-      depth: itemsRow?.uncomm ?? 0,
-      rate: "≈ 30/15m",
+      depth: itemsRow?.itemCommentaryPending ?? 0,
+      rate: "≈ 200/30m",
+      p95Ms: null,
+      driftS: 0,
+    },
+    {
+      name: "event-commentary",
+      depth: clustersRow?.eventCommentaryPending ?? 0,
+      rate: "≈ 8/30m",
       p95Ms: null,
       driftS: 0,
     },
@@ -208,7 +256,7 @@ export async function getSystemSnapshot(): Promise<SystemSnapshot> {
   const cron: SystemCron[] = VERCEL_CRONS.map((c) => ({
     name: c.name,
     schedule: c.schedule,
-    next: `~${c.minutes >= 60 ? `${Math.round(c.minutes / 60)}h` : `${c.minutes}m`} cadence`,
+    next: `~${cadenceLabel(c.minutes)} cadence`,
     last: "—",
   }));
 
