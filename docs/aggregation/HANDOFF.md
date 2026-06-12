@@ -223,19 +223,16 @@ EOF
 1. **HNSW index drop** — `drizzle-kit push` drops `items_embedding_hnsw_idx` every time because drizzle doesn't model it. **Always run `bun run db:hnsw` after `bunx drizzle-kit push`.** This was documented in the original `docs/HANDOFF-AGGREGATION.md`; re-stating because the migration in step 4 above relies on the index existing.
 2. **Vercel env baking** — `vercel env add` doesn't propagate to running deployments. Must redeploy with `vercel --prod` for `ENABLE_EVENT_AGGREGATION=true` to take effect.
 3. **Feature flag** — currently the code does NOT actually check `ENABLE_EVENT_AGGREGATION`. The flag was a *planned* rollback safety net; the read path's `COALESCE(cluster.X, items.X)` fallback already provides this property at the SQL level (singletons unchanged, multi-member events use cluster fields). If you want explicit kill-switch behavior, gate `view: 'today'` defaulting in `app/[locale]/page.tsx` on the env var, and gate the cluster-stage cron workers in `app/api/cron/cluster/route.ts`. Adding the flag to the cron is a 5-line change in Wave 5 if you want belt-and-suspenders.
-4. **Worker wiring into cron** — Wave 2 created the worker modules but the plan's Task 2.M Step 5 (wire `runArbitrationBatch` / `runCanonicalTitleBatch` / `runEventCommentaryBatch` into the cluster cron after `runClusterBatch` completes) **was not done in this session.** The cron handler at `app/api/cron/cluster/route.ts` still only calls `runClusterBatch`. Add the chain:
-   ```ts
-   import { runArbitrationBatch } from "@/workers/cluster/arbitrate";
-   import { runCanonicalTitleBatch } from "@/workers/cluster/canonical-title";
-   import { runEventCommentaryBatch } from "@/workers/cluster/commentary";
-   // after runClusterBatch():
-   const arb = await runArbitrationBatch();
-   const titles = await runCanonicalTitleBatch();
-   const comm = await runEventCommentaryBatch();
-   // include in cron response payload
-   ```
-   This is the **most important runtime gap**; without it, Stage B/C/D never fire.
-5. **Worker DB readiness** — the cluster workers import `@/db/client` at module load. The cron wiring above will fail at module-resolve time unless the schema matches. Push schema (step 3) before wiring or before any cron tick post-deploy.
+4. **Worker wiring into cron — superseded** — the runtime gap described in this
+   original 2026-04-24 handoff has since been closed. Current code centralizes
+   Stage A/A.5/B/B+/C/D in `workers/cluster/pipeline.ts`; both
+   `/api/cron/cluster` and `bun scripts/ops/run-cron.ts cluster` call
+   `runClusterPipeline()`. Keep future edits on that helper rather than
+   re-adding stage sequencing directly to the route handler.
+5. **Worker DB readiness — historical migration warning** — the cluster workers
+   import `@/db/client` at module load. For the original rollout, schema had to
+   be pushed before the cron tick. Current schema is already live; retain this
+   note only as context for any future additive cluster migration.
 
 ---
 
