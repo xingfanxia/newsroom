@@ -10,8 +10,8 @@ import {
 } from "@/workers/cluster/singletons";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const cronSrc = readFileSync(
-  resolve(__dirname, "../../app/api/cron/cluster/route.ts"),
+const pipelineSrc = readFileSync(
+  resolve(__dirname, "../../workers/cluster/pipeline.ts"),
   "utf8",
 );
 
@@ -57,9 +57,9 @@ describe("singleton recluster decision", () => {
 
 describe("cron singleton recluster wiring", () => {
   it("runs singleton reclustering after Stage A and before duplicate-cluster merge", () => {
-    const clusterIdx = cronSrc.indexOf("runClusterBatch()");
-    const singletonsIdx = cronSrc.indexOf("runSingletonReclusterBatch(");
-    const mergeIdx = cronSrc.indexOf("runMergeBatch(");
+    const clusterIdx = pipelineSrc.indexOf("runClusterBatch()");
+    const singletonsIdx = pipelineSrc.indexOf("runSingletonReclusterBatch(");
+    const mergeIdx = pipelineSrc.indexOf("runMergeBatch(");
 
     expect(clusterIdx).toBeGreaterThan(0);
     expect(singletonsIdx).toBeGreaterThan(clusterIdx);
@@ -67,7 +67,7 @@ describe("cron singleton recluster wiring", () => {
   });
 
   it("respects Stage B split audit when choosing a target cluster", () => {
-    expect(cronSrc).toContain("runSingletonReclusterBatch(");
+    expect(pipelineSrc).toContain("runSingletonReclusterBatch(");
 
     const singletonSrc = readFileSync(
       resolve(__dirname, "../../workers/cluster/singletons.ts"),

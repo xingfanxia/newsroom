@@ -21,6 +21,7 @@ Shipped cleanup:
 - Shared cookie-session auth JSON-error mapping for required-session user routes (`/api/feedback*`, `/api/tweaks`) through `lib/api/session-auth.ts`.
 - Shared mutating route JSON body parsing and Zod error-envelope handling through `lib/api/json-body.ts`.
 - Shared hourly/daily/weekly fetch+normalize sequencing through `workers/fetcher/pipeline.ts`, with HTTP route wiring in `app/api/cron/_fetch-bucket-route.ts` and local cron scripts using the same helper.
+- Shared the full cluster Stage A/A.5/B/B+/C/D sequence through `workers/cluster/pipeline.ts`, so `/api/cron/cluster` and `bun scripts/ops/run-cron.ts cluster` no longer drift.
 - Stopped a cluster-cron arbitration loop: Stage A and singleton-recluster now
   skip clusters already rejected for the item in `cluster_splits`, preventing
   the same fuzzy join from being re-added and re-split every tick; after three

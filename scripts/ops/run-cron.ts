@@ -7,7 +7,7 @@
 
 import { runNormalizer } from "@/workers/normalizer";
 import { runEnrichBatch } from "@/workers/enrich";
-import { runClusterBatch } from "@/workers/cluster";
+import { runClusterPipeline } from "@/workers/cluster/pipeline";
 import { runFetchAndNormalize } from "@/workers/fetcher/pipeline";
 import { runArticleBodyFetch } from "@/workers/fetcher/article-body";
 import { runYoutubeTranscriptFetch } from "@/workers/fetcher/youtube-transcript";
@@ -58,8 +58,8 @@ async function main() {
     return;
   }
   if (kind === "cluster") {
-    const c = await runClusterBatch();
-    console.log(JSON.stringify({ cluster: c }, null, 2));
+    const c = await runClusterPipeline();
+    console.log(JSON.stringify(c, null, 2));
     return;
   }
 

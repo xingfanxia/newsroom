@@ -14,8 +14,8 @@ const mergeSrc = readFileSync(
   resolve(__dirname, "../../workers/cluster/merge.ts"),
   "utf8",
 );
-const cronSrc = readFileSync(
-  resolve(__dirname, "../../app/api/cron/cluster/route.ts"),
+const pipelineSrc = readFileSync(
+  resolve(__dirname, "../../workers/cluster/pipeline.ts"),
   "utf8",
 );
 
@@ -146,29 +146,32 @@ describe("Atomic merge transaction", () => {
 
 describe("Cron stage wiring (Stage B+ between B and C)", () => {
   it("imports runMergeBatch from workers/cluster/merge", () => {
-    expect(cronSrc).toContain(
-      'import { runMergeBatch } from "@/workers/cluster/merge"',
-    );
+    expect(pipelineSrc).toContain("runMergeBatch");
+    expect(pipelineSrc).toContain('from "@/workers/cluster/merge"');
   });
 
   it("runs merge AFTER arbitrate, BEFORE canonicalTitles", () => {
     // Order matters: arbitrate splits unrelated items first (clean pool),
     // then merge collapses near-duplicate clusters, then canonical-title
     // regenerates names for the larger surviving clusters.
-    const arbitrateIdx = cronSrc.indexOf("runArbitrationBatch()");
-    const mergeIdx = cronSrc.indexOf("runMergeBatch(");
-    const titlesIdx = cronSrc.indexOf("runCanonicalTitleBatch()");
+    const arbitrateIdx = pipelineSrc.indexOf("runArbitrationBatch()");
+    const mergeIdx = pipelineSrc.indexOf("runMergeBatch(");
+    const titlesIdx = pipelineSrc.indexOf("runCanonicalTitleBatch()");
     expect(arbitrateIdx).toBeGreaterThan(0);
     expect(mergeIdx).toBeGreaterThan(arbitrateIdx);
     expect(titlesIdx).toBeGreaterThan(mergeIdx);
   });
 
   it("scopes merge to a recency window (default 6h) for cron-tick speed", () => {
-    expect(cronSrc).toContain("MERGE_RECENCY_HOURS = 6");
-    expect(cronSrc).toContain("recencyHours: MERGE_RECENCY_HOURS");
+    expect(pipelineSrc).toContain("MERGE_RECENCY_HOURS = 6");
+    expect(pipelineSrc).toContain("recencyHours: MERGE_RECENCY_HOURS");
   });
 
   it("includes the merge stage report in the JSON response", () => {
-    expect(cronSrc).toMatch(/at: new Date\(\)\.toISOString\(\)[\s\S]+?merge,/);
+    const routeSrc = readFileSync(
+      resolve(__dirname, "../../app/api/cron/cluster/route.ts"),
+      "utf8",
+    );
+    expect(routeSrc).toContain("merge: report.merge");
   });
 });
