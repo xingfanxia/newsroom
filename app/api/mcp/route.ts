@@ -51,6 +51,7 @@ import {
 } from "@/lib/items/live";
 import { semanticSearch } from "@/lib/items/semantic-search";
 import { getItemDetail } from "@/lib/items/detail";
+import { toAgentApiItem } from "@/lib/api/v1-items";
 import { toEventMemberApiItems } from "@/lib/api/event-members";
 import { applyFeedbackToggle } from "@/lib/feedback/toggle";
 import { listCollections } from "@/lib/items/collections";
@@ -141,33 +142,7 @@ function buildServer(user: SessionUser): McpServer {
         countFeaturedStories(q),
       ]);
       return text({
-        items: stories.map((s) => {
-          const isEvent = (s.coverage ?? 0) > 1 && s.clusterId != null;
-          return {
-            id: s.id,
-            title: s.title,
-            summary: s.summary,
-            publisher: s.source.publisher,
-            source_id: s.sourceId,
-            source_group: s.source.groupCode ?? null,
-            tier: s.tier,
-            importance: s.importance,
-            hkr: s.hkr ?? null,
-            url: s.url,
-            published_at: s.publishedAt,
-            has_commentary: Boolean(s.editorNote || s.editorAnalysis),
-            // Event aggregation — null for singletons.
-            cluster_id: s.clusterId ?? null,
-            coverage: s.coverage ?? null,
-            canonical_title: isEvent
-              ? (locale === "zh" ? s.canonicalTitleZh : s.canonicalTitleEn) ??
-                null
-              : null,
-            first_seen_at: s.firstSeenAt ?? null,
-            latest_member_at: s.latestMemberAt ?? null,
-            still_developing: s.stillDeveloping ?? null,
-          };
-        }),
+        items: stories.map((s) => toAgentApiItem(s, locale)),
         total,
         limit: q.limit,
         offset: q.offset,
@@ -253,25 +228,9 @@ function buildServer(user: SessionUser): McpServer {
           mode: "semantic",
           q: args.q,
           items: result.items.map((s) => {
-            const isEvent = (s.coverage ?? 0) > 1 && s.clusterId != null;
             return {
-              id: s.id,
-              title: s.title,
-              summary: s.summary,
-              publisher: s.source.publisher,
-              source_id: s.sourceId,
-              tier: s.tier,
-              importance: s.importance,
-              url: s.url,
-              published_at: s.publishedAt,
+              ...toAgentApiItem(s, locale),
               distance: s.distance,
-              cluster_id: s.clusterId ?? null,
-              coverage: s.coverage ?? null,
-              canonical_title: isEvent
-                ? (locale === "zh"
-                    ? s.canonicalTitleZh
-                    : s.canonicalTitleEn) ?? null
-                : null,
             };
           }),
           total: result.total,
@@ -294,27 +253,7 @@ function buildServer(user: SessionUser): McpServer {
       return text({
         mode: "lexical",
         q: args.q,
-        items: stories.map((s) => {
-          const isEvent = (s.coverage ?? 0) > 1 && s.clusterId != null;
-          return {
-            id: s.id,
-            title: s.title,
-            summary: s.summary,
-            publisher: s.source.publisher,
-            source_id: s.sourceId,
-            tier: s.tier,
-            importance: s.importance,
-            url: s.url,
-            published_at: s.publishedAt,
-            cluster_id: s.clusterId ?? null,
-            coverage: s.coverage ?? null,
-            canonical_title: isEvent
-              ? (locale === "zh"
-                  ? s.canonicalTitleZh
-                  : s.canonicalTitleEn) ?? null
-              : null,
-          };
-        }),
+        items: stories.map((s) => toAgentApiItem(s, locale)),
         total: stories.length,
       });
     },

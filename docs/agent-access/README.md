@@ -47,6 +47,7 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 - **`lib/rate-limit/public.ts`** — parameterized IP token-bucket. Each route picks `{ family, windowMs, max }`. Family-isolated so `/feed` polling doesn't burn `/search` budget.
 - **`lib/api/public-helpers.ts`** — `computeEtag`, `ifNoneMatch`, `notModified`, `publicJson`, `publicError`, `publicHeaders`. Every route returns CORS + cache headers via these.
 - **`lib/api/public-items.ts`** — shared anonymous feed/search item serializer. It keeps the public `FeedItem` shape aligned across `/api/public/feed` and `/api/public/search`.
+- **`lib/api/v1-items.ts`** — shared bearer-gated agent item serializer used by `/api/v1/feed`, `/api/v1/search`, and MCP feed/search tools.
 - **`lib/api/story-item-fields.ts`** — shared flat Story field helpers used by both anonymous public serializers and bearer-gated `/api/v1/*` serializers, with each surface still owning its HKR exposure policy.
 - **`lib/api/event-members.ts`** — shared event-member item serializer used by UI-internal, public, v1, and MCP event-member surfaces.
 
@@ -73,13 +74,15 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 - `tests/api/public-ratelimit.test.ts` — threshold, IP isolation, family isolation, IPv4/IPv6 header fallback
 - `tests/api/public-items.test.ts` — anonymous feed/search item shape, HKR reason stripping, locale-specific event title fields
 - `tests/api/event-members.test.ts` — shared event-member item shape used by REST + MCP event coverage surfaces
+- `tests/api/mcp-contract-source.test.ts` — MCP feed/search stay wired to the shared v1 item serializer
 
-Run these with `bun test tests/api/public-*.test.ts tests/api/event-members.test.ts`.
+Run these with `bun test tests/api/public-*.test.ts tests/api/event-members.test.ts tests/api/mcp-contract-source.test.ts`.
 
 ## Operational notes
 
 - **Rate limiter is Vercel-instance-local** — buckets don't survive cold starts. Treated as "discourage hammering" not "airtight cap." Real abuse defense lives at the CDN/WAF layer.
 - **Field stripping is centralized for feed/search items** — `toPublicApiItem` strips HKR reasons once and is shared by `/api/public/feed` and `/api/public/search`. Detail endpoints still own their nested payload shape; if adding a new domain field, update the relevant serializer and OpenAPI schema together.
+- **Bearer agent item serialization is shared across REST + MCP** — `/api/v1/feed`, `/api/v1/search`, MCP `ax_radar_feed`, and MCP `ax_radar_search` all use `toAgentApiItem`.
 - **Event-member serialization is shared across surfaces** — `/api/events/*`, `/api/public/events/*`, `/api/v1/events/*`, and MCP `ax_radar_event_members` all use `toEventMemberApiItems`.
 - **Daily-column endpoints** read from `newsletters` table where `kind='daily' AND column_title IS NOT NULL`. The legacy structured-digest rows (where `headline IS NOT NULL`) ship separately via `/api/feed/newsletter/{locale}/rss.xml`.
 
