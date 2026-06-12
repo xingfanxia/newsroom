@@ -47,6 +47,7 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 - **`lib/rate-limit/public.ts`** — parameterized IP token-bucket. Each route picks `{ family, windowMs, max }`. Family-isolated so `/feed` polling doesn't burn `/search` budget.
 - **`lib/api/public-helpers.ts`** — `computeEtag`, `ifNoneMatch`, `notModified`, `publicJson`, `publicError`, `publicHeaders`. Every route returns CORS + cache headers via these.
 - **`lib/api/feed-query-params.ts`** — shared feed/search query schemas and snake_case-to-`FeedQuery` mapping for public + bearer-gated surfaces; route files only choose auth/rate-limit and per-surface limit ceilings.
+- **`lib/api/source-catalog.ts`** — shared source catalog query + serializers used by `/api/public/sources`, `/api/v1/sources`, and MCP `ax_radar_sources`, with public/v1/MCP each owning only its exposure policy.
 - **`lib/api/public-items.ts`** — shared anonymous feed/search item serializer. It keeps the public `FeedItem` shape aligned across `/api/public/feed` and `/api/public/search`.
 - **`lib/api/v1-items.ts`** — shared bearer-gated agent item serializer used by `/api/v1/feed`, `/api/v1/search`, `/api/v1/saved`, and MCP feed/search tools.
 - **`lib/api/story-item-fields.ts`** — shared flat Story field helpers used by both anonymous public serializers and bearer-gated `/api/v1/*` serializers, with each surface still owning its HKR exposure policy.
@@ -75,19 +76,22 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 - `tests/api/public-ratelimit.test.ts` — threshold, IP isolation, family isolation, IPv4/IPv6 header fallback
 - `tests/api/feed-query-params.test.ts` — shared feed/search parameter defaults, max-limit ceilings, tag parsing, and `FeedQuery` mapping
 - `tests/api/feed-query-source.test.ts` — feed/search routes stay wired to the shared query schema module
+- `tests/api/source-catalog.test.ts` — public, v1, and MCP source catalog serialization contracts
+- `tests/api/source-catalog-source.test.ts` — source routes and OpenAPI stay wired to the shared source catalog module
 - `tests/api/public-items.test.ts` — anonymous feed/search item shape, HKR reason stripping, locale-specific event title fields
 - `tests/api/event-members.test.ts` — shared event-member item shape used by REST + MCP event coverage surfaces
 - `tests/api/mcp-contract-source.test.ts` — MCP feed/search stay wired to the shared v1 item serializer
 - `tests/api/v1-saved-source.test.ts` — `/api/v1/saved` stays wired to the shared saved-item serializer and owner-aware collection helper
 - `tests/items/collections.test.ts` — saved collection assignment rejects cross-owner collection ids
 
-Run these with `bun test tests/api/public-*.test.ts tests/api/feed-query-*.test.ts tests/api/event-members.test.ts tests/api/mcp-contract-source.test.ts tests/api/v1-saved-source.test.ts tests/items/collections.test.ts`.
+Run these with `bun test tests/api/public-*.test.ts tests/api/feed-query-*.test.ts tests/api/source-catalog*.test.ts tests/api/event-members.test.ts tests/api/mcp-contract-source.test.ts tests/api/v1-saved-source.test.ts tests/items/collections.test.ts`.
 
 ## Operational notes
 
 - **Rate limiter is Vercel-instance-local** — buckets don't survive cold starts. Treated as "discourage hammering" not "airtight cap." Real abuse defense lives at the CDN/WAF layer.
 - **Field stripping is centralized for feed/search items** — `toPublicApiItem` strips HKR reasons once and is shared by `/api/public/feed` and `/api/public/search`. Detail endpoints still own their nested payload shape; if adding a new domain field, update the relevant serializer and OpenAPI schema together.
 - **Feed/search query parsing is centralized** — `/api/public/feed`, `/api/public/search`, `/api/v1/feed`, and `/api/v1/search` share `lib/api/feed-query-params.ts`; only public/v1 max limits differ.
+- **Source catalog serialization is centralized** — `/api/public/sources`, `/api/v1/sources`, and MCP `ax_radar_sources` share `lib/api/source-catalog.ts`; public strips operational diagnostics, v1 keeps them, MCP keeps a compact flat shape.
 - **Bearer agent item serialization is shared across REST + MCP** — `/api/v1/feed`, `/api/v1/search`, MCP `ax_radar_feed`, and MCP `ax_radar_search` all use `toAgentApiItem`; `/api/v1/saved` extends it via `toSavedAgentApiItem`.
 - **Saved collection assignment is owner-aware** — `/api/v1/saved`, MCP `ax_radar_save`, and browser move actions all delegate to `assignSavedItemCollection` so a user cannot attach a save to another user's collection id.
 - **Event-member serialization is shared across surfaces** — `/api/events/*`, `/api/public/events/*`, `/api/v1/events/*`, and MCP `ax_radar_event_members` all use `toEventMemberApiItems`.

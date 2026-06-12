@@ -428,7 +428,7 @@ components:
         health:
           type: object
           properties:
-            status: { type: string, enum: [ok, degraded, error, pending] }
+            status: { type: string, enum: [ok, warning, error, pending] }
             last_success_at: { type: string, format: date-time, nullable: true }
             consecutive_failures: { type: integer }
             total_items_count: { type: integer }

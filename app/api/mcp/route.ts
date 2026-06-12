@@ -60,10 +60,14 @@ import {
   listCollections,
   userOwnsSavedCollection,
 } from "@/lib/items/collections";
+import {
+  listSourceCatalogRows,
+  toMcpSourceApiItem,
+} from "@/lib/api/source-catalog";
 import { totalsByWindow } from "@/lib/llm/stats";
 import { db } from "@/db/client";
-import { sources, sourceHealth, newsletters } from "@/db/schema";
-import { asc, eq, sql } from "drizzle-orm";
+import { newsletters } from "@/db/schema";
+import { sql } from "drizzle-orm";
 import type { SessionUser } from "@/lib/auth/session";
 
 type ToolOutput = {
@@ -273,37 +277,9 @@ function buildServer(user: SessionUser): McpServer {
       inputSchema: {},
     },
     async () => {
-      const rows = await db()
-        .select({
-          id: sources.id,
-          nameEn: sources.nameEn,
-          nameZh: sources.nameZh,
-          kind: sources.kind,
-          group: sources.group,
-          cadence: sources.cadence,
-          enabled: sources.enabled,
-          status: sourceHealth.status,
-          lastSuccessAt: sourceHealth.lastSuccessAt,
-          consecutiveFailures: sourceHealth.consecutiveFailures,
-          totalItemsCount: sourceHealth.totalItemsCount,
-        })
-        .from(sources)
-        .leftJoin(sourceHealth, eq(sources.id, sourceHealth.sourceId))
-        .orderBy(asc(sources.id));
+      const rows = await listSourceCatalogRows("id");
       return text({
-        sources: rows.map((r) => ({
-          id: r.id,
-          name_en: r.nameEn,
-          name_zh: r.nameZh,
-          kind: r.kind,
-          group: r.group,
-          cadence: r.cadence,
-          enabled: r.enabled,
-          status: r.status ?? "pending",
-          last_success_at: r.lastSuccessAt?.toISOString() ?? null,
-          consecutive_failures: r.consecutiveFailures ?? 0,
-          total_items: r.totalItemsCount ?? 0,
-        })),
+        sources: rows.map(toMcpSourceApiItem),
         total: rows.length,
       });
     },

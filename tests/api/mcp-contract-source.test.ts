@@ -23,6 +23,11 @@ const searchTool = sectionBetween(
   'server.registerTool(\n    "ax_radar_search"',
   'server.registerTool(\n    "ax_radar_sources"',
 );
+const sourcesTool = sectionBetween(
+  mcpRoute,
+  'server.registerTool(\n    "ax_radar_sources"',
+  'server.registerTool(\n    "ax_radar_save"',
+);
 const saveTool = sectionBetween(
   mcpRoute,
   'server.registerTool(\n    "ax_radar_save"',
@@ -59,5 +64,13 @@ describe("MCP contract source wiring", () => {
     expect(saveTool).toContain("userOwnsSavedCollection");
     expect(saveTool).not.toContain(".update(feedback)");
     expect(saveTool).not.toContain("collection_id ?? null");
+  });
+
+  test("sources tool uses the shared source catalog serializer", () => {
+    expect(mcpRoute).toContain("toMcpSourceApiItem");
+    expect(sourcesTool).toContain('listSourceCatalogRows("id")');
+    expect(sourcesTool).toContain("rows.map(toMcpSourceApiItem)");
+    expect(sourcesTool).not.toContain("sourceHealth.");
+    expect(sourcesTool).not.toContain(".select({");
   });
 });
