@@ -38,7 +38,7 @@ import {
   getFeaturedStories,
   type FeedQuery,
 } from "@/lib/items/live";
-import type { Story } from "@/lib/types";
+import { toAgentApiItem } from "@/lib/api/v1-items";
 
 const querySchema = z.object({
   tier: z.enum(["featured", "p1", "all"]).optional().default("featured"),
@@ -77,67 +77,6 @@ function parseTagList(s: string | undefined): string[] | undefined {
     .map((t) => t.trim())
     .filter(Boolean);
   return tags.length > 0 ? tags : undefined;
-}
-
-type ApiItem = {
-  id: string;
-  title: string;
-  summary: string;
-  publisher: string;
-  source_id: string;
-  source_group: string | null;
-  source_kind: string;
-  tier: Story["tier"];
-  importance: number;
-  hkr: Story["hkr"] | null;
-  tags: string[];
-  url: string;
-  published_at: string;
-  has_commentary: boolean;
-  cross_source_count: number | null;
-  // ── Event aggregation (null for singletons) ──
-  /** clusters.id — pass to GET /api/v1/events/:id/members for cross-source list. */
-  cluster_id: number | null;
-  /** member_count — number of sources covering this event. 1 = singleton. */
-  coverage: number | null;
-  /** Neutral canonical event name in the requested locale. Falls back null for singletons. */
-  canonical_title: string | null;
-  /** ISO — first time any source covered this event (event inception). */
-  first_seen_at: string | null;
-  /** ISO — most recent member join (today-view recency anchor). */
-  latest_member_at: string | null;
-  /** True iff first_seen_at < today AND latest_member_at within hot_window_hours. */
-  still_developing: boolean | null;
-};
-
-function toApiItem(s: Story, locale: "zh" | "en"): ApiItem {
-  const isEvent = (s.coverage ?? 0) > 1 && s.clusterId != null;
-  const canonical = isEvent
-    ? (locale === "zh" ? s.canonicalTitleZh : s.canonicalTitleEn) ?? null
-    : null;
-  return {
-    id: s.id,
-    title: s.title,
-    summary: s.summary,
-    publisher: s.source.publisher,
-    source_id: s.sourceId,
-    source_group: s.source.groupCode ?? null,
-    source_kind: s.source.kindCode,
-    tier: s.tier,
-    importance: s.importance,
-    hkr: s.hkr ?? null,
-    tags: s.tags,
-    url: s.url,
-    published_at: s.publishedAt,
-    has_commentary: Boolean(s.editorNote || s.editorAnalysis),
-    cross_source_count: s.crossSourceCount ?? s.coverage ?? null,
-    cluster_id: s.clusterId ?? null,
-    coverage: s.coverage ?? null,
-    canonical_title: canonical,
-    first_seen_at: s.firstSeenAt ?? null,
-    latest_member_at: s.latestMemberAt ?? null,
-    still_developing: s.stillDeveloping ?? null,
-  };
 }
 
 export async function GET(req: Request) {
@@ -180,7 +119,7 @@ export async function GET(req: Request) {
       countFeaturedStories(feedQuery),
     ]);
     return Response.json({
-      items: stories.map((s) => toApiItem(s, q.locale)),
+      items: stories.map((s) => toAgentApiItem(s, q.locale)),
       total,
       limit: q.limit,
       offset: q.offset,

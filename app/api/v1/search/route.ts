@@ -30,7 +30,7 @@ import {
   type FeedQuery,
 } from "@/lib/items/live";
 import { semanticSearch } from "@/lib/items/semantic-search";
-import type { Story } from "@/lib/types";
+import { toAgentApiItem } from "@/lib/api/v1-items";
 
 const querySchema = z.object({
   q: z.string().min(1, "q is required"),
@@ -49,32 +49,6 @@ const querySchema = z.object({
   offset: z.coerce.number().int().min(0).optional().default(0),
   locale: z.enum(["zh", "en"]).optional().default("en"),
 });
-
-function toApiItem(s: Story, locale: "zh" | "en") {
-  const isEvent = (s.coverage ?? 0) > 1 && s.clusterId != null;
-  const canonical = isEvent
-    ? (locale === "zh" ? s.canonicalTitleZh : s.canonicalTitleEn) ?? null
-    : null;
-  return {
-    id: s.id,
-    title: s.title,
-    summary: s.summary,
-    publisher: s.source.publisher,
-    source_id: s.sourceId,
-    source_group: s.source.groupCode ?? null,
-    source_kind: s.source.kindCode,
-    tier: s.tier,
-    importance: s.importance,
-    hkr: s.hkr ?? null,
-    tags: s.tags,
-    url: s.url,
-    published_at: s.publishedAt,
-    has_commentary: Boolean(s.editorNote || s.editorAnalysis),
-    cluster_id: s.clusterId ?? null,
-    coverage: s.coverage ?? null,
-    canonical_title: canonical,
-  };
-}
 
 export async function GET(req: Request) {
   const auth = await requireApiToken(req);
@@ -112,7 +86,7 @@ export async function GET(req: Request) {
         mode: "semantic",
         q: p.q,
         items: result.items.map((s) => ({
-          ...toApiItem(s, p.locale),
+          ...toAgentApiItem(s, p.locale),
           distance: s.distance,
         })),
         total: result.total,
@@ -150,7 +124,7 @@ export async function GET(req: Request) {
     return Response.json({
       mode: p.mode,
       q: p.q,
-      items: stories.map((s) => toApiItem(s, p.locale)),
+      items: stories.map((s) => toAgentApiItem(s, p.locale)),
       total,
       limit: p.limit,
       offset: p.offset,

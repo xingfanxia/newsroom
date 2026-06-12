@@ -56,6 +56,10 @@ function authedReq(path: string): Request {
   });
 }
 
+const liveSemanticTest =
+  // Semantic mode spends a real embedding call; opt in only for provider smoke tests.
+  process.env.RUN_LIVE_SEMANTIC_TEST === "1" ? test : test.skip;
+
 describe("/api/v1 auth gate", () => {
   test("rejects missing bearer with 401", async () => {
     const res = await feedGet(new Request("http://localhost/api/v1/feed"));
@@ -207,7 +211,7 @@ describe("/api/v1/search", () => {
     expect(res.status).toBe(400);
   });
 
-  test("semantic mode returns ranked items with distance", async () => {
+  liveSemanticTest("semantic mode returns ranked items with distance", async () => {
     const res = await searchGet(
       authedReq("/api/v1/search?q=autonomous+coding+agent&mode=semantic&limit=5"),
     );
