@@ -7,3 +7,7 @@
  * on the same story forever.
  */
 export const MAX_DISTINCT_SPLIT_RETRIES_PER_ITEM = 3;
+
+export function hasReachedSplitRejectionCap(rejectedClusterCount: number): boolean {
+  return rejectedClusterCount >= MAX_DISTINCT_SPLIT_RETRIES_PER_ITEM;
+}

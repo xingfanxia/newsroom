@@ -25,7 +25,8 @@ Shipped cleanup:
 - Stopped a cluster-cron arbitration loop: Stage A and singleton-recluster now
   skip clusters already rejected for the item in `cluster_splits`, preventing
   the same fuzzy join from being re-added and re-split every tick; after three
-  distinct rejected clusters, the item stays singleton.
+  distinct rejected clusters, Stage A explicitly settles the item as a
+  singleton before running nearest-neighbor probes.
 - Moved render-local helper components out of `components/shell/tweaks.tsx`.
 - Reworked effect async loading in `SignalDrawer` and `TweaksProvider` to satisfy React lint rules without disabling them.
 - Replaced an internal raw `<a>` with locale-aware `next/link`.

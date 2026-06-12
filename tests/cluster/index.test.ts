@@ -9,6 +9,10 @@ import { describe, expect, it } from "bun:test";
 import { readFileSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
+import {
+  hasReachedSplitRejectionCap,
+  MAX_DISTINCT_SPLIT_RETRIES_PER_ITEM,
+} from "@/workers/cluster/split-audit";
 
 // Read the worker source once; all assertions are string searches.
 // Use fileURLToPath for ESM+TSC compatibility (import.meta.dir is Bun-only).
@@ -74,7 +78,7 @@ describe("Threshold distance conversion", () => {
 describe("Neighbor SQL — published_at window anchor", () => {
   it("CTE selects published_at alongside embedding", () => {
     expect(workerSrc).toMatch(
-      /WITH target AS \([\s\S]+?SELECT[\s\S]+?embedding,[\s\S]+?published_at,/,
+      /WITH target AS \([\s\S]+?SELECT[\s\S]+?embedding,[\s\S]+?published_at/,
     );
   });
 
@@ -129,13 +133,35 @@ describe("Neighbor SQL — split audit exclusions", () => {
   });
 
   it("stops fuzzy-joining items after several distinct split rejections", () => {
-    expect(workerSrc).toContain("MAX_DISTINCT_SPLIT_RETRIES_PER_ITEM");
     expect(workerSrc).toContain(
       "count(DISTINCT split_audit.from_cluster_id)::int",
     );
-    expect(workerSrc).toContain(
-      "(SELECT rejected_cluster_count FROM target) < ${MAX_DISTINCT_SPLIT_RETRIES_PER_ITEM}",
+    expect(workerSrc).toContain("hasReachedSplitRejectionCap");
+  });
+
+  it("keeps split-cap items as terminal singletons before any nearest-neighbor query", () => {
+    const capCheckIdx = workerSrc.indexOf(
+      "hasReachedSplitRejectionCap(rejectedClusterCount)",
     );
+    const nearestQueryIdx = workerSrc.indexOf("const nearestClusteredResult");
+
+    expect(capCheckIdx).toBeGreaterThan(0);
+    expect(nearestQueryIdx).toBeGreaterThan(capCheckIdx);
+    expect(workerSrc.slice(capCheckIdx, nearestQueryIdx)).toContain(
+      "createSingletonCluster(client, itemId)",
+    );
+  });
+
+  it("treats the split retry cap as inclusive", () => {
+    expect(
+      hasReachedSplitRejectionCap(MAX_DISTINCT_SPLIT_RETRIES_PER_ITEM - 1),
+    ).toBe(false);
+    expect(
+      hasReachedSplitRejectionCap(MAX_DISTINCT_SPLIT_RETRIES_PER_ITEM),
+    ).toBe(true);
+    expect(
+      hasReachedSplitRejectionCap(MAX_DISTINCT_SPLIT_RETRIES_PER_ITEM + 1),
+    ).toBe(true);
   });
 });
 

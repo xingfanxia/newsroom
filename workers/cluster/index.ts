@@ -1,7 +1,7 @@
 import { sql, and, isNull, isNotNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items, clusters } from "@/db/schema";
-import { MAX_DISTINCT_SPLIT_RETRIES_PER_ITEM } from "./split-audit";
+import { hasReachedSplitRejectionCap } from "./split-audit";
 
 const MAX_PER_RUN = 200;
 // Cosine similarity floor for join. 0.75 catches cross-source coverage of the
@@ -82,10 +82,18 @@ export async function runClusterBatch(): Promise<ClusterReport> {
 }
 
 type AssignOutcome = "assigned" | "created" | "already-claimed";
+type ClusterClient = ReturnType<typeof db>;
 
 async function assignOneToCluster(itemId: number): Promise<AssignOutcome> {
   const client = db();
   const threshold = 1 - SIMILARITY_THRESHOLD; // cosine sim → distance
+  const rejectedClusterCount = await countDistinctRejectedClusters(client, itemId);
+  if (hasReachedSplitRejectionCap(rejectedClusterCount)) {
+    // The embedding neighborhood has repeatedly proven topical rather than
+    // event-equivalent. End the loop here instead of spending more HNSW probes
+    // and future arbitration calls on the same item.
+    return createSingletonCluster(client, itemId);
+  }
 
   // Two-pass nearest-neighbor lookup, split by cluster status. We bias Stage A
   // toward joining an existing cluster when both a clustered and an unclustered
@@ -118,12 +126,7 @@ async function assignOneToCluster(itemId: number): Promise<AssignOutcome> {
     WITH target AS (
       SELECT
         embedding,
-        published_at,
-        (
-          SELECT count(DISTINCT split_audit.from_cluster_id)::int
-          FROM cluster_splits split_audit
-          WHERE split_audit.item_id = ${itemId}
-        ) AS rejected_cluster_count
+        published_at
       FROM items WHERE id = ${itemId}
     )
     SELECT
@@ -135,7 +138,6 @@ async function assignOneToCluster(itemId: number): Promise<AssignOutcome> {
       AND i.embedding IS NOT NULL
       AND i.enriched_at IS NOT NULL
       AND i.cluster_id IS NOT NULL
-      AND (SELECT rejected_cluster_count FROM target) < ${MAX_DISTINCT_SPLIT_RETRIES_PER_ITEM}
       AND NOT EXISTS (
         SELECT 1
         FROM cluster_splits split_audit
@@ -167,12 +169,7 @@ async function assignOneToCluster(itemId: number): Promise<AssignOutcome> {
           WITH target AS (
             SELECT
               embedding,
-              published_at,
-              (
-                SELECT count(DISTINCT split_audit.from_cluster_id)::int
-                FROM cluster_splits split_audit
-                WHERE split_audit.item_id = ${itemId}
-              ) AS rejected_cluster_count
+              published_at
             FROM items WHERE id = ${itemId}
           )
           SELECT
@@ -183,7 +180,6 @@ async function assignOneToCluster(itemId: number): Promise<AssignOutcome> {
             AND i.embedding IS NOT NULL
             AND i.enriched_at IS NOT NULL
             AND i.cluster_id IS NULL
-            AND (SELECT rejected_cluster_count FROM target) < ${MAX_DISTINCT_SPLIT_RETRIES_PER_ITEM}
             AND i.published_at BETWEEN
                 (SELECT published_at FROM target) - make_interval(hours => ${WINDOW_HOURS})
                 AND
@@ -243,14 +239,43 @@ async function assignOneToCluster(itemId: number): Promise<AssignOutcome> {
     }
   } else {
     // No neighbor above threshold — new singleton cluster.
-    const [created] = await client
-      .insert(clusters)
-      .values({ leadItemId: itemId, memberCount: 0 })
-      .returning({ id: clusters.id });
-    clusterId = created.id;
-    outcome = "created";
+    return createSingletonCluster(client, itemId);
   }
 
+  return claimClusterAssignment(client, itemId, clusterId, outcome);
+}
+
+async function countDistinctRejectedClusters(
+  client: ClusterClient,
+  itemId: number,
+): Promise<number> {
+  const result = await client.execute(sql`
+    SELECT count(DISTINCT split_audit.from_cluster_id)::int AS count
+    FROM cluster_splits split_audit
+    WHERE split_audit.item_id = ${itemId}
+  `);
+  return Number(
+    (result as unknown as Array<{ count: number | string | null }>)[0]?.count ?? 0,
+  );
+}
+
+async function createSingletonCluster(
+  client: ClusterClient,
+  itemId: number,
+): Promise<AssignOutcome> {
+  const [created] = await client
+    .insert(clusters)
+    .values({ leadItemId: itemId, memberCount: 0 })
+    .returning({ id: clusters.id });
+  return claimClusterAssignment(client, itemId, created.id, "created");
+}
+
+async function claimClusterAssignment(
+  client: ClusterClient,
+  itemId: number,
+  clusterId: number,
+  outcome: Exclude<AssignOutcome, "already-claimed">,
+): Promise<AssignOutcome> {
   // Atomic claim: only increment member_count if we successfully assigned the item.
   // If another worker beat us to this row, the UPDATE returns 0 rows and we
   // silently no-op instead of double-counting.
