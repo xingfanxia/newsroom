@@ -5,8 +5,9 @@ import {
   requireAdmin,
   type SessionUser,
 } from "@/lib/auth/session";
+import { sessionAuthRequiredResponse } from "./session-auth";
 
-type AdminAuthError = "auth_required" | "admin_required";
+type AdminAuthError = "admin_required";
 
 export type AdminRouteAuthResult =
   | { ok: true; admin: SessionUser }
@@ -14,10 +15,7 @@ export type AdminRouteAuthResult =
 
 export function adminAuthErrorResponse(err: unknown): NextResponse | null {
   if (err instanceof UnauthorizedError) {
-    return NextResponse.json(
-      { ok: false, error: "auth_required" satisfies AdminAuthError },
-      { status: 401 },
-    );
+    return sessionAuthRequiredResponse();
   }
   if (err instanceof ForbiddenError) {
     return NextResponse.json(

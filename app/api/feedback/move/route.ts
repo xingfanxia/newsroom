@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getSessionUser, upsertAppUser } from "@/lib/auth/session";
+import { upsertAppUser } from "@/lib/auth/session";
+import { requireSessionForRoute } from "@/lib/api/session-auth";
 import { moveItemToCollection } from "@/lib/items/collections";
 
 const bodySchema = z.object({
@@ -16,10 +17,10 @@ const bodySchema = z.object({
  * 404 if the save doesn't exist for this user.
  */
 export async function POST(req: Request) {
-  const user = await getSessionUser();
-  if (!user) {
-    return NextResponse.json({ ok: false, error: "auth_required" }, { status: 401 });
-  }
+  const auth = await requireSessionForRoute();
+  if (!auth.ok) return auth.response;
+  const user = auth.user;
+
   await upsertAppUser(user);
 
   let raw: unknown;

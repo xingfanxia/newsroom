@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSessionUser } from "@/lib/auth/session";
+import { requireSessionForRoute } from "@/lib/api/session-auth";
 import {
   applyFeedbackToggle,
   feedbackBodySchema,
@@ -10,17 +10,13 @@ import {
  *
  * - 200 { ok: true, userVotes } on success
  * - 400 on invalid body (zod issues)
- * - 401 when the caller has no valid Supabase session
+ * - 401 when the caller has no valid session cookie
  * - 500 on unexpected server error (logged, not exposed)
  */
 export async function POST(req: Request) {
-  const user = await getSessionUser();
-  if (!user) {
-    return NextResponse.json(
-      { ok: false, error: "auth_required" },
-      { status: 401 },
-    );
-  }
+  const auth = await requireSessionForRoute();
+  if (!auth.ok) return auth.response;
+  const user = auth.user;
 
   let raw: unknown;
   try {

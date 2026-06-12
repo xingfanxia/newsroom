@@ -6,14 +6,15 @@ import {
   buildTweaksDbPatch,
   tweaksPatchBodySchema,
 } from "@/lib/api/tweak-requests";
-import { getSessionUser, upsertAppUser } from "@/lib/auth/session";
+import { requireSessionForRoute } from "@/lib/api/session-auth";
+import { upsertAppUser } from "@/lib/auth/session";
 
 /** GET — return the user's saved tweaks + watchlist (null when not set). */
 export async function GET() {
-  const user = await getSessionUser();
-  if (!user) {
-    return NextResponse.json({ ok: false, error: "auth_required" }, { status: 401 });
-  }
+  const auth = await requireSessionForRoute();
+  if (!auth.ok) return auth.response;
+  const user = auth.user;
+
   await upsertAppUser(user);
 
   const [row] = await db()
@@ -31,10 +32,10 @@ export async function GET() {
 
 /** PATCH — save the user's tweaks / watchlist. Either field is optional. */
 export async function PATCH(req: Request) {
-  const user = await getSessionUser();
-  if (!user) {
-    return NextResponse.json({ ok: false, error: "auth_required" }, { status: 401 });
-  }
+  const auth = await requireSessionForRoute();
+  if (!auth.ok) return auth.response;
+  const user = auth.user;
+
   await upsertAppUser(user);
 
   let raw: unknown;
