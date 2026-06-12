@@ -17,10 +17,13 @@
 import { z } from "zod";
 import { requireApiToken } from "@/lib/auth/api-token";
 import { applyFeedbackToggle } from "@/lib/feedback/toggle";
+import { toSavedAgentApiItem } from "@/lib/api/v1-items";
+import {
+  assignSavedItemCollection,
+  getSavedItemCollectionId,
+  userOwnsSavedCollection,
+} from "@/lib/items/collections";
 import { getSavedStories } from "@/lib/items/saved";
-import { db } from "@/db/client";
-import { feedback } from "@/db/schema";
-import { and, eq, sql } from "drizzle-orm";
 
 const getQuerySchema = z.object({
   collection: z
@@ -60,23 +63,7 @@ export async function GET(req: Request) {
       collection: q.collection ?? null,
     });
     return Response.json({
-      items: stories.map((s) => ({
-        id: s.id,
-        title: s.title,
-        summary: s.summary,
-        publisher: s.source.publisher,
-        source_id: s.sourceId,
-        source_group: s.source.groupCode ?? null,
-        source_kind: s.source.kindCode,
-        tier: s.tier,
-        importance: s.importance,
-        hkr: s.hkr ?? null,
-        tags: s.tags,
-        url: s.url,
-        published_at: s.publishedAt,
-        saved_at: s.savedAt,
-        collection_id: s.collectionId,
-      })),
+      items: stories.map((s) => toSavedAgentApiItem(s, q.locale)),
       total: stories.length,
     });
   } catch (err) {
@@ -106,6 +93,14 @@ export async function POST(req: Request) {
   const b = parsed.data;
 
   try {
+    if (
+      b.on &&
+      b.collection_id !== undefined &&
+      !(await userOwnsSavedCollection(user.id, b.collection_id))
+    ) {
+      return Response.json({ error: "collection_not_found" }, { status: 404 });
+    }
+
     const votes = await applyFeedbackToggle(user, {
       itemId: b.item_id,
       vote: "save",
@@ -113,39 +108,25 @@ export async function POST(req: Request) {
       note: b.note,
     });
 
-    // When saving on, optionally pin to a specific collection. Existing
-    // feedback-toggle only sets the vote row; collection assignment is a
-    // follow-up UPDATE because the toggle API stays single-purpose.
-    if (b.on && b.collection_id !== undefined) {
-      await db()
-        .update(feedback)
-        .set({ collectionId: b.collection_id })
-        .where(
-          and(
-            eq(feedback.itemId, b.item_id),
-            eq(feedback.userId, user.id),
-            eq(feedback.vote, "save"),
-          ),
-        );
+    let collectionId: number | null = null;
+    if (votes.save && b.collection_id !== undefined) {
+      const assigned = await assignSavedItemCollection({
+        userId: user.id,
+        itemId: b.item_id,
+        targetCollectionId: b.collection_id,
+      });
+      if (!assigned.ok) {
+        return Response.json({ error: assigned.reason }, { status: 404 });
+      }
+      collectionId = assigned.collectionId;
+    } else if (votes.save) {
+      collectionId = await getSavedItemCollectionId(user.id, b.item_id);
     }
-
-    // Return authoritative state — the agent can trust this to reconcile.
-    const [row] = await db()
-      .select({ collectionId: feedback.collectionId })
-      .from(feedback)
-      .where(
-        and(
-          eq(feedback.itemId, b.item_id),
-          eq(feedback.userId, user.id),
-          eq(feedback.vote, "save"),
-        ),
-      )
-      .limit(1);
 
     return Response.json({
       item_id: b.item_id,
       saved: votes.save,
-      collection_id: row?.collectionId ?? null,
+      collection_id: collectionId,
     });
   } catch (err) {
     // FK-violation on item_id → 404 rather than 500 (caller gave a bad id).
@@ -157,7 +138,3 @@ export async function POST(req: Request) {
     return Response.json({ error: "server_error" }, { status: 500 });
   }
 }
-
-// Keep postgres happy about the unused sql import for when we add
-// collection-pin race semantics (v2).
-void sql;

@@ -23,6 +23,11 @@ const searchTool = sectionBetween(
   'server.registerTool(\n    "ax_radar_search"',
   'server.registerTool(\n    "ax_radar_sources"',
 );
+const saveTool = sectionBetween(
+  mcpRoute,
+  'server.registerTool(\n    "ax_radar_save"',
+  'server.registerTool(\n    "ax_radar_collections_list"',
+);
 
 describe("MCP contract source wiring", () => {
   test("feed/search item payloads use the shared v1 agent serializer", () => {
@@ -43,5 +48,16 @@ describe("MCP contract source wiring", () => {
     expect(feedSearchTools).not.toContain("has_commentary: Boolean");
     expect(feedSearchTools).not.toContain("canonical_title: isEvent");
     expect(feedSearchTools).not.toContain("const isEvent = (s.coverage");
+  });
+
+  test("save tool uses the shared owner-aware collection assignment helper", () => {
+    expect(mcpRoute).toContain("assignSavedItemCollection");
+    expect(mcpRoute).toContain("getSavedItemCollectionId");
+    expect(mcpRoute).toContain("userOwnsSavedCollection");
+    expect(saveTool).toContain("assignSavedItemCollection");
+    expect(saveTool).toContain("getSavedItemCollectionId");
+    expect(saveTool).toContain("userOwnsSavedCollection");
+    expect(saveTool).not.toContain(".update(feedback)");
+    expect(saveTool).not.toContain("collection_id ?? null");
   });
 });

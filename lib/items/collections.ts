@@ -12,6 +12,10 @@ export type SavedCollection = {
   createdAt: string;
 };
 
+export type SavedItemCollectionAssignment =
+  | { ok: true; collectionId: number | null }
+  | { ok: false; reason: "collection_not_found" | "save_not_found" };
+
 /**
  * List all named collections for a user + running save counts.
  * Pinned collections surface first. Unrelated to the virtual `inbox` bucket,
@@ -156,16 +160,65 @@ export async function deleteCollection(
   return result.length > 0;
 }
 
+/** Return the current collection assignment for one saved item. */
+export async function getSavedItemCollectionId(
+  userId: string,
+  itemId: number,
+): Promise<number | null> {
+  const [row] = await db()
+    .select({ collectionId: feedback.collectionId })
+    .from(feedback)
+    .where(
+      and(
+        eq(feedback.userId, userId),
+        eq(feedback.itemId, itemId),
+        eq(feedback.vote, "save"),
+      ),
+    )
+    .limit(1);
+
+  return row?.collectionId ?? null;
+}
+
+/** True only when the named saved collection belongs to the user. */
+export async function userOwnsSavedCollection(
+  userId: string,
+  collectionId: number,
+): Promise<boolean> {
+  const [collection] = await db()
+    .select({ id: savedCollections.id })
+    .from(savedCollections)
+    .where(
+      and(
+        eq(savedCollections.id, collectionId),
+        eq(savedCollections.userId, userId),
+      ),
+    )
+    .limit(1);
+
+  return Boolean(collection);
+}
+
 /**
- * Move a saved item between collections. Passing `targetCollectionId = null`
- * moves it to the inbox. Only the owner's saves are mutable.
+ * Assign a saved item to one of the owner's collections, or null for inbox.
+ * A collection id owned by another user is treated the same as a missing id.
  */
-export async function moveItemToCollection(input: {
+export async function assignSavedItemCollection(input: {
   userId: string;
   itemId: number;
   targetCollectionId: number | null;
-}): Promise<boolean> {
-  const result = await db()
+}): Promise<SavedItemCollectionAssignment> {
+  const client = db();
+
+  if (input.targetCollectionId !== null) {
+    if (
+      !(await userOwnsSavedCollection(input.userId, input.targetCollectionId))
+    ) {
+      return { ok: false, reason: "collection_not_found" };
+    }
+  }
+
+  const result = await client
     .update(feedback)
     .set({ collectionId: input.targetCollectionId })
     .where(
@@ -175,6 +228,24 @@ export async function moveItemToCollection(input: {
         eq(feedback.vote, "save"),
       ),
     )
-    .returning({ id: feedback.id });
-  return result.length > 0;
+    .returning({ collectionId: feedback.collectionId });
+
+  if (result.length === 0) {
+    return { ok: false, reason: "save_not_found" };
+  }
+
+  return { ok: true, collectionId: result[0]?.collectionId ?? null };
+}
+
+/**
+ * Move a saved item between collections. Passing `targetCollectionId = null`
+ * moves it to the inbox. Only the owner's saves and collections are mutable.
+ */
+export async function moveItemToCollection(input: {
+  userId: string;
+  itemId: number;
+  targetCollectionId: number | null;
+}): Promise<boolean> {
+  const result = await assignSavedItemCollection(input);
+  return result.ok;
 }

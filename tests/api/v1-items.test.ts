@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { toAgentApiItem } from "@/lib/api/v1-items";
+import { toAgentApiItem, toSavedAgentApiItem } from "@/lib/api/v1-items";
 import type { Story } from "@/lib/types";
 
 const baseStory: Story = {
@@ -107,5 +107,32 @@ describe("toAgentApiItem", () => {
     expect(item.first_seen_at).toBeNull();
     expect(item.latest_member_at).toBeNull();
     expect(item.still_developing).toBeNull();
+  });
+});
+
+describe("toSavedAgentApiItem", () => {
+  test("extends the shared agent item contract with save metadata", () => {
+    const item = toSavedAgentApiItem(
+      {
+        ...baseStory,
+        crossSourceCount: 3,
+        savedAt: "2026-06-12T01:30:00.000Z",
+        collectionId: 17,
+      },
+      "en",
+    );
+
+    expect(Object.keys(item)).toEqual([
+      ...expectedKeys,
+      "saved_at",
+      "collection_id",
+    ]);
+    expect(item).toMatchObject({
+      id: "42",
+      source_id: "openai-news",
+      cross_source_count: 3,
+      saved_at: "2026-06-12T01:30:00.000Z",
+      collection_id: 17,
+    });
   });
 });

@@ -54,11 +54,16 @@ import { getItemDetail } from "@/lib/items/detail";
 import { toAgentApiItem } from "@/lib/api/v1-items";
 import { toEventMemberApiItems } from "@/lib/api/event-members";
 import { applyFeedbackToggle } from "@/lib/feedback/toggle";
-import { listCollections } from "@/lib/items/collections";
+import {
+  assignSavedItemCollection,
+  getSavedItemCollectionId,
+  listCollections,
+  userOwnsSavedCollection,
+} from "@/lib/items/collections";
 import { totalsByWindow } from "@/lib/llm/stats";
 import { db } from "@/db/client";
-import { feedback, sources, sourceHealth, newsletters } from "@/db/schema";
-import { and, asc, eq, sql } from "drizzle-orm";
+import { sources, sourceHealth, newsletters } from "@/db/schema";
+import { asc, eq, sql } from "drizzle-orm";
 import type { SessionUser } from "@/lib/auth/session";
 
 type ToolOutput = {
@@ -319,28 +324,40 @@ function buildServer(user: SessionUser): McpServer {
     },
     async ({ item_id, on, collection_id, note }) => {
       try {
+        if (
+          on &&
+          collection_id !== undefined &&
+          !(await userOwnsSavedCollection(user.id, collection_id))
+        ) {
+          return error("collection_not_found");
+        }
+
         const votes = await applyFeedbackToggle(user, {
           itemId: item_id,
           vote: "save",
           on,
           note,
         });
-        if (on && collection_id !== undefined) {
-          await db()
-            .update(feedback)
-            .set({ collectionId: collection_id })
-            .where(
-              and(
-                eq(feedback.itemId, item_id),
-                eq(feedback.userId, user.id),
-                eq(feedback.vote, "save"),
-              ),
-            );
+
+        let collectionId: number | null = null;
+        if (votes.save && collection_id !== undefined) {
+          const assigned = await assignSavedItemCollection({
+            userId: user.id,
+            itemId: item_id,
+            targetCollectionId: collection_id,
+          });
+          if (!assigned.ok) {
+            return error(assigned.reason);
+          }
+          collectionId = assigned.collectionId;
+        } else if (votes.save) {
+          collectionId = await getSavedItemCollectionId(user.id, item_id);
         }
+
         return text({
           item_id,
           saved: votes.save,
-          collection_id: collection_id ?? null,
+          collection_id: collectionId,
         });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);

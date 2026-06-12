@@ -50,7 +50,20 @@ export async function getSavedStories(
       sourceLocale: sources.locale,
       sourceKind: sources.kind,
       sourceGroup: sources.group,
+      clusterId: items.clusterId,
       clusterMemberCount: clusters.memberCount,
+      clusterCoverage: clusters.coverage,
+      clusterFirstSeenAt: clusters.firstSeenAt,
+      clusterLatestMemberAt: clusters.latestMemberAt,
+      clusterCanonicalTitleZh: clusters.canonicalTitleZh,
+      clusterCanonicalTitleEn: clusters.canonicalTitleEn,
+      clusterEditorNoteZh: clusters.editorNoteZh,
+      clusterEditorNoteEn: clusters.editorNoteEn,
+      clusterEditorAnalysisZh: clusters.editorAnalysisZh,
+      clusterEditorAnalysisEn: clusters.editorAnalysisEn,
+      clusterImportance: clusters.importance,
+      clusterEventTier: clusters.eventTier,
+      clusterHkr: clusters.hkr,
       savedAt: feedback.createdAt,
       collectionId: feedback.collectionId,
     })
@@ -84,14 +97,42 @@ export async function getSavedStories(
       locale === "en" ? r.sourceNameEn : r.sourceNameZh;
     const title =
       locale === "en"
-        ? r.titleEn ?? r.titleZh ?? r.title
-        : r.titleZh ?? r.titleEn ?? r.title;
+        ? (r.clusterCanonicalTitleEn ??
+          r.titleEn ??
+          r.titleZh ??
+          r.title)
+        : (r.clusterCanonicalTitleZh ??
+          r.titleZh ??
+          r.titleEn ??
+          r.title);
     const editorNote =
-      locale === "en" ? r.editorNoteEn ?? r.editorNoteZh : r.editorNoteZh ?? r.editorNoteEn;
+      locale === "en"
+        ? (r.clusterEditorNoteEn ??
+          r.clusterEditorNoteZh ??
+          r.editorNoteEn ??
+          r.editorNoteZh)
+        : (r.clusterEditorNoteZh ??
+          r.clusterEditorNoteEn ??
+          r.editorNoteZh ??
+          r.editorNoteEn);
     const editorAnalysis =
       locale === "en"
-        ? r.editorAnalysisEn ?? r.editorAnalysisZh
-        : r.editorAnalysisZh ?? r.editorAnalysisEn;
+        ? (r.clusterEditorAnalysisEn ??
+          r.clusterEditorAnalysisZh ??
+          r.editorAnalysisEn ??
+          r.editorAnalysisZh)
+        : (r.clusterEditorAnalysisZh ??
+          r.clusterEditorAnalysisEn ??
+          r.editorAnalysisZh ??
+          r.editorAnalysisEn);
+    const effectiveImportance = r.clusterImportance ?? r.importance ?? 0;
+    const effectiveTier = (r.clusterEventTier ?? r.tier ?? "all") as Story["tier"];
+    const effectiveHkr =
+      (r.clusterHkr as Story["hkr"] | null) ?? (r.hkr as Story["hkr"] | null);
+    const coverage =
+      r.clusterMemberCount && r.clusterMemberCount > 1
+        ? r.clusterMemberCount
+        : undefined;
 
     return {
       id: String(r.id),
@@ -102,15 +143,15 @@ export async function getSavedStories(
         localeCode: (r.sourceLocale ?? "multi") as Story["source"]["localeCode"],
         groupCode: r.sourceGroup as Story["source"]["groupCode"],
       },
-      featured: r.tier === "featured" || r.tier === "p1",
+      featured: effectiveTier === "featured" || effectiveTier === "p1",
       title,
       summary:
         locale === "en"
           ? r.summaryEn ?? r.summaryZh ?? ""
           : r.summaryZh ?? r.summaryEn ?? "",
       tags: flatTags,
-      importance: r.importance ?? 0,
-      tier: (r.tier ?? "all") as Story["tier"],
+      importance: effectiveImportance,
+      tier: effectiveTier,
       publishedAt: r.publishedAt.toISOString(),
       url: r.url,
       crossSourceCount:
@@ -124,7 +165,13 @@ export async function getSavedStories(
         locale === "en"
           ? r.reasoningEn ?? r.reasoningZh ?? r.reasoning ?? undefined
           : r.reasoningZh ?? r.reasoningEn ?? r.reasoning ?? undefined,
-      hkr: (r.hkr as Story["hkr"]) ?? undefined,
+      hkr: effectiveHkr ?? undefined,
+      clusterId: r.clusterId ?? undefined,
+      coverage,
+      firstSeenAt: r.clusterFirstSeenAt?.toISOString(),
+      latestMemberAt: r.clusterLatestMemberAt?.toISOString(),
+      canonicalTitleZh: r.clusterCanonicalTitleZh ?? undefined,
+      canonicalTitleEn: r.clusterCanonicalTitleEn ?? undefined,
       savedAt: r.savedAt.toISOString(),
       collectionId: r.collectionId,
     };

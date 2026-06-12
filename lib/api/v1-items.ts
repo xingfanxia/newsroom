@@ -11,9 +11,14 @@ export type AgentApiItem = ApiItemCommonFields<Story["hkr"]> & {
   still_developing: boolean | null;
 } & ApiItemEventFields;
 
+export type SavedAgentApiItem = AgentApiItem & {
+  saved_at: string;
+  collection_id: number | null;
+};
+
 /**
- * Shared flat item contract for bearer-gated /api/v1/feed and /api/v1/search.
- * Agents should be able to parse either endpoint with one schema.
+ * Shared flat item contract for bearer-gated REST and MCP item lists.
+ * Agents should be able to parse feed/search/saved rows with one schema.
  */
 export function toAgentApiItem(
   story: Story,
@@ -24,5 +29,16 @@ export function toAgentApiItem(
     cross_source_count: story.crossSourceCount ?? story.coverage ?? null,
     ...toApiItemEventFields(story, locale),
     still_developing: story.stillDeveloping ?? null,
+  };
+}
+
+export function toSavedAgentApiItem(
+  story: Story & { savedAt: string; collectionId: number | null },
+  locale: "zh" | "en",
+): SavedAgentApiItem {
+  return {
+    ...toAgentApiItem(story, locale),
+    saved_at: story.savedAt,
+    collection_id: story.collectionId,
   };
 }
