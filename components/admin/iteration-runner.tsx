@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
 import { AgentConsole } from "./agent-console";
 import { DiffViewer } from "./diff-viewer";
 import type { DiffLine, IterationConsoleLine } from "@/lib/types";

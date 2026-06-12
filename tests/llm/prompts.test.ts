@@ -9,7 +9,7 @@ describe("loadDailyColumnPrompt", () => {
 
   it("returns the daily-column.md content as a single string", () => {
     const prompt = loadDailyColumnPrompt();
-    expect(prompt).toMatch(/卡兹克/);
+    expect(prompt).toMatch(/像.*朋友/);
     expect(prompt).toMatch(/UNTRUSTED CONTENT NOTICE/);
     expect(prompt.length).toBeGreaterThan(1500);
   });

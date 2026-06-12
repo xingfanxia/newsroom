@@ -289,7 +289,7 @@ Editorial rules:
 
 function newsletterUserPrompt(args: DraftArgs): string {
   const { rows, locale, kind } = args;
-  const lines = rows.map((r, idx) => {
+  const lines = rows.map((r) => {
     const title =
       locale === "zh"
         ? r.titleZh ?? r.titleEn ?? r.title

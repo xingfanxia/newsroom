@@ -17,6 +17,59 @@ const ACCENT_SWATCHES: Array<{ id: Tweaks["accent"]; hex: string }> = [
   { id: "cyan",   hex: "#39d0d8" },
 ];
 
+type PatchTweaks = <K extends keyof Tweaks>(key: K, value: Tweaks[K]) => void;
+type BooleanTweaksKey = {
+  [K in keyof Tweaks]: Tweaks[K] extends boolean ? K : never;
+}[keyof Tweaks];
+
+function SegmentControl<K extends keyof Tweaks>({
+  tweaks,
+  patch,
+  k,
+  opts,
+}: {
+  tweaks: Tweaks;
+  patch: PatchTweaks;
+  k: K;
+  opts: Array<[Tweaks[K], string]>;
+}) {
+  return (
+    <div className="seg">
+      {opts.map(([v, label]) => (
+        <button
+          key={String(v)}
+          type="button"
+          className={`s ${tweaks[k] === v ? "on" : ""}`}
+          onClick={() => patch(k, v)}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function ToggleControl({
+  tweaks,
+  patch,
+  k,
+}: {
+  tweaks: Tweaks;
+  patch: PatchTweaks;
+  k: BooleanTweaksKey;
+}) {
+  return (
+    <button
+      type="button"
+      className={`tgl ${tweaks[k] ? "on" : ""}`}
+      onClick={() => patch(k, !tweaks[k])}
+      aria-label={String(k)}
+    >
+      <span className="knob" />
+    </button>
+  );
+}
+
 /**
  * Site configuration panel — floats bottom-right on desktop, opened via
  * the "site config" entry in the left-rail or ⌥,. Toggles theme, accent,
@@ -25,38 +78,6 @@ const ACCENT_SWATCHES: Array<{ id: Tweaks["accent"]; hex: string }> = [
 export function Tweaks() {
   const { tweaks, patch, reset, open, setOpen } = useTweaks();
   if (!open) return null;
-
-  const Seg = <K extends keyof Tweaks>({
-    k,
-    opts,
-  }: {
-    k: K;
-    opts: Array<[Tweaks[K], string]>;
-  }) => (
-    <div className="seg">
-      {opts.map(([v, label]) => (
-        <button
-          key={String(v)}
-          type="button"
-          className={`s ${tweaks[k] === v ? "on" : ""}`}
-          onClick={() => patch(k, v as Tweaks[K])}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
-  );
-
-  const Toggle = <K extends keyof Tweaks>({ k }: { k: K }) => (
-    <button
-      type="button"
-      className={`tgl ${tweaks[k] ? "on" : ""}`}
-      onClick={() => patch(k, !tweaks[k] as Tweaks[K])}
-      aria-label={String(k)}
-    >
-      <span className="knob" />
-    </button>
-  );
 
   return (
     <div className="tweaks on scroll-dark">
@@ -140,7 +161,9 @@ export function Tweaks() {
               <span>mono face</span>
               <span className="v">{tweaks.monoFont}</span>
             </div>
-            <Seg
+            <SegmentControl
+              tweaks={tweaks}
+              patch={patch}
               k="monoFont"
               opts={[
                 ["jetbrains", "JetBrains"],
@@ -155,7 +178,9 @@ export function Tweaks() {
               <span>CJK face</span>
               <span className="v">{tweaks.cjkFont}</span>
             </div>
-            <Seg
+            <SegmentControl
+              tweaks={tweaks}
+              patch={patch}
               k="cjkFont"
               opts={[
                 ["notoSerif", "Noto 衬线"],
@@ -169,7 +194,9 @@ export function Tweaks() {
               <span>density</span>
               <span className="v">{tweaks.density}</span>
             </div>
-            <Seg
+            <SegmentControl
+              tweaks={tweaks}
+              patch={patch}
               k="density"
               opts={[
                 ["compact", "compact"],
@@ -183,7 +210,9 @@ export function Tweaks() {
               <span>language</span>
               <span className="v">{tweaks.language}</span>
             </div>
-            <Seg
+            <SegmentControl
+              tweaks={tweaks}
+              patch={patch}
               k="language"
               opts={[
                 ["zh", "中文"],
@@ -201,7 +230,9 @@ export function Tweaks() {
               <span>corner radius</span>
               <span className="v">{tweaks.radius}</span>
             </div>
-            <Seg
+            <SegmentControl
+              tweaks={tweaks}
+              patch={patch}
               k="radius"
               opts={[
                 ["sharp", "sharp"],
@@ -216,7 +247,9 @@ export function Tweaks() {
               <span>score visual</span>
               <span className="v">{tweaks.scoreStyle}</span>
             </div>
-            <Seg
+            <SegmentControl
+              tweaks={tweaks}
+              patch={patch}
               k="scoreStyle"
               opts={[
                 ["ring", "◯ ring"],
@@ -231,7 +264,9 @@ export function Tweaks() {
               <span>chrome</span>
               <span className="v">{tweaks.chromeStyle}</span>
             </div>
-            <Seg
+            <SegmentControl
+              tweaks={tweaks}
+              patch={patch}
               k="chromeStyle"
               opts={[
                 ["terminal", "terminal"],
@@ -250,42 +285,42 @@ export function Tweaks() {
               <span>ticker</span>
               <span className="sub">top scrolling headlines</span>
             </div>
-            <Toggle k="showTicker" />
+            <ToggleControl tweaks={tweaks} patch={patch} k="showTicker" />
           </div>
           <div className="row-tg">
             <div className="lbl">
               <span>radar widget</span>
               <span className="sub">right-rail signal scanner</span>
             </div>
-            <Toggle k="showRadar" />
+            <ToggleControl tweaks={tweaks} patch={patch} k="showRadar" />
           </div>
           <div className="row-tg">
             <div className="lbl">
               <span>24h pulse</span>
               <span className="sub">left-rail bar chart</span>
             </div>
-            <Toggle k="showPulse" />
+            <ToggleControl tweaks={tweaks} patch={patch} k="showPulse" />
           </div>
           <div className="row-tg">
             <div className="lbl">
               <span>breadcrumb prompt</span>
               <span className="sub">ax@ax-radar path in topbar</span>
             </div>
-            <Toggle k="showBreadcrumb" />
+            <ToggleControl tweaks={tweaks} patch={patch} k="showBreadcrumb" />
           </div>
           <div className="row-tg">
             <div className="lbl">
               <span>line numbers</span>
               <span className="sub">gutter numbering on feed</span>
             </div>
-            <Toggle k="showLineNumbers" />
+            <ToggleControl tweaks={tweaks} patch={patch} k="showLineNumbers" />
           </div>
           <div className="row-tg">
             <div className="lbl">
               <span>muted metadata</span>
               <span className="sub">dim source / tier / time</span>
             </div>
-            <Toggle k="mutedMeta" />
+            <ToggleControl tweaks={tweaks} patch={patch} k="mutedMeta" />
           </div>
         </div>
 

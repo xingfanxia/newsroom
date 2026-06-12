@@ -1,5 +1,12 @@
 # 每日 AI 日报 — Design
 
+> **Archived historical context.** This document describes the original
+> 2026-04-25 daily-column design and may mention retired paper feeds or older
+> model routing. For current implementation guidance, start at
+> [`../README.md`](../README.md), [`../HANDOFF.md`](../HANDOFF.md),
+> [`../architecture/ingestion.md`](../architecture/ingestion.md), and the
+> runtime prompt [`../../lib/llm/prompts/daily-column.md`](../../lib/llm/prompts/daily-column.md).
+
 **Status**: SHIPPED 2026-04-25; **voice rebased back to khazix on 2026-05-08** (and AI HOT integration shipped same day).
 
 **Scope**: Daily opinionated AI column; newsletter + 3 lane RSS feeds; MCP resources for column; operator skill composing existing `ax-radar` + writing-style references.

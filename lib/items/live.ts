@@ -1,4 +1,4 @@
-import { and, desc, eq, sql, isNotNull } from "drizzle-orm";
+import { and, eq, sql, isNotNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items, sources, clusters } from "@/db/schema";
 import type { Story } from "@/lib/types";
@@ -238,8 +238,6 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
   const limit = q.limit ?? 40;
   const offset = q.offset ?? 0;
   const client = db();
-
-  const view = q.view ?? "archive";
 
   // Default ordering: lead's published_at first (so old still-developing events
   // don't beat fresh news on importance ties — many P1s sit at 100), importance

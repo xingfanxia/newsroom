@@ -10,7 +10,7 @@
  * Run:
  *   bun --env-file=.env.local scripts/ops/remove-errored-sources.ts
  */
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items, sources, sourceHealth } from "@/db/schema";
 

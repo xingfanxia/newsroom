@@ -102,29 +102,35 @@ export function TweaksProvider({
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    // Start from localStorage for instant paint (zero network), then upgrade
-    // with the server's copy if available — server wins when the user has
-    // saved tweaks on another device and signed in here fresh.
     const local = loadFromStorage(base);
-    setTweaksState(local);
     let cancelled = false;
-    fetch("/api/tweaks", { credentials: "same-origin" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((body) => {
-        if (cancelled || !body?.tweaks) return;
-        const server = body.tweaks as Record<string, unknown>;
-        if (server.language === "both") server.language = "en";
-        const merged: Tweaks = { ...local, ...(server as Partial<Tweaks>) };
+
+    async function loadServerTweaks() {
+      try {
+        const response = await fetch("/api/tweaks", {
+          credentials: "same-origin",
+        });
+        const body = response.ok ? await response.json() : null;
+        if (cancelled) return;
+        const server = body?.tweaks as Record<string, unknown> | undefined;
+        if (server?.language === "both") server.language = "en";
+        const merged: Tweaks = server
+          ? { ...local, ...(server as Partial<Tweaks>) }
+          : local;
         setTweaksState(merged);
         try {
           window.localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
         } catch {
           /* ignore */
         }
-      })
-      .catch(() => {
+      } catch {
         // auth_required / network error — localStorage is still applied.
-      });
+        if (!cancelled) setTweaksState(local);
+      }
+    }
+
+    // Start from localStorage, then upgrade with the server's copy if available.
+    void loadServerTweaks();
     return () => {
       cancelled = true;
     };

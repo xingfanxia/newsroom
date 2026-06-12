@@ -1,5 +1,27 @@
 # AX's AI RADAR — Current Handoff
 
+## 2026-06-12 — Code-quality and docs source-of-truth cleanup
+
+Current maintenance direction:
+- Start docs navigation from `docs/README.md`; historical plans/handoffs are useful context, not current implementation instructions.
+- `bun run lint` is expected to be clean with zero warnings.
+- `upsertAppUser(user)` upserts the effective user row, including API-token users, before FK-owned mutations.
+
+Shipped cleanup:
+- Moved render-local helper components out of `components/shell/tweaks.tsx`.
+- Reworked effect async loading in `SignalDrawer` and `TweaksProvider` to satisfy React lint rules without disabling them.
+- Replaced an internal raw `<a>` with locale-aware `next/link`.
+- Removed unused imports/locals across app, tests, scripts, and workers.
+- Updated stale prompt tests to match the current friend-readable daily-column voice.
+- Added `docs/README.md` routing and archive banners for completed daily-column design/plan/handoff docs.
+- Added a first `knip` report at `docs/reports/code-quality/dead-code-analysis.md`; do not delete reported files until a repo-specific `knip` config separates operator CLI entry points from true dead code.
+
+Verification:
+- `bun run lint` — passed with no warnings.
+- `bun test --env-file=.env.local` — 505 pass, 0 fail.
+- `bun run build` — passed.
+- `git diff --check` — passed.
+
 ## 2026-06-11 — Enrich spend guardrails, usage all-time/model labels
 
 Current production direction:

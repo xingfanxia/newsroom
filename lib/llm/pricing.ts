@@ -140,10 +140,11 @@ function rowToPricing(row: LiteLLMModelRow): ModelPricing | null {
 
 export async function resolvePricing(
   model: string,
-  _provider?: LLMProvider,
+  provider?: LLMProvider,
 ): Promise<ModelPricing | null> {
   // Provider is reserved for future disambiguation (e.g. Azure vs OpenAI deployments
   // that share a family name). Not used yet but keeps callers stable when we wire it in.
+  void provider;
   const { rows } = await loadPricing();
   const stripped = stripProviderPrefix(model);
   // 1. exact match on the raw model string

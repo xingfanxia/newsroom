@@ -8,7 +8,7 @@
  * Cost: ~$0.008/item × ~150 items = ~$1.20 one-time sweep.
  */
 import pLimit from "p-limit";
-import { and, eq, isNull, isNotNull, sql } from "drizzle-orm";
+import { and, eq, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items } from "@/db/schema";
 import { generateStructured, profiles } from "@/lib/llm";

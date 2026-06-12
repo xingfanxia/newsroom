@@ -33,14 +33,16 @@ export function SignalDrawer({ clusterId, locale, showZh, open, onClose }: Props
   useEffect(() => {
     if (!open || !clusterId || members !== null) return;
     let cancelled = false;
-    setLoading(true);
-    setError(null);
-    fetch(`/api/events/${clusterId}/members?locale=${locale}`, {
-      cache: "no-store",
-    })
-      .then(async (r) => {
-        if (!r.ok) throw new Error(`status ${r.status}`);
-        const body = await r.json();
+    async function loadMembers() {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await fetch(
+          `/api/events/${clusterId}/members?locale=${locale}`,
+          { cache: "no-store" },
+        );
+        if (!response.ok) throw new Error(`status ${response.status}`);
+        const body = await response.json();
         if (cancelled) return;
         const mapped: Member[] = (body.members ?? []).map(
           (m: {
@@ -60,15 +62,15 @@ export function SignalDrawer({ clusterId, locale, showZh, open, onClose }: Props
           }),
         );
         setMembers(mapped);
-      })
-      .catch((e: unknown) => {
+      } catch (e: unknown) {
         if (cancelled) return;
         setError(e instanceof Error ? e.message : String(e));
         setMembers([]);
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) setLoading(false);
-      });
+      }
+    }
+    void loadMembers();
     return () => {
       cancelled = true;
     };

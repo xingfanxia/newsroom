@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { RadarWidget, type RadarStats } from "./radar-widget";
 import { useTweaks } from "@/hooks/use-tweaks";
 
@@ -26,6 +27,7 @@ export function RightRail({
   const { tweaks } = useTweaks();
   const lang = tweaks.language;
   const zh = lang === "zh";
+  const policyHref = `/${lang}/admin/policy`;
 
   return (
     <aside className="rail-r scroll-dark">
@@ -55,9 +57,9 @@ export function RightRail({
       <div className="panel">
         <div className="hd">
           <span className="t">{zh ? "精选策略" : "curation policy"}</span>
-          <a className="more" href="/admin/policy">
+          <Link className="more" href={policyHref}>
             {policyVersion}
-          </a>
+          </Link>
         </div>
         <div
           className="bd"

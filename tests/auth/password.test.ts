@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import {
   ADMIN_SESSION_MAX_AGE_SECONDS,
@@ -69,7 +70,6 @@ describe("session cookie round-trip", () => {
     // Build a cookie with payload in the past, manually signed with the same key.
     // We can reuse mintSessionCookie by first rewinding the clock via timer stub
     // — simpler: just craft an expired payload and HMAC it ourselves.
-    const { createHmac } = require("node:crypto");
     const expired = String(Date.now() - 60_000);
     const sig = createHmac("sha256", "round-trip-pw")
       .update(expired)

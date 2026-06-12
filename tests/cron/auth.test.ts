@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach } from "bun:test";
+import { describe, expect, it, afterEach } from "bun:test";
 import { verifyCron } from "@/app/api/cron/_auth";
 
 const ORIGINAL_SECRET = process.env.CRON_SECRET;

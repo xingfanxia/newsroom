@@ -8,7 +8,7 @@
  * Each describe block owns its mock state to avoid bleed between scenarios.
  */
 
-import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test";
+import { describe, it, expect, mock, beforeEach } from "bun:test";
 
 // ── Shared mock factories ──────────────────────────────────────────────────
 
@@ -162,25 +162,6 @@ describe("runArbitrationBatch — keep verdict", () => {
 
     // Simulate the keep-verdict path directly
     const now = new Date();
-    const txCalls: { op: string; args: unknown[] }[] = [];
-
-    const tx = {
-      update: (table: unknown) => ({
-        set: (values: unknown) => ({
-          where: () => {
-            txCalls.push({ op: "update", args: [table, values] });
-            return Promise.resolve();
-          },
-        }),
-      }),
-      insert: (table: unknown) => ({
-        values: (vals: unknown) => {
-          txCalls.push({ op: "insert", args: [table, vals] });
-          return Promise.resolve([]);
-        },
-      }),
-    };
-
     // Simulate the keep path: tx.update(clusters).set({verifiedAt}) + tx.update(items).set({clusterVerifiedAt})
     const clusterVerifiedAtSet: Record<string, unknown>[] = [];
     const itemVerifiedAtSet: Record<string, unknown>[] = [];

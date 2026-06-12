@@ -63,7 +63,7 @@ export async function runCanonicalTitleBatch(): Promise<CanonicalTitleReport> {
 
   const processed = candidates.length;
   let generated = 0;
-  let skipped = 0;
+  const skipped = 0;
   const errors: Array<{ clusterId: number; reason: string }> = [];
 
   for (const candidate of candidates) {

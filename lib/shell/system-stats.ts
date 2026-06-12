@@ -100,7 +100,6 @@ function uptimeFromFirstSuccess(first: Date | null): string {
 
 export async function getSystemSnapshot(): Promise<SystemSnapshot> {
   const client = db();
-  const now = new Date();
 
   // --- services from source_health + sources ---------------------
   const hRows = await client

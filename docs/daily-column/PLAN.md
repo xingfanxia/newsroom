@@ -1,5 +1,11 @@
 # Daily AI Column — Implementation Plan
 
+> **Archived completed plan.** Do not execute this checklist as current work.
+> It preserves the 2026-04-25 implementation sequence and includes retired
+> `/papers` / `papers.xml` and older model references. Current routing starts
+> at [`../README.md`](../README.md) and current behavior is in code plus
+> [`../HANDOFF.md`](../HANDOFF.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace the existing structured `runNewsletterBatch("daily")` with an opinionated 2500-4500 字 daily AI column in 卡兹克 (khazix) voice, ship RSS for the column + 3 lanes, add MCP resources, and create an operator skill that composes existing `ax-radar` + `khazix-writer`.
