@@ -7,6 +7,7 @@ import {
   UnauthorizedError,
   requireAdmin,
 } from "@/lib/auth/session";
+import { parseIterationRunRouteId } from "@/lib/policy/iterations";
 
 export const dynamic = "force-dynamic";
 
@@ -40,13 +41,14 @@ export async function POST(
   }
 
   const { id: rawId } = await params;
-  const id = Number(rawId);
-  if (!Number.isInteger(id) || id <= 0) {
+  const parsedId = parseIterationRunRouteId(rawId);
+  if (!parsedId.ok) {
     return NextResponse.json(
-      { ok: false, error: "invalid_id" },
+      { ok: false, error: parsedId.error },
       { status: 400 },
     );
   }
+  const { id } = parsedId;
 
   const [updated] = await db()
     .update(iterationRuns)

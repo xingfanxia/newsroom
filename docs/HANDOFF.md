@@ -16,6 +16,7 @@ Shipped cleanup:
 - Replaced stale `tsx` operator-script hints with `bun`.
 - Updated README / `.env.example` / architecture docs so Tavily is not advertised as wired, cron docs match the current split route set, and cluster docs match the 0.75 / 72h runtime.
 - Aligned `/admin/system` queue telemetry with worker predicates: item commentary now counts only singleton/unclustered item candidates, event commentary is shown as its own queue, and the cron table derives schedules from `vercel.json`.
+- Shared `/api/admin/iterations/[id]` route-id parsing through `lib/policy/iterations.ts` so fetch/apply/reject stay behaviorally aligned.
 - Moved render-local helper components out of `components/shell/tweaks.tsx`.
 - Reworked effect async loading in `SignalDrawer` and `TweaksProvider` to satisfy React lint rules without disabling them.
 - Replaced an internal raw `<a>` with locale-aware `next/link`.

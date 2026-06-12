@@ -7,6 +7,7 @@ import {
   UnauthorizedError,
   requireAdmin,
 } from "@/lib/auth/session";
+import { parseIterationRunRouteId } from "@/lib/policy/iterations";
 import { commitSkillVersion } from "@/lib/policy/skill";
 import { invalidatePolicyCache } from "@/workers/enrich/policy";
 import { SKILL_NAME } from "@/workers/agent/iterate";
@@ -49,13 +50,14 @@ export async function POST(
   }
 
   const { id: rawId } = await params;
-  const id = Number(rawId);
-  if (!Number.isInteger(id) || id <= 0) {
+  const parsedId = parseIterationRunRouteId(rawId);
+  if (!parsedId.ok) {
     return NextResponse.json(
-      { ok: false, error: "invalid_id" },
+      { ok: false, error: parsedId.error },
       { status: 400 },
     );
   }
+  const { id } = parsedId;
 
   const client = db();
   const [run] = await client
