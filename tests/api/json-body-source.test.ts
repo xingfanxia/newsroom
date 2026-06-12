@@ -1,0 +1,44 @@
+import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
+const root = process.cwd();
+
+const sharedJsonBodyRoutePaths = [
+  "app/api/admin/auth/route.ts",
+  "app/api/admin/collections/route.ts",
+  "app/api/admin/policy/commit/route.ts",
+  "app/api/feedback/route.ts",
+  "app/api/feedback/move/route.ts",
+  "app/api/tweaks/route.ts",
+  "app/api/v1/collections/route.ts",
+  "app/api/v1/saved/route.ts",
+  "app/api/v1/tweaks/route.ts",
+] as const;
+
+function read(path: string): string {
+  return readFileSync(resolve(root, path), "utf8");
+}
+
+describe("JSON body parsing source wiring", () => {
+  test("mutating API routes share JSON parse and Zod error handling", () => {
+    for (const path of sharedJsonBodyRoutePaths) {
+      const source = read(path);
+
+      expect(source).toContain("@/lib/api/json-body");
+      expect(source).toContain("parseJsonRequestBody");
+      expect(source).not.toContain("let raw: unknown");
+      expect(source).not.toContain("raw = await req.json()");
+      expect(source).not.toContain("safeParse(raw)");
+    }
+  });
+
+  test("each surface keeps its intended error envelope", () => {
+    for (const path of sharedJsonBodyRoutePaths) {
+      const source = read(path);
+      const expectedEnvelope = path.includes("/api/v1/") ? "plain" : "ok";
+
+      expect(source).toContain(`envelope: "${expectedEnvelope}"`);
+    }
+  });
+});

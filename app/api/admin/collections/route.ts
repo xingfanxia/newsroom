@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { upsertAppUser } from "@/lib/auth/session";
 import { requireAdminForRoute } from "@/lib/api/admin-auth";
+import { parseJsonRequestBody } from "@/lib/api/json-body";
 import {
   createCollection,
   listCollections,
@@ -33,19 +34,11 @@ export async function POST(req: Request) {
 
   await upsertAppUser(user);
 
-  let raw: unknown;
-  try {
-    raw = await req.json();
-  } catch {
-    return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 });
-  }
-  const parsed = adminCollectionCreateBodySchema.safeParse(raw);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { ok: false, error: "invalid_body", issues: parsed.error.issues },
-      { status: 400 },
-    );
-  }
+  const parsed = await parseJsonRequestBody(req, adminCollectionCreateBodySchema, {
+    envelope: "ok",
+  });
+  if (!parsed.ok) return parsed.response;
+
   try {
     const collection = await createCollection({
       userId: user.id,
@@ -73,19 +66,11 @@ export async function PATCH(req: Request) {
   if (!auth.ok) return auth.response;
   const user = auth.admin;
 
-  let raw: unknown;
-  try {
-    raw = await req.json();
-  } catch {
-    return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 });
-  }
-  const parsed = adminCollectionUpdateBodySchema.safeParse(raw);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { ok: false, error: "invalid_body", issues: parsed.error.issues },
-      { status: 400 },
-    );
-  }
+  const parsed = await parseJsonRequestBody(req, adminCollectionUpdateBodySchema, {
+    envelope: "ok",
+  });
+  if (!parsed.ok) return parsed.response;
+
   try {
     const ok = await updateCollection({
       userId: user.id,
@@ -113,19 +98,12 @@ export async function DELETE(req: Request) {
   if (!auth.ok) return auth.response;
   const user = auth.admin;
 
-  let raw: unknown;
-  try {
-    raw = await req.json();
-  } catch {
-    return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 });
-  }
-  const parsed = collectionDeleteBodySchema.safeParse(raw);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { ok: false, error: "invalid_body" },
-      { status: 400 },
-    );
-  }
+  const parsed = await parseJsonRequestBody(req, collectionDeleteBodySchema, {
+    envelope: "ok",
+    includeIssues: false,
+  });
+  if (!parsed.ok) return parsed.response;
+
   const ok = await deleteCollection(user.id, parsed.data.id);
   if (!ok) {
     return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });

@@ -24,6 +24,7 @@ import {
   v1CollectionCreateBodySchema,
   v1CollectionUpdateBodySchema,
 } from "@/lib/api/collection-requests";
+import { parseJsonRequestBody } from "@/lib/api/json-body";
 
 export async function GET(req: Request) {
   const auth = await requireApiToken(req);
@@ -45,19 +46,11 @@ export async function POST(req: Request) {
   if (auth instanceof Response) return auth;
   const { user } = auth;
 
-  let raw: unknown;
-  try {
-    raw = await req.json();
-  } catch {
-    return Response.json({ error: "invalid_json" }, { status: 400 });
-  }
-  const parsed = v1CollectionCreateBodySchema.safeParse(raw);
-  if (!parsed.success) {
-    return Response.json(
-      { error: "invalid_body", issues: parsed.error.issues },
-      { status: 400 },
-    );
-  }
+  const parsed = await parseJsonRequestBody(req, v1CollectionCreateBodySchema, {
+    envelope: "plain",
+  });
+  if (!parsed.ok) return parsed.response;
+
   try {
     await upsertAppUser(user);
     const collection = await createCollection({
@@ -79,19 +72,11 @@ export async function PATCH(req: Request) {
   if (auth instanceof Response) return auth;
   const { user } = auth;
 
-  let raw: unknown;
-  try {
-    raw = await req.json();
-  } catch {
-    return Response.json({ error: "invalid_json" }, { status: 400 });
-  }
-  const parsed = v1CollectionUpdateBodySchema.safeParse(raw);
-  if (!parsed.success) {
-    return Response.json(
-      { error: "invalid_body", issues: parsed.error.issues },
-      { status: 400 },
-    );
-  }
+  const parsed = await parseJsonRequestBody(req, v1CollectionUpdateBodySchema, {
+    envelope: "plain",
+  });
+  if (!parsed.ok) return parsed.response;
+
   try {
     const ok = await updateCollection({
       userId: user.id,
@@ -110,16 +95,12 @@ export async function DELETE(req: Request) {
   if (auth instanceof Response) return auth;
   const { user } = auth;
 
-  let raw: unknown;
-  try {
-    raw = await req.json();
-  } catch {
-    return Response.json({ error: "invalid_json" }, { status: 400 });
-  }
-  const parsed = collectionDeleteBodySchema.safeParse(raw);
-  if (!parsed.success) {
-    return Response.json({ error: "invalid_body" }, { status: 400 });
-  }
+  const parsed = await parseJsonRequestBody(req, collectionDeleteBodySchema, {
+    envelope: "plain",
+    includeIssues: false,
+  });
+  if (!parsed.ok) return parsed.response;
+
   try {
     const ok = await deleteCollection(user.id, parsed.data.id);
     if (!ok) return Response.json({ error: "not_found" }, { status: 404 });

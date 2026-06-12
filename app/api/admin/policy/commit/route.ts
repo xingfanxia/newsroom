@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAdminForRoute } from "@/lib/api/admin-auth";
+import { parseJsonRequestBody } from "@/lib/api/json-body";
 import { commitSkillVersion } from "@/lib/policy/skill";
 
 const bodySchema = z.object({
@@ -22,19 +23,9 @@ export async function POST(req: Request) {
   if (!auth.ok) return auth.response;
   const user = auth.admin;
 
-  let raw: unknown;
-  try {
-    raw = await req.json();
-  } catch {
-    return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 });
-  }
-  const parsed = bodySchema.safeParse(raw);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { ok: false, error: "invalid_body", issues: parsed.error.issues },
-      { status: 400 },
-    );
-  }
+  const parsed = await parseJsonRequestBody(req, bodySchema, { envelope: "ok" });
+  if (!parsed.ok) return parsed.response;
+
   try {
     const row = await commitSkillVersion({
       skillName: parsed.data.skillName,

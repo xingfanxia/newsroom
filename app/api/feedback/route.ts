@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { parseJsonRequestBody } from "@/lib/api/json-body";
 import { requireSessionForRoute } from "@/lib/api/session-auth";
 import {
   applyFeedbackToggle,
@@ -18,23 +19,10 @@ export async function POST(req: Request) {
   if (!auth.ok) return auth.response;
   const user = auth.user;
 
-  let raw: unknown;
-  try {
-    raw = await req.json();
-  } catch {
-    return NextResponse.json(
-      { ok: false, error: "invalid_json" },
-      { status: 400 },
-    );
-  }
-
-  const parsed = feedbackBodySchema.safeParse(raw);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { ok: false, error: "invalid_body", issues: parsed.error.issues },
-      { status: 400 },
-    );
-  }
+  const parsed = await parseJsonRequestBody(req, feedbackBodySchema, {
+    envelope: "ok",
+  });
+  if (!parsed.ok) return parsed.response;
 
   try {
     const userVotes = await applyFeedbackToggle(user, parsed.data);

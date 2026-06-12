@@ -16,6 +16,7 @@ import {
   buildTweaksDbPatch,
   tweaksPatchBodySchema,
 } from "@/lib/api/tweak-requests";
+import { parseJsonRequestBody } from "@/lib/api/json-body";
 import { requireApiToken } from "@/lib/auth/api-token";
 import { upsertAppUser } from "@/lib/auth/session";
 
@@ -46,19 +47,11 @@ export async function PATCH(req: Request) {
   if (auth instanceof Response) return auth;
   const { user } = auth;
 
-  let raw: unknown;
-  try {
-    raw = await req.json();
-  } catch {
-    return Response.json({ error: "invalid_json" }, { status: 400 });
-  }
-  const parsed = tweaksPatchBodySchema.safeParse(raw);
-  if (!parsed.success) {
-    return Response.json(
-      { error: "invalid_body", issues: parsed.error.issues },
-      { status: 400 },
-    );
-  }
+  const parsed = await parseJsonRequestBody(req, tweaksPatchBodySchema, {
+    envelope: "plain",
+  });
+  if (!parsed.ok) return parsed.response;
+
   const patch = buildTweaksDbPatch(parsed.data);
   if (!patch) {
     return Response.json({ error: "empty_body" }, { status: 400 });

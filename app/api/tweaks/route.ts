@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { users } from "@/db/schema";
+import { parseJsonRequestBody } from "@/lib/api/json-body";
 import {
   buildTweaksDbPatch,
   tweaksPatchBodySchema,
@@ -38,19 +39,10 @@ export async function PATCH(req: Request) {
 
   await upsertAppUser(user);
 
-  let raw: unknown;
-  try {
-    raw = await req.json();
-  } catch {
-    return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 });
-  }
-  const parsed = tweaksPatchBodySchema.safeParse(raw);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { ok: false, error: "invalid_body", issues: parsed.error.issues },
-      { status: 400 },
-    );
-  }
+  const parsed = await parseJsonRequestBody(req, tweaksPatchBodySchema, {
+    envelope: "ok",
+  });
+  if (!parsed.ok) return parsed.response;
 
   const patch = buildTweaksDbPatch(parsed.data);
   if (!patch) {

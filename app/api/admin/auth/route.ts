@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { parseJsonRequestBody } from "@/lib/api/json-body";
 import {
   ADMIN_SESSION_COOKIE,
   ADMIN_SESSION_MAX_AGE_SECONDS,
@@ -25,22 +26,11 @@ const bodySchema = z.object({
  * - 401 wrong password — never returns WHY, just "invalid"
  */
 export async function POST(req: Request) {
-  let raw: unknown;
-  try {
-    raw = await req.json();
-  } catch {
-    return NextResponse.json(
-      { ok: false, error: "invalid_json" },
-      { status: 400 },
-    );
-  }
-  const parsed = bodySchema.safeParse(raw);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { ok: false, error: "invalid_body" },
-      { status: 400 },
-    );
-  }
+  const parsed = await parseJsonRequestBody(req, bodySchema, {
+    envelope: "ok",
+    includeIssues: false,
+  });
+  if (!parsed.ok) return parsed.response;
 
   if (!isValidPassword(parsed.data.password)) {
     return NextResponse.json(

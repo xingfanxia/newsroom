@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { parseJsonRequestBody } from "@/lib/api/json-body";
 import { upsertAppUser } from "@/lib/auth/session";
 import { requireSessionForRoute } from "@/lib/api/session-auth";
 import { moveItemToCollection } from "@/lib/items/collections";
@@ -23,19 +24,9 @@ export async function POST(req: Request) {
 
   await upsertAppUser(user);
 
-  let raw: unknown;
-  try {
-    raw = await req.json();
-  } catch {
-    return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 });
-  }
-  const parsed = bodySchema.safeParse(raw);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { ok: false, error: "invalid_body", issues: parsed.error.issues },
-      { status: 400 },
-    );
-  }
+  const parsed = await parseJsonRequestBody(req, bodySchema, { envelope: "ok" });
+  if (!parsed.ok) return parsed.response;
+
   try {
     const ok = await moveItemToCollection({
       userId: user.id,
