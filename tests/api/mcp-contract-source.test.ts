@@ -39,13 +39,22 @@ describe("MCP contract source wiring", () => {
     expect(mcpRoute).toContain(
       'import { toAgentApiItem } from "@/lib/api/v1-items";',
     );
-    expect(feedTool).toContain(
-      "items: stories.map((s) => toAgentApiItem(s, locale))",
-    );
-    expect(searchTool).toContain(
-      "items: stories.map((s) => toAgentApiItem(s, locale))",
-    );
+    expect(feedTool).toContain("toAgentApiItem(s, locale)");
+    expect(searchTool).toContain("toAgentApiItem(s, locale)");
     expect(searchTool).toContain("...toAgentApiItem(s, locale)");
+  });
+
+  test("feed/search tools share execution with the REST surfaces", () => {
+    expect(mcpRoute).toContain('from "@/lib/api/feed-results"');
+    expect(mcpRoute).toContain('from "@/lib/api/search-results"');
+    expect(feedTool).toContain("runFeedQuery");
+    expect(searchTool).toContain("runSearchQuery");
+    expect(feedTool).not.toContain("countFeaturedStories");
+    expect(feedTool).not.toContain("getFeaturedStories");
+    expect(searchTool).not.toContain("semanticSearch");
+    expect(searchTool).not.toContain("getFeaturedStories");
+    expect(searchTool).not.toContain("total: stories.length");
+    expect(mcpRoute).not.toContain('import { semanticSearch }');
   });
 
   test("does not hand-roll event-aware feed/search item fields", () => {

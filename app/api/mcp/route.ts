@@ -44,12 +44,12 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import { z } from "zod";
 import { requireApiToken } from "@/lib/auth/api-token";
 import {
-  countFeaturedStories,
   getFeaturedStories,
   getEventMembers,
   type FeedQuery,
 } from "@/lib/items/live";
-import { semanticSearch } from "@/lib/items/semantic-search";
+import { runFeedQuery } from "@/lib/api/feed-results";
+import { runSearchQuery } from "@/lib/api/search-results";
 import { getItemDetail } from "@/lib/items/detail";
 import { toAgentApiItem } from "@/lib/api/v1-items";
 import { toEventMemberApiItems } from "@/lib/api/event-members";
@@ -149,16 +149,13 @@ function buildServer(user: SessionUser): McpServer {
         excludeSourceTags: args.exclude_source_tags,
         includeSourceTags: args.include_source_tags,
       };
-      const [stories, total] = await Promise.all([
-        getFeaturedStories(q),
-        countFeaturedStories(q),
-      ]);
+      const result = await runFeedQuery(q);
       return text({
-        items: stories.map((s) => toAgentApiItem(s, locale)),
-        total,
-        limit: q.limit,
-        offset: q.offset,
-        view: q.view,
+        items: result.items.map((s) => toAgentApiItem(s, locale)),
+        total: result.total,
+        limit: result.limit,
+        offset: result.offset,
+        view: result.view,
       });
     },
   );
@@ -223,19 +220,23 @@ function buildServer(user: SessionUser): McpServer {
     async (args) => {
       const mode = args.mode ?? "lexical";
       const limit = args.limit ?? 20;
-
       const locale = args.locale ?? "en";
+      const result = await runSearchQuery({
+        q: args.q,
+        mode,
+        tier: "all",
+        locale,
+        limit,
+        offset: 0,
+        source_id: args.source_id,
+        source_group: args.source_group,
+        source_kind: args.source_kind,
+        date_from: args.date_from,
+        date_to: args.date_to,
+        semanticIncludeExcluded: false,
+      });
 
-      if (mode === "semantic") {
-        const result = await semanticSearch(args.q, {
-          locale,
-          limit,
-          sourceId: args.source_id,
-          sourceGroup: args.source_group,
-          sourceKind: args.source_kind,
-          dateFrom: args.date_from,
-          dateTo: args.date_to,
-        });
+      if (result.mode === "semantic") {
         return text({
           mode: "semantic",
           q: args.q,
@@ -249,24 +250,11 @@ function buildServer(user: SessionUser): McpServer {
         });
       }
 
-      const q: FeedQuery = {
-        tier: "all",
-        locale,
-        limit,
-        sourceId: args.source_id,
-        sourceGroup: args.source_group,
-        sourceKind: args.source_kind,
-        dateFrom: args.date_from,
-        dateTo: args.date_to,
-        searchText: args.q,
-        includeSourceGroup: true,
-      };
-      const stories = await getFeaturedStories(q);
       return text({
         mode: "lexical",
         q: args.q,
-        items: stories.map((s) => toAgentApiItem(s, locale)),
-        total: stories.length,
+        items: result.items.map((s) => toAgentApiItem(s, locale)),
+        total: result.total,
       });
     },
   );

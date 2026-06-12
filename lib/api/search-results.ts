@@ -11,6 +11,16 @@ import type { Story } from "@/lib/types";
 
 type SemanticStory = Story & { distance: number };
 
+export type SearchExecutionParams = SearchQueryParams & {
+  /**
+   * Override semantic excluded-tier inclusion for surfaces whose tier contract
+   * does not map 1:1 to REST query params. REST keeps the default tier-driven
+   * behavior; MCP can preserve its historical non-excluded semantic scope while
+   * still sharing the execution path.
+   */
+  semanticIncludeExcluded?: boolean;
+};
+
 export type SearchExecutionResult =
   | {
       mode: "lexical";
@@ -32,12 +42,12 @@ export type SearchExecutionResult =
     };
 
 /**
- * Shared execution for /api/v1/search and /api/public/search.
- * Route handlers own auth/rate-limit/serialization; this module owns the
+ * Shared execution for REST search routes and MCP ax_radar_search.
+ * Surface adapters own auth/rate-limit/serialization; this module owns the
  * search semantics so lexical totals and semantic filters cannot drift.
  */
 export async function runSearchQuery(
-  params: SearchQueryParams,
+  params: SearchExecutionParams,
 ): Promise<SearchExecutionResult> {
   if (params.mode === "semantic") {
     const started = Date.now();
@@ -52,7 +62,7 @@ export async function runSearchQuery(
       // Semantic search defaults to spanning everything, including
       // excluded-tier items, because intent often conflicts with curator
       // heuristics (an excluded interview can be exactly what an agent needs).
-      includeExcluded: params.tier === "all",
+      includeExcluded: params.semanticIncludeExcluded ?? params.tier === "all",
     });
 
     return {

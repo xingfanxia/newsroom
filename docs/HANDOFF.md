@@ -23,12 +23,12 @@ Shipped cleanup:
 - Shared admin auth JSON-error mapping for protected `/api/admin/*` data routes through `lib/api/admin-auth.ts`.
 - Shared cookie-session auth JSON-error mapping for required-session user routes (`/api/feedback*`, `/api/tweaks`) through `lib/api/session-auth.ts`.
 - Shared mutating route JSON body parsing and Zod error-envelope handling through `lib/api/json-body.ts`.
-- Shared public/v1 search execution through `lib/api/search-results.ts`;
-  route handlers now own only auth/rate-limit/ETag/serialization, while the
-  helper owns lexical full-match totals and semantic source/date/tier filters.
-- Shared public/v1 feed execution through `lib/api/feed-results.ts`;
-  route handlers now own only auth/rate-limit/ETag/serialization, while the
-  helper owns paired item + full-match total queries and pagination defaults.
+- Shared REST/MCP search execution through `lib/api/search-results.ts`;
+  adapters now own only auth/rate-limit/ETag/serialization, while the helper
+  owns lexical full-match totals and semantic source/date/tier filters.
+- Shared REST/MCP feed execution through `lib/api/feed-results.ts`;
+  adapters now own only auth/rate-limit/ETag/serialization, while the helper
+  owns paired item + full-match total queries and pagination defaults.
 - Shared hourly/daily/weekly fetch+normalize sequencing through `workers/fetcher/pipeline.ts`, with HTTP route wiring in `app/api/cron/_fetch-bucket-route.ts` and local cron scripts using the same helper.
 - Shared article body + YouTube transcript prefetch sequencing through
   `workers/fetcher/content-prefetch.ts`, so `/api/cron/article-body` and

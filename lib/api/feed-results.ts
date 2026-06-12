@@ -14,9 +14,9 @@ export type FeedExecutionResult = {
 };
 
 /**
- * Shared feed execution for /api/v1/feed and /api/public/feed.
- * Route handlers own auth/rate-limit/ETag/serialization; this module owns the
- * paired item + total query so pagination semantics cannot drift by surface.
+ * Shared feed execution for REST feed routes and MCP ax_radar_feed.
+ * Surface adapters own auth/rate-limit/ETag/serialization; this module owns
+ * the paired item + total query so pagination semantics cannot drift.
  */
 export async function runFeedQuery(
   feedQuery: FeedQuery,
