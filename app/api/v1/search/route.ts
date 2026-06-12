@@ -22,33 +22,17 @@
  *   offset       = ≥0, default 0 (lexical only — semantic doesn't paginate)
  *   locale       = zh | en (default en)
  */
-import { z } from "zod";
 import { requireApiToken } from "@/lib/auth/api-token";
 import {
   countFeaturedStories,
   getFeaturedStories,
-  type FeedQuery,
 } from "@/lib/items/live";
 import { semanticSearch } from "@/lib/items/semantic-search";
 import { toAgentApiItem } from "@/lib/api/v1-items";
-
-const querySchema = z.object({
-  q: z.string().min(1, "q is required"),
-  mode: z.enum(["lexical", "semantic"]).optional().default("lexical"),
-  tier: z.enum(["featured", "p1", "all"]).optional().default("all"),
-  date: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "expected YYYY-MM-DD")
-    .optional(),
-  date_from: z.string().datetime().optional(),
-  date_to: z.string().datetime().optional(),
-  source_id: z.string().min(1).optional(),
-  source_group: z.string().min(1).optional(),
-  source_kind: z.string().min(1).optional(),
-  limit: z.coerce.number().int().min(1).max(100).optional().default(20),
-  offset: z.coerce.number().int().min(0).optional().default(0),
-  locale: z.enum(["zh", "en"]).optional().default("en"),
-});
+import {
+  searchFeedQueryFromParams,
+  v1SearchQueryParamSchema,
+} from "@/lib/api/feed-query-params";
 
 export async function GET(req: Request) {
   const auth = await requireApiToken(req);
@@ -56,7 +40,7 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   const params = Object.fromEntries(url.searchParams.entries());
-  const parsed = querySchema.safeParse(params);
+  const parsed = v1SearchQueryParamSchema.safeParse(params);
   if (!parsed.success) {
     return Response.json(
       { error: "invalid_query", issues: parsed.error.issues },
@@ -101,20 +85,7 @@ export async function GET(req: Request) {
     }
   }
 
-  const feedQuery: FeedQuery = {
-    tier: p.tier,
-    locale: p.locale,
-    limit: p.limit,
-    offset: p.offset,
-    sourceId: p.source_id,
-    sourceGroup: p.source_group,
-    sourceKind: p.source_kind,
-    date: p.date,
-    dateFrom: p.date_from,
-    dateTo: p.date_to,
-    includeSourceGroup: true,
-    searchText: p.q,
-  };
+  const feedQuery = searchFeedQueryFromParams(p);
 
   try {
     const [stories, total] = await Promise.all([

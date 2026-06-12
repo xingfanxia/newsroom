@@ -7,11 +7,7 @@
  *
  * Same item shape and field stripping as /api/public/feed.
  */
-import { z } from "zod";
-import {
-  getFeaturedStories,
-  type FeedQuery,
-} from "@/lib/items/live";
+import { getFeaturedStories } from "@/lib/items/live";
 import { semanticSearch } from "@/lib/items/semantic-search";
 import { publicRateLimit } from "@/lib/rate-limit/public";
 import {
@@ -23,27 +19,13 @@ import {
   publicJson,
 } from "@/lib/api/public-helpers";
 import { toPublicApiItem } from "@/lib/api/public-items";
+import {
+  publicSearchQueryParamSchema,
+  searchFeedQueryFromParams,
+} from "@/lib/api/feed-query-params";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
-const querySchema = z.object({
-  q: z.string().min(1, "q is required"),
-  mode: z.enum(["lexical", "semantic"]).optional().default("lexical"),
-  tier: z.enum(["featured", "p1", "all"]).optional().default("all"),
-  date: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "expected YYYY-MM-DD")
-    .optional(),
-  date_from: z.string().datetime().optional(),
-  date_to: z.string().datetime().optional(),
-  source_id: z.string().min(1).optional(),
-  source_group: z.string().min(1).optional(),
-  source_kind: z.string().min(1).optional(),
-  limit: z.coerce.number().int().min(1).max(50).optional().default(20),
-  offset: z.coerce.number().int().min(0).optional().default(0),
-  locale: z.enum(["zh", "en"]).optional().default("en"),
-});
 
 export async function GET(req: Request) {
   // Semantic search has measurable LLM cost — tighter limit than feed.
@@ -55,7 +37,7 @@ export async function GET(req: Request) {
   if (limited) return limited;
 
   const url = new URL(req.url);
-  const parsed = querySchema.safeParse(
+  const parsed = publicSearchQueryParamSchema.safeParse(
     Object.fromEntries(url.searchParams.entries()),
   );
   if (!parsed.success) {
@@ -108,20 +90,7 @@ export async function GET(req: Request) {
       );
     }
 
-    const feedQuery: FeedQuery = {
-      tier: p.tier,
-      locale: p.locale,
-      limit: p.limit,
-      offset: p.offset,
-      sourceId: p.source_id,
-      sourceGroup: p.source_group,
-      sourceKind: p.source_kind,
-      date: p.date,
-      dateFrom: p.date_from,
-      dateTo: p.date_to,
-      includeSourceGroup: true,
-      searchText: p.q,
-    };
+    const feedQuery = searchFeedQueryFromParams(p);
     const stories = await getFeaturedStories(feedQuery);
     const etag = computeEtag(
       "public-search",

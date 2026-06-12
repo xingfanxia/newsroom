@@ -13,11 +13,9 @@
  *   tier / view / hot_window_hours / date{,_from,_to} / source_{id,group,kind}
  *   curated_only / include_source_tags / exclude_source_tags / limit / offset / locale
  */
-import { z } from "zod";
 import {
   countFeaturedStories,
   getFeaturedStories,
-  type FeedQuery,
 } from "@/lib/items/live";
 import { publicRateLimit } from "@/lib/rate-limit/public";
 import {
@@ -29,45 +27,13 @@ import {
   publicJson,
 } from "@/lib/api/public-helpers";
 import { toPublicApiItem } from "@/lib/api/public-items";
+import {
+  feedQueryFromParams,
+  publicFeedQueryParamSchema,
+} from "@/lib/api/feed-query-params";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
-const querySchema = z.object({
-  tier: z.enum(["featured", "p1", "all"]).optional().default("featured"),
-  view: z.enum(["today", "archive"]).optional().default("archive"),
-  hot_window_hours: z.coerce
-    .number()
-    .int()
-    .min(1)
-    .max(168)
-    .optional()
-    .default(24),
-  date: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "expected YYYY-MM-DD")
-    .optional(),
-  date_from: z.string().datetime().optional(),
-  date_to: z.string().datetime().optional(),
-  source_id: z.string().min(1).optional(),
-  source_group: z.string().min(1).optional(),
-  source_kind: z.string().min(1).optional(),
-  curated_only: z
-    .enum(["true", "false", "1", "0"])
-    .optional()
-    .transform((v) => v === "true" || v === "1"),
-  exclude_source_tags: z.string().min(1).optional(),
-  include_source_tags: z.string().min(1).optional(),
-  limit: z.coerce.number().int().min(1).max(100).optional().default(40),
-  offset: z.coerce.number().int().min(0).optional().default(0),
-  locale: z.enum(["zh", "en"]).optional().default("en"),
-});
-
-function parseTagList(s: string | undefined): string[] | undefined {
-  if (!s) return undefined;
-  const tags = s.split(",").map((t) => t.trim()).filter(Boolean);
-  return tags.length > 0 ? tags : undefined;
-}
 
 export async function GET(req: Request) {
   const limited = publicRateLimit(req, {
@@ -79,7 +45,7 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   const params = Object.fromEntries(url.searchParams.entries());
-  const parsed = querySchema.safeParse(params);
+  const parsed = publicFeedQueryParamSchema.safeParse(params);
   if (!parsed.success) {
     return publicError(
       `invalid_query: ${parsed.error.issues.map((i) => i.message).join("; ")}`,
@@ -87,25 +53,7 @@ export async function GET(req: Request) {
     );
   }
   const q = parsed.data;
-
-  const feedQuery: FeedQuery = {
-    tier: q.tier,
-    locale: q.locale,
-    limit: q.limit,
-    offset: q.offset,
-    sourceId: q.source_id,
-    sourceGroup: q.source_group,
-    sourceKind: q.source_kind,
-    date: q.date,
-    dateFrom: q.date_from,
-    dateTo: q.date_to,
-    includeSourceGroup: true,
-    view: q.view,
-    hotWindowHours: q.hot_window_hours,
-    curatedOnly: q.curated_only || undefined,
-    excludeSourceTags: parseTagList(q.exclude_source_tags),
-    includeSourceTags: parseTagList(q.include_source_tags),
-  };
+  const feedQuery = feedQueryFromParams(q);
 
   try {
     const [stories, total] = await Promise.all([
