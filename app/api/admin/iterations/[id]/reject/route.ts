@@ -2,11 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "@/db/client";
 import { iterationRuns } from "@/db/schema";
-import {
-  ForbiddenError,
-  UnauthorizedError,
-  requireAdmin,
-} from "@/lib/auth/session";
+import { requireAdminForRoute } from "@/lib/api/admin-auth";
 import { parseIterationRunRouteId } from "@/lib/policy/iterations";
 
 export const dynamic = "force-dynamic";
@@ -22,23 +18,8 @@ export async function POST(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  try {
-    await requireAdmin();
-  } catch (err) {
-    if (err instanceof UnauthorizedError) {
-      return NextResponse.json(
-        { ok: false, error: "auth_required" },
-        { status: 401 },
-      );
-    }
-    if (err instanceof ForbiddenError) {
-      return NextResponse.json(
-        { ok: false, error: "admin_required" },
-        { status: 403 },
-      );
-    }
-    throw err;
-  }
+  const auth = await requireAdminForRoute();
+  if (!auth.ok) return auth.response;
 
   const { id: rawId } = await params;
   const parsedId = parseIterationRunRouteId(rawId);

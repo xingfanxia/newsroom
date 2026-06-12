@@ -1,9 +1,5 @@
 import { NextResponse } from "next/server";
-import {
-  ForbiddenError,
-  UnauthorizedError,
-  requireAdmin,
-} from "@/lib/auth/session";
+import { requireAdminForRoute } from "@/lib/api/admin-auth";
 import { IterationGuardError, runIteration } from "@/workers/agent/iterate";
 
 export const dynamic = "force-dynamic";
@@ -26,24 +22,9 @@ export const maxDuration = 600;
  *   500 { error, detail }                          — agent call crashed; run row has status='failed'
  */
 export async function POST() {
-  let admin;
-  try {
-    admin = await requireAdmin();
-  } catch (err) {
-    if (err instanceof UnauthorizedError) {
-      return NextResponse.json(
-        { ok: false, error: "auth_required" },
-        { status: 401 },
-      );
-    }
-    if (err instanceof ForbiddenError) {
-      return NextResponse.json(
-        { ok: false, error: "admin_required" },
-        { status: 403 },
-      );
-    }
-    throw err;
-  }
+  const auth = await requireAdminForRoute();
+  if (!auth.ok) return auth.response;
+  const { admin } = auth;
 
   try {
     const result = await runIteration({ requestedBy: admin.email });
