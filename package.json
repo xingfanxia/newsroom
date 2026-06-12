@@ -21,7 +21,12 @@
     "db:hnsw": "bun scripts/ops/db-create-hnsw.ts",
     "cron:hourly": "bun scripts/ops/run-cron.ts hourly",
     "cron:daily": "bun scripts/ops/run-cron.ts daily",
-    "cron:normalize": "bun scripts/ops/run-cron.ts normalize"
+    "cron:weekly": "bun scripts/ops/run-cron.ts weekly",
+    "cron:normalize": "bun scripts/ops/run-cron.ts normalize",
+    "cron:enrich": "bun scripts/ops/run-cron.ts enrich",
+    "cron:body": "bun scripts/ops/run-cron.ts body",
+    "cron:yt": "bun scripts/ops/run-cron.ts yt",
+    "cron:cluster": "bun scripts/ops/run-cron.ts cluster"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.71",

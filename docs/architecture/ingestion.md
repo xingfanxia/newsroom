@@ -66,6 +66,8 @@ Grouping for the `信源` UI: same enum as `group` above.
 
 - Runs on **Vercel Cron** route handlers declared in `vercel.json`.
 - Each source has `cadence` → scheduler bucket.
+- Local operator triggers use the table-driven `scripts/ops/run-cron.ts`
+  runner and package aliases `bun run cron:<hourly|daily|weekly|normalize|enrich|body|yt|cluster>`.
 - RSS/Atom parsing via `fast-xml-parser`.
 - RSSHub routes hit `https://rsshub.app/{route}` (public instance) or self-hosted fallback.
 - Supported fetch kinds are `rss`, `atom`, `rsshub`, `x-api`, and

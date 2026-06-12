@@ -12,8 +12,34 @@ import { runFetchAndNormalize } from "@/workers/fetcher/pipeline";
 import { runContentPrefetch } from "@/workers/fetcher/content-prefetch";
 import { runYoutubeTranscriptFetch } from "@/workers/fetcher/youtube-transcript";
 
-const USAGE =
-  "usage: bun scripts/ops/run-cron.ts {hourly|daily|weekly|normalize|enrich|body|yt|cluster}";
+type CronKind =
+  | "hourly"
+  | "daily"
+  | "weekly"
+  | "normalize"
+  | "enrich"
+  | "body"
+  | "yt"
+  | "cluster";
+
+type CronRunner = () => Promise<unknown>;
+
+const CRON_RUNNERS = {
+  hourly: () => runFetchAndNormalize(["live", "hourly"]),
+  daily: () => runFetchAndNormalize(["daily"]),
+  weekly: () => runFetchAndNormalize(["weekly"]),
+  normalize: async () => ({ normalize: await runNormalizer() }),
+  enrich: async () => ({ enrich: await runEnrichBatch() }),
+  body: () => runContentPrefetch(),
+  yt: async () => ({ youtube: await runYoutubeTranscriptFetch() }),
+  cluster: () => runClusterPipeline(),
+} satisfies Record<CronKind, CronRunner>;
+
+const USAGE = `usage: bun scripts/ops/run-cron.ts {${Object.keys(CRON_RUNNERS).join("|")}}`;
+
+function isCronKind(kind: string): kind is CronKind {
+  return kind in CRON_RUNNERS;
+}
 
 async function main() {
   const kind = process.argv[2];
@@ -22,49 +48,14 @@ async function main() {
     process.exit(2);
   }
 
-  if (kind === "hourly") {
-    const report = await runFetchAndNormalize(["live", "hourly"]);
-    console.log(JSON.stringify(report, null, 2));
-    return;
-  }
-  if (kind === "daily") {
-    const report = await runFetchAndNormalize(["daily"]);
-    console.log(JSON.stringify(report, null, 2));
-    return;
-  }
-  if (kind === "weekly") {
-    const report = await runFetchAndNormalize(["weekly"]);
-    console.log(JSON.stringify(report, null, 2));
-    return;
-  }
-  if (kind === "normalize") {
-    const n = await runNormalizer();
-    console.log(JSON.stringify({ normalize: n }, null, 2));
-    return;
-  }
-  if (kind === "enrich") {
-    const e = await runEnrichBatch();
-    console.log(JSON.stringify({ enrich: e }, null, 2));
-    return;
-  }
-  if (kind === "body") {
-    const report = await runContentPrefetch();
-    console.log(JSON.stringify(report, null, 2));
-    return;
-  }
-  if (kind === "yt") {
-    const y = await runYoutubeTranscriptFetch();
-    console.log(JSON.stringify({ youtube: y }, null, 2));
-    return;
-  }
-  if (kind === "cluster") {
-    const c = await runClusterPipeline();
-    console.log(JSON.stringify(c, null, 2));
-    return;
+  if (!isCronKind(kind)) {
+    console.error(`unknown kind: ${kind}`);
+    console.error(USAGE);
+    process.exit(2);
   }
 
-  console.error(`unknown kind: ${kind}`);
-  process.exit(2);
+  const report = await CRON_RUNNERS[kind]();
+  console.log(JSON.stringify(report, null, 2));
 }
 
 main().catch((err) => {

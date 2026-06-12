@@ -33,13 +33,9 @@ describe("content prefetch cron wiring", () => {
 
   it("keeps the local body bucket on the production prefetch path", () => {
     const src = readFileSync(scriptPath, "utf8");
-    const bodyBranch = src.slice(
-      src.indexOf('if (kind === "body")'),
-      src.indexOf('if (kind === "yt")'),
-    );
 
     expect(src).toContain("runContentPrefetch");
-    expect(bodyBranch).toContain("runContentPrefetch()");
-    expect(bodyBranch).not.toContain("runArticleBodyFetch()");
+    expect(src).toContain("body: () => runContentPrefetch()");
+    expect(src).not.toContain("runArticleBodyFetch()");
   });
 });

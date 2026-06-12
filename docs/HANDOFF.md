@@ -24,6 +24,9 @@ Shipped cleanup:
 - Shared article body + YouTube transcript prefetch sequencing through
   `workers/fetcher/content-prefetch.ts`, so `/api/cron/article-body` and
   `bun scripts/ops/run-cron.ts body` use the same production path.
+- Table-drove `scripts/ops/run-cron.ts` through one `CRON_RUNNERS` map and
+  exposed all supported local buckets as `bun run cron:<bucket>` aliases:
+  hourly, daily, weekly, normalize, enrich, body, yt, and cluster.
 - Added an enrich claim readiness gate: normal web items must have
   `body_fetched_at` set before `runEnrichBatch` can claim them, while
   X/Twitter status URLs remain exempt because their adapter already stores
