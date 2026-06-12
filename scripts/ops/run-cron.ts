@@ -2,41 +2,39 @@
  * Local trigger for cron buckets — bypasses HTTP layer, calls workers directly.
  *
  * Usage:
- *   bun run cron:hourly
- *   bun run cron:daily
- *   bun run cron:normalize
+ *   bun scripts/ops/run-cron.ts {hourly|daily|weekly|normalize|enrich|body|yt|cluster}
  */
 
-import { runFetchBucket } from "@/workers/fetcher";
 import { runNormalizer } from "@/workers/normalizer";
 import { runEnrichBatch } from "@/workers/enrich";
 import { runClusterBatch } from "@/workers/cluster";
+import { runFetchAndNormalize } from "@/workers/fetcher/pipeline";
 import { runArticleBodyFetch } from "@/workers/fetcher/article-body";
 import { runYoutubeTranscriptFetch } from "@/workers/fetcher/youtube-transcript";
+
+const USAGE =
+  "usage: bun scripts/ops/run-cron.ts {hourly|daily|weekly|normalize|enrich|body|yt|cluster}";
 
 async function main() {
   const kind = process.argv[2];
   if (!kind) {
-    console.error("usage: bun scripts/ops/run-cron.ts {hourly|daily|weekly|normalize}");
+    console.error(USAGE);
     process.exit(2);
   }
 
   if (kind === "hourly") {
-    const f = await runFetchBucket(["live", "hourly"]);
-    const n = await runNormalizer();
-    console.log(JSON.stringify({ fetch: f, normalize: n }, null, 2));
+    const report = await runFetchAndNormalize(["live", "hourly"]);
+    console.log(JSON.stringify(report, null, 2));
     return;
   }
   if (kind === "daily") {
-    const f = await runFetchBucket(["daily"]);
-    const n = await runNormalizer();
-    console.log(JSON.stringify({ fetch: f, normalize: n }, null, 2));
+    const report = await runFetchAndNormalize(["daily"]);
+    console.log(JSON.stringify(report, null, 2));
     return;
   }
   if (kind === "weekly") {
-    const f = await runFetchBucket(["weekly"]);
-    const n = await runNormalizer();
-    console.log(JSON.stringify({ fetch: f, normalize: n }, null, 2));
+    const report = await runFetchAndNormalize(["weekly"]);
+    console.log(JSON.stringify(report, null, 2));
     return;
   }
   if (kind === "normalize") {

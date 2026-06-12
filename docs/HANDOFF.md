@@ -20,7 +20,7 @@ Shipped cleanup:
 - Shared admin auth JSON-error mapping for protected `/api/admin/*` data routes through `lib/api/admin-auth.ts`.
 - Shared cookie-session auth JSON-error mapping for required-session user routes (`/api/feedback*`, `/api/tweaks`) through `lib/api/session-auth.ts`.
 - Shared mutating route JSON body parsing and Zod error-envelope handling through `lib/api/json-body.ts`.
-- Shared hourly/daily/weekly fetch cron route wiring through `app/api/cron/_fetch-bucket-route.ts`.
+- Shared hourly/daily/weekly fetch+normalize sequencing through `workers/fetcher/pipeline.ts`, with HTTP route wiring in `app/api/cron/_fetch-bucket-route.ts` and local cron scripts using the same helper.
 - Stopped a cluster-cron arbitration loop: Stage A and singleton-recluster now
   skip clusters already rejected for the item in `cluster_splits`, preventing
   the same fuzzy join from being re-added and re-split every tick; after three

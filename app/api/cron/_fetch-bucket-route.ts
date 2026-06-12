@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
-import { runFetchBucket } from "@/workers/fetcher";
-import { runNormalizer } from "@/workers/normalizer";
+import {
+  runFetchAndNormalize,
+  type FetchCadences,
+} from "@/workers/fetcher/pipeline";
 import { verifyCron } from "./_auth";
 
 type FetchCronKind = "fetch-hourly" | "fetch-daily" | "fetch-weekly";
-type FetchCadences = Parameters<typeof runFetchBucket>[0];
 
 export async function runFetchBucketCronRoute(
   req: Request,
@@ -13,13 +14,12 @@ export async function runFetchBucketCronRoute(
   const deny = verifyCron(req);
   if (deny) return deny;
 
-  const fetchReport = await runFetchBucket(options.cadences);
-  const normalizeReport = await runNormalizer();
+  const report = await runFetchAndNormalize(options.cadences);
 
   return NextResponse.json({
     kind: options.kind,
     at: new Date().toISOString(),
-    fetch: fetchReport,
-    normalize: normalizeReport,
+    fetch: report.fetch,
+    normalize: report.normalize,
   });
 }
