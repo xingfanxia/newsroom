@@ -129,6 +129,11 @@ Separate pass after enrich, because policy can change without re-enriching:
   create or join a `clusters` row and update member counts / coverage.
 - Stage B arbitrates fuzzy joins, Stage C writes canonical titles, and Stage D
   writes event-level commentary for multi-member events.
+- Stage B split verdicts are recorded in `cluster_splits`; Stage A and the
+  singleton-recluster repair pass treat those rows as negative edges so a
+  rejected item is not rejoined to the same cluster every cron tick. After
+  three distinct rejected clusters, the item stays singleton to cap arbitration
+  spend on topical-near but event-different stories.
 
 ### 2.7 Store
 Postgres (Vercel Postgres / Neon / Supabase) with schema:
@@ -246,7 +251,7 @@ A curated set of enabled X handles stored as normal `sources` rows.
 
 ### Deviations from original blueprint (what actually shipped vs. what Section 2 specified)
 
-- **Clustering path (§2.6)**: implemented as its own cron (`/api/cron/cluster`) not baked into enrich. The current Stage A threshold is 0.75 similarity with a 72h bidirectional published-at window. Widened neighbor search (§2.6 said "lead_item_id only"; we search all enriched) so same-batch siblings merge without a two-pass fix. Atomic row claim via `WHERE clustered_at IS NULL RETURNING` prevents double-counting.
+- **Clustering path (§2.6)**: implemented as its own cron (`/api/cron/cluster`) not baked into enrich. The current Stage A threshold is 0.75 similarity with a 72h bidirectional published-at window. Widened neighbor search (§2.6 said "lead_item_id only"; we search all enriched) so same-batch siblings merge without a two-pass fix. Atomic row claim via `WHERE clustered_at IS NULL RETURNING` prevents double-counting. Stage A also excludes `cluster_splits` matches and stops fuzzy-joining an item after three distinct rejected clusters, so Stage B's rejected joins do not become an every-tick arbitration loop.
 - **Embeddings (§2.4)**: `voyage-3 / text-embedding-3-large` — we picked **text-embedding-3-large native 3072 dims** stored as `halfvec(3072)` (not truncated to 1536 via Matryoshka). Same storage as `vector(1536)`, full quality, fits pgvector HNSW's 4000-dim cap.
 - **Scoring model (§2.5)**: "Sonnet 4.6" placeholder → shipped first as Azure GPT, then moved on 2026-06-10 to **Azure AI Foundry DeepSeek V4 Pro/Flash**. High-value items use Pro; lower-value items use Flash to avoid spending heavy tokens on throwaway content.
 - **LLM SDK choice**: original plan assumed direct vendor SDKs — migrated to **Vercel AI SDK v6** + `@ai-sdk/{anthropic,google,azure,openai}` for unified `generateText` / `generateObject` / `embed` across providers.

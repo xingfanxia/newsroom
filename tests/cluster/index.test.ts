@@ -73,8 +73,8 @@ describe("Threshold distance conversion", () => {
 
 describe("Neighbor SQL — published_at window anchor", () => {
   it("CTE selects published_at alongside embedding", () => {
-    expect(workerSrc).toContain(
-      "SELECT embedding, published_at FROM items WHERE id =",
+    expect(workerSrc).toMatch(
+      /WITH target AS \([\s\S]+?SELECT[\s\S]+?embedding,[\s\S]+?published_at,/,
     );
   });
 
@@ -114,6 +114,28 @@ describe("Neighbor SQL — verified items must be joinable", () => {
     // singleton. The fix: drop the filter and rely on the structural
     // invariant (Stage A is add-only).
     expect(workerSrc).not.toContain("AND i.cluster_verified_at IS NULL");
+  });
+});
+
+// ── SQL: Stage B split audit is a negative edge ─────────────────────────────
+
+describe("Neighbor SQL — split audit exclusions", () => {
+  it("does not rejoin an item to a cluster Stage B already rejected", () => {
+    expect(workerSrc).toContain("FROM cluster_splits split_audit");
+    expect(workerSrc).toContain("split_audit.item_id = ${itemId}");
+    expect(workerSrc).toContain(
+      "split_audit.from_cluster_id = i.cluster_id",
+    );
+  });
+
+  it("stops fuzzy-joining items after several distinct split rejections", () => {
+    expect(workerSrc).toContain("MAX_DISTINCT_SPLIT_RETRIES_PER_ITEM");
+    expect(workerSrc).toContain(
+      "count(DISTINCT split_audit.from_cluster_id)::int",
+    );
+    expect(workerSrc).toContain(
+      "(SELECT rejected_cluster_count FROM target) < ${MAX_DISTINCT_SPLIT_RETRIES_PER_ITEM}",
+    );
   });
 });
 

@@ -1,6 +1,7 @@
 import { sql, and, isNull, isNotNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items, clusters } from "@/db/schema";
+import { MAX_DISTINCT_SPLIT_RETRIES_PER_ITEM } from "./split-audit";
 
 const MAX_PER_RUN = 200;
 // Cosine similarity floor for join. 0.75 catches cross-source coverage of the
@@ -107,9 +108,23 @@ async function assignOneToCluster(itemId: number): Promise<AssignOutcome> {
   // members, never reshuffles, so a new item joining a Stage-B-verified
   // cluster is safe (the verified-lock protects existing membership, not
   // future joins).
+  //
+  // Stage B split verdicts are different: if the arbitrator already rejected
+  // this item from a cluster, Stage A must not rejoin it to that same cluster
+  // on every cron tick. The cluster_splits audit table is the negative edge.
+  // After several distinct rejected clusters, keep the item as a singleton;
+  // its embedding neighborhood is topical rather than event-equivalent.
   const nearestClusteredResult = await client.execute(sql`
     WITH target AS (
-      SELECT embedding, published_at FROM items WHERE id = ${itemId}
+      SELECT
+        embedding,
+        published_at,
+        (
+          SELECT count(DISTINCT split_audit.from_cluster_id)::int
+          FROM cluster_splits split_audit
+          WHERE split_audit.item_id = ${itemId}
+        ) AS rejected_cluster_count
+      FROM items WHERE id = ${itemId}
     )
     SELECT
       i.id,
@@ -120,6 +135,13 @@ async function assignOneToCluster(itemId: number): Promise<AssignOutcome> {
       AND i.embedding IS NOT NULL
       AND i.enriched_at IS NOT NULL
       AND i.cluster_id IS NOT NULL
+      AND (SELECT rejected_cluster_count FROM target) < ${MAX_DISTINCT_SPLIT_RETRIES_PER_ITEM}
+      AND NOT EXISTS (
+        SELECT 1
+        FROM cluster_splits split_audit
+        WHERE split_audit.item_id = ${itemId}
+          AND split_audit.from_cluster_id = i.cluster_id
+      )
       AND i.published_at BETWEEN
           (SELECT published_at FROM target) - make_interval(hours => ${WINDOW_HOURS})
           AND
@@ -143,7 +165,15 @@ async function assignOneToCluster(itemId: number): Promise<AssignOutcome> {
       ? null
       : ((await client.execute(sql`
           WITH target AS (
-            SELECT embedding, published_at FROM items WHERE id = ${itemId}
+            SELECT
+              embedding,
+              published_at,
+              (
+                SELECT count(DISTINCT split_audit.from_cluster_id)::int
+                FROM cluster_splits split_audit
+                WHERE split_audit.item_id = ${itemId}
+              ) AS rejected_cluster_count
+            FROM items WHERE id = ${itemId}
           )
           SELECT
             i.id,
@@ -153,6 +183,7 @@ async function assignOneToCluster(itemId: number): Promise<AssignOutcome> {
             AND i.embedding IS NOT NULL
             AND i.enriched_at IS NOT NULL
             AND i.cluster_id IS NULL
+            AND (SELECT rejected_cluster_count FROM target) < ${MAX_DISTINCT_SPLIT_RETRIES_PER_ITEM}
             AND i.published_at BETWEEN
                 (SELECT published_at FROM target) - make_interval(hours => ${WINDOW_HOURS})
                 AND

@@ -13,6 +13,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clusters, items } from "@/db/schema";
+import { MAX_DISTINCT_SPLIT_RETRIES_PER_ITEM } from "./split-audit";
 
 export const SINGLETON_RECLUSTER_SIMILARITY_THRESHOLD = 0.75;
 export const SINGLETON_RECLUSTER_WINDOW_HOURS = 72;
@@ -154,7 +155,15 @@ export async function runSingletonReclusterBatch(
 
       const neighbors = (await client.execute(sql`
         WITH target AS (
-          SELECT embedding, published_at FROM items WHERE id = ${s.item_id}
+          SELECT
+            embedding,
+            published_at,
+            (
+              SELECT count(DISTINCT split_audit.from_cluster_id)::int
+              FROM cluster_splits split_audit
+              WHERE split_audit.item_id = ${s.item_id}
+            ) AS rejected_cluster_count
+          FROM items WHERE id = ${s.item_id}
         )
         SELECT i.id, i.cluster_id,
                (i.embedding <=> (SELECT embedding FROM target))::float8 AS distance
@@ -163,6 +172,13 @@ export async function runSingletonReclusterBatch(
           AND i.cluster_id IS NOT NULL
           AND i.embedding IS NOT NULL
           AND i.enriched_at IS NOT NULL
+          AND (SELECT rejected_cluster_count FROM target) < ${MAX_DISTINCT_SPLIT_RETRIES_PER_ITEM}
+          AND NOT EXISTS (
+            SELECT 1
+            FROM cluster_splits split_audit
+            WHERE split_audit.item_id = ${s.item_id}
+              AND split_audit.from_cluster_id = i.cluster_id
+          )
           AND i.published_at BETWEEN
               (SELECT published_at FROM target) - make_interval(hours => ${SINGLETON_RECLUSTER_WINDOW_HOURS})
               AND

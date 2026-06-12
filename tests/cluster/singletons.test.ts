@@ -65,4 +65,22 @@ describe("cron singleton recluster wiring", () => {
     expect(singletonsIdx).toBeGreaterThan(clusterIdx);
     expect(mergeIdx).toBeGreaterThan(singletonsIdx);
   });
+
+  it("respects Stage B split audit when choosing a target cluster", () => {
+    expect(cronSrc).toContain("runSingletonReclusterBatch(");
+
+    const singletonSrc = readFileSync(
+      resolve(__dirname, "../../workers/cluster/singletons.ts"),
+      "utf8",
+    );
+    expect(singletonSrc).toContain("FROM cluster_splits split_audit");
+    expect(singletonSrc).toContain("split_audit.item_id = ${s.item_id}");
+    expect(singletonSrc).toContain(
+      "split_audit.from_cluster_id = i.cluster_id",
+    );
+    expect(singletonSrc).toContain("MAX_DISTINCT_SPLIT_RETRIES_PER_ITEM");
+    expect(singletonSrc).toContain(
+      "count(DISTINCT split_audit.from_cluster_id)::int",
+    );
+  });
 });
