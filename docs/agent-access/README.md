@@ -51,7 +51,7 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 - **`lib/api/public-items.ts`** — shared anonymous feed/search item serializer. It keeps the public `FeedItem` shape aligned across `/api/public/feed` and `/api/public/search`.
 - **`lib/api/v1-items.ts`** — shared bearer-gated agent item serializer used by `/api/v1/feed`, `/api/v1/search`, `/api/v1/saved`, and MCP feed/search tools.
 - **`lib/api/story-item-fields.ts`** — shared flat Story field helpers used by both anonymous public serializers and bearer-gated `/api/v1/*` serializers, with each surface still owning its HKR exposure policy.
-- **`lib/api/item-detail.ts`** — shared full-detail item query + serializers used by `/api/public/items/{id}` and `/api/v1/items/{id}`. The v1 serializer keeps raw reasoning + RSS body; the public serializer strips LLM internals and uses an event-aware ETag signal.
+- **`lib/api/item-detail.ts`** — shared full-detail item route id parsing, query, and serializers used by `/api/public/items/{id}` and `/api/v1/items/{id}`. The v1 serializer keeps raw reasoning + RSS body; the public serializer strips LLM internals and uses an event-aware ETag signal.
 - **`lib/api/event-members.ts`** — shared event-member route param parsing and item serializer used by UI-internal, public, v1, and MCP event-member surfaces.
 - **`lib/api/daily-columns.ts`** — shared daily-column query, REST serializers, ETag signals, date-window helpers, and MCP markdown renderer used by the public daily endpoints, site daily pages, `/api/rss/daily.xml`, and MCP daily resources.
 - **`lib/api/collection-requests.ts`** — shared saved-collection request schemas and duplicate-name detection used by cookie-gated `/api/admin/collections` and bearer-gated `/api/v1/collections`; each route still owns its auth and response envelope.
@@ -83,8 +83,8 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 - `tests/api/source-catalog.test.ts` — public, v1, and MCP source catalog serialization contracts
 - `tests/api/source-catalog-source.test.ts` — source routes and OpenAPI stay wired to the shared source catalog module
 - `tests/api/public-items.test.ts` — anonymous feed/search item shape, HKR reason stripping, locale-specific event title fields
-- `tests/api/item-detail.test.ts` — public/v1 full-detail item shape, public HKR stripping, and event-aware ETag signal
-- `tests/api/item-detail-source.test.ts` — public/v1 item detail routes stay wired to the shared detail module
+- `tests/api/item-detail.test.ts` — public/v1 full-detail item route id parsing, item shape, public HKR stripping, and event-aware ETag signal
+- `tests/api/item-detail-source.test.ts` — public/v1 item detail routes stay wired to the shared detail parser/query/serializer module
 - `tests/api/event-members.test.ts` — shared event-member route param parsing and item shape used by REST + MCP event coverage surfaces
 - `tests/api/event-members-source.test.ts` — UI/public/v1 event-member routes stay wired to shared parsing + serialization helpers
 - `tests/api/daily-columns.test.ts` — daily-column REST serializers, ETag signals, UTC date windows, and MCP markdown renderer

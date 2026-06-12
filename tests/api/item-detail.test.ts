@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  parseItemDetailRouteId,
   publicItemDetailEtagSignal,
   toPublicItemDetail,
   toV1ItemDetail,
@@ -72,6 +73,23 @@ function detailRow(overrides: Partial<ItemDetailRow> = {}): ItemDetailRow {
     ...overrides,
   } as ItemDetailRow;
 }
+
+describe("parseItemDetailRouteId", () => {
+  test("accepts positive integer route ids", () => {
+    expect(parseItemDetailRouteId("42")).toEqual({ ok: true, id: 42 });
+  });
+
+  test("rejects invalid route ids", () => {
+    expect(parseItemDetailRouteId("0")).toEqual({
+      ok: false,
+      error: "invalid_id",
+    });
+    expect(parseItemDetailRouteId("abc")).toEqual({
+      ok: false,
+      error: "invalid_id",
+    });
+  });
+});
 
 describe("toV1ItemDetail", () => {
   test("keeps the bearer-gated full detail contract", () => {

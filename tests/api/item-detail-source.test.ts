@@ -25,13 +25,15 @@ const storyItemFieldsModule = readFileSync(
 );
 
 describe("item detail route source wiring", () => {
-  test("public and v1 detail routes delegate DB lookup and serialization", () => {
+  test("public and v1 detail routes delegate route id parsing, DB lookup, and serialization", () => {
     for (const source of [v1ItemRoute, publicItemRoute]) {
       expect(source).toContain("@/lib/api/item-detail");
+      expect(source).toContain("parseItemDetailRouteId");
       expect(source).toContain("getItemDetailRow");
       expect(source).not.toContain(".select({");
       expect(source).not.toContain("leftJoin(clusters");
       expect(source).not.toContain("innerJoin(sources");
+      expect(source).not.toContain("const idSchema = z.coerce");
     }
     expect(v1ItemRoute).toContain("toV1ItemDetail(row)");
     expect(publicItemRoute).toContain("toPublicItemDetail(row)");

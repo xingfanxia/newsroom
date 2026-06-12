@@ -15,11 +15,12 @@
  * Returns 404 on unknown id. No cluster dedup here — if the caller knows
  * the id they get exactly that row.
  */
-import { z } from "zod";
 import { requireApiToken } from "@/lib/auth/api-token";
-import { getItemDetailRow, toV1ItemDetail } from "@/lib/api/item-detail";
-
-const idSchema = z.coerce.number().int().positive();
+import {
+  getItemDetailRow,
+  parseItemDetailRouteId,
+  toV1ItemDetail,
+} from "@/lib/api/item-detail";
 
 export async function GET(
   req: Request,
@@ -29,14 +30,13 @@ export async function GET(
   if (auth instanceof Response) return auth;
 
   const { id: idRaw } = await ctx.params;
-  const parsed = idSchema.safeParse(idRaw);
-  if (!parsed.success) {
-    return Response.json({ error: "invalid_id" }, { status: 400 });
+  const parsed = parseItemDetailRouteId(idRaw);
+  if (!parsed.ok) {
+    return Response.json({ error: parsed.error }, { status: 400 });
   }
-  const id = parsed.data;
 
   try {
-    const row = await getItemDetailRow(id);
+    const row = await getItemDetailRow(parsed.id);
     if (!row) {
       return Response.json({ error: "not_found" }, { status: 404 });
     }

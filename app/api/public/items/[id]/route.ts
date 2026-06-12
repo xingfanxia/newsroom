@@ -7,7 +7,6 @@
  *   - HKR booleans only (no per-axis reasonsZh/reasonsEn)
  *   - body_md kept (transcript / article text); body_rss (raw HTML) dropped
  */
-import { z } from "zod";
 import { publicRateLimit } from "@/lib/rate-limit/public";
 import {
   computeEtag,
@@ -18,14 +17,13 @@ import {
 } from "@/lib/api/public-helpers";
 import {
   getItemDetailRow,
+  parseItemDetailRouteId,
   publicItemDetailEtagSignal,
   toPublicItemDetail,
 } from "@/lib/api/item-detail";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
-const idSchema = z.coerce.number().int().positive();
 
 export async function GET(
   req: Request,
@@ -39,12 +37,11 @@ export async function GET(
   if (limited) return limited;
 
   const { id: idRaw } = await ctx.params;
-  const parsed = idSchema.safeParse(idRaw);
-  if (!parsed.success) return publicError("invalid_id", 400);
-  const id = parsed.data;
+  const parsed = parseItemDetailRouteId(idRaw);
+  if (!parsed.ok) return publicError(parsed.error, 400);
 
   try {
-    const row = await getItemDetailRow(id);
+    const row = await getItemDetailRow(parsed.id);
     if (!row) return publicError("not_found", 404);
 
     const etag = computeEtag(
