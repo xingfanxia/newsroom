@@ -64,10 +64,13 @@ import {
   listSourceCatalogRows,
   toMcpSourceApiItem,
 } from "@/lib/api/source-catalog";
+import {
+  dailyColumnDateSchema,
+  getDailyColumnRowByDate,
+  getLatestDailyColumnRow,
+  renderDailyColumnMarkdown,
+} from "@/lib/api/daily-columns";
 import { totalsByWindow } from "@/lib/llm/stats";
-import { db } from "@/db/client";
-import { newsletters } from "@/db/schema";
-import { sql } from "drizzle-orm";
 import type { SessionUser } from "@/lib/auth/session";
 
 type ToolOutput = {
@@ -482,22 +485,6 @@ function buildServer(user: SessionUser): McpServer {
   );
 
   // ── Daily column resources ─────────────────────────────────────
-  function dateKey(d: Date): string {
-    return d.toISOString().slice(0, 10);
-  }
-
-  function renderColumnMarkdown(row: {
-    columnTitle: string | null;
-    columnSummaryMd: string | null;
-    columnNarrativeMd: string | null;
-    columnThemeTag: string | null;
-    periodStart: Date;
-  }): string {
-    const dk = dateKey(row.periodStart);
-    const tag = row.columnThemeTag ? `\n\n_# ${row.columnThemeTag}_` : "";
-    return `# AX 的 AI 日报 · ${dk}\n\n## ${row.columnTitle ?? ""}${tag}\n\n${row.columnSummaryMd ?? ""}\n\n---\n\n${row.columnNarrativeMd ?? ""}`;
-  }
-
   server.registerResource(
     "daily-latest",
     "ax-radar://daily/latest",
@@ -508,25 +495,8 @@ function buildServer(user: SessionUser): McpServer {
       mimeType: "text/markdown",
     },
     async (uri) => {
-      const client = db();
-      const rows = await client
-        .select({
-          columnTitle: newsletters.columnTitle,
-          columnSummaryMd: newsletters.columnSummaryMd,
-          columnNarrativeMd: newsletters.columnNarrativeMd,
-          columnThemeTag: newsletters.columnThemeTag,
-          periodStart: newsletters.periodStart,
-        })
-        .from(newsletters)
-        .where(
-          sql`${newsletters.kind} = 'daily'
-            AND ${newsletters.locale} = 'zh'
-            AND ${newsletters.columnTitle} IS NOT NULL`,
-        )
-        .orderBy(sql`${newsletters.periodStart} DESC`)
-        .limit(1);
-
-      if (rows.length === 0) {
+      const row = await getLatestDailyColumnRow("zh");
+      if (!row) {
         return {
           contents: [
             {
@@ -542,7 +512,7 @@ function buildServer(user: SessionUser): McpServer {
           {
             uri: uri.href,
             mimeType: "text/markdown",
-            text: renderColumnMarkdown(rows[0]!),
+            text: renderDailyColumnMarkdown(row),
           },
         ],
       };
@@ -560,7 +530,7 @@ function buildServer(user: SessionUser): McpServer {
     },
     async (uri, variables) => {
       const date = String(variables.date ?? "");
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      if (!dailyColumnDateSchema.safeParse(date).success) {
         return {
           contents: [
             {
@@ -571,28 +541,8 @@ function buildServer(user: SessionUser): McpServer {
           ],
         };
       }
-      const dayStart = new Date(`${date}T00:00:00Z`);
-      const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
-      const client = db();
-      const rows = await client
-        .select({
-          columnTitle: newsletters.columnTitle,
-          columnSummaryMd: newsletters.columnSummaryMd,
-          columnNarrativeMd: newsletters.columnNarrativeMd,
-          columnThemeTag: newsletters.columnThemeTag,
-          periodStart: newsletters.periodStart,
-        })
-        .from(newsletters)
-        .where(
-          sql`${newsletters.kind} = 'daily'
-            AND ${newsletters.locale} = 'zh'
-            AND ${newsletters.columnTitle} IS NOT NULL
-            AND ${newsletters.periodStart} >= ${dayStart.toISOString()}::timestamptz
-            AND ${newsletters.periodStart} <  ${dayEnd.toISOString()}::timestamptz`,
-        )
-        .limit(1);
-
-      if (rows.length === 0) {
+      const row = await getDailyColumnRowByDate(date, "zh");
+      if (!row) {
         return {
           contents: [
             {
@@ -608,7 +558,7 @@ function buildServer(user: SessionUser): McpServer {
           {
             uri: uri.href,
             mimeType: "text/markdown",
-            text: renderColumnMarkdown(rows[0]!),
+            text: renderDailyColumnMarkdown(row),
           },
         ],
       };
