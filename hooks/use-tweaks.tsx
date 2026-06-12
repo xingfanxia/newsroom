@@ -8,44 +8,9 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { TWEAK_DEFAULTS, type Tweaks } from "@/lib/tweaks";
 
-export type Tweaks = {
-  density: "compact" | "comfy" | "reader";
-  accent: "green" | "blue" | "purple" | "orange" | "red" | "cyan";
-  theme: "midnight" | "obsidian" | "slate" | "paper";
-  monoFont: "jetbrains" | "ibm" | "iosevka" | "system";
-  cjkFont: "notoSerif" | "notoSans" | "lxgw";
-  radius: "sharp" | "subtle" | "soft" | "pill";
-  chromeStyle: "terminal" | "clean" | "brutalist";
-  scoreStyle: "ring" | "bar" | "tag" | "none";
-  showTicker: boolean;
-  showRadar: boolean;
-  showPulse: boolean;
-  showBreadcrumb: boolean;
-  showLineNumbers: boolean;
-  mutedMeta: boolean;
-  language: "zh" | "en";
-};
-
-export const TWEAK_DEFAULTS: Tweaks = {
-  density: "compact",
-  accent: "green",
-  theme: "midnight",
-  monoFont: "jetbrains",
-  // Noto Sans SC matches how --font-mono falls back to Sans SC for CJK
-  // glyphs that JetBrains doesn't carry. Consistent nav + body rendering.
-  cjkFont: "notoSans",
-  radius: "sharp",
-  chromeStyle: "terminal",
-  scoreStyle: "ring",
-  showTicker: true,
-  showRadar: true,
-  showPulse: true,
-  showBreadcrumb: true,
-  showLineNumbers: false,
-  mutedMeta: true,
-  language: "en",
-};
+export type { Tweaks };
 
 const STORAGE_KEY = "ax-radar:tweaks";
 

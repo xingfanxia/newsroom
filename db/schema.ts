@@ -500,7 +500,7 @@ export const users = pgTable(
     email: text("email").notNull(),
     role: userRoleEnum("role").notNull().default("reader"),
     /** User-side display preferences (theme/accent/density/language/etc). Shape
-     *  mirrors `Tweaks` in hooks/use-tweaks.tsx. Null = not yet saved server-side,
+     *  mirrors `Tweaks` in lib/tweaks.ts. Null = not yet saved server-side,
      *  falls back to localStorage then to TWEAK_DEFAULTS. */
     tweaks: jsonb("tweaks"),
     /** User-configurable watchlist terms (["gpt-6", "agentic IDE", ...]). */

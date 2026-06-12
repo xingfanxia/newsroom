@@ -10,36 +10,14 @@
  * model simple ("I sent [a,b,c] → server state is exactly [a,b,c]").
  */
 import { eq } from "drizzle-orm";
-import { z } from "zod";
 import { db } from "@/db/client";
 import { users } from "@/db/schema";
+import {
+  buildTweaksDbPatch,
+  tweaksPatchBodySchema,
+} from "@/lib/api/tweak-requests";
 import { requireApiToken } from "@/lib/auth/api-token";
 import { upsertAppUser } from "@/lib/auth/session";
-
-const tweaksShape = z.object({
-  density: z.enum(["compact", "comfy", "reader"]).optional(),
-  accent: z
-    .enum(["green", "blue", "purple", "orange", "red", "cyan"])
-    .optional(),
-  theme: z.enum(["midnight", "obsidian", "slate", "paper"]).optional(),
-  monoFont: z.enum(["jetbrains", "ibm", "iosevka", "system"]).optional(),
-  cjkFont: z.enum(["notoSerif", "notoSans", "lxgw"]).optional(),
-  radius: z.enum(["sharp", "subtle", "soft", "pill"]).optional(),
-  chromeStyle: z.enum(["terminal", "clean", "brutalist"]).optional(),
-  scoreStyle: z.enum(["ring", "bar", "tag", "none"]).optional(),
-  showTicker: z.boolean().optional(),
-  showRadar: z.boolean().optional(),
-  showPulse: z.boolean().optional(),
-  showBreadcrumb: z.boolean().optional(),
-  showLineNumbers: z.boolean().optional(),
-  mutedMeta: z.boolean().optional(),
-  language: z.enum(["zh", "en"]).optional(),
-});
-
-const patchSchema = z.object({
-  tweaks: tweaksShape.optional(),
-  watchlist: z.array(z.string().min(1).max(64)).max(24).optional(),
-});
 
 export async function GET(req: Request) {
   const auth = await requireApiToken(req);
@@ -74,17 +52,15 @@ export async function PATCH(req: Request) {
   } catch {
     return Response.json({ error: "invalid_json" }, { status: 400 });
   }
-  const parsed = patchSchema.safeParse(raw);
+  const parsed = tweaksPatchBodySchema.safeParse(raw);
   if (!parsed.success) {
     return Response.json(
       { error: "invalid_body", issues: parsed.error.issues },
       { status: 400 },
     );
   }
-  const patch: Record<string, unknown> = { updatedAt: new Date() };
-  if (parsed.data.tweaks !== undefined) patch.tweaks = parsed.data.tweaks;
-  if (parsed.data.watchlist !== undefined) patch.watchlist = parsed.data.watchlist;
-  if (Object.keys(patch).length === 1) {
+  const patch = buildTweaksDbPatch(parsed.data);
+  if (!patch) {
     return Response.json({ error: "empty_body" }, { status: 400 });
   }
 

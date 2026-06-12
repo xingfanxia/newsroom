@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { TWEAK_DEFAULTS } from "@/hooks/use-tweaks";
+import { TWEAK_DEFAULTS } from "@/lib/tweaks";
 
 // The full TweaksProvider requires a DOM; we can't exercise React here. Instead
 // we assert the public shape + defaults so a rename or silently dropped field
