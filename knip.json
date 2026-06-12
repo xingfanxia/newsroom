@@ -1,0 +1,23 @@
+{
+  "$schema": "https://unpkg.com/knip@latest/schema.json",
+  "entry": [
+    "next.config.ts",
+    "postcss.config.mjs",
+    "eslint.config.mjs",
+    "drizzle.config.ts",
+    "proxy.ts",
+    "app/**/{default,error,global-error,layout,loading,not-found,page,route,sitemap,robots}.{ts,tsx}",
+    "scripts/**/*.ts",
+    "tests/**/*.test.ts",
+    "workers/**/*.test.ts"
+  ],
+  "project": [
+    "**/*.{js,cjs,mjs,jsx,ts,tsx}",
+    "!node_modules/**",
+    "!.next/**",
+    "!.codegraph/**"
+  ],
+  "ignoreFiles": [
+    "next-env.d.ts"
+  ]
+}

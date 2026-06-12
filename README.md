@@ -17,7 +17,7 @@
 AX's AI RADAR is a dashboard for editors and analysts who cover the AI industry. It does four things:
 
 1. **Ingests** 52 curated sources (RSS, Atom, RSSHub, APIs, scraping) — vendor blogs, media, newsletters, deep-report feeds, social signal, podcasts, policy, market, and product sources.
-2. **Enriches** each story via LLM — Chinese / English summary, friend-readable commentary, 0–100 importance score, multi-axis taxonomy (capability / entity / topic), cross-source clustering, and optional [Tavily](https://tavily.com/) web-context.
+2. **Enriches** each story via LLM — Chinese / English summary, friend-readable commentary, 0–100 importance score, multi-axis taxonomy (capability / entity / topic), and cross-source clustering.
 3. **Curates** with a human-readable `editorial.skill.md` policy file. Editors click 👍 / 👎 / ⭐ and add notes.
 4. **Iterates itself** — a Claude Agent reads accumulated feedback, diffs `editorial.skill.md`, shows the change for approval, and ships it as v-next. Workers pick up the new policy on the next enrichment pass.
 
@@ -44,14 +44,14 @@ AX's AI RADAR is a dashboard for editors and analysts who cover the AI industry.
 - **Next.js 16** (App Router, Turbopack, Fluid Compute), **React 19**, **TypeScript**
 - **Tailwind v4** (CSS-first design tokens in `globals.css`)
 - **next-intl** v4 for `zh` / `en` routing and messages
-- **Radix UI** primitives + `lucide-react` icons
+- **Radix Slot** for polymorphic buttons + `lucide-react` icons
 - **Supabase Postgres** + **drizzle-orm** + **pgvector 0.8** (`halfvec(3072)` + HNSW)
 - **Vercel AI SDK v6** unifies LLM + embedding access across providers:
   - Azure AI Foundry DeepSeek V4 Pro for high-value bilingual enrich, score, commentary, cluster summaries, and daily columns.
   - Azure AI Foundry DeepSeek V4 Flash for low-value item treatment and cheap arbitration work.
   - Azure OpenAI `text-embedding-3-large` remains the embedding provider; `gpt-5.5-standard` is kept as a compatibility/probe deployment, not the default prose model.
   - Anthropic Claude Opus 4.7 + Google Gemini 3.1 Pro Preview are wired as optional fallbacks.
-- **Vercel Cron** triggers 6 route handlers (fetch hourly/daily/weekly + normalize + enrich every 15 min + cluster every 30 min)
+- **Vercel Cron** triggers 11 route handlers: fetch hourly/daily/weekly, normalize, article-body, enrich, commentary, score-backfill, cluster, and newsletter daily/monthly.
 - **bun** for install / build / dev / tests
 
 ### Design system
@@ -68,7 +68,7 @@ Blueprint in [`docs/architecture/ingestion.md`](./docs/architecture/ingestion.md
 # 1. copy env template and fill in keys
 cp .env.example .env.local
 # edit .env.local to add AZURE_DEEPSEEK_*, AZURE_OPENAI_* embedding/chat keys,
-# optional ANTHROPIC_API_KEY, GEMINI_API_KEY, TAVILY_API_KEY
+# optional ANTHROPIC_API_KEY and GEMINI_API_KEY
 
 # 2. install + dev
 bun install
@@ -87,7 +87,7 @@ See [`.env.example`](./.env.example) for the complete template. On Vercel, most 
 - **Azure DeepSeek** (`AZURE_DEEPSEEK_*`) — primary prose/scoring provider, with `DeepSeek-V4-Pro` and `DeepSeek-V4-Flash` deployments.
 - **Task routing** (`AIHOT_ENRICH_PROVIDER` / `_SCORE_PROVIDER` / `_EMBED_PROVIDER`) — enrich/score default to `azure-deepseek`; embeddings default to `azure-openai`.
 - **LLM safety knobs** (`LLM_CALL_TIMEOUT_MS`) — optional per-call timeout override; default is 90s.
-- **Fallback providers** (`ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `TAVILY_API_KEY`) — wired but unused by M2.
+- **Fallback providers** (`ANTHROPIC_API_KEY`, `GEMINI_API_KEY`) — wired but not on the default production route.
 
 ### Roadmap status
 
@@ -121,7 +121,7 @@ Docs routing starts at [`docs/README.md`](./docs/README.md). Full blueprint + de
 AX 的 AI 雷达是一款面向 AI 行业编辑和分析师的情报工作台，由四个环节组成：
 
 1. **拉取**：52 个精选信源（RSS / Atom / RSSHub / API / 网页抓取）——厂商博客、媒体、新闻信、深度报告、社交信号、播客、政策、市场和产品源。
-2. **加工**：每篇内容经 LLM 管线处理——中英文摘要、像朋友分享一样的点评、0–100 的 importance 分数、多轴标签（能力 / 实体 / 话题）、跨源聚类；可选 [Tavily](https://tavily.com/) 网页上下文补充。
+2. **加工**：每篇内容经 LLM 管线处理——中英文摘要、像朋友分享一样的点评、0–100 的 importance 分数、多轴标签（能力 / 实体 / 话题）和跨源聚类。
 3. **精选**：以人类可读的 `editorial.skill.md` 作为精选策略。编辑点 👍 / 👎 / ⭐ 并写文字反馈。
 4. **策略自迭代**：Claude Agent 读取累积的反馈，生成 `editorial.skill.md` 的 diff，编辑审核后发布为下一个版本，Worker 下次 enrich 自动使用新策略。
 
@@ -143,7 +143,7 @@ AX 的 AI 雷达是一款面向 AI 行业编辑和分析师的情报工作台，
 
 ### 技术栈
 
-Next.js 16（App Router + Turbopack + Fluid Compute）· React 19 · TypeScript · Tailwind v4 · next-intl v4 · Radix UI · Lucide · Vercel AI SDK v6（Azure DeepSeek V4 Pro/Flash 负责正文与评分，Azure OpenAI `text-embedding-3-large` 负责嵌入）· Supabase Postgres + drizzle + pgvector 0.8（halfvec + HNSW）· Vercel Cron（6 定时任务）· Bun。
+Next.js 16（App Router + Turbopack + Fluid Compute）· React 19 · TypeScript · Tailwind v4 · next-intl v4 · Radix Slot · Lucide · Vercel AI SDK v6（Azure DeepSeek V4 Pro/Flash 负责正文与评分，Azure OpenAI `text-embedding-3-large` 负责嵌入）· Supabase Postgres + drizzle + pgvector 0.8（halfvec + HNSW）· Vercel Cron（11 个 route handlers）· Bun。
 
 ### 设计系统
 

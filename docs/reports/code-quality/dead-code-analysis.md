@@ -5,50 +5,66 @@ Date: 2026-06-12
 Command:
 
 ```bash
-bunx knip --reporter compact
+bun run code:dead
 ```
 
-Result: `knip` exited non-zero because it found candidates. No files were
-deleted from this report alone; this repo intentionally keeps many one-shot
-operator scripts that are not imported by app code.
+Result after the 2026-06-12 cleanup: default dead-code gate exits `0` for
+unused files, dependencies, binaries, unlisted dependencies, unresolved imports,
+and catalog issues.
+
+The broader export-only review is intentionally separate:
+
+```bash
+bun run code:dead:exports
+```
+
+That command still exits non-zero because many route/worker/library modules
+export boundary helpers or operational constants that are not imported by app
+runtime code. Treat those as review candidates, not automatic deletion targets.
 
 ## Interpretation
 
-### Safe To Inspect First
+### Removed In This Pass
 
-These are likely low-risk cleanup candidates, but still need a focused diff and
-verification before removal:
+- Deleted unused UI/row components:
+  - `components/sources/source-row.tsx`
+  - `components/ui/badge.tsx`
+  - `components/ui/card.tsx`
+  - `components/ui/tabs.tsx`
+- Deleted the unused Tavily integration file `lib/search/tavily.ts`.
+- Removed direct unused dependencies from `package.json` / `bun.lock`:
+  `@radix-ui/react-dialog`, `@radix-ui/react-scroll-area`,
+  `@radix-ui/react-separator`, `@radix-ui/react-tabs`,
+  `@radix-ui/react-tooltip`, `date-fns`, `tailwindcss`, and `tsx`.
+- Kept `@radix-ui/react-slot` because `components/ui/button.tsx` uses it.
 
-- UI primitives reported unused: `components/ui/badge.tsx`,
-  `components/ui/card.tsx`, `components/ui/tabs.tsx`.
-- Source table row component: `components/sources/source-row.tsx`.
-- Small utility exports reported unused: `lib/utils.ts` helpers,
-  `lib/items/collections.ts:INBOX_COLLECTION`.
+### Remaining Export Review
 
-### Caution
+`bun run code:dead:exports` currently reports unused exported symbols in these
+families:
 
-These are not safe to delete from import analysis alone:
+- UI convenience exports (`components/ui/button.tsx:buttonVariants`,
+  `lib/utils.ts` helpers).
+- Public/auth/API boundary helpers (`i18n/navigation.ts`,
+  `lib/auth/*`, `lib/rate-limit/*`).
+- Worker constants and operator helpers (`workers/*`, `lib/llm/*`,
+  `lib/policy/*`, `lib/sources/*`).
 
-- `scripts/ops/*` and `scripts/migrations/*`: many are operator entry points
-  invoked directly from the shell, handoffs, or runbooks.
-- `lib/auth/api-token.ts` exports: API/MCP auth surface; some exports are public
-  contracts or test helpers.
-- `workers/*` constants: many are asserted from tests or used as operational
-  knobs.
-- `lib/llm/index.ts` exports: public LLM facade; some exports are deliberately
-  kept for probes, scripts, or tests.
+Do not remove these from Knip output alone. For each symbol, prove that it is
+not a public contract, not a test helper, and not used by operator scripts or
+external consumers.
 
-### Danger / Do Not Delete Without Owner-Level Review
+### Current Tooling Policy
 
-- Dependencies reported unused: Radix packages, `date-fns`, `tsx`.
-  These may be present for UI patterns, dynamic imports, or upcoming work.
-- `lib/search/tavily.ts` and `lib/backfill/*`: deferred integrations and
-  backfill helpers. Remove only after confirming product direction.
+- `bun run code:dead` is the low-noise gate. It should stay clean.
+- `bun run code:dead:exports` is a manual review queue. It may be non-zero
+  until a focused API/export-boundary pass decides which symbols to unexport.
 
 ## Follow-Up Strategy
 
-1. Add a `knip` config that treats `scripts/ops/**`, `scripts/migrations/**`,
-   tests, and public route/helper entry points as project entries.
-2. Re-run `knip` after config to separate true dead code from CLI entry points.
-3. Delete only SAFE candidates one small batch at a time, with `bun run lint`,
-   relevant tests, and `bun run build`.
+1. Keep operator scripts, migrations, tests, and Next route files in
+   `knip.json` entry patterns.
+2. Re-run `bun run code:dead` before every cleanup batch.
+3. Run `bun run code:dead:exports` when doing an explicit boundary/export pass.
+4. Delete only small, proven-safe batches with `bun test --env-file=.env.local`,
+   `bun run lint`, `bun run build`, and `git diff --check`.

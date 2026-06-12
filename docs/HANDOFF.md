@@ -5,18 +5,24 @@
 Current maintenance direction:
 - Start docs navigation from `docs/README.md`; historical plans/handoffs are useful context, not current implementation instructions.
 - `bun run lint` is expected to be clean with zero warnings.
+- `bun run code:dead` is the low-noise Knip gate for unused files/dependencies/unresolved imports and should exit cleanly. Use `bun run code:dead:exports` separately for manual export-boundary review.
 - `upsertAppUser(user)` upserts the effective user row, including API-token users, before FK-owned mutations.
 
 Shipped cleanup:
+- Added repo-specific `knip.json` entry/project patterns for Next routes, tests, workers, scripts, and config files.
+- Removed unused UI/source-row components, the unused Tavily integration stub, and unused direct package dependencies.
+- Replaced stale `tsx` operator-script hints with `bun`.
+- Updated README / `.env.example` / architecture docs so Tavily is not advertised as wired, cron docs match the current split route set, and cluster docs match the 0.75 / 72h runtime.
 - Moved render-local helper components out of `components/shell/tweaks.tsx`.
 - Reworked effect async loading in `SignalDrawer` and `TweaksProvider` to satisfy React lint rules without disabling them.
 - Replaced an internal raw `<a>` with locale-aware `next/link`.
 - Removed unused imports/locals across app, tests, scripts, and workers.
 - Updated stale prompt tests to match the current friend-readable daily-column voice.
 - Added `docs/README.md` routing and archive banners for completed daily-column design/plan/handoff docs.
-- Added a first `knip` report at `docs/reports/code-quality/dead-code-analysis.md`; do not delete reported files until a repo-specific `knip` config separates operator CLI entry points from true dead code.
+- Updated `docs/reports/code-quality/dead-code-analysis.md` with current Knip commands, cleanup results, and remaining export-review queue.
 
 Verification:
+- `bun run code:dead` — passed.
 - `bun run lint` — passed with no warnings.
 - `bun test --env-file=.env.local` — 505 pass, 0 fail.
 - `bun run build` — passed.

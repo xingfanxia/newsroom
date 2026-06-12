@@ -17,7 +17,7 @@ import { runYoutubeTranscriptFetch } from "@/workers/fetcher/youtube-transcript"
 async function main() {
   const kind = process.argv[2];
   if (!kind) {
-    console.error("usage: tsx scripts/ops/run-cron.ts {hourly|daily|weekly|normalize}");
+    console.error("usage: bun scripts/ops/run-cron.ts {hourly|daily|weekly|normalize}");
     process.exit(2);
   }
 

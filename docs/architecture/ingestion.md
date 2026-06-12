@@ -114,9 +114,13 @@ Separate pass after enrich, because policy can change without re-enriching:
 **Dedup**: hash title + canonical-url shortly after normalize. Drop exact duplicates.
 
 **Near-dup clustering** (runs async, not on critical path):
-- For each new enriched item, compute cosine similarity vs last 48h window.
-- If `sim > 0.88`, create or join a `cluster` row: `cluster_id, lead_item_id, member_item_ids[], sources[]`.
-- Timeline shows the lead item with a `另有 N 个源也报道了此事件` badge — click expands member list.
+- `/api/cron/cluster` processes enriched unclustered items.
+- Stage A compares against a bidirectional ±72h window anchored to the target
+  item's `published_at`.
+- If cosine similarity is at least `0.75` (`halfvec` distance `<= 0.25`),
+  create or join a `clusters` row and update member counts / coverage.
+- Stage B arbitrates fuzzy joins, Stage C writes canonical titles, and Stage D
+  writes event-level commentary for multi-member events.
 
 ### 2.7 Store
 Postgres (Vercel Postgres / Neon / Supabase) with schema:
@@ -222,19 +226,19 @@ Seed watchlist (v0): `@sama`, `@AndrewYNg`, `@ylecun`, `@drjimfan`, `@karpathy`,
 |---|---|---|
 | **M0 — Shell** | Next.js 16 + next-intl v4 + Tailwind v4 + UI from screenshots + mock fixtures | ✅ shipped |
 | **M1 — Read-only ingestion** | Supabase Postgres + drizzle, 41 sources seeded, RSS/Atom/RSSHub fetcher with SSRF guard, normalizer with canonical URL + sha256 dedup, 4 cron routes + `信源` live | ✅ shipped |
-| **M2 — Enrich + Score + Cluster** | Vercel AI SDK v6 + DeepSeek V4 Pro/Flash for prose/scoring, Azure OpenAI `text-embedding-3-large` native 3072-dim via `halfvec` + HNSW cosine, cluster dedup at 0.88/48h, `热点资讯` live feed with fallback ladder. Ultra-review: 3 CRITICAL + 7 HIGH all fixed. | ✅ shipped |
+| **M2 — Enrich + Score + Cluster** | Vercel AI SDK v6 + DeepSeek V4 Pro/Flash for prose/scoring, Azure OpenAI `text-embedding-3-large` native 3072-dim via `halfvec` + HNSW cosine, cluster dedup at 0.75 similarity / 72h, `热点资讯` live feed with fallback ladder. Ultra-review: 3 CRITICAL + 7 HIGH all fixed. | ✅ shipped |
 | **M3 — Feedback + Auth** | `feedback` table + admin gate + real metrics on `策略迭代` page + `POST /api/feedback` | ✅ shipped |
 | **M4 — Editorial agent** | Agent session reads feedback, diffs `editorial.skill.md`, streams to console, versioned rollout | ✅ shipped |
 | **M5 — X monitor + Low-follower + cluster UI** | X watchlist via Apify/X API v2, viral-score detector, "also reported by N sources" chips | planned |
 
 ### Deviations from original blueprint (what actually shipped vs. what Section 2 specified)
 
-- **Clustering path (§2.6)**: implemented as its own cron (`/api/cron/cluster`) not baked into enrich. Widened neighbor search (§2.6 said "lead_item_id only"; we search all enriched) so same-batch siblings merge without a two-pass fix. Atomic row claim via `WHERE clustered_at IS NULL RETURNING` prevents double-counting.
+- **Clustering path (§2.6)**: implemented as its own cron (`/api/cron/cluster`) not baked into enrich. The current Stage A threshold is 0.75 similarity with a 72h bidirectional published-at window. Widened neighbor search (§2.6 said "lead_item_id only"; we search all enriched) so same-batch siblings merge without a two-pass fix. Atomic row claim via `WHERE clustered_at IS NULL RETURNING` prevents double-counting.
 - **Embeddings (§2.4)**: `voyage-3 / text-embedding-3-large` — we picked **text-embedding-3-large native 3072 dims** stored as `halfvec(3072)` (not truncated to 1536 via Matryoshka). Same storage as `vector(1536)`, full quality, fits pgvector HNSW's 4000-dim cap.
 - **Scoring model (§2.5)**: "Sonnet 4.6" placeholder → shipped first as Azure GPT, then moved on 2026-06-10 to **Azure AI Foundry DeepSeek V4 Pro/Flash**. High-value items use Pro; lower-value items use Flash to avoid spending heavy tokens on throwaway content.
 - **LLM SDK choice**: original plan assumed direct vendor SDKs — migrated to **Vercel AI SDK v6** + `@ai-sdk/{anthropic,google,azure,openai}` for unified `generateText` / `generateObject` / `embed` across providers.
 - **Prompt injection defense** (not in original §2): XML-fence untrusted content + system-prompt framing + control-sequence neutralization (added per security review).
-- **Cron timing**: enrich every 15 min, cluster every 30 min, catch-up normalize every 6 h.
+- **Cron timing**: `vercel.json` owns the schedule. Current production routes are fetch-hourly, fetch-daily, fetch-weekly, normalize, article-body, enrich, commentary, score-backfill, cluster, newsletter-daily, and newsletter-monthly. Article-body, enrich, commentary, score-backfill, and cluster are split so one slow/spendy stage cannot starve the others.
 - **Enrich claim/backoff guardrail (2026-06-11)**: the enrich cron now claims work in Postgres before LLM calls and stores retry state on `items`. This closes the gap where overlapping cron/manual backfill runs could all select the same `enriched_at IS NULL` rows and waste spend even if the final write was idempotent.
 - **AI HOT integration (2026-05-08, voice refreshed 2026-06-10)**: added pre-curated source `aihot-selected` (kind `aihot-api`) ingesting hourly from https://aihot.virxact.com; merge their structured `/api/public/daily` report into our daily column generator as a must-cover baseline (`newsletters.aihot_daily_payload` + `aihot_daily_date`). Voice prompts now target a friend-sharing style: plain, useful, accurate, and low on AI/memo flavor. Full design: `docs/aihot-integration/PLAN.md`. New env vars: `AIHOT_API_BASE_URL` + `AIHOT_API_USER_AGENT` (both with safe defaults). Operator scripts: `scripts/ops/backfill-style.ts` (cost-bounded re-enrich) + `scripts/ops/import-aihot-daily-history.ts` (180-day daily history import).
 - **Tier-gated commentary (2026-05-08, PR #34)**: Stage-4 commentary now branches by tier instead of running the full schema for every non-excluded item. `editor_note_*` (一句话点评) runs for every non-excluded item / event; `editor_analysis_*` **only** runs for tier `featured` / `p1`. Tier `all` items take the lighter `commentaryNoteSchema` LLM call (`COMMENTARY_NOTE_ONLY_SYSTEM`, ~85% smaller output). Cluster commentary path also extended to cover `event_tier='all'`. Worker dispatch in `workers/enrich/commentary.ts` + `workers/cluster/commentary.ts`; backfill mirror in `scripts/ops/backfill-style.ts`.

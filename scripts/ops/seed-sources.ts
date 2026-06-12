@@ -5,7 +5,7 @@
  * Usage:
  *   bun run db:seed
  * or:
- *   tsx scripts/ops/seed-sources.ts
+ *   bun scripts/ops/seed-sources.ts
  */
 
 import { db } from "@/db/client";

@@ -110,7 +110,7 @@ Old terminology that's been retired: "深度解读" / "deep read" (replaced by �
 - Numbers stay original (don't round 78.4 to 80). Entity names stay in original language.
 - If body lacks a key fact, say "标题已给 X, 正文未披露 Y" / "the post does not disclose Y".
 
-If a Tavily-sourced context is provided, use it to correct errors and add one missing fact — never to inflate length.
+If external source context is provided, use it to correct errors and add one missing fact — never to inflate length.
 
 ---
 
