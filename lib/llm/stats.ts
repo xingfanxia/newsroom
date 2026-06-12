@@ -165,6 +165,7 @@ export async function breakdownByModel(
 export type RecentCall = {
   id: number;
   task: string | null;
+  provider: string;
   model: string;
   inputTokens: number;
   cachedInputTokens: number;
@@ -214,6 +215,7 @@ export async function recentCalls(limit = 25): Promise<RecentCall[]> {
     .select({
       id: llmUsage.id,
       task: llmUsage.task,
+      provider: llmUsage.provider,
       model: llmUsage.model,
       inputTokens: llmUsage.inputTokens,
       cachedInputTokens: llmUsage.cachedInputTokens,

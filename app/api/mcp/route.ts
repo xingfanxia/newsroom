@@ -70,7 +70,10 @@ import {
   getLatestDailyColumnRow,
   renderDailyColumnMarkdown,
 } from "@/lib/api/daily-columns";
-import { totalsByWindow } from "@/lib/llm/stats";
+import {
+  getUsageSummary,
+  USAGE_WINDOWS,
+} from "@/lib/api/usage-summary";
 import type { SessionUser } from "@/lib/auth/session";
 
 type ToolOutput = {
@@ -355,23 +358,14 @@ function buildServer(user: SessionUser): McpServer {
     {
       title: "Check LLM spend + token budget",
       description:
-        "Return recent LLM cost + token usage for a time window. Useful for chatty agents to budget check before firing a batch. Fields: calls, cost_usd, input/output/reasoning tokens, plus per-task breakdown.",
+        "Return recent LLM cost + token usage for a time window. Useful for chatty agents to budget check before firing a batch. Fields: totals, by_task, by_model, and recent_calls with provider/model labels.",
       inputSchema: {
-        window: z.enum(["today", "week", "month", "all"]).optional(),
+        window: z.enum(USAGE_WINDOWS).optional(),
       },
     },
     async ({ window }) => {
       const w = window ?? "week";
-      const totals = await totalsByWindow(w);
-      return text({
-        window: w,
-        calls: totals.calls,
-        cost_usd: totals.costUsd,
-        input_tokens: totals.inputTokens,
-        cached_input_tokens: totals.cachedInputTokens,
-        output_tokens: totals.outputTokens,
-        reasoning_tokens: totals.reasoningTokens,
-      });
+      return text(await getUsageSummary(w));
     },
   );
 

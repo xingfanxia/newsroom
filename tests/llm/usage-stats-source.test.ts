@@ -17,23 +17,38 @@ describe("usage stats surfaces", () => {
     "utf8",
   );
   const mcp = readFileSync(resolve(root, "app/api/mcp/route.ts"), "utf8");
+  const summary = readFileSync(resolve(root, "lib/api/usage-summary.ts"), "utf8");
 
   it("supports an all-time usage window across admin, API, and MCP surfaces", () => {
     expect(stats).toContain('"all"');
     expect(page).toContain('"all"');
-    expect(route).toContain('"all"');
-    expect(mcp).toContain('"all"');
+    expect(summary).toContain('"all"');
+    expect(route).toContain("USAGE_WINDOWS");
+    expect(mcp).toContain("USAGE_WINDOWS");
   });
 
   it("includes task-level model breakdowns for the task spend table", () => {
     expect(stats).toContain("type TaskModelBreakdown");
     expect(stats).toContain("models: TaskModelBreakdown[]");
     expect(page).toContain("formatTaskModels(t.models)");
-    expect(route).toContain("models: t.models");
+    expect(summary).toContain("models: t.models.map");
   });
 
   it("renders model labels in recent calls", () => {
     expect(page).toContain("{zh ? \"模型\" : \"model\"}");
     expect(page).toContain("{c.model}");
+  });
+
+  it("v1 and MCP usage share the same agent summary contract", () => {
+    expect(route).toContain("@/lib/api/usage-summary");
+    expect(mcp).toContain("@/lib/api/usage-summary");
+    expect(route).toContain("getUsageSummary");
+    expect(mcp).toContain("getUsageSummary");
+    expect(route).not.toContain("totalsByWindow");
+    expect(route).not.toContain("breakdownByTask");
+    expect(mcp).not.toContain("totalsByWindow");
+    expect(summary).toContain("by_task");
+    expect(summary).toContain("by_model");
+    expect(summary).toContain("recent_calls");
   });
 });

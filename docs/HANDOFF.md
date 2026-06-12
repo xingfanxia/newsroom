@@ -29,6 +29,10 @@ Shipped cleanup:
 - Shared REST/MCP feed execution through `lib/api/feed-results.ts`;
   adapters now own only auth/rate-limit/ETag/serialization, while the helper
   owns paired item + full-match total queries and pagination defaults.
+- Shared bearer-agent usage summary serialization through
+  `lib/api/usage-summary.ts`; `/api/v1/usage/summary` and MCP
+  `ax_radar_usage` now share the same totals, `by_task`, `by_model`, and
+  `recent_calls` contract.
 - Shared hourly/daily/weekly fetch+normalize sequencing through `workers/fetcher/pipeline.ts`, with HTTP route wiring in `app/api/cron/_fetch-bucket-route.ts` and local cron scripts using the same helper.
 - Shared article body + YouTube transcript prefetch sequencing through
   `workers/fetcher/content-prefetch.ts`, so `/api/cron/article-body` and
@@ -65,15 +69,15 @@ Verification:
 - `bun run code:dead:exports` — passed.
 - `bun run code:dead:types` — passed.
 - `bun run lint` — passed with no warnings.
-- `bun test --env-file=.env.local` — 616 pass, 1 skip, 0 fail.
+- `bun test --env-file=.env.local` — 621 pass, 1 skip, 0 fail.
 - `bun run build` — passed.
 - `git diff --check` — passed.
 
 ## 2026-06-11 — Enrich spend guardrails, usage all-time/model labels
 
 Current production direction:
-- `/admin/usage` and `/api/v1/usage/summary` report `today`, `week`, `month`, and `all` windows.
-- Task spend rows include per-model/provider breakdowns; recent calls show model labels.
+- `/admin/usage`, `/api/v1/usage/summary`, and MCP `ax_radar_usage` report `today`, `week`, `month`, and `all` windows.
+- Task spend rows include per-model/provider breakdowns; recent calls show provider/model labels.
 - Enrich workers must claim rows before LLM calls. Do not reintroduce plain `WHERE enriched_at IS NULL LIMIT n` worker selection for spend-bearing work.
 
 Incident root cause:
@@ -85,7 +89,7 @@ Shipped code changes:
 - `runEnrichBatch` now uses `FOR UPDATE SKIP LOCKED`, stale-claim retry, max attempts, failure recording, and lower default per-tick caps.
 - Prompt schemas now truncate/cap overlong arrays and rationale strings instead of failing after successful model output.
 - Azure embedding API version is normalized when env accidentally contains `v1`; LLM generate/embed calls have a default 90s timeout.
-- Usage admin/API/MCP gained all-time totals and model breakdowns.
+- Usage admin/API/MCP gained all-time totals, model breakdowns, and recent-call model labels.
 
 Verification:
 - Manual DB migration applied to production database and columns verified.

@@ -21,6 +21,7 @@ import { GET as feedGet } from "@/app/api/v1/feed/route";
 import { GET as sourcesGet } from "@/app/api/v1/sources/route";
 import { GET as searchGet } from "@/app/api/v1/search/route";
 import { GET as itemGet } from "@/app/api/v1/items/[id]/route";
+import { GET as usageGet } from "@/app/api/v1/usage/summary/route";
 
 let token: string;
 let tokenId: number;
@@ -202,6 +203,52 @@ describe("/api/v1/sources", () => {
       expect(s.health).toBeDefined();
       expect(["ok", "warning", "error", "pending"]).toContain(s.health.status);
     }
+  });
+});
+
+describe("/api/v1/usage/summary", () => {
+  test("returns the shared usage summary contract", async () => {
+    const res = await usageGet(authedReq("/api/v1/usage/summary?window=week"));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    expect(body.window).toBe("week");
+    expect(typeof body.totals.calls).toBe("number");
+    expect(typeof body.totals.cost_usd).toBe("number");
+    expect(typeof body.totals.input_tokens).toBe("number");
+    expect(typeof body.totals.cached_input_tokens).toBe("number");
+    expect(typeof body.totals.output_tokens).toBe("number");
+    expect(typeof body.totals.reasoning_tokens).toBe("number");
+    expect(Array.isArray(body.by_task)).toBe(true);
+    expect(Array.isArray(body.by_model)).toBe(true);
+    expect(Array.isArray(body.recent_calls)).toBe(true);
+
+    if (body.by_task.length > 0) {
+      expect(typeof body.by_task[0].calls).toBe("number");
+      expect(Array.isArray(body.by_task[0].models)).toBe(true);
+      if (body.by_task[0].models.length > 0) {
+        expect(typeof body.by_task[0].models[0].provider).toBe("string");
+        expect(typeof body.by_task[0].models[0].model).toBe("string");
+      }
+    }
+    if (body.by_model.length > 0) {
+      expect(typeof body.by_model[0].provider).toBe("string");
+      expect(typeof body.by_model[0].model).toBe("string");
+    }
+    if (body.recent_calls.length > 0) {
+      expect(typeof body.recent_calls[0].provider).toBe("string");
+      expect(typeof body.recent_calls[0].model).toBe("string");
+      expect(body.recent_calls[0].created_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    }
+  });
+
+  test("rejects invalid usage windows", async () => {
+    const res = await usageGet(
+      authedReq("/api/v1/usage/summary?window=forever"),
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe("invalid_query");
   });
 });
 

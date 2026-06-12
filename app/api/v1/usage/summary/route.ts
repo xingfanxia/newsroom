@@ -10,10 +10,13 @@
  */
 import { z } from "zod";
 import { requireApiToken } from "@/lib/auth/api-token";
-import { breakdownByTask, totalsByWindow } from "@/lib/llm/stats";
+import {
+  getUsageSummary,
+  USAGE_WINDOWS,
+} from "@/lib/api/usage-summary";
 
 const querySchema = z.object({
-  window: z.enum(["today", "week", "month", "all"]).optional().default("week"),
+  window: z.enum(USAGE_WINDOWS).optional().default("week"),
 });
 
 export async function GET(req: Request) {
@@ -30,32 +33,7 @@ export async function GET(req: Request) {
   const w = parsed.data.window;
 
   try {
-    const [totals, byTask] = await Promise.all([
-      totalsByWindow(w),
-      breakdownByTask(w),
-    ]);
-    return Response.json({
-      window: w,
-      totals: {
-        calls: totals.calls,
-        cost_usd: totals.costUsd,
-        input_tokens: totals.inputTokens,
-        cached_input_tokens: totals.cachedInputTokens,
-        output_tokens: totals.outputTokens,
-        reasoning_tokens: totals.reasoningTokens,
-      },
-      by_task: byTask.map((t) => ({
-        task: t.task,
-        calls: t.calls,
-        cost_usd: t.costUsd,
-        models: t.models.map((m) => ({
-          provider: m.provider,
-          model: m.model,
-          calls: m.calls,
-          cost_usd: m.costUsd,
-        })),
-      })),
-    });
+    return Response.json(await getUsageSummary(w));
   } catch (err) {
     console.error("[api/v1/usage/summary] failed", err);
     return Response.json({ error: "server_error" }, { status: 500 });
