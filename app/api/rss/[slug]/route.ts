@@ -1,8 +1,11 @@
 import { sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { newsletters } from "@/db/schema";
 import { renderRssFeed, type RssItem } from "@/lib/rss/render";
 import { rssRateLimit } from "@/lib/rate-limit/rss";
+import {
+  dailyColumnDateKey,
+  listDailyColumnRows,
+} from "@/lib/api/daily-columns";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -30,10 +33,6 @@ const FEED_META: Record<
     route: "/zh/curated",
   },
 };
-
-function dateKey(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
 
 export async function GET(
   req: Request,
@@ -66,28 +65,10 @@ async function renderDailyFeed(
   meta: { title: string; description: string; route: string },
   slug: string,
 ): Promise<string> {
-  const client = db();
-  const rows = await client
-    .select({
-      id: newsletters.id,
-      columnTitle: newsletters.columnTitle,
-      columnSummaryMd: newsletters.columnSummaryMd,
-      columnNarrativeMd: newsletters.columnNarrativeMd,
-      columnThemeTag: newsletters.columnThemeTag,
-      periodStart: newsletters.periodStart,
-      publishedAt: newsletters.publishedAt,
-    })
-    .from(newsletters)
-    .where(
-      sql`${newsletters.kind} = 'daily'
-        AND ${newsletters.locale} = 'zh'
-        AND ${newsletters.columnTitle} IS NOT NULL`,
-    )
-    .orderBy(sql`${newsletters.periodStart} DESC`)
-    .limit(50);
+  const rows = await listDailyColumnRows({ locale: "zh", take: 50 });
 
   const items: RssItem[] = rows.map((r) => {
-    const dk = dateKey(r.periodStart);
+    const dk = dailyColumnDateKey(r.periodStart);
     const link = `${SITE}/zh/daily/${dk}`;
     const issueId = `AX 的 AI 日报 · ${dk}`;
     const subtitle = r.columnTitle ?? "";

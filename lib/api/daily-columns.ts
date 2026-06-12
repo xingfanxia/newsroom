@@ -9,7 +9,16 @@ export type DailyColumnLocale = z.infer<typeof dailyColumnLocaleSchema>;
 
 export const dailyColumnDateSchema = z
   .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, "expected YYYY-MM-DD");
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "expected YYYY-MM-DD")
+  .refine(
+    (date) => {
+      const parsed = new Date(`${date}T00:00:00Z`);
+      return !Number.isNaN(parsed.getTime()) && dailyColumnDateKey(parsed) === date;
+    },
+    {
+      message: "expected valid UTC calendar date",
+    },
+  );
 
 export const dailyColumnIndexQuerySchema = z.object({
   take: z.coerce.number().int().min(1).max(180).optional().default(30),
@@ -33,6 +42,7 @@ const fullDailyColumnSelect = {
   periodStart: newsletters.periodStart,
   periodEnd: newsletters.periodEnd,
   publishedAt: newsletters.publishedAt,
+  aihotDailyDate: newsletters.aihotDailyDate,
 } as const;
 
 const indexDailyColumnSelect = {
@@ -64,14 +74,27 @@ export function dailyColumnDayWindow(date: string): {
 }
 
 export async function getLatestDailyColumnRow(locale: DailyColumnLocale) {
-  const [row] = await db()
+  const [row] = await listDailyColumnRows({ locale, take: 1 });
+
+  return row ?? null;
+}
+
+export async function listDailyColumnRows({
+  locale,
+  take,
+  offset = 0,
+}: {
+  locale: DailyColumnLocale;
+  take: number;
+  offset?: number;
+}) {
+  return db()
     .select(fullDailyColumnSelect)
     .from(newsletters)
     .where(dailyColumnWhere(locale))
     .orderBy(sql`${newsletters.periodStart} DESC`)
-    .limit(1);
-
-  return row ?? null;
+    .limit(take)
+    .offset(offset);
 }
 
 export async function getDailyColumnRowByDate(

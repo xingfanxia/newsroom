@@ -21,6 +21,11 @@ const routePaths = [
   "app/api/public/daily/[date]/route.ts",
   "app/api/public/dailies/route.ts",
 ] as const;
+const dailyUiPaths = [
+  "app/[locale]/daily/page.tsx",
+  "app/[locale]/daily/[date]/page.tsx",
+  "app/api/rss/[slug]/route.ts",
+] as const;
 
 const mcpRoute = read("app/api/mcp/route.ts");
 const mcpDailyResources = sectionBetween(
@@ -47,6 +52,26 @@ describe("daily-column API source wiring", () => {
     );
     expect(read("app/api/public/dailies/route.ts")).toContain(
       "listDailyColumnIndexRows",
+    );
+  });
+
+  test("site daily pages and RSS reuse the same daily-column query helpers", () => {
+    for (const path of dailyUiPaths) {
+      const source = read(path);
+
+      expect(source).toContain("@/lib/api/daily-columns");
+      expect(source).not.toContain(".select({");
+      expect(source).not.toContain("from(newsletters)");
+      expect(source).not.toContain("newsletters.columnTitle");
+    }
+    expect(read("app/[locale]/daily/page.tsx")).toContain(
+      "listDailyColumnRows",
+    );
+    expect(read("app/[locale]/daily/[date]/page.tsx")).toContain(
+      "getDailyColumnRowByDate",
+    );
+    expect(read("app/api/rss/[slug]/route.ts")).toContain(
+      "listDailyColumnRows",
     );
   });
 

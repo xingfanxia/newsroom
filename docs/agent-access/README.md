@@ -53,7 +53,7 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 - **`lib/api/story-item-fields.ts`** — shared flat Story field helpers used by both anonymous public serializers and bearer-gated `/api/v1/*` serializers, with each surface still owning its HKR exposure policy.
 - **`lib/api/item-detail.ts`** — shared full-detail item query + serializers used by `/api/public/items/{id}` and `/api/v1/items/{id}`. The v1 serializer keeps raw reasoning + RSS body; the public serializer strips LLM internals and uses an event-aware ETag signal.
 - **`lib/api/event-members.ts`** — shared event-member item serializer used by UI-internal, public, v1, and MCP event-member surfaces.
-- **`lib/api/daily-columns.ts`** — shared daily-column query, REST serializers, ETag signals, date-window helpers, and MCP markdown renderer used by `/api/public/daily`, `/api/public/daily/{date}`, `/api/public/dailies`, and MCP daily resources.
+- **`lib/api/daily-columns.ts`** — shared daily-column query, REST serializers, ETag signals, date-window helpers, and MCP markdown renderer used by the public daily endpoints, site daily pages, `/api/rss/daily.xml`, and MCP daily resources.
 
 ## Adding a new public endpoint
 
@@ -101,7 +101,7 @@ Run these with `bun test tests/api/public-*.test.ts tests/api/feed-query-*.test.
 - **Bearer agent item serialization is shared across REST + MCP** — `/api/v1/feed`, `/api/v1/search`, MCP `ax_radar_feed`, and MCP `ax_radar_search` all use `toAgentApiItem`; `/api/v1/saved` extends it via `toSavedAgentApiItem`.
 - **Saved collection assignment is owner-aware** — `/api/v1/saved`, MCP `ax_radar_save`, and browser move actions all delegate to `assignSavedItemCollection` so a user cannot attach a save to another user's collection id.
 - **Event-member serialization is shared across surfaces** — `/api/events/*`, `/api/public/events/*`, `/api/v1/events/*`, and MCP `ax_radar_event_members` all use `toEventMemberApiItems`.
-- **Daily-column serialization is centralized across REST + MCP** — `lib/api/daily-columns.ts` owns `newsletters` queries where `kind='daily' AND column_title IS NOT NULL`, public JSON shape, ETag signals, UTC date-window lookup, and MCP markdown rendering. The legacy structured-digest rows (where `headline IS NOT NULL`) ship separately via `/api/feed/newsletter/{locale}/rss.xml`.
+- **Daily-column serialization is centralized across REST, RSS, site pages, and MCP** — `lib/api/daily-columns.ts` owns `newsletters` queries where `kind='daily' AND column_title IS NOT NULL`, public JSON shape, ETag signals, UTC date-window lookup, RSS/page row listing, and MCP markdown rendering. The legacy structured-digest rows (where `headline IS NOT NULL`) ship separately via `/api/feed/newsletter/{locale}/rss.xml`.
 
 ## Related
 

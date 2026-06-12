@@ -1,14 +1,15 @@
 import Link from "next/link";
 import { setRequestLocale } from "next-intl/server";
-import { sql } from "drizzle-orm";
-import { db } from "@/db/client";
-import { newsletters } from "@/db/schema";
 import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
 import {
   getPulseData,
   getRadarStats,
 } from "@/lib/shell/dashboard-stats";
+import {
+  dailyColumnDateKey,
+  listDailyColumnRows,
+} from "@/lib/api/daily-columns";
 
 export const dynamic = "force-dynamic";
 
@@ -18,10 +19,6 @@ type Props = {
   params: Promise<{ locale: "zh" | "en" }>;
   searchParams: Promise<{ p?: string }>;
 };
-
-function dateKey(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
 
 function relativeAgo(d: Date): string {
   const diffH = Math.floor((Date.now() - d.getTime()) / 3_600_000);
@@ -65,34 +62,8 @@ export default async function DailyLandingPage({
 
   const [rows, stats, pulse] = await Promise.all([
     isZh
-      ? db()
-          .select({
-            id: newsletters.id,
-            columnTitle: newsletters.columnTitle,
-            columnSummaryMd: newsletters.columnSummaryMd,
-            columnThemeTag: newsletters.columnThemeTag,
-            periodStart: newsletters.periodStart,
-            publishedAt: newsletters.publishedAt,
-          })
-          .from(newsletters)
-          .where(
-            sql`${newsletters.kind} = 'daily'
-              AND ${newsletters.locale} = 'zh'
-              AND ${newsletters.columnTitle} IS NOT NULL`,
-          )
-          .orderBy(sql`${newsletters.periodStart} DESC`)
-          .limit(PAGE_SIZE)
-          .offset(offset)
-      : Promise.resolve(
-          [] as {
-            id: number;
-            columnTitle: string | null;
-            columnSummaryMd: string | null;
-            columnThemeTag: string | null;
-            periodStart: Date;
-            publishedAt: Date;
-          }[],
-        ),
+      ? listDailyColumnRows({ locale: "zh", take: PAGE_SIZE, offset })
+      : Promise.resolve([]),
     getRadarStats().catch(() => ({
       items_today: 0,
       items_p1: 0,
@@ -146,7 +117,7 @@ export default async function DailyLandingPage({
           <>
             <div className="feed">
               {rows.map((r) => {
-                const dk = dateKey(r.periodStart);
+                const dk = dailyColumnDateKey(r.periodStart);
                 const preview = summaryPreview(r.columnSummaryMd ?? "");
                 return (
                   <Link

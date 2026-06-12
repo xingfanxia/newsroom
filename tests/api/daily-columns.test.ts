@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  dailyColumnDateSchema,
   dailyColumnDateKey,
   dailyColumnDayWindow,
   publicDailyColumnEtagSignal,
@@ -121,6 +122,13 @@ describe("daily column public API serialization", () => {
 });
 
 describe("daily column shared date helpers", () => {
+  test("accepts only real UTC calendar dates", () => {
+    expect(dailyColumnDateSchema.safeParse("2026-06-11").success).toBe(true);
+    expect(dailyColumnDateSchema.safeParse("2026-99-99").success).toBe(false);
+    expect(dailyColumnDateSchema.safeParse("2026-02-30").success).toBe(false);
+    expect(dailyColumnDateSchema.safeParse("06-11-2026").success).toBe(false);
+  });
+
   test("uses the UTC period_start date as the public date key", () => {
     expect(dailyColumnDateKey(periodStart)).toBe("2026-06-11");
   });

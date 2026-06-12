@@ -1,14 +1,15 @@
 import { notFound } from "next/navigation";
 import { setRequestLocale } from "next-intl/server";
-import { sql } from "drizzle-orm";
-import { db } from "@/db/client";
-import { newsletters } from "@/db/schema";
 import { ViewShell } from "@/components/shell/view-shell";
 import { DailyColumnRenderer } from "../_renderer";
 import {
   getPulseData,
   getRadarStats,
 } from "@/lib/shell/dashboard-stats";
+import {
+  dailyColumnDateSchema,
+  getDailyColumnRowByDate,
+} from "@/lib/api/daily-columns";
 
 export const dynamic = "force-dynamic";
 
@@ -20,34 +21,11 @@ export default async function DailyDatePage({ params }: Props) {
   const { locale, date } = await params;
   setRequestLocale(locale);
   if (locale !== "zh") notFound();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) notFound();
+  const parsedDate = dailyColumnDateSchema.safeParse(date);
+  if (!parsedDate.success) notFound();
 
-  const dayStart = new Date(`${date}T00:00:00Z`);
-  if (Number.isNaN(dayStart.getTime())) notFound();
-  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
-
-  const [rows, stats, pulse] = await Promise.all([
-    db()
-      .select({
-        id: newsletters.id,
-        columnTitle: newsletters.columnTitle,
-        columnSummaryMd: newsletters.columnSummaryMd,
-        columnNarrativeMd: newsletters.columnNarrativeMd,
-        columnThemeTag: newsletters.columnThemeTag,
-        publishedAt: newsletters.publishedAt,
-        periodStart: newsletters.periodStart,
-        aihotDailyDate: newsletters.aihotDailyDate,
-      })
-      .from(newsletters)
-      .where(
-        sql`${newsletters.kind} = 'daily'
-          AND ${newsletters.locale} = 'zh'
-          AND ${newsletters.columnTitle} IS NOT NULL
-          AND ${newsletters.periodStart} >= ${dayStart.toISOString()}::timestamptz
-          AND ${newsletters.periodStart} <  ${dayEnd.toISOString()}::timestamptz`,
-      )
-      .orderBy(sql`${newsletters.periodStart} DESC`)
-      .limit(1),
+  const [row, stats, pulse] = await Promise.all([
+    getDailyColumnRowByDate(parsedDate.data, "zh"),
     getRadarStats().catch(() => ({
       items_today: 0,
       items_p1: 0,
@@ -57,8 +35,7 @@ export default async function DailyDatePage({ params }: Props) {
     getPulseData().catch(() => []),
   ]);
 
-  if (rows.length === 0) notFound();
-  const r = rows[0]!;
+  if (!row) notFound();
 
   return (
     <ViewShell
@@ -74,14 +51,14 @@ export default async function DailyDatePage({ params }: Props) {
       <main className="main">
         <DailyColumnRenderer
           column={{
-            id: r.id,
-            columnTitle: r.columnTitle ?? "",
-            columnSummaryMd: r.columnSummaryMd ?? "",
-            columnNarrativeMd: r.columnNarrativeMd ?? "",
-            columnThemeTag: r.columnThemeTag,
-            publishedAt: r.publishedAt,
-            periodStart: r.periodStart,
-            aihotDailyDate: r.aihotDailyDate,
+            id: row.id,
+            columnTitle: row.columnTitle ?? "",
+            columnSummaryMd: row.columnSummaryMd ?? "",
+            columnNarrativeMd: row.columnNarrativeMd ?? "",
+            columnThemeTag: row.columnThemeTag,
+            publishedAt: row.publishedAt,
+            periodStart: row.periodStart,
+            aihotDailyDate: row.aihotDailyDate,
           }}
         />
       </main>
