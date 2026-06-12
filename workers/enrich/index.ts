@@ -23,6 +23,7 @@ import {
   generateChineseEnrichment,
   generateChineseScoreRationale,
 } from "./chinese";
+import { ENRICH_CLAIM_RESET_VALUES } from "./claim-state";
 import { loadPolicy } from "./policy";
 import { treatmentForScore, type EnrichTreatment } from "./treatment";
 
@@ -264,9 +265,7 @@ async function enrichOne(
       reasoningEn: scored.reasoningEn,
       embedding,
       enrichedAt: new Date(),
-      enrichClaimedAt: null,
-      enrichAttempts: 0,
-      enrichError: null,
+      ...ENRICH_CLAIM_RESET_VALUES,
       policyVersion: policy.version,
     })
     .where(and(eq(items.id, item.id), isNull(items.enrichedAt)));

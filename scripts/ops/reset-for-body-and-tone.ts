@@ -25,6 +25,7 @@
  */
 import { db, closeDb } from "@/db/client";
 import { items } from "@/db/schema";
+import { ENRICH_CLAIM_RESET_VALUES } from "@/workers/enrich/claim-state";
 import { isNotNull, sql } from "drizzle-orm";
 
 async function main() {
@@ -46,9 +47,7 @@ async function main() {
     .update(items)
     .set({
       enrichedAt: null,
-      enrichClaimedAt: null,
-      enrichAttempts: 0,
-      enrichError: null,
+      ...ENRICH_CLAIM_RESET_VALUES,
     })
     .where(isNotNull(items.enrichedAt))
     .returning({ id: items.id });

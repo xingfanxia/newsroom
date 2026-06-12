@@ -36,6 +36,10 @@ Shipped cleanup:
   full tweet text. This prevents the `fetch-hourly :17` / `enrich :20`
   cron ordering from spending LLM tokens before article-body has a chance
   to run.
+- Shared enrich-claim reset values through `workers/enrich/claim-state.ts`;
+  worker success and operator reset scripts now clear `enrich_claimed_at`,
+  `enrich_attempts`, and `enrich_error` from one helper instead of repeating
+  the three-field reset object.
 - Shared the full cluster Stage A/A.5/B/B+/C/D sequence through `workers/cluster/pipeline.ts`, so `/api/cron/cluster` and `bun scripts/ops/run-cron.ts cluster` no longer drift.
 - Stopped a cluster-cron arbitration loop: Stage A and singleton-recluster now
   skip clusters already rejected for the item in `cluster_splits`, preventing
@@ -53,8 +57,9 @@ Shipped cleanup:
 Verification:
 - `bun run code:dead` — passed.
 - `bun run code:dead:exports` — passed.
+- `bun run code:dead:types` — passed.
 - `bun run lint` — passed with no warnings.
-- `bun test --env-file=.env.local` — 607 pass, 1 skip, 0 fail.
+- `bun test --env-file=.env.local` — 612 pass, 1 skip, 0 fail.
 - `bun run build` — passed.
 - `git diff --check` — passed.
 
