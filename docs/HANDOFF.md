@@ -5,13 +5,14 @@
 Current maintenance direction:
 - Start docs navigation from `docs/README.md`; historical plans/handoffs are useful context, not current implementation instructions.
 - `bun run lint` is expected to be clean with zero warnings.
-- `bun run code:dead` is the low-noise Knip gate for unused files/dependencies/unresolved imports and should exit cleanly. `bun run code:dead:exports` checks value exports and should also stay clean. `bun run code:dead:types` is the remaining manual queue for type-only contract candidates.
+- `bun run code:dead` is the low-noise Knip gate for unused files/dependencies/unresolved imports and should exit cleanly. `bun run code:dead:exports` checks value exports and `bun run code:dead:types` checks type exports; both should stay clean.
 - `upsertAppUser(user)` upserts the effective user row, including API-token users, before FK-owned mutations.
 
 Shipped cleanup:
 - Added repo-specific `knip.json` entry/project patterns for Next routes, tests, workers, scripts, and config files.
 - Removed unused UI/source-row components, the unused Tavily integration stub, and unused direct package dependencies.
 - Removed/de-exported unused internal value exports across auth, i18n navigation, policy, rate-limit, utility, worker, X API, newsletter, normalizer, and cluster modules.
+- Removed/de-exported unused internal type-only exports in the LLM usage and facade modules.
 - Replaced stale `tsx` operator-script hints with `bun`.
 - Updated README / `.env.example` / architecture docs so Tavily is not advertised as wired, cron docs match the current split route set, and cluster docs match the 0.75 / 72h runtime.
 - Moved render-local helper components out of `components/shell/tweaks.tsx`.

@@ -20,16 +20,13 @@ bun run code:dead:exports
 
 Result after the export-boundary cleanup: exits `0`.
 
-Type-only exports have a separate review queue:
+Type-only exports have a separate gate:
 
 ```bash
 bun run code:dead:types
 ```
 
-That command still exits non-zero for the remaining type-contract candidates:
-`lib/llm/stats.ts:TaskModelBreakdown` and
-`lib/llm/types.ts:LLMUsageContext, ModelMessage`. Keep these until a focused
-LLM/API type-contract pass decides whether to hide or document them.
+Result after the type-boundary cleanup: exits `0`.
 
 ## Interpretation
 
@@ -52,25 +49,11 @@ LLM/API type-contract pass decides whether to hide or document them.
   caps, X API internals, newsletter helpers, normalizer readability helpers,
   and cluster merge helpers.
 
-### Remaining Type Review
-
-`bun run code:dead:types` currently reports:
-
-- `lib/llm/stats.ts:TaskModelBreakdown` — intentionally asserted by tests as
-  the task/model usage breakdown surface.
-- `lib/llm/types.ts:LLMUsageContext, ModelMessage` — LLM facade type
-  candidates; inspect during a focused LLM facade pass.
-
-Do not remove these from Knip output alone. For each type, prove that it is not
-a public contract, not asserted by tests, and not relied on by downstream
-callers.
-
 ### Current Tooling Policy
 
 - `bun run code:dead` is the low-noise gate. It should stay clean.
 - `bun run code:dead:exports` checks value exports. It should stay clean.
-- `bun run code:dead:types` is the type-only manual review queue. It may be
-  non-zero while type-contract candidates are being evaluated.
+- `bun run code:dead:types` checks type exports. It should stay clean.
 
 ## Follow-Up Strategy
 

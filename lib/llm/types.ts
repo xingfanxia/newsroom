@@ -25,7 +25,7 @@ export type LLMTask =
   | "canonical-title"
   | "other";
 
-export type LLMUsageContext = {
+type LLMUsageContext = {
   /** Categorizes the call for cost dashboards. */
   task?: LLMTask;
   /** Link usage back to the item being processed, when applicable. */
@@ -109,5 +109,3 @@ export class LLMError extends Error {
     this.name = "LLMError";
   }
 }
-
-export type { ModelMessage } from "ai";

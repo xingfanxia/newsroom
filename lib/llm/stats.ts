@@ -79,7 +79,7 @@ export type TaskBreakdown = {
   models: TaskModelBreakdown[];
 };
 
-export type TaskModelBreakdown = {
+type TaskModelBreakdown = {
   provider: string;
   model: string;
   calls: number;

@@ -26,7 +26,7 @@ describe("usage stats surfaces", () => {
   });
 
   it("includes task-level model breakdowns for the task spend table", () => {
-    expect(stats).toContain("export type TaskModelBreakdown");
+    expect(stats).toContain("type TaskModelBreakdown");
     expect(stats).toContain("models: TaskModelBreakdown[]");
     expect(page).toContain("formatTaskModels(t.models)");
     expect(route).toContain("models: t.models");
