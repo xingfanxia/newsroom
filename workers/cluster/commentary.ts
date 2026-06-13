@@ -36,9 +36,19 @@ import { treatmentForScore } from "@/workers/enrich/treatment";
 
 const MAX_EVENT_COMMENTARY_PER_RUN = 8;
 
+type EventCommentaryBatchOptions = {
+  /**
+   * Restrict candidate events to recent latest_member_at / first_seen_at.
+   * Null means no recency filter and is intended for explicit operator
+   * backfills, not scheduled cron.
+   */
+  recencyHours?: number | null;
+};
+
 export type EventCommentaryReport = {
   processed: number;
   generated: number;
+  recencyHours: number | null;
   durationMs: number;
   errors: Array<{ clusterId: number; reason: string }>;
 };
@@ -64,7 +74,9 @@ export type EventCommentaryReport = {
  * are long-running; parallel runs at this scale just hit Azure's
  * reasoning-effort throttle faster.
  */
-export async function runEventCommentaryBatch(): Promise<EventCommentaryReport> {
+export async function runEventCommentaryBatch(
+  opts: EventCommentaryBatchOptions = {},
+): Promise<EventCommentaryReport> {
   const started = Date.now();
   const client = db();
 
@@ -87,6 +99,7 @@ export async function runEventCommentaryBatch(): Promise<EventCommentaryReport> 
         inArray(clusters.eventTier, VISIBLE_ITEM_TIERS),
         sql`${clusters.memberCount} >= 2`,
         isNull(clusters.commentaryAt),
+        commentaryRecencyFilter(opts),
       ),
     )
     .orderBy(
@@ -113,12 +126,18 @@ export async function runEventCommentaryBatch(): Promise<EventCommentaryReport> 
   return {
     processed: candidates.length,
     generated,
+    recencyHours: opts.recencyHours ?? null,
     durationMs: Date.now() - started,
     errors,
   };
 }
 
 // ── Internal helpers ──────────────────────────────────────────────────────
+
+function commentaryRecencyFilter(opts: EventCommentaryBatchOptions) {
+  if (opts.recencyHours == null) return sql`true`;
+  return sql`COALESCE(${clusters.latestMemberAt}, ${clusters.firstSeenAt}) >= now() - make_interval(hours => ${opts.recencyHours})`;
+}
 
 interface ClusterCandidate {
   id: number;

@@ -18,6 +18,8 @@
  * tests/cluster/commentary.integration.test.ts and mock generateStructured.
  */
 
+import { readFileSync } from "fs";
+import { resolve } from "path";
 import { describe, it, expect } from "bun:test";
 import { isHighlightItemTier } from "@/lib/types";
 import {
@@ -33,6 +35,7 @@ import {
 // We document the expected value here as a specification test; the constant
 // is also verified structurally by the candidate query cap in commentary.ts.
 const EXPECTED_MAX_PER_RUN = 8;
+const workerSource = readFileSync(resolve(import.meta.dir, "commentary.ts"), "utf8");
 
 // ── Prompt shape tests (pure, no mocks needed) ────────────────────────────
 
@@ -327,6 +330,21 @@ describe("MAX_EVENT_COMMENTARY_PER_RUN specification", () => {
     // so any change to the constant surfaces as a test failure requiring
     // deliberate acknowledgment. The actual constant lives in commentary.ts.
     expect(EXPECTED_MAX_PER_RUN).toBe(8);
+  });
+});
+
+// ── Cron recency guardrail ────────────────────────────────────────────────
+
+describe("event commentary cron recency guardrail", () => {
+  it("lets cron pass a recency window so historical backlog does not spend every tick", () => {
+    expect(workerSource).toContain("type EventCommentaryBatchOptions");
+    expect(workerSource).toContain("recencyHours?: number | null");
+  });
+
+  it("filters candidates by latest_member_at with first_seen_at fallback when recency is set", () => {
+    expect(workerSource).toContain("commentaryRecencyFilter");
+    expect(workerSource).toContain("COALESCE(${clusters.latestMemberAt}, ${clusters.firstSeenAt})");
+    expect(workerSource).toContain("make_interval(hours => ${opts.recencyHours})");
   });
 });
 

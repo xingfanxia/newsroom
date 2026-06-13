@@ -16,6 +16,7 @@ import {
   runSingletonReclusterBatch,
   type SingletonReclusterReport,
 } from "@/workers/cluster/singletons";
+import { EVENT_COMMENTARY_CRON_RECENCY_HOURS } from "@/lib/events/commentary-window";
 
 // Merge-stage recency window. Each tick only considers multi-member clusters
 // whose latest_member_at is within the last 6h, keeping pairwise distance
@@ -79,9 +80,12 @@ export async function runClusterPipeline(): Promise<ClusterPipelineReport> {
     runCanonicalTitleBatch(),
   );
 
-  // Stage D: event-level editorial commentary for non-excluded events.
+  // Stage D: event-level editorial commentary for recent non-excluded events.
+  // Historical commentary backlogs are handled by cost-bounded backfill scripts.
   const eventCommentary = await safeStage("event-commentary", () =>
-    runEventCommentaryBatch(),
+    runEventCommentaryBatch({
+      recencyHours: EVENT_COMMENTARY_CRON_RECENCY_HOURS,
+    }),
   );
 
   return {

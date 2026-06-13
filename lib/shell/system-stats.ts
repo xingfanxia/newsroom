@@ -18,6 +18,7 @@
 import { and, eq, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clusters, items, rawItems, sources, sourceHealth } from "@/db/schema";
+import { EVENT_COMMENTARY_CRON_RECENCY_HOURS } from "@/lib/events/commentary-window";
 import vercelConfig from "@/vercel.json";
 
 type SystemService = {
@@ -251,6 +252,7 @@ export async function getSystemSnapshot(): Promise<SystemSnapshot> {
         where ${clusters.eventTier} in ('featured','p1','all')
           and ${clusters.memberCount} >= 2
           and ${clusters.commentaryAt} is null
+          and COALESCE(${clusters.latestMemberAt}, ${clusters.firstSeenAt}) >= now() - make_interval(hours => ${EVENT_COMMENTARY_CRON_RECENCY_HOURS})
       )::int`,
     })
     .from(clusters);

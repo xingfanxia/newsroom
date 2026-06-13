@@ -20,5 +20,8 @@ describe("admin system stats source wiring", () => {
     expect(source).toContain("coalesce(${clusters.memberCount}, 1) < 2");
     expect(source).toContain('name: "event-commentary"');
     expect(source).toContain("eventCommentaryPending");
+    expect(source).toContain("EVENT_COMMENTARY_CRON_RECENCY_HOURS");
+    expect(source).toContain("COALESCE(${clusters.latestMemberAt}, ${clusters.firstSeenAt})");
+    expect(source).toContain("make_interval(hours => ${EVENT_COMMENTARY_CRON_RECENCY_HOURS})");
   });
 });

@@ -20,7 +20,7 @@ describe("cluster cron pipeline wiring", () => {
       "runArbitrationBatch()",
       "runMergeBatch(",
       "runCanonicalTitleBatch()",
-      "runEventCommentaryBatch()",
+      "runEventCommentaryBatch({",
     ].map((needle) => src.indexOf(needle));
 
     for (const idx of stageOrder) expect(idx).toBeGreaterThan(0);
@@ -28,6 +28,9 @@ describe("cluster cron pipeline wiring", () => {
     expect(src).toContain("safeStage");
     expect(src).toContain("MERGE_RECENCY_HOURS = 6");
     expect(src).toContain("SINGLETON_RECLUSTER_RECENCY_HOURS = 72");
+    expect(src).toContain("EVENT_COMMENTARY_CRON_RECENCY_HOURS");
+    expect(src).toContain("runEventCommentaryBatch({");
+    expect(src).toContain("recencyHours: EVENT_COMMENTARY_CRON_RECENCY_HOURS");
   });
 
   it("keeps the HTTP route as auth plus response wiring", () => {
