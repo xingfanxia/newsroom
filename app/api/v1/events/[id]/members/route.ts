@@ -17,11 +17,7 @@
  * (member_count = 1) just return their lone member.
  */
 import { runV1Route, v1Error, v1Json } from "@/lib/api/v1-route";
-import {
-  parseEventMemberRouteParams,
-  toEventMemberApiItems,
-} from "@/lib/api/event-members";
-import { getEventMembers } from "@/lib/items/live";
+import { getEventMembersRoutePayload } from "@/lib/api/event-members";
 
 export async function GET(
   req: Request,
@@ -30,20 +26,20 @@ export async function GET(
   return runV1Route(req, async () => {
     const { id: idRaw } = await ctx.params;
     const url = new URL(req.url);
-    const parsed = parseEventMemberRouteParams({
-      rawId: idRaw,
-      rawLocale: url.searchParams.get("locale"),
-      defaultLocale: "zh",
-    });
-    if (!parsed.ok) {
-      return v1Error(parsed.error, 400);
-    }
 
     try {
-      const members = await getEventMembers(parsed.clusterId, parsed.locale);
+      const result = await getEventMembersRoutePayload({
+        rawId: idRaw,
+        rawLocale: url.searchParams.get("locale"),
+        defaultLocale: "zh",
+      });
+      if (!result.ok) {
+        return v1Error(result.error, result.status);
+      }
+
       return v1Json({
-        members: toEventMemberApiItems(members),
-        total: members.length,
+        members: result.payload.members,
+        total: result.payload.total,
       });
     } catch (err) {
       console.error("[api/v1/events/:id/members] failed", err);

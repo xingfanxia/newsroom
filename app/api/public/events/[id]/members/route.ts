@@ -8,11 +8,7 @@
  * Unknown cluster_id returns 200 with empty members[] so consumer agents can
  * degrade without a special error path — same convention as v1.
  */
-import {
-  parseEventMemberRouteParams,
-  toEventMemberApiItems,
-} from "@/lib/api/event-members";
-import { getEventMembers } from "@/lib/items/live";
+import { getEventMembersRoutePayload } from "@/lib/api/event-members";
 import {
   etagSignal,
   publicCachedJson,
@@ -32,27 +28,23 @@ export async function GET(
 
   const { id: idRaw } = await ctx.params;
   const url = new URL(req.url);
-  const parsed = parseEventMemberRouteParams({
-    rawId: idRaw,
-    rawLocale: url.searchParams.get("locale"),
-    defaultLocale: "en",
-  });
-  if (!parsed.ok) return publicError(parsed.error, 400);
 
   try {
-    const members = await getEventMembers(parsed.clusterId, parsed.locale);
-    const body = {
-      cluster_id: parsed.clusterId,
-      members: toEventMemberApiItems(members),
-      total: members.length,
-    };
+    const result = await getEventMembersRoutePayload({
+      rawId: idRaw,
+      rawLocale: url.searchParams.get("locale"),
+      defaultLocale: "en",
+    });
+    if (!result.ok) return publicError(result.error, result.status);
+
+    const body = result.payload;
     return publicCachedJson(req, {
       endpoint: "eventMembers",
       etagFamily: "public-event",
       signal: etagSignal({
-        cluster_id: parsed.clusterId,
-        n: members.length,
-        last_at: members[members.length - 1]?.publishedAt ?? "",
+        cluster_id: body.cluster_id,
+        n: body.total,
+        last_at: body.members[body.members.length - 1]?.published_at ?? "",
       }),
       body,
     });

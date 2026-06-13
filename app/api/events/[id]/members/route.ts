@@ -15,11 +15,7 @@
  * Returns empty members array (not 404) for unknown cluster ids so the UI's
  * drawer can degrade gracefully without a separate error path.
  */
-import {
-  parseEventMemberRouteParams,
-  toEventMemberApiItems,
-} from "@/lib/api/event-members";
-import { getEventMembers } from "@/lib/items/live";
+import { getEventMembersRoutePayload } from "@/lib/api/event-members";
 
 export async function GET(
   req: Request,
@@ -27,20 +23,23 @@ export async function GET(
 ) {
   const { id: idRaw } = await ctx.params;
   const url = new URL(req.url);
-  const parsed = parseEventMemberRouteParams({
-    rawId: idRaw,
-    rawLocale: url.searchParams.get("locale"),
-    defaultLocale: "zh",
-  });
-  if (!parsed.ok) {
-    return Response.json({ error: parsed.error }, { status: 400 });
-  }
 
   try {
-    const members = await getEventMembers(parsed.clusterId, parsed.locale);
+    const result = await getEventMembersRoutePayload({
+      rawId: idRaw,
+      rawLocale: url.searchParams.get("locale"),
+      defaultLocale: "zh",
+    });
+    if (!result.ok) {
+      return Response.json(
+        { error: result.error },
+        { status: result.status },
+      );
+    }
+
     return Response.json({
-      members: toEventMemberApiItems(members),
-      total: members.length,
+      members: result.payload.members,
+      total: result.payload.total,
     });
   } catch (err) {
     console.error("[api/events/:id/members] failed", err);

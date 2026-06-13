@@ -43,16 +43,12 @@ import {
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { z } from "zod";
 import { requireApiToken } from "@/lib/auth/api-token";
-import {
-  getFeaturedStories,
-  getEventMembers,
-  type FeedQuery,
-} from "@/lib/items/live";
+import { getFeaturedStories, type FeedQuery } from "@/lib/items/live";
 import { runFeedQuery } from "@/lib/api/feed-results";
 import { runSearchQuery } from "@/lib/api/search-results";
 import { getItemDetail } from "@/lib/items/detail";
 import { toAgentApiItem } from "@/lib/api/v1-items";
-import { toEventMemberApiItems } from "@/lib/api/event-members";
+import { getEventMembersPayload } from "@/lib/api/event-members";
 import { applyFeedbackToggle } from "@/lib/feedback/toggle";
 import {
   assignSavedItemCollection,
@@ -184,12 +180,7 @@ function buildServer(user: SessionUser): McpServer {
       },
     },
     async ({ cluster_id, locale }) => {
-      const members = await getEventMembers(cluster_id, locale ?? "en");
-      return text({
-        cluster_id,
-        members: toEventMemberApiItems(members),
-        total: members.length,
-      });
+      return text(await getEventMembersPayload(cluster_id, locale ?? "en"));
     },
   );
 

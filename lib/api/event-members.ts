@@ -3,6 +3,7 @@ import {
   INVALID_ROUTE_ID_ERROR,
   parsePositiveRouteId,
 } from "@/lib/api/route-params";
+import { getEventMembers } from "@/lib/items/live";
 import { APP_LOCALES, type Story } from "@/lib/types";
 
 type EventMember = NonNullable<Story["members"]>[number];
@@ -23,6 +24,16 @@ export type EventMemberApiItem = {
   published_at: string;
   importance: number;
 };
+
+export type EventMembersPayload = {
+  cluster_id: number;
+  members: EventMemberApiItem[];
+  total: number;
+};
+
+type EventMembersRoutePayloadResult =
+  | { ok: true; payload: EventMembersPayload }
+  | { ok: false; error: "invalid_id" | "invalid_locale"; status: 400 };
 
 export function parseEventMemberRouteParams({
   rawId,
@@ -65,4 +76,47 @@ export function toEventMemberApiItems(
   members: EventMember[],
 ): EventMemberApiItem[] {
   return members.map(toEventMemberApiItem);
+}
+
+export function toEventMembersPayload(
+  clusterId: number,
+  members: EventMember[],
+): EventMembersPayload {
+  return {
+    cluster_id: clusterId,
+    members: toEventMemberApiItems(members),
+    total: members.length,
+  };
+}
+
+export async function getEventMembersPayload(
+  clusterId: number,
+  locale: EventMemberLocale,
+): Promise<EventMembersPayload> {
+  const members = await getEventMembers(clusterId, locale);
+  return toEventMembersPayload(clusterId, members);
+}
+
+export async function getEventMembersRoutePayload({
+  rawId,
+  rawLocale,
+  defaultLocale,
+}: {
+  rawId: string;
+  rawLocale: string | null;
+  defaultLocale: EventMemberLocale;
+}): Promise<EventMembersRoutePayloadResult> {
+  const parsed = parseEventMemberRouteParams({
+    rawId,
+    rawLocale,
+    defaultLocale,
+  });
+  if (!parsed.ok) {
+    return { ok: false, error: parsed.error, status: 400 };
+  }
+
+  return {
+    ok: true,
+    payload: await getEventMembersPayload(parsed.clusterId, parsed.locale),
+  };
 }

@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import {
+  getEventMembersRoutePayload,
   parseEventMemberRouteParams,
   toEventMemberApiItem,
   toEventMemberApiItems,
+  toEventMembersPayload,
 } from "@/lib/api/event-members";
 import type { Story } from "@/lib/types";
 
@@ -97,5 +99,43 @@ describe("event member API serialization", () => {
       "openai-news",
       "anthropic-news",
     ]);
+  });
+
+  test("builds the shared event members payload envelope", () => {
+    expect(
+      toEventMembersPayload(42, [
+        member,
+        { ...member, sourceId: "anthropic-news", sourceName: "Anthropic" },
+      ]),
+    ).toEqual({
+      cluster_id: 42,
+      members: [
+        toEventMemberApiItem(member),
+        toEventMemberApiItem({
+          ...member,
+          sourceId: "anthropic-news",
+          sourceName: "Anthropic",
+        }),
+      ],
+      total: 2,
+    });
+  });
+
+  test("route payload lookup returns shared validation errors before fetching", async () => {
+    await expect(
+      getEventMembersRoutePayload({
+        rawId: "0",
+        rawLocale: null,
+        defaultLocale: "zh",
+      }),
+    ).resolves.toEqual({ ok: false, error: "invalid_id", status: 400 });
+
+    await expect(
+      getEventMembersRoutePayload({
+        rawId: "42",
+        rawLocale: "ja",
+        defaultLocale: "zh",
+      }),
+    ).resolves.toEqual({ ok: false, error: "invalid_locale", status: 400 });
   });
 });

@@ -70,6 +70,10 @@ Shipped cleanup:
 - Shared v1/public item-detail route lookup through
   `getItemDetailRouteRow` in `lib/api/item-detail.ts`; route files now own
   only auth/cache/error-envelope mapping and surface-specific serialization.
+- Shared event-member route payload execution through
+  `getEventMembersRoutePayload` / `getEventMembersPayload` in
+  `lib/api/event-members.ts`; UI-internal, public, v1, and MCP adapters now
+  own only their auth/rate-limit/cache/envelope mapping.
 - Shared bearer-agent usage summary serialization through
   `lib/api/usage-summary.ts`; `/api/v1/usage/summary` and MCP
   `ax_radar_usage` now share the same totals, `by_task`, `by_model`, and
@@ -159,12 +163,12 @@ Shipped cleanup:
 - Added `docs/README.md` routing and archive banners for completed daily-column design/plan/handoff docs.
 - Updated `docs/reports/code-quality/dead-code-analysis.md` with current Knip commands, cleanup results, and remaining type-review queue.
 
-Verification:
+Verification (2026-06-13):
 - `bun run code:dead` — passed.
 - `bun run code:dead:exports` — passed.
 - `bun run code:dead:types` — passed.
 - `bun run lint` — passed with no warnings.
-- `bun test --env-file=.env.local` — 628 pass, 1 skip, 0 fail.
+- `bun test --env-file=.env.local` — 724 pass, 1 skip, 0 fail.
 - `bun run build` — passed.
 - `git diff --check` — passed.
 
