@@ -51,6 +51,10 @@ Shipped cleanup:
   `freshAdminSessionCookie` and `expiredAdminSessionCookie` in
   `lib/auth/password.ts`, so login/logout cannot drift on cookie name,
   `httpOnly`, `secure`, `sameSite`, path, or max-age attributes.
+- Shared admin login/logout HTTP response construction through
+  `lib/api/admin-session-routes.ts`, so next-target sanitization, invalid
+  password envelopes, ok envelopes, and Set-Cookie attachment stay out of
+  route leaf files.
 - Shared admin/v1 saved-collection CRUD result mapping through
   `lib/api/collection-routes.ts`, so both surfaces reuse the same
   `duplicate_name` and `not_found` decisions while keeping their own auth,

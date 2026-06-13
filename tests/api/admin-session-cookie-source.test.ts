@@ -9,14 +9,23 @@ function read(path: string): string {
 }
 
 describe("admin session cookie source wiring", () => {
-  test("login and logout routes share cookie option helpers", () => {
+  test("login and logout routes share admin session response helpers", () => {
     const login = read("app/api/admin/auth/route.ts");
     const logout = read("app/api/admin/logout/route.ts");
+    const helper = read("lib/api/admin-session-routes.ts");
 
-    expect(login).toContain("freshAdminSessionCookie");
-    expect(logout).toContain("expiredAdminSessionCookie");
+    expect(login).toContain("@/lib/api/admin-session-routes");
+    expect(logout).toContain("@/lib/api/admin-session-routes");
+    expect(login).toContain("adminLoginSuccessResponse");
+    expect(login).toContain("adminLoginInvalidResponse");
+    expect(logout).toContain("adminLogoutResponse");
+    expect(helper).toContain("freshAdminSessionCookie");
+    expect(helper).toContain("expiredAdminSessionCookie");
 
     for (const source of [login, logout]) {
+      expect(source).not.toContain("NextResponse");
+      expect(source).not.toContain("freshAdminSessionCookie");
+      expect(source).not.toContain("expiredAdminSessionCookie");
       expect(source).not.toContain("ADMIN_SESSION_COOKIE");
       expect(source).not.toContain("sameSite:");
       expect(source).not.toContain("httpOnly:");

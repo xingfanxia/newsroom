@@ -1,17 +1,14 @@
-import { NextResponse } from "next/server";
-import { z } from "zod";
 import { parseJsonRequestBody } from "@/lib/api/json-body";
 import {
-  freshAdminSessionCookie,
+  adminLoginBodySchema,
+  adminLoginInvalidResponse,
+  adminLoginSuccessResponse,
+} from "@/lib/api/admin-session-routes";
+import {
   isValidPassword,
 } from "@/lib/auth/password";
 
 export const dynamic = "force-dynamic";
-
-const bodySchema = z.object({
-  password: z.string().min(1).max(256),
-  next: z.string().max(2048).optional(),
-});
 
 /**
  * POST /api/admin/auth — exchange an admin password for a signed session
@@ -24,31 +21,15 @@ const bodySchema = z.object({
  * - 401 wrong password — never returns WHY, just "invalid"
  */
 export async function POST(req: Request) {
-  const parsed = await parseJsonRequestBody(req, bodySchema, {
+  const parsed = await parseJsonRequestBody(req, adminLoginBodySchema, {
     envelope: "ok",
     includeIssues: false,
   });
   if (!parsed.ok) return parsed.response;
 
   if (!isValidPassword(parsed.data.password)) {
-    return NextResponse.json(
-      { ok: false, error: "invalid" },
-      { status: 401 },
-    );
+    return adminLoginInvalidResponse();
   }
 
-  const res = NextResponse.json({
-    ok: true,
-    next: sanitiseNext(parsed.data.next),
-  });
-  res.cookies.set(freshAdminSessionCookie());
-  return res;
-}
-
-/** Same rules as the old Supabase callback — block open-redirects. */
-function sanitiseNext(raw: string | undefined): string {
-  if (!raw) return "/";
-  if (!raw.startsWith("/") || raw.startsWith("//")) return "/";
-  if (raw.startsWith("/api")) return "/";
-  return raw;
+  return adminLoginSuccessResponse(parsed.data.next);
 }
