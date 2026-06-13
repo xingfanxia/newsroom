@@ -1,6 +1,10 @@
 import { and, eq, sql, isNotNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items, sources, clusters } from "@/db/schema";
+import {
+  eventStorySelectFields,
+  storySelectFields,
+} from "@/lib/items/story-select";
 import { toStory } from "@/lib/items/story-mapper";
 import {
   type AppLocale,
@@ -273,45 +277,8 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
 
   const rows = await client
     .select({
-      id: items.id,
-      title: items.title,
-      titleZh: items.titleZh,
-      titleEn: items.titleEn,
-      summaryZh: items.summaryZh,
-      summaryEn: items.summaryEn,
-      editorNoteZh: items.editorNoteZh,
-      editorNoteEn: items.editorNoteEn,
-      editorAnalysisZh: items.editorAnalysisZh,
-      editorAnalysisEn: items.editorAnalysisEn,
-      reasoning: items.reasoning,
-      reasoningZh: items.reasoningZh,
-      reasoningEn: items.reasoningEn,
-      hkr: items.hkr,
-      url: items.url,
-      importance: items.importance,
-      tier: items.tier,
-      tags: items.tags,
-      publishedAt: items.publishedAt,
-      sourceId: items.sourceId,
-      sourceNameZh: sources.nameZh,
-      sourceNameEn: sources.nameEn,
-      sourceLocale: sources.locale,
-      sourceKind: sources.kind,
-      sourceGroup: sources.group,
-      // ── Event-aggregation: cluster-level fields for multi-member events ──
-      clusterId: items.clusterId,
-      clusterMemberCount: clusters.memberCount,
-      clusterFirstSeenAt: clusters.firstSeenAt,
-      clusterLatestMemberAt: clusters.latestMemberAt,
-      clusterCanonicalTitleZh: clusters.canonicalTitleZh,
-      clusterCanonicalTitleEn: clusters.canonicalTitleEn,
-      clusterEditorNoteZh: clusters.editorNoteZh,
-      clusterEditorNoteEn: clusters.editorNoteEn,
-      clusterEditorAnalysisZh: clusters.editorAnalysisZh,
-      clusterEditorAnalysisEn: clusters.editorAnalysisEn,
-      clusterImportance: clusters.importance,
-      clusterEventTier: clusters.eventTier,
-      clusterHkr: clusters.hkr,
+      ...storySelectFields,
+      ...eventStorySelectFields,
     })
     .from(items)
     .innerJoin(sources, eq(items.sourceId, sources.id))

@@ -21,6 +21,7 @@
 import { and, eq, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items, sources, clusters, halfvecToDriver } from "@/db/schema";
+import { storySelectFields } from "@/lib/items/story-select";
 import { toStory } from "@/lib/items/story-mapper";
 import { embed } from "@/lib/llm";
 import {
@@ -91,31 +92,7 @@ export async function semanticSearch(
 
   const rows = await db()
     .select({
-      id: items.id,
-      title: items.title,
-      titleZh: items.titleZh,
-      titleEn: items.titleEn,
-      summaryZh: items.summaryZh,
-      summaryEn: items.summaryEn,
-      editorNoteZh: items.editorNoteZh,
-      editorNoteEn: items.editorNoteEn,
-      editorAnalysisZh: items.editorAnalysisZh,
-      editorAnalysisEn: items.editorAnalysisEn,
-      reasoning: items.reasoning,
-      reasoningZh: items.reasoningZh,
-      reasoningEn: items.reasoningEn,
-      hkr: items.hkr,
-      url: items.url,
-      importance: items.importance,
-      tier: items.tier,
-      tags: items.tags,
-      publishedAt: items.publishedAt,
-      sourceId: items.sourceId,
-      sourceNameZh: sources.nameZh,
-      sourceNameEn: sources.nameEn,
-      sourceLocale: sources.locale,
-      sourceKind: sources.kind,
-      sourceGroup: sources.group,
+      ...storySelectFields,
       distance,
     })
     .from(items)

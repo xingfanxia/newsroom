@@ -1,6 +1,10 @@
 import { desc, eq, and, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items, sources, feedback, clusters } from "@/db/schema";
+import {
+  eventStorySelectFields,
+  storySelectFields,
+} from "@/lib/items/story-select";
 import { toStory } from "@/lib/items/story-mapper";
 import { FEEDBACK_SAVE_VOTE, type Story } from "@/lib/types";
 
@@ -26,44 +30,8 @@ export async function getSavedStories(
         : undefined;
   const rows = await db()
     .select({
-      id: items.id,
-      title: items.title,
-      titleZh: items.titleZh,
-      titleEn: items.titleEn,
-      summaryZh: items.summaryZh,
-      summaryEn: items.summaryEn,
-      editorNoteZh: items.editorNoteZh,
-      editorNoteEn: items.editorNoteEn,
-      editorAnalysisZh: items.editorAnalysisZh,
-      editorAnalysisEn: items.editorAnalysisEn,
-      reasoningZh: items.reasoningZh,
-      reasoningEn: items.reasoningEn,
-      reasoning: items.reasoning,
-      hkr: items.hkr,
-      url: items.url,
-      importance: items.importance,
-      tier: items.tier,
-      tags: items.tags,
-      publishedAt: items.publishedAt,
-      sourceId: items.sourceId,
-      sourceNameZh: sources.nameZh,
-      sourceNameEn: sources.nameEn,
-      sourceLocale: sources.locale,
-      sourceKind: sources.kind,
-      sourceGroup: sources.group,
-      clusterId: items.clusterId,
-      clusterMemberCount: clusters.memberCount,
-      clusterFirstSeenAt: clusters.firstSeenAt,
-      clusterLatestMemberAt: clusters.latestMemberAt,
-      clusterCanonicalTitleZh: clusters.canonicalTitleZh,
-      clusterCanonicalTitleEn: clusters.canonicalTitleEn,
-      clusterEditorNoteZh: clusters.editorNoteZh,
-      clusterEditorNoteEn: clusters.editorNoteEn,
-      clusterEditorAnalysisZh: clusters.editorAnalysisZh,
-      clusterEditorAnalysisEn: clusters.editorAnalysisEn,
-      clusterImportance: clusters.importance,
-      clusterEventTier: clusters.eventTier,
-      clusterHkr: clusters.hkr,
+      ...storySelectFields,
+      ...eventStorySelectFields,
       savedAt: feedback.createdAt,
       collectionId: feedback.collectionId,
     })
