@@ -17,6 +17,10 @@ import { db } from "@/db/client";
 import { newsletters, columnQcLog } from "@/db/schema";
 import { generateStructured, profiles } from "@/lib/llm";
 import { loadDailyColumnPrompt } from "@/lib/llm/prompts/load";
+import {
+  DAILY_NEWSLETTER_KIND,
+  type NewsletterLocale,
+} from "@/lib/types";
 import { selectDailyColumnPool, type SelectedRow } from "./select";
 import { runColumnSelfCheck } from "./qc/self-check";
 import {
@@ -25,6 +29,8 @@ import {
   renderAihotDailyForPrompt,
 } from "./aihot-daily";
 import type { AihotDailyReport } from "@/lib/sources/aihot";
+
+const DAILY_COLUMN_LOCALE = "zh" satisfies NewsletterLocale;
 
 const dailyColumnSchema = z.object({
   title: z.string().min(1).transform((s) =>
@@ -74,8 +80,8 @@ export async function runDailyColumn(
       .select({ id: newsletters.id })
       .from(newsletters)
       .where(
-        sql`${newsletters.kind} = 'daily'
-          AND ${newsletters.locale} = 'zh'
+        sql`${newsletters.kind} = ${DAILY_NEWSLETTER_KIND}
+          AND ${newsletters.locale} = ${DAILY_COLUMN_LOCALE}
           AND ${newsletters.periodStart} = ${pool.windowStart.toISOString()}::timestamptz
           AND ${newsletters.columnTitle} IS NOT NULL`,
       )
@@ -127,8 +133,8 @@ export async function runDailyColumn(
   const inserted = await client
     .insert(newsletters)
     .values({
-      kind: "daily",
-      locale: "zh",
+      kind: DAILY_NEWSLETTER_KIND,
+      locale: DAILY_COLUMN_LOCALE,
       periodStart: pool.windowStart,
       periodEnd: pool.windowEnd,
       columnTitle: title,

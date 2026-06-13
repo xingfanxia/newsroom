@@ -3,9 +3,9 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import { newsletters } from "@/db/schema";
 import { etagSignal } from "@/lib/api/public-helpers";
-import { APP_LOCALES } from "@/lib/types";
+import { DAILY_NEWSLETTER_KIND, NEWSLETTER_LOCALES } from "@/lib/types";
 
-export const dailyColumnLocaleSchema = z.enum(APP_LOCALES).default("zh");
+export const dailyColumnLocaleSchema = z.enum(NEWSLETTER_LOCALES).default("zh");
 export type DailyColumnLocale = z.infer<typeof dailyColumnLocaleSchema>;
 
 export const dailyColumnDateSchema = z
@@ -56,7 +56,7 @@ const indexDailyColumnSelect = {
 } as const;
 
 function dailyColumnWhere(locale: DailyColumnLocale) {
-  return sql`${newsletters.kind} = 'daily'
+  return sql`${newsletters.kind} = ${DAILY_NEWSLETTER_KIND}
     AND ${newsletters.locale} = ${locale}
     AND ${newsletters.columnTitle} IS NOT NULL`;
 }

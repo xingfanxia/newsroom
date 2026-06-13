@@ -16,9 +16,12 @@ import { and, desc, gte, lt, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items, newsletters } from "@/db/schema";
 import { generateStructured, profiles } from "@/lib/llm";
-
-export type NewsletterKind = "daily" | "monthly";
-type NewsletterLocale = "zh" | "en";
+import {
+  DAILY_NEWSLETTER_KIND,
+  NEWSLETTER_LOCALES,
+  type NewsletterKind,
+  type NewsletterLocale,
+} from "@/lib/types";
 
 const DAILY_TOP_N = 25;
 const MONTHLY_TOP_N = 75;
@@ -100,7 +103,7 @@ export async function runNewsletterBatch(
   const started = Date.now();
   const now = opts.now ?? new Date();
   const { start, end } = computeWindow(kind, now);
-  const topN = kind === "daily" ? DAILY_TOP_N : MONTHLY_TOP_N;
+  const topN = kind === DAILY_NEWSLETTER_KIND ? DAILY_TOP_N : MONTHLY_TOP_N;
   const client = db();
 
   const rows = await client
@@ -147,7 +150,7 @@ export async function runNewsletterBatch(
 
   const generated: { locale: NewsletterLocale; newsletterId: number }[] = [];
 
-  for (const locale of ["zh", "en"] as NewsletterLocale[]) {
+  for (const locale of NEWSLETTER_LOCALES) {
     if (!opts.force) {
       const existing = await client
         .select({ id: newsletters.id })
@@ -258,7 +261,7 @@ function newsletterSystem(
       ? "用中文写作。保留英文专有名词 (Anthropic / OpenAI / Claude)。"
       : "Write in English. Keep Chinese proper nouns in pinyin or their common English rendering.";
   const periodLabel =
-    kind === "daily"
+    kind === DAILY_NEWSLETTER_KIND
       ? locale === "zh"
         ? "过去 24 小时"
         : "past 24 hours"

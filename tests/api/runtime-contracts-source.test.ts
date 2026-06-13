@@ -35,18 +35,20 @@ describe("runtime contract source wiring", () => {
   test("locales have shared runtime tuples for app routes and source rows", () => {
     expect(types).toContain("export const APP_LOCALES");
     expect(types).toContain("export const SOURCE_LOCALES");
+    expect(types).toContain("export const NEWSLETTER_LOCALES");
     expect(schema).toContain('pgEnum("locale_kind", SOURCE_LOCALES)');
 
     for (const source of [
       feedParams,
       eventMembers,
-      dailyColumns,
       mcpRoute,
       v1SavedRoute,
       sitemap,
     ]) {
       expect(source).toContain("APP_LOCALES");
     }
+    expect(dailyColumns).toContain("NEWSLETTER_LOCALES");
+    expect(dailyColumns).toContain("z.enum(NEWSLETTER_LOCALES)");
 
     expect(liveItems).toContain("type Locale = AppLocale");
     expect(itemDetail).toContain("type Locale = AppLocale");

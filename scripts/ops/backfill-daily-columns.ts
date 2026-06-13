@@ -11,7 +11,10 @@ import pLimit from "p-limit";
 import { and, desc, gte, lte, sql } from "drizzle-orm";
 import { closeDb, db } from "@/db/client";
 import { newsletters } from "@/db/schema";
+import { DAILY_NEWSLETTER_KIND, type NewsletterLocale } from "@/lib/types";
 import { runDailyColumn } from "@/workers/newsletter/run-daily-column";
+
+const DAILY_COLUMN_LOCALE = "zh" satisfies NewsletterLocale;
 
 const STATE_FILE = path.resolve(
   process.cwd(),
@@ -131,8 +134,8 @@ function runTimeForPeriodStart(periodStartIso: string): Date {
 
 async function loadExistingDailyPeriods(flags: Flags): Promise<string[]> {
   const filters = [
-    sql`${newsletters.kind} = 'daily'`,
-    sql`${newsletters.locale} = 'zh'`,
+    sql`${newsletters.kind} = ${DAILY_NEWSLETTER_KIND}`,
+    sql`${newsletters.locale} = ${DAILY_COLUMN_LOCALE}`,
     sql`${newsletters.columnTitle} IS NOT NULL`,
   ];
   if (flags.since) filters.push(gte(newsletters.periodStart, startOfUtcDate(flags.since)));

@@ -37,6 +37,17 @@ export type Cadence = (typeof CADENCES)[number];
 export const APP_LOCALES = ["zh", "en"] as const;
 export type AppLocale = (typeof APP_LOCALES)[number];
 
+export const DAILY_NEWSLETTER_KIND = "daily";
+export const MONTHLY_NEWSLETTER_KIND = "monthly";
+export const NEWSLETTER_KINDS = [
+  DAILY_NEWSLETTER_KIND,
+  MONTHLY_NEWSLETTER_KIND,
+] as const;
+export type NewsletterKind = (typeof NEWSLETTER_KINDS)[number];
+
+export const NEWSLETTER_LOCALES = APP_LOCALES;
+export type NewsletterLocale = AppLocale;
+
 export const SOURCE_LOCALES = ["en", "zh", "multi"] as const;
 type SourceLocale = (typeof SOURCE_LOCALES)[number];
 

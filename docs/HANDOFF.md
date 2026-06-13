@@ -34,6 +34,9 @@ Shipped cleanup:
   `LLM_PROVIDERS`, `LLM_TASKS`, and `REASONING_EFFORTS` in
   `lib/llm/types.ts`; provider env parsing and usage ledger writes now validate
   against those runtime tuples before spending or recording cost.
+- Shared newsletter kind and locale labels through `NEWSLETTER_KINDS` and
+  `NEWSLETTER_LOCALES` in `lib/types.ts`; digest workers, daily-column queries,
+  and backfill scripts no longer carry local `daily|monthly` / `zh|en` unions.
 - Shared REST/MCP search execution through `lib/api/search-results.ts`;
   adapters now own only auth/rate-limit/ETag/serialization, while the helper
   owns lexical full-match totals and semantic source/date/tier filters.
