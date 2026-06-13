@@ -17,7 +17,12 @@ import {
   tweaksPatchBodySchema,
 } from "@/lib/api/tweak-requests";
 import { parseJsonRequestBody } from "@/lib/api/json-body";
-import { runV1Route, v1Error, v1Json } from "@/lib/api/v1-route";
+import {
+  runV1Route,
+  v1Error,
+  v1Json,
+  v1ServerError,
+} from "@/lib/api/v1-route";
 import { upsertAppUser } from "@/lib/auth/session";
 
 export async function GET(req: Request) {
@@ -34,8 +39,7 @@ export async function GET(req: Request) {
         watchlist: (row?.watchlist as string[] | null) ?? null,
       });
     } catch (err) {
-      console.error("[api/v1/tweaks GET] failed", err);
-      return v1Error("server_error", 500);
+      return v1ServerError("api/v1/tweaks GET", err);
     }
   });
 }
@@ -57,8 +61,7 @@ export async function PATCH(req: Request) {
       await db().update(users).set(patch).where(eq(users.id, user.id));
       return v1Json({ ok: true });
     } catch (err) {
-      console.error("[api/v1/tweaks PATCH] failed", err);
-      return v1Error("server_error", 500);
+      return v1ServerError("api/v1/tweaks PATCH", err);
     }
   });
 }

@@ -29,3 +29,8 @@ export function v1InvalidQuery(issues?: unknown): Response {
     ? v1Error("invalid_query", 400)
     : v1Error("invalid_query", 400, { issues });
 }
+
+export function v1ServerError(label: string, err: unknown): Response {
+  console.error(`[${label}] failed`, err);
+  return v1Error("server_error", 500);
+}

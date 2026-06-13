@@ -33,9 +33,9 @@
  */
 import {
   runV1Route,
-  v1Error,
   v1InvalidQuery,
   v1Json,
+  v1ServerError,
 } from "@/lib/api/v1-route";
 import { parseQueryParams } from "@/lib/api/query-params";
 import { runFeedQuery } from "@/lib/api/feed-results";
@@ -63,8 +63,7 @@ export async function GET(req: Request) {
         view: result.view,
       });
     } catch (err) {
-      console.error("[api/v1/feed] failed", err);
-      return v1Error("server_error", 500);
+      return v1ServerError("api/v1/feed", err);
     }
   });
 }

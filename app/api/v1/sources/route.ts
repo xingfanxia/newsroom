@@ -7,7 +7,11 @@
  * enabled=false — the operator may want to see what's in the catalog
  * even if the adapter is paused.
  */
-import { runV1Route, v1Error, v1Json } from "@/lib/api/v1-route";
+import {
+  runV1Route,
+  v1Json,
+  v1ServerError,
+} from "@/lib/api/v1-route";
 import {
   listSourceCatalogRows,
   toV1SourceApiItem,
@@ -22,8 +26,7 @@ export async function GET(req: Request) {
         total: rows.length,
       });
     } catch (err) {
-      console.error("[api/v1/sources] failed", err);
-      return v1Error("server_error", 500);
+      return v1ServerError("api/v1/sources", err);
     }
   });
 }

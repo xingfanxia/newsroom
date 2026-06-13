@@ -16,7 +16,12 @@
  * can degrade gracefully without a separate error path. Singleton clusters
  * (member_count = 1) just return their lone member.
  */
-import { runV1Route, v1Error, v1Json } from "@/lib/api/v1-route";
+import {
+  runV1Route,
+  v1Error,
+  v1Json,
+  v1ServerError,
+} from "@/lib/api/v1-route";
 import { getEventMembersRoutePayload } from "@/lib/api/event-members";
 
 export async function GET(
@@ -42,8 +47,7 @@ export async function GET(
         total: result.payload.total,
       });
     } catch (err) {
-      console.error("[api/v1/events/:id/members] failed", err);
-      return v1Error("server_error", 500);
+      return v1ServerError("api/v1/events/:id/members", err);
     }
   });
 }

@@ -22,6 +22,7 @@ import {
   v1Error,
   v1InvalidQuery,
   v1Json,
+  v1ServerError,
 } from "@/lib/api/v1-route";
 import { applyFeedbackToggle } from "@/lib/feedback/toggle";
 import { toSavedAgentApiItem } from "@/lib/api/v1-items";
@@ -65,8 +66,7 @@ export async function GET(req: Request) {
         total: stories.length,
       });
     } catch (err) {
-      console.error("[api/v1/saved GET] failed", err);
-      return v1Error("server_error", 500);
+      return v1ServerError("api/v1/saved GET", err);
     }
   });
 }
@@ -122,8 +122,7 @@ export async function POST(req: Request) {
       if (/foreign key|not present/i.test(msg)) {
         return v1Error("item_not_found", 404);
       }
-      console.error("[api/v1/saved POST] failed", err);
-      return v1Error("server_error", 500);
+      return v1ServerError("api/v1/saved POST", err);
     }
   });
 }

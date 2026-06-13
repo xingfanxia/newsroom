@@ -4,6 +4,7 @@ import {
   v1Error,
   v1InvalidQuery,
   v1Json,
+  v1ServerError,
 } from "@/lib/api/v1-route";
 
 describe("v1 route helpers", () => {
@@ -31,6 +32,25 @@ describe("v1 route helpers", () => {
       error: "invalid_query",
       issues,
     });
+  });
+
+  test("v1ServerError logs the route label and returns the shared 500 envelope", async () => {
+    const originalError = console.error;
+    const calls: unknown[][] = [];
+    console.error = (...args: unknown[]) => {
+      calls.push(args);
+    };
+
+    try {
+      const err = new Error("boom");
+      const res = v1ServerError("api/v1/example", err);
+
+      expect(res.status).toBe(500);
+      expect(await res.json()).toEqual({ error: "server_error" });
+      expect(calls).toEqual([["[api/v1/example] failed", err]]);
+    } finally {
+      console.error = originalError;
+    }
   });
 
   test("runV1Route returns auth denial without running the handler", async () => {

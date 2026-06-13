@@ -24,9 +24,9 @@
  */
 import {
   runV1Route,
-  v1Error,
   v1InvalidQuery,
   v1Json,
+  v1ServerError,
 } from "@/lib/api/v1-route";
 import { parseQueryParams } from "@/lib/api/query-params";
 import { toAgentApiItem } from "@/lib/api/v1-items";
@@ -67,8 +67,7 @@ export async function GET(req: Request) {
         offset: result.offset,
       });
     } catch (err) {
-      console.error("[api/v1/search] failed", err);
-      return v1Error("server_error", 500);
+      return v1ServerError("api/v1/search", err);
     }
   });
 }

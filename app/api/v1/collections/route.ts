@@ -10,7 +10,12 @@
  * PATCH   → update  { id, name?, name_cjk?, pinned? }
  * DELETE  → delete  { id }   (cascade-reparents saves to inbox)
  */
-import { runV1Route, v1Error, v1Json } from "@/lib/api/v1-route";
+import {
+  runV1Route,
+  v1Error,
+  v1Json,
+  v1ServerError,
+} from "@/lib/api/v1-route";
 import {
   createCollection,
   deleteCollection,
@@ -33,8 +38,7 @@ export async function GET(req: Request) {
       const collections = await listCollections(user.id);
       return v1Json({ collections, total: collections.length });
     } catch (err) {
-      console.error("[api/v1/collections GET] failed", err);
-      return v1Error("server_error", 500);
+      return v1ServerError("api/v1/collections GET", err);
     }
   });
 }
@@ -61,8 +65,7 @@ export async function POST(req: Request) {
       if (isDuplicateCollectionNameError(err)) {
         return v1Error("duplicate_name", 409);
       }
-      console.error("[api/v1/collections POST] failed", err);
-      return v1Error("server_error", 500);
+      return v1ServerError("api/v1/collections POST", err);
     }
   });
 }
@@ -86,8 +89,7 @@ export async function PATCH(req: Request) {
       if (!ok) return v1Error("not_found", 404);
       return v1Json({ ok: true });
     } catch (err) {
-      console.error("[api/v1/collections PATCH] failed", err);
-      return v1Error("server_error", 500);
+      return v1ServerError("api/v1/collections PATCH", err);
     }
   });
 }
@@ -105,8 +107,7 @@ export async function DELETE(req: Request) {
       if (!ok) return v1Error("not_found", 404);
       return v1Json({ ok: true });
     } catch (err) {
-      console.error("[api/v1/collections DELETE] failed", err);
-      return v1Error("server_error", 500);
+      return v1ServerError("api/v1/collections DELETE", err);
     }
   });
 }

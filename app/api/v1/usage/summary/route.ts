@@ -12,9 +12,9 @@ import { z } from "zod";
 import { parseQueryParams } from "@/lib/api/query-params";
 import {
   runV1Route,
-  v1Error,
   v1InvalidQuery,
   v1Json,
+  v1ServerError,
 } from "@/lib/api/v1-route";
 import {
   getUsageSummary,
@@ -35,8 +35,7 @@ export async function GET(req: Request) {
     try {
       return v1Json(await getUsageSummary(w));
     } catch (err) {
-      console.error("[api/v1/usage/summary] failed", err);
-      return v1Error("server_error", 500);
+      return v1ServerError("api/v1/usage/summary", err);
     }
   });
 }

@@ -126,6 +126,9 @@ Shipped cleanup:
   `lib/api/query-params.ts`; public and v1 query routes now reuse one
   Request/URLSearchParams parser while keeping their separate
   `publicInvalidQuery` and `v1InvalidQuery` envelopes.
+- Shared v1 server-error logging/envelope through `v1ServerError` in
+  `lib/api/v1-route.ts`; v1 route files keep their business 4xx branches but
+  no longer hand-copy `console.error` plus `v1Error("server_error", 500)`.
 - Shared RSS XML/HTTP response envelope, XML escaping, CDATA splitting, and
   lightweight markdown-to-HTML rendering through `lib/rss/render.ts`;
   `/api/rss/*`, the featured-locale feeds, and the legacy newsletter feeds now
@@ -208,7 +211,7 @@ Verification (2026-06-13):
 - `bun run code:dead:exports` — passed.
 - `bun run code:dead:types` — passed.
 - `bun run lint` — passed with no warnings.
-- `bun test --env-file=.env.local` — 765 pass, 1 skip, 0 fail.
+- `bun test --env-file=.env.local` — 766 pass, 1 skip, 0 fail.
 - `bun run build` — passed.
 - `git diff --check` — passed.
 

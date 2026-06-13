@@ -15,7 +15,12 @@
  * Returns 404 on unknown id. No cluster dedup here — if the caller knows
  * the id they get exactly that row.
  */
-import { runV1Route, v1Error, v1Json } from "@/lib/api/v1-route";
+import {
+  runV1Route,
+  v1Error,
+  v1Json,
+  v1ServerError,
+} from "@/lib/api/v1-route";
 import {
   getItemDetailRouteRow,
   toV1ItemDetail,
@@ -35,8 +40,7 @@ export async function GET(
       }
       return v1Json(toV1ItemDetail(found.row));
     } catch (err) {
-      console.error("[api/v1/items/:id] failed", err);
-      return v1Error("server_error", 500);
+      return v1ServerError("api/v1/items/:id", err);
     }
   });
 }
