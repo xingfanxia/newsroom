@@ -1,6 +1,7 @@
 import { and, eq, sql, isNotNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items, sources, clusters } from "@/db/schema";
+import { pickLocalizedText, pickSameLocaleText } from "@/lib/items/localized";
 import { flattenItemTags } from "@/lib/items/tags";
 import {
   isHighlightItemTier,
@@ -350,12 +351,16 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
     d.setUTCHours(0, 0, 0, 0);
     return d.getTime();
   })();
+  const locale = q.locale ?? "zh";
 
   return dedupedRows.map((r): Story => {
     const flatTags = flattenItemTags(r.tags, 4);
 
     const publisher =
-      q.locale === "en" ? r.sourceNameEn : r.sourceNameZh;
+      pickSameLocaleText(locale, {
+        en: r.sourceNameEn,
+        zh: r.sourceNameZh,
+      }) ?? r.sourceId;
 
     // Event-aware title fallback ladder:
     //   cluster.canonical_title_<locale>   (LLM-generated neutral event name)
@@ -363,38 +368,36 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
     //   → item.title_<other-locale>        (whichever locale we have)
     //   → item.title                       (raw source title)
     const title =
-      q.locale === "en"
-        ? (r.clusterCanonicalTitleEn ??
-          r.titleEn ??
-          r.titleZh ??
-          r.title)
-        : (r.clusterCanonicalTitleZh ??
-          r.titleZh ??
-          r.titleEn ??
-          r.title);
+      pickSameLocaleText(locale, {
+        en: r.clusterCanonicalTitleEn,
+        zh: r.clusterCanonicalTitleZh,
+      }) ??
+      pickLocalizedText(locale, {
+        en: r.titleEn,
+        zh: r.titleZh,
+        fallback: r.title,
+      })!;
 
     // Event-aware editor note/analysis: cluster-level wins when present
     // (multi-member events have commentary at cluster, singletons keep it at item).
     const editorNote =
-      q.locale === "en"
-        ? (r.clusterEditorNoteEn ??
-          r.clusterEditorNoteZh ??
-          r.editorNoteEn ??
-          r.editorNoteZh)
-        : (r.clusterEditorNoteZh ??
-          r.clusterEditorNoteEn ??
-          r.editorNoteZh ??
-          r.editorNoteEn);
+      pickLocalizedText(locale, {
+        en: r.clusterEditorNoteEn,
+        zh: r.clusterEditorNoteZh,
+      }) ??
+      pickLocalizedText(locale, {
+        en: r.editorNoteEn,
+        zh: r.editorNoteZh,
+      });
     const editorAnalysis =
-      q.locale === "en"
-        ? (r.clusterEditorAnalysisEn ??
-          r.clusterEditorAnalysisZh ??
-          r.editorAnalysisEn ??
-          r.editorAnalysisZh)
-        : (r.clusterEditorAnalysisZh ??
-          r.clusterEditorAnalysisEn ??
-          r.editorAnalysisZh ??
-          r.editorAnalysisEn);
+      pickLocalizedText(locale, {
+        en: r.clusterEditorAnalysisEn,
+        zh: r.clusterEditorAnalysisZh,
+      }) ??
+      pickLocalizedText(locale, {
+        en: r.editorAnalysisEn,
+        zh: r.editorAnalysisZh,
+      });
 
     // Event-aware importance + tier.
     const effectiveImportance = r.clusterImportance ?? r.importance ?? 0;
@@ -432,10 +435,10 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
       },
       featured: isHighlightItemTier(effectiveTier),
       title,
-      summary:
-        q.locale === "en"
-          ? r.summaryEn ?? r.summaryZh ?? ""
-          : r.summaryZh ?? r.summaryEn ?? "",
+      summary: pickLocalizedText(locale, {
+        en: r.summaryEn,
+        zh: r.summaryZh,
+      }) ?? "",
       tags: flatTags,
       importance: effectiveImportance,
       tier: effectiveTier,
@@ -449,10 +452,11 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
       locale: (r.sourceLocale ?? "multi") as Story["locale"],
       editorNote: editorNote ?? undefined,
       editorAnalysis: editorAnalysis ?? undefined,
-      reasoning:
-        q.locale === "en"
-          ? r.reasoningEn ?? r.reasoningZh ?? r.reasoning ?? undefined
-          : r.reasoningZh ?? r.reasoningEn ?? r.reasoning ?? undefined,
+      reasoning: pickLocalizedText(locale, {
+        en: r.reasoningEn,
+        zh: r.reasoningZh,
+        fallback: r.reasoning,
+      }) ?? undefined,
       hkr: effectiveHkr ?? undefined,
       // ── Event-aggregation fields ──
       clusterId: r.clusterId ?? undefined,

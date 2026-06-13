@@ -21,6 +21,7 @@
 import { and, eq, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items, sources, clusters, halfvecToDriver } from "@/db/schema";
+import { pickLocalizedText, pickSameLocaleText } from "@/lib/items/localized";
 import { flattenItemTags } from "@/lib/items/tags";
 import { embed } from "@/lib/llm";
 import {
@@ -141,20 +142,24 @@ export async function semanticSearch(
 
   const mapped = rows.map((r) => {
     const flatTags = flattenItemTags(r.tags, 4);
-
-    const publisher = locale === "en" ? r.sourceNameEn : r.sourceNameZh;
-    const title =
-      locale === "en"
-        ? r.titleEn ?? r.titleZh ?? r.title
-        : r.titleZh ?? r.titleEn ?? r.title;
-    const editorNote =
-      locale === "en"
-        ? r.editorNoteEn ?? r.editorNoteZh
-        : r.editorNoteZh ?? r.editorNoteEn;
-    const editorAnalysis =
-      locale === "en"
-        ? r.editorAnalysisEn ?? r.editorAnalysisZh
-        : r.editorAnalysisZh ?? r.editorAnalysisEn;
+    const publisher =
+      pickSameLocaleText(locale, {
+        en: r.sourceNameEn,
+        zh: r.sourceNameZh,
+      }) ?? r.sourceId;
+    const title = pickLocalizedText(locale, {
+      en: r.titleEn,
+      zh: r.titleZh,
+      fallback: r.title,
+    })!;
+    const editorNote = pickLocalizedText(locale, {
+      en: r.editorNoteEn,
+      zh: r.editorNoteZh,
+    });
+    const editorAnalysis = pickLocalizedText(locale, {
+      en: r.editorAnalysisEn,
+      zh: r.editorAnalysisZh,
+    });
 
     const story: Story & { distance: number } = {
       id: String(r.id),
@@ -167,10 +172,10 @@ export async function semanticSearch(
       },
       featured: isHighlightItemTier(r.tier),
       title,
-      summary:
-        locale === "en"
-          ? r.summaryEn ?? r.summaryZh ?? ""
-          : r.summaryZh ?? r.summaryEn ?? "",
+      summary: pickLocalizedText(locale, {
+        en: r.summaryEn,
+        zh: r.summaryZh,
+      }) ?? "",
       tags: flatTags,
       importance: r.importance ?? 0,
       tier: (r.tier ?? "all") as Story["tier"],
@@ -179,10 +184,11 @@ export async function semanticSearch(
       locale: (r.sourceLocale ?? "multi") as Story["locale"],
       editorNote: editorNote ?? undefined,
       editorAnalysis: editorAnalysis ?? undefined,
-      reasoning:
-        locale === "en"
-          ? r.reasoningEn ?? r.reasoningZh ?? r.reasoning ?? undefined
-          : r.reasoningZh ?? r.reasoningEn ?? r.reasoning ?? undefined,
+      reasoning: pickLocalizedText(locale, {
+        en: r.reasoningEn,
+        zh: r.reasoningZh,
+        fallback: r.reasoning,
+      }) ?? undefined,
       hkr: (r.hkr as Story["hkr"]) ?? undefined,
       distance: Number(r.distance),
     };

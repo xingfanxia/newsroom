@@ -1,6 +1,7 @@
 import { desc, eq, and, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items, sources, feedback, clusters } from "@/db/schema";
+import { pickLocalizedText, pickSameLocaleText } from "@/lib/items/localized";
 import { flattenItemTags } from "@/lib/items/tags";
 import {
   FEEDBACK_SAVE_VOTE,
@@ -90,37 +91,38 @@ export async function getSavedStories(
     const flatTags = flattenItemTags(r.tags, 6);
 
     const publisher =
-      locale === "en" ? r.sourceNameEn : r.sourceNameZh;
+      pickSameLocaleText(locale, {
+        en: r.sourceNameEn,
+        zh: r.sourceNameZh,
+      }) ?? r.sourceId;
     const title =
-      locale === "en"
-        ? (r.clusterCanonicalTitleEn ??
-          r.titleEn ??
-          r.titleZh ??
-          r.title)
-        : (r.clusterCanonicalTitleZh ??
-          r.titleZh ??
-          r.titleEn ??
-          r.title);
+      pickSameLocaleText(locale, {
+        en: r.clusterCanonicalTitleEn,
+        zh: r.clusterCanonicalTitleZh,
+      }) ??
+      pickLocalizedText(locale, {
+        en: r.titleEn,
+        zh: r.titleZh,
+        fallback: r.title,
+      })!;
     const editorNote =
-      locale === "en"
-        ? (r.clusterEditorNoteEn ??
-          r.clusterEditorNoteZh ??
-          r.editorNoteEn ??
-          r.editorNoteZh)
-        : (r.clusterEditorNoteZh ??
-          r.clusterEditorNoteEn ??
-          r.editorNoteZh ??
-          r.editorNoteEn);
+      pickLocalizedText(locale, {
+        en: r.clusterEditorNoteEn,
+        zh: r.clusterEditorNoteZh,
+      }) ??
+      pickLocalizedText(locale, {
+        en: r.editorNoteEn,
+        zh: r.editorNoteZh,
+      });
     const editorAnalysis =
-      locale === "en"
-        ? (r.clusterEditorAnalysisEn ??
-          r.clusterEditorAnalysisZh ??
-          r.editorAnalysisEn ??
-          r.editorAnalysisZh)
-        : (r.clusterEditorAnalysisZh ??
-          r.clusterEditorAnalysisEn ??
-          r.editorAnalysisZh ??
-          r.editorAnalysisEn);
+      pickLocalizedText(locale, {
+        en: r.clusterEditorAnalysisEn,
+        zh: r.clusterEditorAnalysisZh,
+      }) ??
+      pickLocalizedText(locale, {
+        en: r.editorAnalysisEn,
+        zh: r.editorAnalysisZh,
+      });
     const effectiveImportance = r.clusterImportance ?? r.importance ?? 0;
     const effectiveTier = (r.clusterEventTier ?? r.tier ?? "all") as Story["tier"];
     const effectiveHkr =
@@ -141,10 +143,10 @@ export async function getSavedStories(
       },
       featured: isHighlightItemTier(effectiveTier),
       title,
-      summary:
-        locale === "en"
-          ? r.summaryEn ?? r.summaryZh ?? ""
-          : r.summaryZh ?? r.summaryEn ?? "",
+      summary: pickLocalizedText(locale, {
+        en: r.summaryEn,
+        zh: r.summaryZh,
+      }) ?? "",
       tags: flatTags,
       importance: effectiveImportance,
       tier: effectiveTier,
@@ -157,10 +159,11 @@ export async function getSavedStories(
       locale: (r.sourceLocale ?? "multi") as Story["locale"],
       editorNote: editorNote ?? undefined,
       editorAnalysis: editorAnalysis ?? undefined,
-      reasoning:
-        locale === "en"
-          ? r.reasoningEn ?? r.reasoningZh ?? r.reasoning ?? undefined
-          : r.reasoningZh ?? r.reasoningEn ?? r.reasoning ?? undefined,
+      reasoning: pickLocalizedText(locale, {
+        en: r.reasoningEn,
+        zh: r.reasoningZh,
+        fallback: r.reasoning,
+      }) ?? undefined,
       hkr: effectiveHkr ?? undefined,
       clusterId: r.clusterId ?? undefined,
       coverage,
