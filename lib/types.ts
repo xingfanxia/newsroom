@@ -40,6 +40,14 @@ export type AppLocale = (typeof APP_LOCALES)[number];
 export const SOURCE_LOCALES = ["en", "zh", "multi"] as const;
 type SourceLocale = (typeof SOURCE_LOCALES)[number];
 
+export const SOURCE_HEALTH_STATUSES = [
+  "ok",
+  "warning",
+  "error",
+  "pending",
+] as const;
+export type SourceHealthStatus = (typeof SOURCE_HEALTH_STATUSES)[number];
+
 export const ITEM_TIERS = ["featured", "p1", "all", "excluded"] as const;
 export type ItemTier = (typeof ITEM_TIERS)[number];
 

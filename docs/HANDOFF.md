@@ -36,7 +36,7 @@ Shipped cleanup:
 - Shared usage window keys through `USAGE_WINDOWS` in `lib/llm/stats.ts`, so
   the admin usage page, v1 usage summary, and MCP usage tool cannot drift on
   the `today|week|month|all` window set.
-- Shared source kind/group/cadence/source-locale runtime tuples through `lib/types.ts` and
+- Shared source kind/group/cadence/source-locale/source-health status runtime tuples through `lib/types.ts` and
   source group display metadata through `lib/sources/groups.ts`, so DB enums
   and the `/sources` group order/labels cannot drift from catalog types.
 - Shared app/source locale tuples and the fetcher-supported source-kind subset
@@ -54,7 +54,7 @@ Shipped cleanup:
   are not mistaken for current implementation guidance.
 - Shared `/skill.md` and `/openapi.yaml` public contract enums through the same
   `lib/types.ts` runtime tuples, including app/source locales, source
-  group/kind/cadence, item tiers, feed views, and search modes; the source catalog
+  group/kind/cadence, source-health statuses, item tiers, feed views, and search modes; the source catalog
   description no longer embeds a stale monitored-source count, and MCP
   source-tool copy avoids fixed counts for the same reason.
 - Shared hourly/daily/weekly fetch+normalize sequencing through `workers/fetcher/pipeline.ts`, with HTTP route wiring in `app/api/cron/_fetch-bucket-route.ts` and local cron scripts using the same helper.

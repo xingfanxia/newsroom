@@ -12,6 +12,7 @@ import {
   ITEM_TIERS,
   SEARCH_MODES,
   SOURCE_GROUPS,
+  SOURCE_HEALTH_STATUSES,
   SOURCE_KINDS,
   SOURCE_LOCALES,
   VISIBLE_ITEM_TIERS,
@@ -28,6 +29,7 @@ const ITEM_TIER_ENUM = yamlInlineEnum(ITEM_TIERS);
 const SEARCH_MODE_ENUM = yamlInlineEnum(SEARCH_MODES);
 const SOURCE_GROUP_ENUM = yamlInlineEnum(SOURCE_GROUPS);
 const SOURCE_GROUP_NULLABLE_ENUM = yamlInlineEnum([...SOURCE_GROUPS, null]);
+const SOURCE_HEALTH_STATUS_ENUM = yamlInlineEnum(SOURCE_HEALTH_STATUSES);
 const SOURCE_KIND_ENUM = yamlInlineEnum(SOURCE_KINDS);
 const SOURCE_LOCALE_ENUM = yamlInlineEnum(SOURCE_LOCALES);
 const VISIBLE_ITEM_TIER_ENUM = yamlInlineEnum(VISIBLE_ITEM_TIERS);
@@ -455,7 +457,7 @@ components:
         health:
           type: object
           properties:
-            status: { type: string, enum: [ok, warning, error, pending] }
+            status: { type: string, enum: ${SOURCE_HEALTH_STATUS_ENUM} }
             last_success_at: { type: string, format: date-time, nullable: true }
             consecutive_failures: { type: integer }
             total_items_count: { type: integer }

@@ -1,8 +1,11 @@
 import { asc, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { sources, sourceHealth } from "@/db/schema";
+import type { SourceHealthStatus } from "@/lib/types";
 
 type SourceCatalogOrder = "priority" | "id";
+
+const DEFAULT_SOURCE_HEALTH_STATUS = "pending" satisfies SourceHealthStatus;
 
 export async function listSourceCatalogRows(
   order: SourceCatalogOrder = "priority",
@@ -64,7 +67,7 @@ export function toV1SourceApiItem(r: SourceCatalogRow) {
     enabled: r.enabled,
     notes: r.notes,
     health: {
-      status: r.status ?? "pending",
+      status: r.status ?? DEFAULT_SOURCE_HEALTH_STATUS,
       last_fetched_at: iso(r.lastFetchedAt),
       last_success_at: iso(r.lastSuccessAt),
       consecutive_failures: r.consecutiveFailures ?? 0,
@@ -90,7 +93,7 @@ export function toPublicSourceApiItem(r: SourceCatalogRow) {
     enabled: r.enabled,
     curated: r.curated ?? false,
     health: {
-      status: r.status ?? "pending",
+      status: r.status ?? DEFAULT_SOURCE_HEALTH_STATUS,
       last_success_at: iso(r.lastSuccessAt),
       consecutive_failures: r.consecutiveFailures ?? 0,
       total_items_count: r.totalItemsCount ?? 0,
@@ -107,7 +110,7 @@ export function toMcpSourceApiItem(r: SourceCatalogRow) {
     group: r.group,
     cadence: r.cadence,
     enabled: r.enabled,
-    status: r.status ?? "pending",
+    status: r.status ?? DEFAULT_SOURCE_HEALTH_STATUS,
     last_success_at: iso(r.lastSuccessAt),
     consecutive_failures: r.consecutiveFailures ?? 0,
     total_items: r.totalItemsCount ?? 0,

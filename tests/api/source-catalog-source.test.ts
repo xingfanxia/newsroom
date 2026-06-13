@@ -9,6 +9,7 @@ import {
   ITEM_TIERS,
   SEARCH_MODES,
   SOURCE_GROUPS,
+  SOURCE_HEALTH_STATUSES,
   SOURCE_KINDS,
   SOURCE_LOCALES,
   VISIBLE_ITEM_TIERS,
@@ -47,6 +48,14 @@ const architectureDoc = readFileSync(
 );
 const handoffDoc = readFileSync(resolve(root, "docs/HANDOFF.md"), "utf8");
 const schema = readFileSync(resolve(root, "db/schema.ts"), "utf8");
+const sourceCatalog = readFileSync(
+  resolve(root, "lib/api/source-catalog.ts"),
+  "utf8",
+);
+const removeErroredSourcesScript = readFileSync(
+  resolve(root, "scripts/ops/remove-errored-sources.ts"),
+  "utf8",
+);
 const types = readFileSync(resolve(root, "lib/types.ts"), "utf8");
 const openapiRoute = readFileSync(
   resolve(root, "app/openapi.yaml/route.ts"),
@@ -70,8 +79,18 @@ describe("source catalog source wiring", () => {
   });
 
   test("OpenAPI documents the runtime source health enum", () => {
-    expect(openapiRoute).toContain(
+    expect(types).toContain("export const SOURCE_HEALTH_STATUSES");
+    expect(schema).toContain('pgEnum("health_status", SOURCE_HEALTH_STATUSES)');
+    expect(openapiRoute).toContain("SOURCE_HEALTH_STATUSES");
+    expect(sourceCatalog).toContain("SourceHealthStatus");
+    expect(sourceCatalog).toContain("DEFAULT_SOURCE_HEALTH_STATUS");
+    expect(removeErroredSourcesScript).toContain("SourceHealthStatus");
+    expect(removeErroredSourcesScript).toContain("DISABLED_SOURCE_HEALTH_STATUS");
+    expect(openapiRoute).not.toContain(
       "status: { type: string, enum: [ok, warning, error, pending] }",
+    );
+    expect(removeErroredSourcesScript).not.toContain(
+      "health_status enum is (ok | warning | error | pending)",
     );
     expect(openapiRoute).not.toContain("enum: [ok, degraded, error, pending]");
   });
@@ -94,6 +113,7 @@ describe("source catalog source wiring", () => {
       "ITEM_TIERS",
       "SEARCH_MODES",
       "SOURCE_GROUPS",
+      "SOURCE_HEALTH_STATUSES",
       "SOURCE_KINDS",
       "SOURCE_LOCALES",
       "VISIBLE_ITEM_TIERS",
@@ -109,6 +129,7 @@ describe("source catalog source wiring", () => {
       "enum: [featured, p1, all, excluded]",
       "enum: [today, archive]",
       "enum: [lexical, semantic]",
+      "enum: [ok, warning, error, pending]",
       "enum: [vendor-official, media, newsletter, research, social, product, podcast, policy, market]",
       "enum: [rss, atom, api, rsshub, scrape, x-api, aihot-api]",
       "enum: [live, hourly, daily, weekly]",
@@ -138,6 +159,7 @@ describe("source catalog source wiring", () => {
       ITEM_TIERS,
       SEARCH_MODES,
       SOURCE_KINDS,
+      SOURCE_HEALTH_STATUSES,
       SOURCE_LOCALES,
       VISIBLE_ITEM_TIERS,
     ]) {

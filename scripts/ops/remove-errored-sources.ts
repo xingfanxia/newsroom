@@ -13,6 +13,7 @@
 import { eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items, sources, sourceHealth } from "@/db/schema";
+import type { SourceHealthStatus } from "@/lib/types";
 
 // 13 zero-item sources safe to fully delete
 const DELETE_IDS = [
@@ -33,6 +34,7 @@ const DELETE_IDS = [
 
 // 2 with items — preserve data, just disable + clear health
 const DISABLE_IDS = ["36kr-direct", "sspai-direct"];
+const DISABLED_SOURCE_HEALTH_STATUS = "pending" satisfies SourceHealthStatus;
 
 async function main() {
   const client = db();
@@ -88,12 +90,15 @@ async function main() {
     .where(inArray(sources.id, DISABLE_IDS));
   console.log(`disabled source rows for:       ${DISABLE_IDS.length} ids`);
 
-  // health_status enum is (ok | warning | error | pending) — no 'idle'.
-  // Use 'pending' for "disabled, unknown state" so the UI's source-filter
-  // doesn't treat these as actively erroring.
+  // Use the shared health_status value for "disabled, unknown state" so the
+  // UI's source-filter doesn't treat these as actively erroring.
   await client
     .update(sourceHealth)
-    .set({ status: "pending", consecutiveFailures: 0, lastError: null })
+    .set({
+      status: DISABLED_SOURCE_HEALTH_STATUS,
+      consecutiveFailures: 0,
+      lastError: null,
+    })
     .where(inArray(sourceHealth.sourceId, DISABLE_IDS));
   console.log(`reset health rows for:          ${DISABLE_IDS.length} ids`);
 

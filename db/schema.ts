@@ -13,7 +13,13 @@ import {
   customType,
   numeric,
 } from "drizzle-orm/pg-core";
-import { CADENCES, SOURCE_GROUPS, SOURCE_KINDS, SOURCE_LOCALES } from "@/lib/types";
+import {
+  CADENCES,
+  SOURCE_GROUPS,
+  SOURCE_HEALTH_STATUSES,
+  SOURCE_KINDS,
+  SOURCE_LOCALES,
+} from "@/lib/types";
 import type {
   SourceKind as TSourceKind,
   SourceGroup as TSourceGroup,
@@ -84,12 +90,7 @@ export const localeEnum = pgEnum("locale_kind", SOURCE_LOCALES);
 
 export const cadenceEnum = pgEnum("cadence", CADENCES);
 
-export const healthStatusEnum = pgEnum("health_status", [
-  "ok",
-  "warning",
-  "error",
-  "pending",
-]);
+export const healthStatusEnum = pgEnum("health_status", SOURCE_HEALTH_STATUSES);
 
 /** App-level role. `admin` sees /admin/*, `editor` reserved for future authoring
  *  tools, `reader` is the default for anyone who signs in. */
