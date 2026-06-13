@@ -5,18 +5,11 @@
  * `last_fetched_at` (operational; not interesting publicly). Useful for
  * "does AX Radar cover X publisher?" before issuing a filtered feed query.
  */
-import { publicRateLimit } from "@/lib/rate-limit/public";
 import {
-  publicCacheConfig,
-  publicRateLimitConfig,
-} from "@/lib/api/public-endpoint-config";
-import {
-  computeEtag,
   etagSignal,
-  ifNoneMatch,
-  notModified,
+  publicCachedJson,
+  publicEndpointRateLimit,
   publicError,
-  publicJson,
 } from "@/lib/api/public-helpers";
 import {
   listSourceCatalogRows,
@@ -27,7 +20,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
-  const limited = publicRateLimit(req, publicRateLimitConfig("sources"));
+  const limited = publicEndpointRateLimit(req, "sources");
   if (limited) return limited;
 
   try {
@@ -37,20 +30,19 @@ export async function GET(req: Request) {
       total: rows.length,
     };
 
-    const etag = computeEtag(
-      "public-sources",
-      etagSignal({
+    // Catalog rarely changes — long stale-while-revalidate.
+    return publicCachedJson(req, {
+      endpoint: "sources",
+      etagFamily: "public-sources",
+      signal: etagSignal({
         count: rows.length,
         latest_success: rows
           .map((r) => r.lastSuccessAt?.toISOString() ?? "")
           .sort()
           .pop() ?? "",
       }),
-    );
-    if (ifNoneMatch(req, etag)) return notModified(etag);
-
-    // Catalog rarely changes — long stale-while-revalidate.
-    return publicJson(body, etag, publicCacheConfig("sources"));
+      body,
+    });
   } catch (err) {
     console.error("[api/public/sources] failed", err);
     return publicError("server_error", 500);

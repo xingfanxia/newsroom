@@ -7,17 +7,10 @@
  *   - HKR booleans only (no per-axis reasonsZh/reasonsEn)
  *   - body_md kept (transcript / article text); body_rss (raw HTML) dropped
  */
-import { publicRateLimit } from "@/lib/rate-limit/public";
 import {
-  publicCacheConfig,
-  publicRateLimitConfig,
-} from "@/lib/api/public-endpoint-config";
-import {
-  computeEtag,
-  ifNoneMatch,
-  notModified,
+  publicCachedJson,
+  publicEndpointRateLimit,
   publicError,
-  publicJson,
 } from "@/lib/api/public-helpers";
 import {
   getItemDetailRow,
@@ -33,7 +26,7 @@ export async function GET(
   req: Request,
   ctx: { params: Promise<{ id: string }> },
 ) {
-  const limited = publicRateLimit(req, publicRateLimitConfig("item"));
+  const limited = publicEndpointRateLimit(req, "item");
   if (limited) return limited;
 
   const { id: idRaw } = await ctx.params;
@@ -44,13 +37,12 @@ export async function GET(
     const row = await getItemDetailRow(parsed.id);
     if (!row) return publicError("not_found", 404);
 
-    const etag = computeEtag(
-      "public-item",
-      publicItemDetailEtagSignal(row),
-    );
-    if (ifNoneMatch(req, etag)) return notModified(etag);
-
-    return publicJson(toPublicItemDetail(row), etag, publicCacheConfig("item"));
+    return publicCachedJson(req, {
+      endpoint: "item",
+      etagFamily: "public-item",
+      signal: publicItemDetailEtagSignal(row),
+      body: toPublicItemDetail(row),
+    });
   } catch (err) {
     console.error("[api/public/items/:id] failed", err);
     return publicError("server_error", 500);

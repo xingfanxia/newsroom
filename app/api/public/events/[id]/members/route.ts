@@ -13,18 +13,11 @@ import {
   toEventMemberApiItems,
 } from "@/lib/api/event-members";
 import { getEventMembers } from "@/lib/items/live";
-import { publicRateLimit } from "@/lib/rate-limit/public";
 import {
-  publicCacheConfig,
-  publicRateLimitConfig,
-} from "@/lib/api/public-endpoint-config";
-import {
-  computeEtag,
   etagSignal,
-  ifNoneMatch,
-  notModified,
+  publicCachedJson,
+  publicEndpointRateLimit,
   publicError,
-  publicJson,
 } from "@/lib/api/public-helpers";
 
 export const dynamic = "force-dynamic";
@@ -34,7 +27,7 @@ export async function GET(
   req: Request,
   ctx: { params: Promise<{ id: string }> },
 ) {
-  const limited = publicRateLimit(req, publicRateLimitConfig("eventMembers"));
+  const limited = publicEndpointRateLimit(req, "eventMembers");
   if (limited) return limited;
 
   const { id: idRaw } = await ctx.params;
@@ -53,16 +46,16 @@ export async function GET(
       members: toEventMemberApiItems(members),
       total: members.length,
     };
-    const etag = computeEtag(
-      "public-event",
-      etagSignal({
+    return publicCachedJson(req, {
+      endpoint: "eventMembers",
+      etagFamily: "public-event",
+      signal: etagSignal({
         cluster_id: parsed.clusterId,
         n: members.length,
         last_at: members[members.length - 1]?.publishedAt ?? "",
       }),
-    );
-    if (ifNoneMatch(req, etag)) return notModified(etag);
-    return publicJson(body, etag, publicCacheConfig("eventMembers"));
+      body,
+    });
   } catch (err) {
     console.error("[api/public/events/:id/members] failed", err);
     return publicError("server_error", 500);

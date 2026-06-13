@@ -45,8 +45,8 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 ## Shared infrastructure
 
 - **`lib/site.ts`** — canonical public origin (`https://news.ax0x.ai`) and URL builder used by sitemap, robots, RSS feeds, `/skill.md`, `/openapi.yaml`, and the `/agents` integration page so public discovery surfaces do not drift across domains.
-- **`lib/api/public-endpoint-config.ts` + `lib/rate-limit/public.ts`** — one public endpoint contract for rate limits, cache policy, docs grouping, and endpoint count, plus the parameterized IP token-bucket. Routes call `publicRateLimitConfig("<endpoint-key>")` and `publicCacheConfig("<endpoint-key>")`; public docs, `/skill.md`, `/openapi.yaml`, and `/agents` copy render or verify the same contract. Family-isolated so `/feed` polling doesn't burn `/search` budget.
-- **`lib/api/public-helpers.ts`** — `computeEtag`, `ifNoneMatch`, `notModified`, `publicJson`, `publicError`, `publicHeaders`. Every route returns CORS + cache headers via these.
+- **`lib/api/public-endpoint-config.ts` + `lib/rate-limit/public.ts`** — one public endpoint contract for rate limits, cache policy, docs grouping, and endpoint count, plus the parameterized IP token-bucket. Public docs, `/skill.md`, `/openapi.yaml`, and `/agents` copy render or verify the same contract. Family-isolated so `/feed` polling doesn't burn `/search` budget.
+- **`lib/api/public-helpers.ts`** — `publicEndpointRateLimit(req, "<endpoint-key>")` applies the endpoint's IP token bucket, while `publicCachedJson(req, { endpoint: "<endpoint-key>", etagFamily, signal, body })` computes ETags, handles `If-None-Match` 304s, and applies the endpoint cache policy. `publicError`, `publicHeaders`, and the lower-level ETag helpers stay here for explicit error and test coverage paths.
 - **`lib/api/feed-query-params.ts`** — shared feed/search query schemas and snake_case-to-`FeedQuery` mapping for public + bearer-gated surfaces; route files only choose auth/rate-limit and per-surface limit ceilings.
 - **`lib/types.ts`** — shared item tier, highlight-tier subset, feed view, search mode, app/source locale, source group/kind, source-health status, feedback vote, user role, iteration status, and cadence runtime tuples used by REST/MCP schemas, public/agent item source fields, cluster lead-pick authority typing, `/skill.md`, `/openapi.yaml`, sitemap generation, DB enums, fetcher support checks, score parsing, feedback routes, iteration routes, and commentary workers.
 - **`lib/api/feed-results.ts`** — shared feed execution for `/api/public/feed`, `/api/v1/feed`, and MCP `ax_radar_feed`; surface adapters own auth/rate-limit/ETag and serializers, while this helper owns paired item + `total` queries and pagination defaults.
@@ -68,9 +68,9 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 
 1. Create `app/api/public/<name>/route.ts`
 2. Add its key, family, limit, cache policy, and doc grouping in `lib/api/public-endpoint-config.ts`
-3. Call `publicRateLimit(req, publicRateLimitConfig("<endpoint-key>"))` at the top
+3. Call `publicEndpointRateLimit(req, "<endpoint-key>")` at the top
 4. Build a stable `etagSignal({ ... })` — anything that changes when content updates
-5. Use `publicJson(body, etag, publicCacheConfig("<endpoint-key>"))` for 200, `publicError(msg, code)` for 4xx/5xx
+5. Use `publicCachedJson(req, { endpoint: "<endpoint-key>", etagFamily: "public-<name>", signal, body })` for 200/304, `publicError(msg, code)` for 4xx/5xx
 6. Strip LLM internals before returning
 7. Update `/openapi.yaml` (in `app/openapi.yaml/route.ts`) with the new path
 8. Update `/skill.md` (in `app/skill.md/route.ts`) intent table if user-visible
@@ -120,7 +120,7 @@ Run these with `bun test tests/api/public-*.test.ts tests/api/feed-query-*.test.
 ## Operational notes
 
 - **Rate limiter is Vercel-instance-local** — buckets don't survive cold starts. Treated as "discourage hammering" not "airtight cap." Real abuse defense lives at the CDN/WAF layer.
-- **Public endpoint configuration is centralized** — add or change endpoint budgets/cache in `lib/api/public-endpoint-config.ts` first, then wire routes with `publicRateLimitConfig("<endpoint-key>")` and `publicCacheConfig("<endpoint-key>")`. `/skill.md`, `/openapi.yaml`, `/agents`, and this doc should never hand-copy a different limit or cache table.
+- **Public endpoint configuration is centralized** — add or change endpoint budgets/cache in `lib/api/public-endpoint-config.ts` first, then wire routes through `publicEndpointRateLimit(req, "<endpoint-key>")` and `publicCachedJson(req, { endpoint: "<endpoint-key>", etagFamily, signal, body })`. `/skill.md`, `/openapi.yaml`, `/agents`, and this doc should never hand-copy a different limit or cache table.
 - **Field stripping is centralized for feed/search and item-detail surfaces** — `toPublicApiItem` strips HKR reasons for feed/search, while `toPublicItemDetail` strips detail-only LLM internals (`reasoning`, `body_rss`, HKR reasons). If adding a new domain field, update the relevant serializer and OpenAPI schema together.
 - **Feed/search query parsing is centralized** — `/api/public/feed`, `/api/public/search`, `/api/v1/feed`, and `/api/v1/search` share `lib/api/feed-query-params.ts`; only public/v1 max limits differ. Feed-facing tier values come from `VISIBLE_ITEM_TIERS`, highlight/deep-dive tier checks come from `HIGHLIGHT_ITEM_TIERS` / `isHighlightItemTier`, `today|archive` comes from `FEED_VIEWS`, `lexical|semantic` comes from `SEARCH_MODES`, and `source_group` / `source_kind` come from `SOURCE_GROUPS` / `SOURCE_KINDS`, all in `lib/types.ts`; MCP, `/skill.md`, and `/openapi.yaml` render or validate those same runtime tuples instead of repeating enum lists.
 - **Feed execution is centralized for REST + MCP** — `/api/public/feed`, `/api/v1/feed`, and MCP `ax_radar_feed` all call `runFeedQuery`; adapters keep only auth/rate-limit/ETag and item serialization while the helper keeps item rows and `total` counts paired.

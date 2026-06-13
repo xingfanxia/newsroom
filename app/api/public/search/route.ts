@@ -7,18 +7,11 @@
  *
  * Same item shape and field stripping as /api/public/feed.
  */
-import { publicRateLimit } from "@/lib/rate-limit/public";
 import {
-  publicCacheConfig,
-  publicRateLimitConfig,
-} from "@/lib/api/public-endpoint-config";
-import {
-  computeEtag,
   etagSignal,
-  ifNoneMatch,
-  notModified,
+  publicCachedJson,
+  publicEndpointRateLimit,
   publicError,
-  publicJson,
 } from "@/lib/api/public-helpers";
 import { toPublicApiItem } from "@/lib/api/public-items";
 import {
@@ -31,7 +24,7 @@ export const runtime = "nodejs";
 
 export async function GET(req: Request) {
   // Semantic search has measurable LLM cost — tighter limit than feed.
-  const limited = publicRateLimit(req, publicRateLimitConfig("search"));
+  const limited = publicEndpointRateLimit(req, "search");
   if (limited) return limited;
 
   const url = new URL(req.url);
@@ -55,14 +48,13 @@ export async function GET(req: Request) {
 
   try {
     const result = await runSearchQuery(p);
+    const signal = `${baseSignal}|total=${result.total}|first=${result.items[0]?.id ?? ""}`;
     if (result.mode === "semantic") {
-      const etag = computeEtag(
-        "public-search",
-        `${baseSignal}|total=${result.total}|first=${result.items[0]?.id ?? ""}`,
-      );
-      if (ifNoneMatch(req, etag)) return notModified(etag);
-      return publicJson(
-        {
+      return publicCachedJson(req, {
+        endpoint: "search",
+        etagFamily: "public-search",
+        signal,
+        body: {
           mode: "semantic",
           q: result.q,
           items: result.items.map((s) => ({
@@ -74,18 +66,14 @@ export async function GET(req: Request) {
           offset: result.offset,
           latency_ms: result.latencyMs,
         },
-        etag,
-        publicCacheConfig("search"),
-      );
+      });
     }
 
-    const etag = computeEtag(
-      "public-search",
-      `${baseSignal}|total=${result.total}|first=${result.items[0]?.id ?? ""}`,
-    );
-    if (ifNoneMatch(req, etag)) return notModified(etag);
-    return publicJson(
-      {
+    return publicCachedJson(req, {
+      endpoint: "search",
+      etagFamily: "public-search",
+      signal,
+      body: {
         mode: result.mode,
         q: result.q,
         items: result.items.map((s) => toPublicApiItem(s, p.locale)),
@@ -93,9 +81,7 @@ export async function GET(req: Request) {
         limit: result.limit,
         offset: result.offset,
       },
-      etag,
-      publicCacheConfig("search"),
-    );
+    });
   } catch (err) {
     console.error("[api/public/search] failed", err);
     return publicError("server_error", 500);

@@ -4,17 +4,10 @@
  * Returns the column written for the 24h window whose period_start falls on
  * the requested UTC date. 404 if no column for that date.
  */
-import { publicRateLimit } from "@/lib/rate-limit/public";
 import {
-  publicCacheConfig,
-  publicRateLimitConfig,
-} from "@/lib/api/public-endpoint-config";
-import {
-  computeEtag,
-  ifNoneMatch,
-  notModified,
+  publicCachedJson,
+  publicEndpointRateLimit,
   publicError,
-  publicJson,
 } from "@/lib/api/public-helpers";
 import {
   dailyColumnDateSchema,
@@ -31,7 +24,7 @@ export async function GET(
   req: Request,
   ctx: { params: Promise<{ date: string }> },
 ) {
-  const limited = publicRateLimit(req, publicRateLimitConfig("dailyByDate"));
+  const limited = publicEndpointRateLimit(req, "dailyByDate");
   if (limited) return limited;
 
   const { date: rawDate } = await ctx.params;
@@ -54,14 +47,13 @@ export async function GET(
     }
 
     const body = toPublicDailyColumn(row);
-    const etag = computeEtag(
-      "public-daily-date",
-      publicDailyColumnEtagSignal(row),
-    );
-    if (ifNoneMatch(req, etag)) return notModified(etag);
-
     // Historical dailies are immutable — aggressive cache.
-    return publicJson(body, etag, publicCacheConfig("dailyByDate"));
+    return publicCachedJson(req, {
+      endpoint: "dailyByDate",
+      etagFamily: "public-daily-date",
+      signal: publicDailyColumnEtagSignal(row),
+      body,
+    });
   } catch (err) {
     console.error("[api/public/daily/:date] failed", err);
     return publicError("server_error", 500);

@@ -3,9 +3,9 @@
  * read-only JSON surfaces.
  *
  * Three things every public route should call:
- *   1. publicRateLimit(req, publicRateLimitConfig("<endpoint-key>")) — IP token bucket
- *   2. computeEtag(family, signal) + ifNoneMatch(req, etag) → notModified()
- *   3. publicJson(body, etag) or publicError(...)
+ *   1. publicEndpointRateLimit(req, "<endpoint-key>") — IP token bucket
+ *   2. publicCachedJson(req, { endpoint, etagFamily, signal, body }) for 200/304
+ *   3. publicError(...) for explicit 4xx/5xx envelopes
  *
  * Public-safe field stripping lives next to each route handler (since each
  * route's domain model is different) — but the helpers here pin CORS, cache,
@@ -14,8 +14,19 @@
 import { createHash } from "node:crypto";
 import {
   PUBLIC_CACHE_DEFAULT,
+  publicCacheConfig,
+  publicRateLimitConfig,
   type PublicCacheConfig,
+  type PublicEndpointKey,
 } from "@/lib/api/public-endpoint-config";
+import { publicRateLimit } from "@/lib/rate-limit/public";
+
+type PublicCachedJsonArgs = {
+  endpoint: PublicEndpointKey;
+  etagFamily: string;
+  signal: string;
+  body: unknown;
+};
 
 /** Generate `W/"<family>-<sha1[:16]>"` — weak so reverse proxies can vary. */
 export function computeEtag(family: string, signal: string): string {
@@ -47,8 +58,14 @@ export function publicHeaders(
 }
 
 /** 304 response — empty body, just the ETag + CORS so clients can read it. */
-export function notModified(etag: string): Response {
-  return new Response(null, { status: 304, headers: publicHeaders(etag) });
+export function notModified(
+  etag: string,
+  cache: PublicCacheConfig = PUBLIC_CACHE_DEFAULT,
+): Response {
+  return new Response(null, {
+    status: 304,
+    headers: publicHeaders(etag, cache),
+  });
 }
 
 /** 200 JSON response with ETag + cache headers. */
@@ -64,6 +81,23 @@ export function publicJson(
       "content-type": "application/json; charset=utf-8",
     },
   });
+}
+
+export function publicEndpointRateLimit(
+  req: Request,
+  endpoint: PublicEndpointKey,
+): Response | null {
+  return publicRateLimit(req, publicRateLimitConfig(endpoint));
+}
+
+export function publicCachedJson(
+  req: Request,
+  { endpoint, etagFamily, signal, body }: PublicCachedJsonArgs,
+): Response {
+  const etag = computeEtag(etagFamily, signal);
+  const cache = publicCacheConfig(endpoint);
+  if (ifNoneMatch(req, etag)) return notModified(etag, cache);
+  return publicJson(body, etag, cache);
 }
 
 /** 4xx error — CORS-open so the browser can read the body. */

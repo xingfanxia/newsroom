@@ -7,17 +7,10 @@
  *
  * take: 1..180, default 30. Strict 400 on out-of-range.
  */
-import { publicRateLimit } from "@/lib/rate-limit/public";
 import {
-  publicCacheConfig,
-  publicRateLimitConfig,
-} from "@/lib/api/public-endpoint-config";
-import {
-  computeEtag,
-  ifNoneMatch,
-  notModified,
+  publicCachedJson,
+  publicEndpointRateLimit,
   publicError,
-  publicJson,
 } from "@/lib/api/public-helpers";
 import {
   dailyColumnIndexQuerySchema,
@@ -30,7 +23,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
-  const limited = publicRateLimit(req, publicRateLimitConfig("dailies"));
+  const limited = publicEndpointRateLimit(req, "dailies");
   if (limited) return limited;
 
   const url = new URL(req.url);
@@ -48,13 +41,12 @@ export async function GET(req: Request) {
   try {
     const rows = await listDailyColumnIndexRows(q);
     const body = toPublicDailyColumnIndex(rows);
-    const etag = computeEtag(
-      "public-dailies",
-      publicDailyColumnIndexEtagSignal(rows, q),
-    );
-    if (ifNoneMatch(req, etag)) return notModified(etag);
-
-    return publicJson(body, etag, publicCacheConfig("dailies"));
+    return publicCachedJson(req, {
+      endpoint: "dailies",
+      etagFamily: "public-dailies",
+      signal: publicDailyColumnIndexEtagSignal(rows, q),
+      body,
+    });
   } catch (err) {
     console.error("[api/public/dailies] failed", err);
     return publicError("server_error", 500);

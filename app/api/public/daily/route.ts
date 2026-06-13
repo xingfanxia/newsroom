@@ -8,17 +8,10 @@
  *
  * locale=zh default. Only zh is generated today.
  */
-import { publicRateLimit } from "@/lib/rate-limit/public";
 import {
-  publicCacheConfig,
-  publicRateLimitConfig,
-} from "@/lib/api/public-endpoint-config";
-import {
-  computeEtag,
-  ifNoneMatch,
-  notModified,
+  publicCachedJson,
+  publicEndpointRateLimit,
   publicError,
-  publicJson,
 } from "@/lib/api/public-helpers";
 import {
   dailyColumnLocaleSchema,
@@ -31,7 +24,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
-  const limited = publicRateLimit(req, publicRateLimitConfig("daily"));
+  const limited = publicEndpointRateLimit(req, "daily");
   if (limited) return limited;
 
   const url = new URL(req.url);
@@ -48,11 +41,13 @@ export async function GET(req: Request) {
     }
 
     const body = toPublicDailyColumn(row);
-    const etag = computeEtag("public-daily", publicDailyColumnEtagSignal(row));
-    if (ifNoneMatch(req, etag)) return notModified(etag);
-
     // Daily column lands once per day; long stale-while-revalidate.
-    return publicJson(body, etag, publicCacheConfig("daily"));
+    return publicCachedJson(req, {
+      endpoint: "daily",
+      etagFamily: "public-daily",
+      signal: publicDailyColumnEtagSignal(row),
+      body,
+    });
   } catch (err) {
     console.error("[api/public/daily] failed", err);
     return publicError("server_error", 500);

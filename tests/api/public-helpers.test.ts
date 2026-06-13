@@ -4,6 +4,7 @@ import {
   etagSignal,
   ifNoneMatch,
   notModified,
+  publicCachedJson,
   publicError,
   publicHeaders,
   publicJson,
@@ -94,6 +95,17 @@ describe("public-helpers — etag + CORS + cache", () => {
       expect(res.headers.get("etag")).toBe(`W/"x-abc"`);
       expect(res.headers.get("access-control-allow-origin")).toBe("*");
     });
+
+    it("uses endpoint cache settings when provided", () => {
+      const res = notModified(`W/"x-abc"`, {
+        sMaxAge: 3600,
+        staleWhileRevalidate: 86_400,
+      });
+      expect(res.status).toBe(304);
+      expect(res.headers.get("cache-control")).toBe(
+        "public, s-maxage=3600, stale-while-revalidate=86400",
+      );
+    });
   });
 
   describe("publicJson", () => {
@@ -105,6 +117,46 @@ describe("public-helpers — etag + CORS + cache", () => {
       expect(res.headers.get("access-control-allow-origin")).toBe("*");
       const body = await res.json();
       expect(body).toEqual({ ok: true });
+    });
+  });
+
+  describe("publicCachedJson", () => {
+    it("returns cached JSON using the endpoint cache policy", async () => {
+      const req = new Request("https://x.test/");
+      const res = publicCachedJson(req, {
+        endpoint: "dailyByDate",
+        etagFamily: "public-daily-date",
+        signal: "date=2026-06-13",
+        body: { ok: true },
+      });
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get("etag")).toMatch(
+        /^W\/"public-daily-date-[0-9a-f]{16}"$/,
+      );
+      expect(res.headers.get("cache-control")).toBe(
+        "public, s-maxage=3600, stale-while-revalidate=86400",
+      );
+      expect(await res.json()).toEqual({ ok: true });
+    });
+
+    it("returns 304 with the same endpoint cache policy on ETag match", () => {
+      const etag = computeEtag("public-daily-date", "date=2026-06-13");
+      const req = new Request("https://x.test/", {
+        headers: { "if-none-match": etag },
+      });
+      const res = publicCachedJson(req, {
+        endpoint: "dailyByDate",
+        etagFamily: "public-daily-date",
+        signal: "date=2026-06-13",
+        body: { ok: true },
+      });
+
+      expect(res.status).toBe(304);
+      expect(res.headers.get("etag")).toBe(etag);
+      expect(res.headers.get("cache-control")).toBe(
+        "public, s-maxage=3600, stale-while-revalidate=86400",
+      );
     });
   });
 

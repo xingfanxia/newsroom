@@ -104,12 +104,18 @@ describe("public API endpoint contract", () => {
     );
   });
 
-  test("public route handlers select named limit/cache keys instead of repeating numbers", () => {
+  test("public route handlers delegate endpoint rate-limit/cache/ETag wiring to shared helpers", () => {
     for (const [key, path] of routeContracts) {
       const source = readProjectFile(path);
-      expect(source).toContain("@/lib/api/public-endpoint-config");
-      expect(source).toContain(`publicRateLimitConfig("${key}")`);
-      expect(source).toContain(`publicCacheConfig("${key}")`);
+      expect(source).toContain("@/lib/api/public-helpers");
+      expect(source).toContain(`publicEndpointRateLimit(req, "${key}")`);
+      expect(source).toContain("publicCachedJson(req,");
+      expect(source).not.toContain("publicRateLimitConfig");
+      expect(source).not.toContain("publicCacheConfig");
+      expect(source).not.toContain("publicRateLimit(req");
+      expect(source).not.toContain("ifNoneMatch(");
+      expect(source).not.toContain("notModified(");
+      expect(source).not.toContain("publicJson(");
       expect(source).not.toContain("windowMs: 60_000");
       expect(source).not.toMatch(/max: (600|300|120)/);
       expect(source).not.toContain('family: "public-');
@@ -155,8 +161,8 @@ describe("public API endpoint contract", () => {
     const configSource = readProjectFile("lib/api/public-endpoint-config.ts");
 
     expect(doc).toContain("lib/api/public-endpoint-config.ts");
-    expect(doc).toContain('publicRateLimitConfig("<endpoint-key>")');
-    expect(doc).toContain('publicCacheConfig("<endpoint-key>")');
+    expect(doc).toContain('publicEndpointRateLimit(req, "<endpoint-key>")');
+    expect(doc).toContain('publicCachedJson(req, { endpoint: "<endpoint-key>"');
     expect(doc).toContain("Cache headers are centralized");
     expect(configSource).toContain("PUBLIC_RATE_LIMIT_DOC_GROUPS");
 
@@ -167,6 +173,9 @@ describe("public API endpoint contract", () => {
     }
     expect(doc).not.toContain(
       'publicRateLimit(req, { family: "public-<name>", windowMs: 60_000, max: ... })',
+    );
+    expect(doc).not.toContain(
+      'publicRateLimit(req, publicRateLimitConfig("<endpoint-key>"))',
     );
   });
 });

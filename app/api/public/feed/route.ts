@@ -13,18 +13,11 @@
  *   tier / view / hot_window_hours / date{,_from,_to} / source_{id,group,kind}
  *   curated_only / include_source_tags / exclude_source_tags / limit / offset / locale
  */
-import { publicRateLimit } from "@/lib/rate-limit/public";
 import {
-  publicCacheConfig,
-  publicRateLimitConfig,
-} from "@/lib/api/public-endpoint-config";
-import {
-  computeEtag,
   etagSignal,
-  ifNoneMatch,
-  notModified,
+  publicCachedJson,
+  publicEndpointRateLimit,
   publicError,
-  publicJson,
 } from "@/lib/api/public-helpers";
 import { runFeedQuery } from "@/lib/api/feed-results";
 import { toPublicApiItem } from "@/lib/api/public-items";
@@ -37,7 +30,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
-  const limited = publicRateLimit(req, publicRateLimitConfig("feed"));
+  const limited = publicEndpointRateLimit(req, "feed");
   if (limited) return limited;
 
   const url = new URL(req.url);
@@ -55,29 +48,24 @@ export async function GET(req: Request) {
   try {
     const result = await runFeedQuery(feedQuery);
 
-    const etag = computeEtag(
-      "public-feed",
-      etagSignal({
+    return publicCachedJson(req, {
+      endpoint: "feed",
+      etagFamily: "public-feed",
+      signal: etagSignal({
         count: result.items.length,
         total: result.total,
         first_id: result.items[0]?.id ?? "",
         latest_at: result.items[0]?.publishedAt ?? "",
         qs: url.search,
       }),
-    );
-    if (ifNoneMatch(req, etag)) return notModified(etag);
-
-    return publicJson(
-      {
+      body: {
         items: result.items.map((s) => toPublicApiItem(s, q.locale)),
         total: result.total,
         limit: result.limit,
         offset: result.offset,
         view: result.view,
       },
-      etag,
-      publicCacheConfig("feed"),
-    );
+    });
   } catch (err) {
     console.error("[api/public/feed] failed", err);
     return publicError("server_error", 500);

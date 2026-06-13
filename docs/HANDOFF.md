@@ -96,11 +96,13 @@ Shipped cleanup:
   description no longer embeds a stale monitored-source count, and MCP
   source-tool copy avoids fixed counts for the same reason.
 - Shared public API endpoint metadata through
-  `lib/api/public-endpoint-config.ts`; public route handlers now call
-  `publicRateLimitConfig("<endpoint-key>")` and
-  `publicCacheConfig("<endpoint-key>")`, while `/skill.md`, `/openapi.yaml`,
-  `/agents`, and `docs/agent-access/README.md` render or verify the same
-  endpoint count, limit labels, and cache policy instead of repeating budgets.
+  `lib/api/public-endpoint-config.ts`, with public route HTTP envelopes
+  centralized in `lib/api/public-helpers.ts`; public route handlers now call
+  `publicEndpointRateLimit(req, "<endpoint-key>")` and
+  `publicCachedJson(req, { endpoint, etagFamily, signal, body })`, while
+  `/skill.md`, `/openapi.yaml`, `/agents`, and
+  `docs/agent-access/README.md` render or verify the same endpoint count,
+  limit labels, and cache policy instead of repeating budgets or 304 wiring.
 - Shared RSS envelope, XML escaping, CDATA splitting, and lightweight
   markdown-to-HTML rendering through `lib/rss/render.ts`; `/api/rss/*`, the
   featured-locale feeds, and the legacy newsletter feeds now use the same
