@@ -3,6 +3,7 @@ import {
   adminError,
   adminJson,
   adminOk,
+  adminServerError,
   runAdminRoute,
 } from "@/lib/api/admin-route";
 import { parseJsonRequestBody } from "@/lib/api/json-body";
@@ -48,8 +49,7 @@ export async function POST(req: Request) {
       if (isDuplicateCollectionNameError(err)) {
         return adminError("duplicate_name", 409);
       }
-      console.error("[api/admin/collections POST] failed", err);
-      return adminError("server_error", 500);
+      return adminServerError("api/admin/collections POST", err);
     }
   });
 }
@@ -70,8 +70,7 @@ export async function PATCH(req: Request) {
       if (!ok) return adminError("not_found", 404);
       return adminOk();
     } catch (err) {
-      console.error("[api/admin/collections PATCH] failed", err);
-      return adminError("server_error", 500);
+      return adminServerError("api/admin/collections PATCH", err);
     }
   });
 }

@@ -27,6 +27,7 @@ describe("protected admin route source wiring", () => {
     expect(source).toContain("adminJson");
     expect(source).toContain("adminOk");
     expect(source).toContain("adminError");
+    expect(source).toContain("adminServerError");
     expect(source).not.toContain("Response.json({ ok:");
   });
 
@@ -43,6 +44,8 @@ describe("protected admin route source wiring", () => {
       expect(source).not.toContain('{ ok: false, error: "auth_required" }');
       expect(source).not.toContain("UnauthorizedError");
       expect(source).not.toContain("ForbiddenError");
+      expect(source).not.toContain('console.error("[api/admin');
+      expect(source).not.toContain('adminError("server_error"');
     }
   });
 });

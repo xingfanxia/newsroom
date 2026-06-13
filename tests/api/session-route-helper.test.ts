@@ -4,6 +4,7 @@ import {
   sessionError,
   sessionJson,
   sessionOk,
+  sessionServerError,
 } from "@/lib/api/session-route";
 
 describe("session route helpers", () => {
@@ -27,6 +28,28 @@ describe("session route helpers", () => {
 
     expect(res.status).toBe(404);
     expect(await res.json()).toEqual({ ok: false, error: "not_found" });
+  });
+
+  test("sessionServerError logs the route label and returns the shared 500 envelope", async () => {
+    const originalError = console.error;
+    const calls: unknown[][] = [];
+    console.error = (...args: unknown[]) => {
+      calls.push(args);
+    };
+
+    try {
+      const err = new Error("boom");
+      const res = sessionServerError("api/session/example", err);
+
+      expect(res.status).toBe(500);
+      expect(await res.json()).toEqual({
+        ok: false,
+        error: "server_error",
+      });
+      expect(calls).toEqual([["[api/session/example] failed", err]]);
+    } finally {
+      console.error = originalError;
+    }
   });
 
   test("runSessionRoute returns auth denial without running the handler", async () => {

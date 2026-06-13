@@ -15,3 +15,12 @@ export async function runAdminRoute(
 export const adminJson = okJson;
 export const adminOk = okEmpty;
 export const adminError = okError;
+
+export function adminServerError(
+  label: string,
+  err: unknown,
+  extra: Record<string, unknown> = {},
+): Response {
+  console.error(`[${label}] failed`, err);
+  return adminError("server_error", 500, extra);
+}

@@ -15,3 +15,8 @@ export async function runSessionRoute(
 export const sessionJson = okJson;
 export const sessionOk = okEmpty;
 export const sessionError = okError;
+
+export function sessionServerError(label: string, err: unknown): Response {
+  console.error(`[${label}] failed`, err);
+  return sessionError("server_error", 500);
+}

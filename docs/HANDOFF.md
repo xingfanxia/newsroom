@@ -29,13 +29,13 @@ Shipped cleanup:
   `lib/shell/system-cron.ts`, so schedule parsing stays out of
   `getSystemSnapshot` and display cannot drift when a cron path changes.
 - Shared `/api/admin/iterations/[id]` route-id parsing through `lib/policy/iterations.ts` so fetch/apply/reject stay behaviorally aligned.
-- Shared protected-admin route auth and ok/error JSON envelopes through
-  `lib/api/admin-route.ts`, wrapping the lower-level
-  `lib/api/admin-auth.ts` auth/admin-required response mapping.
+- Shared protected-admin route auth, ok/error JSON envelopes, and catch-all
+  server-error logging through `lib/api/admin-route.ts`, wrapping the
+  lower-level `lib/api/admin-auth.ts` auth/admin-required response mapping.
 - Shared cookie-session route auth and ok/error JSON envelopes for
-  required-session user routes (`/api/feedback*`, `/api/tweaks`) through
-  `lib/api/session-route.ts`, wrapping the lower-level
-  `lib/api/session-auth.ts` auth-required response.
+  required-session user routes (`/api/feedback*`, `/api/tweaks`), plus their
+  catch-all server-error logging, through `lib/api/session-route.ts`, wrapping
+  the lower-level `lib/api/session-auth.ts` auth-required response.
 - Shared the underlying `{ ok: true }` / `{ ok: false, error }` response
   envelope construction through `lib/api/ok-response.ts`; admin/session route
   helpers now alias that implementation while keeping domain-specific names.
@@ -215,7 +215,7 @@ Verification (2026-06-13):
 - `bun run code:dead:exports` — passed.
 - `bun run code:dead:types` — passed.
 - `bun run lint` — passed with no warnings.
-- `bun test --env-file=.env.local` — 767 pass, 1 skip, 0 fail.
+- `bun test --env-file=.env.local` — 769 pass, 1 skip, 0 fail.
 - `bun run build` — passed.
 - `git diff --check` — passed.
 

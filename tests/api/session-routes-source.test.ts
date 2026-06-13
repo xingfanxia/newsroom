@@ -24,6 +24,7 @@ describe("required session route source wiring", () => {
     expect(source).toContain("sessionJson");
     expect(source).toContain("sessionOk");
     expect(source).toContain("sessionError");
+    expect(source).toContain("sessionServerError");
     expect(source).not.toContain("Response.json({ ok:");
   });
 
@@ -38,6 +39,8 @@ describe("required session route source wiring", () => {
       expect(source).not.toContain("getSessionUser");
       expect(source).not.toContain('{ ok: false, error: "auth_required" }');
       expect(source).not.toContain("NextResponse.json(");
+      expect(source).not.toContain('console.error("[api/feedback');
+      expect(source).not.toContain('sessionError("server_error"');
     }
   });
 

@@ -3,6 +3,7 @@ import {
   adminError,
   adminJson,
   adminOk,
+  adminServerError,
   runAdminRoute,
 } from "@/lib/api/admin-route";
 
@@ -31,6 +32,31 @@ describe("admin route helpers", () => {
       id: 123,
       error: "not_found",
     });
+  });
+
+  test("adminServerError logs the route label and returns the shared 500 envelope", async () => {
+    const originalError = console.error;
+    const calls: unknown[][] = [];
+    console.error = (...args: unknown[]) => {
+      calls.push(args);
+    };
+
+    try {
+      const err = new Error("boom");
+      const res = adminServerError("api/admin/example", err, {
+        detail: "kept",
+      });
+
+      expect(res.status).toBe(500);
+      expect(await res.json()).toEqual({
+        ok: false,
+        detail: "kept",
+        error: "server_error",
+      });
+      expect(calls).toEqual([["[api/admin/example] failed", err]]);
+    } finally {
+      console.error = originalError;
+    }
   });
 
   test("runAdminRoute returns auth denial without running the handler", async () => {

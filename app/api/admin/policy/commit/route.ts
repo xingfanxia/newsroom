@@ -1,7 +1,7 @@
 import { z } from "zod";
 import {
-  adminError,
   adminJson,
+  adminServerError,
   runAdminRoute,
 } from "@/lib/api/admin-route";
 import { parseJsonRequestBody } from "@/lib/api/json-body";
@@ -37,8 +37,7 @@ export async function POST(req: Request) {
       });
       return adminJson({ version: row.version });
     } catch (err) {
-      console.error("[api/admin/policy/commit] failed", err);
-      return adminError("server_error", 500);
+      return adminServerError("api/admin/policy/commit", err);
     }
   });
 }

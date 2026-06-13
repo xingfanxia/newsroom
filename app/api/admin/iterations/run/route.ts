@@ -1,6 +1,7 @@
 import {
   adminError,
   adminJson,
+  adminServerError,
   runAdminRoute,
 } from "@/lib/api/admin-route";
 import {
@@ -52,8 +53,7 @@ export async function POST() {
       if (err instanceof IterationGuardError) {
         return adminError(err.code, 400, { detail: err.message });
       }
-      console.error("[api/admin/iterations/run] failed", err);
-      return adminError("server_error", 500, {
+      return adminServerError("api/admin/iterations/run", err, {
         detail: err instanceof Error ? err.message : String(err),
       });
     }

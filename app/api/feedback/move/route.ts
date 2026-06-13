@@ -4,6 +4,7 @@ import {
   runSessionRoute,
   sessionError,
   sessionOk,
+  sessionServerError,
 } from "@/lib/api/session-route";
 import { upsertAppUser } from "@/lib/auth/session";
 import { moveItemToCollection } from "@/lib/items/collections";
@@ -36,8 +37,7 @@ export async function POST(req: Request) {
       if (!ok) return sessionError("not_found", 404);
       return sessionOk();
     } catch (err) {
-      console.error("[api/feedback/move] failed", err);
-      return sessionError("server_error", 500);
+      return sessionServerError("api/feedback/move", err);
     }
   });
 }
