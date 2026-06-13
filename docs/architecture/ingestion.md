@@ -11,7 +11,7 @@
  ┌─────────────┐     ┌──────────────┐     ┌──────────────┐     ┌───────────────┐     ┌──────────────┐
  │  SOURCES    │ →→→ │   FETCHER    │ →→→ │   NORMALIZE  │ →→→ │    ENRICH     │ →→→ │    SCORE     │
  │ (catalog)   │     │ (cron/queue) │     │ (schema)     │     │ (LLM summary, │     │ (LLM policy) │
- │  ~50 feeds  │     │              │     │              │     │  tag, embed)  │     │              │
+ │ typed srcs  │     │              │     │              │     │  tag, embed)  │     │              │
  └─────────────┘     └──────────────┘     └──────────────┘     └───────────────┘     └──────────────┘
                                                                                              │
                                                                                              ▼
@@ -267,7 +267,7 @@ A curated set of enabled X handles stored as normal `sources` rows.
 | Milestone | Scope | Status |
 |---|---|---|
 | **M0 — Shell** | Next.js 16 + next-intl v4 + Tailwind v4 + UI from screenshots + mock fixtures | ✅ shipped |
-| **M1 — Read-only ingestion** | Supabase Postgres + drizzle, 41 sources seeded, RSS/Atom/RSSHub fetcher with SSRF guard, normalizer with canonical URL + sha256 dedup, 4 cron routes + `信源` live | ✅ shipped |
+| **M1 — Read-only ingestion** | Supabase Postgres + drizzle, typed source catalog seeded, RSS/Atom/RSSHub fetcher with SSRF guard, normalizer with canonical URL + sha256 dedup, cron routes + `信源` live | ✅ shipped |
 | **M2 — Enrich + Score + Cluster** | Vercel AI SDK v6 + DeepSeek V4 Pro/Flash for prose/scoring, Azure OpenAI `text-embedding-3-large` native 3072-dim via `halfvec` + HNSW cosine, cluster dedup at 0.75 similarity / 72h, `热点资讯` live feed with fallback ladder. Ultra-review: 3 CRITICAL + 7 HIGH all fixed. | ✅ shipped |
 | **M3 — Feedback + Auth** | `feedback` table + admin gate + real metrics on `策略迭代` page + `POST /api/feedback` | ✅ shipped |
 | **M4 — Editorial agent** | Agent session reads feedback, diffs `editorial.skill.md`, streams to console, versioned rollout | ✅ shipped |

@@ -22,10 +22,24 @@ const publicSourcesRoute = readFileSync(
   resolve(root, "app/api/public/sources/route.ts"),
   "utf8",
 );
+const agentsTabs = readFileSync(
+  resolve(root, "app/[locale]/agents/_tabs.tsx"),
+  "utf8",
+);
+const mainFeedRssRoute = readFileSync(
+  resolve(root, "app/api/feed/[locale]/rss.xml/route.ts"),
+  "utf8",
+);
 const sourcesPage = readFileSync(
   resolve(root, "app/[locale]/sources/page.tsx"),
   "utf8",
 );
+const readme = readFileSync(resolve(root, "README.md"), "utf8");
+const architectureDoc = readFileSync(
+  resolve(root, "docs/architecture/ingestion.md"),
+  "utf8",
+);
+const handoffDoc = readFileSync(resolve(root, "docs/HANDOFF.md"), "utf8");
 const schema = readFileSync(resolve(root, "db/schema.ts"), "utf8");
 const types = readFileSync(resolve(root, "lib/types.ts"), "utf8");
 const openapiRoute = readFileSync(
@@ -131,5 +145,33 @@ describe("source catalog source wiring", () => {
     expect(sourcesPage).toContain("SOURCE_GROUP_LABELS");
     expect(sourcesPage).not.toContain("const GROUP_ORDER");
     expect(sourcesPage).not.toContain("const GROUP_LABELS");
+  });
+
+  test("current docs and public agent copy avoid fixed source-count claims", () => {
+    const currentCopy = [
+      readme,
+      architectureDoc,
+      handoffDoc,
+      agentsTabs,
+      mainFeedRssRoute,
+      openapiRoute,
+    ].join("\n");
+
+    for (const staleCount of [
+      "50+ sources in",
+      "50+ sources",
+      "50+ 来源",
+      "~50 feeds",
+      "41 RSS/Atom/RSSHub sources",
+      "41 sources seeded",
+      "45 sources",
+      "52 sources monitored",
+      "52-source catalog",
+      "59+ source catalog",
+      "59+ 源目录",
+      "59-source catalog",
+    ]) {
+      expect(currentCopy).not.toContain(staleCount);
+    }
   });
 });

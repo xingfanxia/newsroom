@@ -559,8 +559,8 @@ function ApiPane({ lang }: { lang: Lang }) {
           [
             "GET /api/public/sources",
             lang === "zh"
-              ? "59+ 源目录 + 实时健康"
-              : "59+ source catalog + live health",
+              ? "精选信源目录 + 实时健康"
+              : "Monitored source catalog + live health",
           ],
           [
             "GET /api/public/daily",

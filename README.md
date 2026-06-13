@@ -1,6 +1,6 @@
 # AX's AI RADAR
 
-> **A bilingual AI intelligence radar with a self-iterating editorial agent.** 50+ sources in, curated signal out.
+> **A bilingual AI intelligence radar with a self-iterating editorial agent.** Monitored sources in, curated signal out.
 > Terminal-forward command-center aesthetic with HKR score rings; JetBrains Mono + Noto Sans/Serif SC; zh/en locale-first.
 
 🌐 **Live**: [newsroom-orpin.vercel.app](https://newsroom-orpin.vercel.app) → redirects to `/zh`
@@ -93,7 +93,7 @@ See [`.env.example`](./.env.example) for the complete template. On Vercel, most 
 | Milestone | Scope | Status |
 |---|---|---|
 | **M0 — Shell** | Next.js i18n app + UI from screenshots + mock data | ✅ shipped |
-| **M1 — Read-only ingestion** | 41 RSS/Atom/RSSHub sources + fetcher + normalizer + live Sources page | ✅ shipped |
+| **M1 — Read-only ingestion** | Typed source catalog + fetcher + normalizer + live Sources page | ✅ shipped |
 | **M2 — Enrich + Score + Cluster** | LLM summary + tags + 0-100 score + halfvec embeddings + pgvector dedup + live Hot News feed | ✅ shipped |
 | **M3 — Feedback + Auth** | `feedback` table + admin gate + real metrics on 策略迭代 page (Supabase Auth → password gate in s6) | ✅ shipped |
 | **M4 — Editorial agent** | Policy agent reads feedback, diffs `editorial.skill.md`, streams to console | ✅ shipped |
@@ -166,7 +166,7 @@ bun run dev
 | 里程碑 | 范围 | 状态 |
 |---|---|---|
 | **M0 — 骨架** | 双语 UI + mock 数据 | ✅ 已发布 |
-| **M1 — 只读接入** | 41 个信源 + fetcher + normalizer + 实时 /sources | ✅ 已发布 |
+| **M1 — 只读接入** | 类型化信源目录 + fetcher + normalizer + 实时 /sources | ✅ 已发布 |
 | **M2 — 加工评分聚类** | LLM 摘要 / 标签 / 0-100 分 / 向量嵌入 / 去重 / 实时热点 | ✅ 已发布 |
 | **M3 — 反馈 + 鉴权** | feedback 表 + 管理员鉴权（s6 由 Supabase 改为密码门）+ 策略迭代真实指标 | ✅ 已上线 |
 | **M4 — 编辑 agent** | Agent 读反馈、改策略、审核 diff、提交 v-next | ✅ 已上线 |

@@ -193,7 +193,7 @@ Known caveat:
   table prefix when a `Date` param is bound, `postgres-js` then rejects
   the ambiguous statement. Fixed with explicit `::timestamptz` casts in
   `getRadarStats`, `getTopTopics`, and `getFeaturedStories` date filter.
-  Widget now reads 3182 today / 71 P1 / 981 featured / 45 sources.
+  Widget now reports non-zero today / P1 / featured / source metrics again.
 - **Radar sweep static + bottom clipping** — SVG `viewBox` expanded to
   `-8 -8 116 116` so HOOK/AUTH/RES/DENSITY labels don't clip. Later bug
   in the same widget (see round 5 below) with the transform origin.

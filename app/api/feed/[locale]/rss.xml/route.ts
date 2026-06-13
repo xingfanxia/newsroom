@@ -8,8 +8,8 @@ export const revalidate = 600;
 const SITE_URL = "https://newsroom-orpin.vercel.app";
 const BRAND = { en: "AX's AI RADAR", zh: "AX 的 AI 雷达" };
 const DESCRIPTION = {
-  en: "Bilingual AI intelligence radar — curated daily signal from 50+ sources.",
-  zh: "双语 AI 情报雷达 — 每日精选 50+ 来源的高价值内容。",
+  en: "Bilingual AI intelligence radar — curated daily signal from the monitored source catalog.",
+  zh: "双语 AI 情报雷达 — 从已监控的精选信源目录中提炼每日高价值内容。",
 };
 
 export async function GET(
