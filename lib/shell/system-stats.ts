@@ -17,7 +17,14 @@
  */
 import { and, eq, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { clusters, items, rawItems, sources, sourceHealth } from "@/db/schema";
+import {
+  clusters,
+  items,
+  newsletters,
+  rawItems,
+  sources,
+  sourceHealth,
+} from "@/db/schema";
 import { EVENT_COMMENTARY_CRON_RECENCY_HOURS } from "@/lib/events/commentary-window";
 import { systemCronSnapshots, type SystemCron } from "@/lib/shell/system-cron";
 import { systemQueueSnapshot, type SystemQueue } from "@/lib/shell/system-queues";
@@ -85,6 +92,7 @@ export async function getSystemSnapshot(): Promise<SystemSnapshot> {
       sourceId: sources.id,
       nameEn: sources.nameEn,
       kind: sources.kind,
+      cadence: sources.cadence,
       enabled: sources.enabled,
       status: sourceHealth.status,
       consecutiveFailures: sourceHealth.consecutiveFailures,
@@ -140,6 +148,7 @@ export async function getSystemSnapshot(): Promise<SystemSnapshot> {
     .select({
       rawPending: sql<number>`count(*) filter (where ${rawItems.normalizedAt} is null)::int`,
       rawTotal: sql<number>`count(*)::int`,
+      lastNormalizedAt: sql<Date | null>`max(${rawItems.normalizedAt})`,
     })
     .from(rawItems);
 
@@ -155,6 +164,9 @@ export async function getSystemSnapshot(): Promise<SystemSnapshot> {
           )
       )::int`,
       unscored: sql<number>`count(*) filter (where ${items.importance} is null)::int`,
+      lastBodyFetchedAt: sql<Date | null>`max(${items.bodyFetchedAt})`,
+      lastEnrichedAt: sql<Date | null>`max(${items.enrichedAt})`,
+      lastItemCommentaryAt: sql<Date | null>`max(${items.commentaryAt})`,
     })
     .from(items)
     .leftJoin(clusters, eq(items.clusterId, clusters.id));
@@ -167,8 +179,16 @@ export async function getSystemSnapshot(): Promise<SystemSnapshot> {
           and ${clusters.commentaryAt} is null
           and COALESCE(${clusters.latestMemberAt}, ${clusters.firstSeenAt}) >= now() - make_interval(hours => ${EVENT_COMMENTARY_CRON_RECENCY_HOURS})
       )::int`,
+      lastClusterActivityAt: sql<Date | null>`max(${clusters.updatedAt})`,
     })
     .from(clusters);
+
+  const [newsletterRow] = await client
+    .select({
+      lastDailyNewsletterAt: sql<Date | null>`max(${newsletters.publishedAt}) filter (where ${newsletters.kind} = 'daily')`,
+      lastMonthlyNewsletterAt: sql<Date | null>`max(${newsletters.publishedAt}) filter (where ${newsletters.kind} = 'monthly')`,
+    })
+    .from(newsletters);
 
   const queues: SystemQueue[] = [
     systemQueueSnapshot("normalize", queueRow?.rawPending ?? 0),
@@ -182,7 +202,26 @@ export async function getSystemSnapshot(): Promise<SystemSnapshot> {
   ];
 
   // --- cron from vercel.json --------------------------------------
-  const cron: SystemCron[] = systemCronSnapshots();
+  const enabledSourceRows = hRows.filter((r) => r.enabled);
+  const latestFetchForCadences = (cadences: string[]) =>
+    latestDate(
+      ...enabledSourceRows
+        .filter((r) => cadences.includes(r.cadence))
+        .map((r) => r.lastFetchedAt),
+    );
+  const cron: SystemCron[] = systemCronSnapshots({
+    "fetch-hourly": latestFetchForCadences(["live", "hourly"]),
+    "fetch-daily": latestFetchForCadences(["daily"]),
+    "fetch-weekly": latestFetchForCadences(["weekly"]),
+    normalize: queueRow?.lastNormalizedAt ?? null,
+    "article-body": itemsRow?.lastBodyFetchedAt ?? null,
+    enrich: itemsRow?.lastEnrichedAt ?? null,
+    commentary: itemsRow?.lastItemCommentaryAt ?? null,
+    "score-backfill": null,
+    cluster: clustersRow?.lastClusterActivityAt ?? null,
+    "newsletter-daily": newsletterRow?.lastDailyNewsletterAt ?? null,
+    "newsletter-monthly": newsletterRow?.lastMonthlyNewsletterAt ?? null,
+  });
 
   // --- errors from source_health.last_error -----------------------
   const errRows = await client
@@ -228,4 +267,15 @@ export async function getSystemSnapshot(): Promise<SystemSnapshot> {
   );
 
   return { services, queues, cron, errors, counts };
+}
+
+function latestDate(...dates: Array<Date | string | null | undefined>) {
+  let latest: Date | null = null;
+  for (const value of dates) {
+    if (!value) continue;
+    const date = value instanceof Date ? value : new Date(value);
+    if (!Number.isFinite(date.getTime())) continue;
+    if (!latest || date > latest) latest = date;
+  }
+  return latest;
 }

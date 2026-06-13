@@ -7,6 +7,11 @@ export type SystemCron = {
   last: string;
 };
 
+export type SystemCronActivityByName = Record<
+  string,
+  Date | string | null | undefined
+>;
+
 type VercelCronConfig = {
   path: string;
   schedule: string;
@@ -14,15 +19,25 @@ type VercelCronConfig = {
 
 const CRON_ROUTE_PREFIX = /^\/api\/cron\//;
 
-export function systemCronSnapshots(): SystemCron[] {
+export function systemCronSnapshots(
+  activityByName: SystemCronActivityByName = {},
+  now = new Date(),
+): SystemCron[] {
   const crons = (vercelConfig as { crons?: VercelCronConfig[] }).crons ?? [];
   return crons.map((c) => {
+    const name = c.path.replace(CRON_ROUTE_PREFIX, "");
     const minutes = cadenceMinutesFromCron(c.schedule);
+    const hasActivitySignal = Object.prototype.hasOwnProperty.call(
+      activityByName,
+      name,
+    );
     return {
-      name: c.path.replace(CRON_ROUTE_PREFIX, ""),
+      name,
       schedule: c.schedule,
       next: `~${cadenceLabel(minutes)} cadence`,
-      last: "—",
+      last: hasActivitySignal
+        ? formatCronLastActivity(activityByName[name], now)
+        : "—",
     };
   });
 }
@@ -68,6 +83,30 @@ function cadenceLabel(minutes: number | null): string {
   if (!minutes) return "configured";
   if (minutes >= 60) return `${Math.round(minutes / 60)}h`;
   return `${minutes}m`;
+}
+
+function formatCronLastActivity(
+  value: Date | string | null | undefined,
+  now: Date,
+): string {
+  const date = coerceDate(value);
+  if (!date) return "no signal";
+
+  const ms = Math.max(0, now.getTime() - date.getTime());
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s}s ago`;
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.round(h / 24);
+  return `${d}d ago`;
+}
+
+function coerceDate(value: Date | string | null | undefined): Date | null {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isFinite(date.getTime()) ? date : null;
 }
 
 function evenlySpacedInterval(field: string, cycle: number): number | null {

@@ -133,6 +133,10 @@ Shipped cleanup:
 - Shared legacy structured newsletter RSS construction through
   `lib/rss/newsletter-feed.ts`; `/api/feed/newsletter/{locale}/rss.xml` now
   owns only locale normalization and the RSS HTTP response envelope.
+- Overlaid `/admin/system` cron rows with DB-derived recent activity in
+  `lib/shell/system-cron.ts` / `lib/shell/system-stats.ts`; schedules still
+  come from `vercel.json`, while jobs without a durable timestamp explicitly
+  show `no signal`.
 - Shared bearer-gated `/api/v1/*` auth and plain JSON/error envelopes through
   `lib/api/v1-route.ts`; v1 route files now call `runV1Route` and return
   `v1Json` / `v1Error` / `v1InvalidQuery`, so token verification and response
@@ -178,7 +182,7 @@ Verification (2026-06-13):
 - `bun run code:dead:exports` — passed.
 - `bun run code:dead:types` — passed.
 - `bun run lint` — passed with no warnings.
-- `bun test --env-file=.env.local` — 734 pass, 1 skip, 0 fail.
+- `bun test --env-file=.env.local` — 736 pass, 1 skip, 0 fail.
 - `bun run build` — passed.
 - `git diff --check` — passed.
 

@@ -43,4 +43,24 @@ describe("cadenceMinutesFromCron", () => {
     );
     expect(snapshots.every((c) => c.last === "—")).toBe(true);
   });
+
+  it("adds optional last-activity labels without changing schedule ownership", () => {
+    const snapshots = systemCronSnapshots(
+      {
+        "fetch-hourly": new Date("2026-06-13T10:30:00.000Z"),
+        "score-backfill": null,
+      },
+      new Date("2026-06-13T11:36:00.000Z"),
+    );
+
+    expect(snapshots.find((c) => c.name === "fetch-hourly")?.last).toBe(
+      "1h ago",
+    );
+    expect(snapshots.find((c) => c.name === "score-backfill")?.last).toBe(
+      "no signal",
+    );
+    expect(snapshots.find((c) => c.name === "newsletter-daily")?.last).toBe(
+      "—",
+    );
+  });
 });

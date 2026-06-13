@@ -252,6 +252,7 @@ export default async function SystemPage({
                     <th>{zh ? "任务" : "job"}</th>
                     <th>{zh ? "调度" : "schedule"}</th>
                     <th>{zh ? "节奏" : "cadence"}</th>
+                    <th>{zh ? "最近" : "last"}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -279,6 +280,9 @@ export default async function SystemPage({
                       </td>
                       <td>
                         <span className="muted">{c.next}</span>
+                      </td>
+                      <td>
+                        <span className="muted">{c.last}</span>
                       </td>
                     </tr>
                   ))}

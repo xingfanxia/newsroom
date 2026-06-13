@@ -82,6 +82,12 @@ Grouping for the `信源` UI: same enum as `group` above, with labels/order from
   only static Next route config plus worker payload mapping; sequencing lives
   in worker helpers such as `workers/fetcher/pipeline.ts` and
   `workers/cluster/pipeline.ts`.
+- `/admin/system` derives the cron table from `vercel.json` for schedules and
+  overlays recent activity from durable DB write timestamps (`source_health`,
+  `raw_items.normalized_at`, `items.body_fetched_at`, `items.enriched_at`,
+  commentary timestamps, cluster updates, and newsletter publishes). Jobs with
+  no dedicated durable timestamp, such as `score-backfill`, are shown as
+  `no signal` instead of inventing a last-run time.
 - RSS/Atom parsing via `fast-xml-parser`.
 - RSSHub routes hit `https://rsshub.app/{route}` (public instance) or self-hosted fallback.
 - Supported fetch kinds are `rss`, `atom`, `rsshub`, `x-api`, and

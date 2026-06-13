@@ -8,13 +8,27 @@ const source = readFileSync(resolve(root, "lib/shell/system-stats.ts"), "utf8");
 describe("admin system stats source wiring", () => {
   it("derives cron schedules from vercel.json", () => {
     expect(source).toContain("@/lib/shell/system-cron");
-    expect(source).toContain("systemCronSnapshots()");
+    expect(source).toContain("systemCronSnapshots({");
     expect(source).not.toContain("@/vercel.json");
     expect(source).not.toContain("VercelCronConfig");
     expect(source).not.toContain("cadenceMinutesFromCron");
     expect(source).not.toContain("function cadenceLabel");
     expect(source).not.toContain("CRON_CADENCE_MINUTES_BY_PATH");
     expect(source).not.toContain('{ name: "newsletter-daily", schedule: "11 9 * * *"');
+  });
+
+  it("passes real DB activity signals into the cron table", () => {
+    expect(source).toContain("latestFetchForCadences([\"live\", \"hourly\"])");
+    expect(source).toContain("latestFetchForCadences([\"daily\"])");
+    expect(source).toContain("latestFetchForCadences([\"weekly\"])");
+    expect(source).toContain("lastNormalizedAt");
+    expect(source).toContain("lastBodyFetchedAt");
+    expect(source).toContain("lastEnrichedAt");
+    expect(source).toContain("lastItemCommentaryAt");
+    expect(source).toContain("lastClusterActivityAt");
+    expect(source).toContain("lastDailyNewsletterAt");
+    expect(source).toContain("lastMonthlyNewsletterAt");
+    expect(source).toContain("\"score-backfill\": null");
   });
 
   it("keeps item commentary queue aligned with the singleton-only worker", () => {
