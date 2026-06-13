@@ -59,7 +59,7 @@ Terminal-forward command-center aesthetic — green/orange/blue accents on a nea
 
 ### Data ingestion & AI pipeline
 
-Blueprint in [`docs/architecture/ingestion.md`](./docs/architecture/ingestion.md). Source catalog in [`lib/sources/catalog.ts`](./lib/sources/catalog.ts). Editorial policy lives at [`modules/feed/runtime/policy/skills/editorial.skill.md`](./modules/feed/runtime/policy/skills/editorial.skill.md). Enrichment workers claim rows in Postgres before spending LLM tokens, wait for body prefetch on normal web articles, and cap retry attempts, so overlapping cron/backfill runs do not repeatedly process the same stuck item or title-only page. Local operator cron triggers are exposed as `bun run cron:<hourly|daily|weekly|normalize|enrich|body|yt|cluster>`.
+Blueprint in [`docs/architecture/ingestion.md`](./docs/architecture/ingestion.md). Source catalog in [`lib/sources/catalog.ts`](./lib/sources/catalog.ts). Editorial policy lives at [`modules/feed/runtime/policy/skills/editorial.skill.md`](./modules/feed/runtime/policy/skills/editorial.skill.md). Enrichment workers claim rows in Postgres before spending LLM tokens, wait for body prefetch on normal web articles, and cap retry attempts, so overlapping cron/backfill runs do not repeatedly process the same stuck item or title-only page. Local operator cron triggers mirror the `vercel.json` route slugs, for example `bun run cron:fetch-hourly`, `bun run cron:article-body`, `bun run cron:score-backfill`, and `bun run cron:newsletter-daily`; short aliases such as `cron:hourly`, `cron:body`, `cron:score`, and `cron:yt` remain available.
 
 ### Local setup
 

@@ -47,7 +47,7 @@ describe("cluster cron pipeline wiring", () => {
     const src = readFileSync(scriptPath, "utf8");
 
     expect(src).toContain("runClusterPipeline");
-    expect(src).toContain("cluster: () => runClusterPipeline()");
+    expect(src).toContain('"cluster": () => runClusterPipeline()');
     expect(src).not.toContain("runClusterBatch");
   });
 });

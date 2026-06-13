@@ -35,7 +35,8 @@ describe("content prefetch cron wiring", () => {
     const src = readFileSync(scriptPath, "utf8");
 
     expect(src).toContain("runContentPrefetch");
-    expect(src).toContain("body: () => runContentPrefetch()");
+    expect(src).toContain('"article-body": contentPrefetch');
+    expect(src).toContain('body: "article-body"');
     expect(src).not.toContain("runArticleBodyFetch()");
   });
 });

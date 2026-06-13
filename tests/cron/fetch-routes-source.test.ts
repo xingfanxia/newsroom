@@ -71,6 +71,10 @@ describe("fetch cron routes", () => {
     expect(src).toContain('runFetchAndNormalize(["daily"])');
     expect(src).toContain('runFetchAndNormalize(["weekly"])');
     expect(src).not.toContain("runFetchBucket");
-    expect(src).toContain('Object.keys(CRON_RUNNERS).join("|")');
+    expect(src).toContain('"fetch-hourly": fetchHourly');
+    expect(src).toContain('"fetch-daily": fetchDaily');
+    expect(src).toContain('"fetch-weekly": fetchWeekly');
+    expect(src).toContain("hourly: \"fetch-hourly\"");
+    expect(src).toContain('USAGE_KINDS.join("|")');
   });
 });
