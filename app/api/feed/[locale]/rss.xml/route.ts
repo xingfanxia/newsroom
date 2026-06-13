@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
 import { getFeaturedStories } from "@/lib/items/live";
+import {
+  escapeXml,
+  renderMarkdownishHtml,
+  renderRssFeed,
+  type RssItem,
+} from "@/lib/rss/render";
 import type { Story } from "@/lib/types";
 
 /** Cache for 10 min — the underlying feed updates every 15 min via enrich cron. */
@@ -29,13 +35,39 @@ export async function GET(
     stories = await getFeaturedStories({ tier: "all", locale, limit: 50 });
   }
 
-  const xml = buildRss({
-    locale,
-    siteUrl: SITE_URL,
-    selfUrl: `${SITE_URL}/api/feed/${locale}/rss.xml`,
+  const items = stories.map((story): RssItem => {
+    const extraElements = [
+      { name: "importance", value: story.importance },
+      { name: "tier", value: story.tier },
+      { name: "crossSourceCount", value: story.crossSourceCount },
+    ];
+
+    return {
+      title: story.title,
+      link: story.url,
+      description: story.summary,
+      pubDate: new Date(story.publishedAt),
+      guid: story.url,
+      guidIsPermalink: true,
+      source: story.source.publisher,
+      category: story.tags.length ? story.tags.join(", ") : undefined,
+      contentEncoded: buildContentHtml(story),
+      extraElements,
+    };
+  });
+
+  const xml = renderRssFeed({
     title: BRAND[locale],
+    link: `${SITE_URL}/${locale}`,
     description: DESCRIPTION[locale],
-    stories,
+    language: locale === "zh" ? "zh-CN" : "en-US",
+    lastBuildDate: items[0]?.pubDate ?? new Date(),
+    selfLink: `${SITE_URL}/api/feed/${locale}/rss.xml`,
+    generator: `${BRAND[locale]} (newsroom-orpin.vercel.app)`,
+    namespaces: {
+      radar: `${SITE_URL}/schemas/radar/1.0`,
+    },
+    items,
   });
 
   return new NextResponse(xml, {
@@ -48,107 +80,17 @@ export async function GET(
   });
 }
 
-function buildRss(args: {
-  locale: "zh" | "en";
-  siteUrl: string;
-  selfUrl: string;
-  title: string;
-  description: string;
-  stories: Story[];
-}): string {
-  const { locale, siteUrl, selfUrl, title, description, stories } = args;
-  const now = new Date().toUTCString();
-  const language = locale === "zh" ? "zh-CN" : "en-US";
-
-  const items = stories
-    .map((s) => {
-      const tagsLine = s.tags.length
-        ? `<category>${escape(s.tags.join(", "))}</category>`
-        : "";
-      const score = `<importance>${s.importance}</importance>`;
-      const tier = `<tier>${s.tier}</tier>`;
-      const cross =
-        s.crossSourceCount != null
-          ? `<crossSourceCount>${s.crossSourceCount}</crossSourceCount>`
-          : "";
-      // content:encoded — full body combining editor note + summary + analysis.
-      // Most readers render this in the detail pane; fallback to <description>.
-      const contentHtml = buildContentHtml(s);
-      return `    <item>
-      <title>${escape(s.title)}</title>
-      <link>${escape(s.url)}</link>
-      <guid isPermaLink="true">${escape(s.url)}</guid>
-      <pubDate>${new Date(s.publishedAt).toUTCString()}</pubDate>
-      <source>${escape(s.source.publisher)}</source>
-      <description><![CDATA[${s.summary}]]></description>
-      <content:encoded><![CDATA[${contentHtml}]]></content:encoded>
-      ${tagsLine}
-      ${score}
-      ${tier}
-      ${cross}
-    </item>`;
-    })
-    .join("\n");
-
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0"
-  xmlns:atom="http://www.w3.org/2005/Atom"
-  xmlns:content="http://purl.org/rss/1.0/modules/content/"
-  xmlns:radar="${siteUrl}/schemas/radar/1.0">
-  <channel>
-    <title>${escape(title)}</title>
-    <link>${escape(siteUrl)}/${locale}</link>
-    <atom:link href="${escape(selfUrl)}" rel="self" type="application/rss+xml"/>
-    <description>${escape(description)}</description>
-    <language>${language}</language>
-    <lastBuildDate>${now}</lastBuildDate>
-    <generator>${escape(title)} (newsroom-orpin.vercel.app)</generator>
-${items}
-  </channel>
-</rss>`;
-}
-
-/**
- * Minimal markdown-ish → HTML rendering for RSS content:encoded.
- * Preserves the headings and paragraph breaks produced by the commentary stage
- * without pulling in a full markdown library in a Fluid route.
- */
-function mdToHtml(md: string): string {
-  const escaped = md
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-  const withHeadings = escaped
-    .replace(/^## (.+)$/gm, "<h3>$1</h3>")
-    .replace(/^# (.+)$/gm, "<h2>$1</h2>");
-  const paragraphs = withHeadings
-    .split(/\n\s*\n/)
-    .map((block) =>
-      block.trimStart().startsWith("<h") ? block : `<p>${block.trim()}</p>`,
-    )
-    .filter(Boolean)
-    .join("\n");
-  return paragraphs;
-}
-
 function buildContentHtml(s: {
   summary: string;
   editorNote?: string;
   editorAnalysis?: string;
 }): string {
   const note = s.editorNote
-    ? `<blockquote><strong>Editor&rsquo;s take:</strong> ${s.editorNote}</blockquote>`
+    ? `<blockquote><strong>Editor&rsquo;s take:</strong> ${escapeXml(s.editorNote)}</blockquote>`
     : "";
-  const summary = `<p>${s.summary}</p>`;
-  const analysis = s.editorAnalysis ? `<hr/>${mdToHtml(s.editorAnalysis)}` : "";
+  const summary = `<p>${escapeXml(s.summary)}</p>`;
+  const analysis = s.editorAnalysis
+    ? `<hr/>${renderMarkdownishHtml(s.editorAnalysis)}`
+    : "";
   return `${note}${summary}${analysis}`;
-}
-
-function escape(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
 }

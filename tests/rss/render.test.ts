@@ -1,5 +1,9 @@
 import { describe, expect, it } from "bun:test";
-import { renderRssFeed, type RssItem } from "@/lib/rss/render";
+import {
+  renderMarkdownishHtml,
+  renderRssFeed,
+  type RssItem,
+} from "@/lib/rss/render";
 
 describe("renderRssFeed", () => {
   const baseChannel = {
@@ -70,6 +74,49 @@ describe("renderRssFeed", () => {
     expect(xml).toContain('rel="self"');
   });
 
+  it("renders channel namespaces and generator metadata", () => {
+    const xml = renderRssFeed({
+      ...baseChannel,
+      items: [],
+      generator: "AX Radar (news.ax0x.ai)",
+      namespaces: {
+        radar: "https://news.ax0x.ai/schemas/radar/1.0",
+      },
+    });
+
+    expect(xml).toContain(
+      'xmlns:radar="https://news.ax0x.ai/schemas/radar/1.0"',
+    );
+    expect(xml).toContain("<generator>AX Radar (news.ax0x.ai)</generator>");
+  });
+
+  it("renders item source, permalink guids, and escaped extra elements", () => {
+    const item: RssItem = {
+      title: "Story",
+      link: "https://example.com/story",
+      description: "summary",
+      pubDate: new Date("2026-04-25T05:00:00Z"),
+      guid: "https://example.com/story",
+      guidIsPermalink: true,
+      source: "A&B <source>",
+      extraElements: [
+        { name: "importance", value: 88 },
+        { name: "tier", value: "featured" },
+        { name: "crossSourceCount", value: 3 },
+      ],
+    };
+
+    const xml = renderRssFeed({ ...baseChannel, items: [item] });
+
+    expect(xml).toContain(
+      '<guid isPermaLink="true">https://example.com/story</guid>',
+    );
+    expect(xml).toContain("<source>A&amp;B &lt;source&gt;</source>");
+    expect(xml).toContain("<importance>88</importance>");
+    expect(xml).toContain("<tier>featured</tier>");
+    expect(xml).toContain("<crossSourceCount>3</crossSourceCount>");
+  });
+
   it("renders items in the order given", () => {
     const items: RssItem[] = [
       { title: "First", link: "a", description: "", pubDate: new Date(), guid: "1" },
@@ -77,5 +124,13 @@ describe("renderRssFeed", () => {
     ];
     const xml = renderRssFeed({ ...baseChannel, items });
     expect(xml.indexOf("First")).toBeLessThan(xml.indexOf("Second"));
+  });
+
+  it("renders shared markdown-ish HTML for RSS bodies", () => {
+    const html = renderMarkdownishHtml(`# Title\n\n- one\n- two\n\nplain & <text>`);
+
+    expect(html).toContain("<h2>Title</h2>");
+    expect(html).toContain("<ul><li>one</li>\n<li>two</li>\n</ul>");
+    expect(html).toContain("<p>plain &amp; &lt;text&gt;</p>");
   });
 });

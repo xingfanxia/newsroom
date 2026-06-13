@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db/client";
 import { newsletters } from "@/db/schema";
+import {
+  escapeXml,
+  renderMarkdownishHtml,
+  renderRssFeed,
+  type RssItem,
+} from "@/lib/rss/render";
 import { sql, desc } from "drizzle-orm";
 
 /** Cache for 10 min — daily newsletter lands once a day; cheap to refresh. */
@@ -36,63 +42,56 @@ export async function GET(
     .orderBy(desc(newsletters.publishedAt))
     .limit(60);
 
-  const items = rows
-    .map((n) => {
-      const path = `/${locale}/newsletter/${n.id}`;
-      const kindLabel =
-        n.kind === "monthly"
-          ? locale === "zh"
-            ? "月报"
-            : "Monthly"
-          : locale === "zh"
-            ? "日报"
-            : "Daily";
-      // headline filter on the WHERE means these are non-null in practice,
-      // but TS sees the column type as nullable post-migration.
-      const headline = n.headline ?? "";
-      const overview = n.overview ?? "";
-      const highlights = n.highlights ?? "";
-      const commentary = n.commentary ?? "";
-      const title = `[${kindLabel}] ${headline}`;
-      const content = `
-<h2>${escape(headline)}</h2>
+  const items: RssItem[] = rows.map((n) => {
+    const path = `/${locale}/newsletter/${n.id}`;
+    const kindLabel =
+      n.kind === "monthly"
+        ? locale === "zh"
+          ? "月报"
+          : "Monthly"
+        : locale === "zh"
+          ? "日报"
+          : "Daily";
+    // headline filter on the WHERE means these are non-null in practice,
+    // but TS sees the column type as nullable post-migration.
+    const headline = n.headline ?? "";
+    const overview = n.overview ?? "";
+    const highlights = n.highlights ?? "";
+    const commentary = n.commentary ?? "";
+    const title = `[${kindLabel}] ${headline}`;
+    const content = `
+<h2>${escapeXml(headline)}</h2>
 <p><strong>${locale === "zh" ? "全局概览" : "Overview"}</strong></p>
-<p>${escape(overview)}</p>
+<p>${escapeXml(overview)}</p>
 <hr/>
 <p><strong>${locale === "zh" ? "特别关注" : "Highlights"}</strong></p>
-${mdToHtml(highlights)}
+${renderMarkdownishHtml(highlights)}
 <hr/>
 <p><strong>${locale === "zh" ? "点评" : "Commentary"}</strong></p>
-${mdToHtml(commentary)}
+${renderMarkdownishHtml(commentary)}
 <hr/>
 <p><em>${locale === "zh" ? "覆盖" : "Covered"} ${n.storyCount} ${locale === "zh" ? "条故事" : "stories"} · ${formatRange(n.periodStart, n.periodEnd, locale)}</em></p>`.trim();
 
-      return `    <item>
-      <title>${escape(title)}</title>
-      <link>${escape(SITE_URL + path)}</link>
-      <guid isPermaLink="false">newsletter-${n.id}</guid>
-      <pubDate>${n.publishedAt.toUTCString()}</pubDate>
-      <description><![CDATA[${overview}]]></description>
-      <content:encoded><![CDATA[${content}]]></content:encoded>
-      <category>${escape(kindLabel)}</category>
-    </item>`;
-    })
-    .join("\n");
+    return {
+      title,
+      link: SITE_URL + path,
+      description: overview,
+      pubDate: n.publishedAt,
+      guid: `newsletter-${n.id}`,
+      contentEncoded: content,
+      category: kindLabel,
+    };
+  });
 
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0"
-  xmlns:atom="http://www.w3.org/2005/Atom"
-  xmlns:content="http://purl.org/rss/1.0/modules/content/">
-  <channel>
-    <title>${escape(BRAND[locale])}</title>
-    <link>${escape(SITE_URL + "/" + locale)}</link>
-    <atom:link href="${escape(SITE_URL + "/api/feed/newsletter/" + locale + "/rss.xml")}" rel="self" type="application/rss+xml"/>
-    <description>${escape(DESCRIPTION[locale])}</description>
-    <language>${locale === "zh" ? "zh-CN" : "en-US"}</language>
-    <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>
-${items}
-  </channel>
-</rss>`;
+  const xml = renderRssFeed({
+    title: BRAND[locale],
+    link: `${SITE_URL}/${locale}`,
+    description: DESCRIPTION[locale],
+    language: locale === "zh" ? "zh-CN" : "en-US",
+    lastBuildDate: items[0]?.pubDate ?? new Date(),
+    selfLink: `${SITE_URL}/api/feed/newsletter/${locale}/rss.xml`,
+    items,
+  });
 
   return new NextResponse(xml, {
     status: 200,
@@ -104,37 +103,10 @@ ${items}
   });
 }
 
-function mdToHtml(md: string): string {
-  const escaped = md
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-  return escaped
-    .replace(/^## (.+)$/gm, "<h3>$1</h3>")
-    .replace(/^# (.+)$/gm, "<h2>$1</h2>")
-    .replace(/^- (.+)$/gm, "<li>$1</li>")
-    .replace(/(<li>.*<\/li>\n?)+/g, (m) => `<ul>${m}</ul>`)
-    .split(/\n\s*\n/)
-    .map((b) =>
-      /^<(h\d|ul|hr|blockquote)/.test(b.trimStart()) ? b : `<p>${b.trim()}</p>`,
-    )
-    .filter(Boolean)
-    .join("\n");
-}
-
 function formatRange(start: Date, end: Date, locale: "zh" | "en"): string {
   const fmt = new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US", {
     month: "short",
     day: "numeric",
   });
   return `${fmt.format(start)} – ${fmt.format(new Date(end.getTime() - 1))}`;
-}
-
-function escape(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
 }

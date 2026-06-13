@@ -101,6 +101,10 @@ Shipped cleanup:
   `publicCacheConfig("<endpoint-key>")`, while `/skill.md`, `/openapi.yaml`,
   `/agents`, and `docs/agent-access/README.md` render or verify the same
   endpoint count, limit labels, and cache policy instead of repeating budgets.
+- Shared RSS envelope, XML escaping, CDATA splitting, and lightweight
+  markdown-to-HTML rendering through `lib/rss/render.ts`; `/api/rss/*`, the
+  featured-locale feeds, and the legacy newsletter feeds now use the same
+  renderer while keeping feed-specific metadata such as radar extension fields.
 - Shared hourly/daily/weekly fetch+normalize sequencing through `workers/fetcher/pipeline.ts`, with HTTP route wiring in `app/api/cron/_fetch-bucket-route.ts` and local cron scripts using the same helper.
 - Shared article body + YouTube transcript prefetch sequencing through
   `workers/fetcher/content-prefetch.ts`, so `/api/cron/article-body` and
