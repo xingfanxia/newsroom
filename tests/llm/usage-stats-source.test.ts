@@ -23,7 +23,9 @@ describe("usage stats surfaces", () => {
     expect(stats).toContain("export const USAGE_WINDOWS");
     expect(stats).toContain('"all"');
     expect(page).toContain("USAGE_WINDOWS");
+    expect(page).toContain("USAGE_RANGE_LABELS");
     expect(page).not.toContain('const RANGES = ["today", "week", "month", "all"]');
+    expect(page).not.toContain("const RANGE_LABEL");
     expect(summary).toContain("USAGE_WINDOWS");
     expect(summary).not.toContain('export const USAGE_WINDOWS = ["today", "week", "month", "all"]');
     expect(route).toContain("USAGE_WINDOWS");
@@ -33,13 +35,24 @@ describe("usage stats surfaces", () => {
   it("includes task-level model breakdowns for the task spend table", () => {
     expect(stats).toContain("type TaskModelBreakdown");
     expect(stats).toContain("models: TaskModelBreakdown[]");
-    expect(page).toContain("formatTaskModels(t.models)");
+    expect(page).toContain("formatUsageTaskModels(t.models)");
     expect(summary).toContain("models: t.models.map");
   });
 
   it("renders model labels in recent calls", () => {
     expect(page).toContain("{zh ? \"模型\" : \"model\"}");
     expect(page).toContain("{c.model}");
+  });
+
+  it("keeps usage presentation helpers out of the admin page component", () => {
+    expect(page).toContain("@/lib/llm/usage-display");
+    expect(page).toContain("usageTaskTone(c.task)");
+    expect(page).toContain("formatUsageTaskModels(t.models)");
+    expect(page).not.toContain("function taskPillColor");
+    expect(page).not.toContain("function formatTokens");
+    expect(page).not.toContain("function formatNumber");
+    expect(page).not.toContain("function formatTaskModels");
+    expect(page).not.toContain("function formatShortDate");
   });
 
   it("v1 and MCP usage share the same agent summary contract", () => {

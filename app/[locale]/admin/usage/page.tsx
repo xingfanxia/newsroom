@@ -13,15 +13,16 @@ import {
   type WindowKey,
   type WindowTotals,
 } from "@/lib/llm/stats";
+import {
+  USAGE_RANGE_LABELS,
+  formatUsageCount,
+  formatUsageShortDate,
+  formatUsageTaskModels,
+  formatUsageTokens,
+  usageTaskTone,
+} from "@/lib/llm/usage-display";
 
 export const dynamic = "force-dynamic";
-
-const RANGE_LABEL: Record<WindowKey, { en: string; zh: string }> = {
-  today: { en: "today", zh: "今日" },
-  week: { en: "past 7d", zh: "近 7 天" },
-  month: { en: "past 30d", zh: "近 30 天" },
-  all: { en: "all-time", zh: "全量" },
-};
 
 const MONTHLY_CAP_USD = Number(process.env.USAGE_MONTHLY_CAP_USD ?? 1000);
 
@@ -99,7 +100,7 @@ export default async function UsagePage({
           live={zh ? "计费实时" : "billing current"}
           extra={
             <span>
-              {zh ? "监控窗口" : "window"} {RANGE_LABEL[range].en} ·{" "}
+              {zh ? "监控窗口" : "window"} {USAGE_RANGE_LABELS[range].en} ·{" "}
               {selected.calls} {zh ? "次调用" : "calls"}
             </span>
           }
@@ -121,8 +122,8 @@ export default async function UsagePage({
                 data-active={r === range ? "true" : "false"}
                 scroll={false}
               >
-                <span className="d">{RANGE_LABEL[r].en}</span>
-                <span className="n">{RANGE_LABEL[r].zh}</span>
+                <span className="d">{USAGE_RANGE_LABELS[r].en}</span>
+                <span className="n">{USAGE_RANGE_LABELS[r].zh}</span>
               </Link>
             ))}
           </div>
@@ -163,7 +164,8 @@ export default async function UsagePage({
                     marginBottom: 6,
                   }}
                 >
-                  {zh ? "总花费" : "total spend"} · {RANGE_LABEL[range].en}
+                  {zh ? "总花费" : "total spend"} ·{" "}
+                  {USAGE_RANGE_LABELS[range].en}
                 </div>
                 <CostBig amount={selected.costUsd} />
               </div>
@@ -278,13 +280,17 @@ export default async function UsagePage({
               >
                 {daily.length > 0 && (
                   <>
-                    <span>{formatShortDate(daily[0].date)}</span>
+                    <span>{formatUsageShortDate(daily[0].date)}</span>
                     {daily.length > 10 && (
                       <span>
-                        {formatShortDate(daily[Math.floor(daily.length / 2)].date)}
+                        {formatUsageShortDate(
+                          daily[Math.floor(daily.length / 2)].date,
+                        )}
                       </span>
                     )}
-                    <span>{formatShortDate(daily[daily.length - 1].date)}</span>
+                    <span>
+                      {formatUsageShortDate(daily[daily.length - 1].date)}
+                    </span>
                   </>
                 )}
               </div>
@@ -301,8 +307,8 @@ export default async function UsagePage({
             <Tile
               labelEn="api calls"
               labelZh="调用次数"
-              value={formatNumber(selected.calls)}
-              sub={RANGE_LABEL[range].en}
+              value={formatUsageCount(selected.calls)}
+              sub={USAGE_RANGE_LABELS[range].en}
               color="var(--fg-0)"
             />
             <TokenMixTile
@@ -394,17 +400,17 @@ export default async function UsagePage({
                               whiteSpace: "normal",
                             }}
                           >
-                            {formatTaskModels(t.models)}
+                            {formatUsageTaskModels(t.models)}
                           </td>
-                          <td className="right">{formatNumber(t.calls)}</td>
+                          <td className="right">{formatUsageCount(t.calls)}</td>
                           <td className="right">
                             <span className="muted">
-                              {formatTokens(t.inputTokens)}
+                              {formatUsageTokens(t.inputTokens)}
                             </span>
                           </td>
                           <td className="right">
                             <span className="muted">
-                              {formatTokens(t.outputTokens)}
+                              {formatUsageTokens(t.outputTokens)}
                             </span>
                           </td>
                           <td
@@ -473,7 +479,7 @@ export default async function UsagePage({
                         <td>
                           <span className="muted">{m.provider}</span>
                         </td>
-                        <td className="right">{formatNumber(m.calls)}</td>
+                        <td className="right">{formatUsageCount(m.calls)}</td>
                         <td
                           className="right"
                           style={{ color: "var(--accent-orange)" }}
@@ -525,7 +531,7 @@ export default async function UsagePage({
                           {timeFmt.format(c.createdAt)}
                         </td>
                         <td>
-                          <span className={`pill-s ${taskPillColor(c.task)}`}>
+                          <span className={`pill-s ${usageTaskTone(c.task)}`}>
                             {c.task ?? "—"}
                           </span>
                         </td>
@@ -542,12 +548,12 @@ export default async function UsagePage({
                         </td>
                         <td className="right">
                           <span className="muted">
-                            {formatNumber(c.inputTokens)}
+                            {formatUsageTokens(c.inputTokens)}
                           </span>
                         </td>
                         <td className="right">
                           <span className="muted">
-                            {formatNumber(c.outputTokens)}
+                            {formatUsageTokens(c.outputTokens)}
                           </span>
                         </td>
                         <td className="right">
@@ -658,7 +664,7 @@ function TokenMixTile({
               fontFamily: "var(--font-mono)",
             }}
           >
-            {formatTokens(inputTokens)}
+            {formatUsageTokens(inputTokens)}
           </span>
         </div>
         <div className="hbar">
@@ -680,7 +686,7 @@ function TokenMixTile({
               fontFamily: "var(--font-mono)",
             }}
           >
-            {formatTokens(outputTokens)}
+            {formatUsageTokens(outputTokens)}
           </span>
         </div>
         <div className="hbar">
@@ -737,7 +743,7 @@ function MiniSpend({ label, totals }: { label: string; totals: WindowTotals }) {
           marginTop: 2,
         }}
       >
-        {totals.calls} calls · {formatTokens(totals.inputTokens)} in
+        {totals.calls} calls · {formatUsageTokens(totals.inputTokens)} in
       </div>
     </div>
   );
@@ -767,40 +773,4 @@ function SectionHeader({
       {meta && <span style={{ color: "var(--fg-0)" }}>{meta}</span>}
     </h3>
   );
-}
-
-function taskPillColor(task: string | null): "g" | "b" | "o" | "r" | "" {
-  if (task === "score") return "g";
-  if (task === "enrich") return "b";
-  if (task === "commentary") return "o";
-  if (task === "embed") return "";
-  if (task === "agent") return "r";
-  return "";
-}
-
-function formatTokens(n: number): string {
-  if (n < 1000) return n.toString();
-  if (n < 1_000_000) return `${(n / 1000).toFixed(1)}K`;
-  return `${(n / 1_000_000).toFixed(2)}M`;
-}
-
-function formatNumber(n: number): string {
-  if (n < 1000) return n.toString();
-  if (n < 1_000_000) return `${(n / 1000).toFixed(1)}K`;
-  return `${(n / 1_000_000).toFixed(2)}M`;
-}
-
-function formatTaskModels(
-  models: { model: string; calls: number; provider: string }[],
-): string {
-  if (models.length === 0) return "—";
-  return models
-    .slice(0, 2)
-    .map((m) => `${m.model} ${formatNumber(m.calls)}`)
-    .join(" · ");
-}
-
-function formatShortDate(iso: string): string {
-  const [, mm, dd] = iso.split("-");
-  return `${mm}·${dd}`;
 }

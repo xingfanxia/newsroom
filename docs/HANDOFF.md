@@ -57,6 +57,10 @@ Shipped cleanup:
 - Shared usage window keys through `USAGE_WINDOWS` in `lib/llm/stats.ts`, so
   the admin usage page, v1 usage summary, and MCP usage tool cannot drift on
   the `today|week|month|all` window set.
+- Shared admin usage presentation helpers through `lib/llm/usage-display.ts`,
+  so range labels, task badge tones, token/call compaction, sparkline dates,
+  and task-model summaries stay exhaustive over `USAGE_WINDOWS` and
+  `LLM_TASKS` instead of living as page-local switches.
 - Shared source kind/group/cadence/source-locale/source-health status runtime tuples through `lib/types.ts` and
   source group display metadata through `lib/sources/groups.ts`, so DB enums
   and the `/sources` group order/labels cannot drift from catalog types.

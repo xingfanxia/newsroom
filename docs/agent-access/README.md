@@ -108,10 +108,11 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 - `tests/api/mcp-contract-source.test.ts` — MCP feed/search stay wired to shared execution helpers and the shared v1 item serializer
 - `tests/api/usage-summary.test.ts` — bearer-gated usage summary serializes totals, task/model breakdowns, and recent calls for agents
 - `tests/api/v1-saved-source.test.ts` — `/api/v1/saved` stays wired to the shared saved-item serializer and owner-aware collection helper
+- `tests/llm/usage-display.test.ts` — admin usage labels, task tones, and compact formatting stay exhaustive over the runtime usage/task tuples
 - `tests/llm/usage-stats-source.test.ts` — admin/v1/MCP usage surfaces stay wired to all-time windows, model labels, and the shared agent summary contract
 - `tests/items/collections.test.ts` — saved collection assignment rejects cross-owner collection ids
 
-Run these with `bun test tests/api/public-*.test.ts tests/api/feed-query-*.test.ts tests/api/source-catalog*.test.ts tests/api/skill-source.test.ts tests/api/item-detail*.test.ts tests/api/event-members*.test.ts tests/api/daily-columns*.test.ts tests/api/collection*.test.ts tests/api/tweak*.test.ts tests/api/mcp-contract-source.test.ts tests/api/usage-summary.test.ts tests/api/v1-saved-source.test.ts tests/llm/usage-stats-source.test.ts tests/items/collections.test.ts`.
+Run these with `bun test tests/api/public-*.test.ts tests/api/feed-query-*.test.ts tests/api/source-catalog*.test.ts tests/api/skill-source.test.ts tests/api/item-detail*.test.ts tests/api/event-members*.test.ts tests/api/daily-columns*.test.ts tests/api/collection*.test.ts tests/api/tweak*.test.ts tests/api/mcp-contract-source.test.ts tests/api/usage-summary.test.ts tests/api/v1-saved-source.test.ts tests/llm/usage-display.test.ts tests/llm/usage-stats-source.test.ts tests/items/collections.test.ts`.
 
 ## Operational notes
 
@@ -129,6 +130,7 @@ Run these with `bun test tests/api/public-*.test.ts tests/api/feed-query-*.test.
 - **Event-member parsing + serialization is shared across surfaces** — `/api/events/*`, `/api/public/events/*`, and `/api/v1/events/*` parse `cluster_id` + `locale` through `parseEventMemberRouteParams`; positive route IDs come from `lib/api/route-params.ts`, and those routes plus MCP `ax_radar_event_members` all use `toEventMemberApiItems`.
 - **Daily-column serialization is centralized across REST, RSS, site pages, and MCP** — `lib/api/daily-columns.ts` owns `newsletters` queries for `DAILY_NEWSLETTER_KIND` rows with `column_title IS NOT NULL`, public JSON shape, ETag signals, UTC date-window lookup, RSS/page row listing, and MCP markdown rendering. Newsletter kind and locale labels come from `NEWSLETTER_KINDS` / `NEWSLETTER_LOCALES` in `lib/types.ts`. The legacy structured-digest rows (where `headline IS NOT NULL`) ship separately via `/api/feed/newsletter/{locale}/rss.xml`.
 - **Usage summary serialization is centralized across bearer agent surfaces** — `/api/v1/usage/summary` and MCP `ax_radar_usage` both call `getUsageSummary`; the helper owns the `today|week|month|all` window set, totals, `by_task`, `by_model`, and `recent_calls` shape.
+- **Usage presentation is centralized for the admin surface** — `lib/llm/usage-display.ts` owns usage range labels, task badge tones, compact token/call formatting, sparkline date labels, and task-model summaries; tests keep those helpers exhaustive over `USAGE_WINDOWS` and `LLM_TASKS`.
 
 ## Related
 
