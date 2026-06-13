@@ -27,16 +27,16 @@ describe("feed/search route query parsing source wiring", () => {
 
   test("routes keep their intended public vs bearer limit contracts", () => {
     expect(read("app/api/v1/feed/route.ts")).toContain(
-      "v1FeedQueryParamSchema.safeParse",
+      "parseQueryParams(req, v1FeedQueryParamSchema)",
     );
     expect(read("app/api/public/feed/route.ts")).toContain(
-      "publicFeedQueryParamSchema.safeParse",
+      "parseQueryParams(url, publicFeedQueryParamSchema)",
     );
     expect(read("app/api/v1/search/route.ts")).toContain(
-      "v1SearchQueryParamSchema.safeParse",
+      "parseQueryParams(req, v1SearchQueryParamSchema)",
     );
     expect(read("app/api/public/search/route.ts")).toContain(
-      "publicSearchQueryParamSchema.safeParse",
+      "parseQueryParams(url, publicSearchQueryParamSchema)",
     );
   });
 

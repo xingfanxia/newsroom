@@ -28,16 +28,15 @@ import {
   v1InvalidQuery,
   v1Json,
 } from "@/lib/api/v1-route";
+import { parseQueryParams } from "@/lib/api/query-params";
 import { toAgentApiItem } from "@/lib/api/v1-items";
 import { v1SearchQueryParamSchema } from "@/lib/api/feed-query-params";
 import { runSearchQuery } from "@/lib/api/search-results";
 
 export async function GET(req: Request) {
   return runV1Route(req, async () => {
-    const url = new URL(req.url);
-    const params = Object.fromEntries(url.searchParams.entries());
-    const parsed = v1SearchQueryParamSchema.safeParse(params);
-    if (!parsed.success) return v1InvalidQuery(parsed.error.issues);
+    const parsed = parseQueryParams(req, v1SearchQueryParamSchema);
+    if (!parsed.ok) return v1InvalidQuery(parsed.issues);
 
     const p = parsed.data;
 

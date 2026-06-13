@@ -12,6 +12,7 @@ import {
   publicEndpointRateLimit,
   publicError,
 } from "@/lib/api/public-helpers";
+import { queryParamsRecord } from "@/lib/api/query-params";
 import { getPublicDailyColumnIndex } from "@/lib/api/daily-columns";
 
 export const dynamic = "force-dynamic";
@@ -21,12 +22,8 @@ export async function GET(req: Request) {
   const limited = publicEndpointRateLimit(req, "dailies");
   if (limited) return limited;
 
-  const url = new URL(req.url);
-
   try {
-    const result = await getPublicDailyColumnIndex(
-      Object.fromEntries(url.searchParams.entries()),
-    );
+    const result = await getPublicDailyColumnIndex(queryParamsRecord(req));
     if (!result.ok) return publicError(result.error, result.status);
 
     return publicCachedJson(req, {

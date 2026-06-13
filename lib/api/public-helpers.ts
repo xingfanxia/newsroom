@@ -19,6 +19,7 @@ import {
   type PublicCacheConfig,
   type PublicEndpointKey,
 } from "@/lib/api/public-endpoint-config";
+import { invalidQueryError } from "@/lib/api/query-params";
 import { publicRateLimit } from "@/lib/rate-limit/public";
 
 type PublicCachedJsonArgs = {
@@ -112,6 +113,10 @@ export function publicError(message: string, status: number): Response {
       },
     },
   );
+}
+
+export function publicInvalidQuery(issues: readonly unknown[]): Response {
+  return publicError(invalidQueryError(issues), 400);
 }
 
 /**

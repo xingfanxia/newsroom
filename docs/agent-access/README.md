@@ -46,8 +46,9 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 
 - **`lib/site.ts`** — canonical public origin (`https://news.ax0x.ai`) and URL builder used by sitemap, robots, RSS feeds, `/skill.md`, `/openapi.yaml`, and the `/agents` integration page so public discovery surfaces do not drift across domains.
 - **`lib/api/public-endpoint-config.ts` + `lib/rate-limit/public.ts`** — one public endpoint contract for rate limits, cache policy, docs grouping, and endpoint count, plus the parameterized IP token-bucket. Public docs, `/skill.md`, `/openapi.yaml`, and `/agents` copy render or verify the same contract. Family-isolated so `/feed` polling doesn't burn `/search` budget.
-- **`lib/api/public-helpers.ts`** — `publicEndpointRateLimit(req, "<endpoint-key>")` applies the endpoint's IP token bucket, while `publicCachedJson(req, { endpoint: "<endpoint-key>", etagFamily, signal, body })` computes ETags, handles `If-None-Match` 304s, and applies the endpoint cache policy. `publicError`, `publicHeaders`, and the lower-level ETag helpers stay here for explicit error and test coverage paths.
+- **`lib/api/public-helpers.ts`** — `publicEndpointRateLimit(req, "<endpoint-key>")` applies the endpoint's IP token bucket, while `publicCachedJson(req, { endpoint: "<endpoint-key>", etagFamily, signal, body })` computes ETags, handles `If-None-Match` 304s, and applies the endpoint cache policy. `publicError`, `publicInvalidQuery`, `publicHeaders`, and the lower-level ETag helpers stay here for explicit error and test coverage paths.
 - **`lib/api/v1-route.ts`** — shared bearer-gated route envelope for `/api/v1/*`. It bridges `requireApiToken(req)` into a handler callback and owns the plain JSON/error helpers (`v1Json`, `v1Error`, `v1InvalidQuery`), leaving v1 route files responsible only for request parsing, business helpers, and logging.
+- **`lib/api/query-params.ts`** — shared `URLSearchParams` extraction, Zod `safeParse` plumbing, and `invalid_query` issue formatting used by public + bearer-gated query routes. Surface adapters still choose their own error envelope (`publicInvalidQuery` vs `v1InvalidQuery`).
 - **`lib/api/feed-query-params.ts`** — shared feed/search query schemas and snake_case-to-`FeedQuery` mapping for public + bearer-gated surfaces; route files only choose auth/rate-limit and per-surface limit ceilings.
 - **`lib/types.ts`** — shared item tier, highlight-tier subset, feed view, search mode, app/source locale, source group/kind, source-health status, feedback vote, user role, iteration status, and cadence runtime tuples used by REST/MCP schemas, public/agent item source fields, cluster lead-pick authority typing, `/skill.md`, `/openapi.yaml`, sitemap generation, DB enums, fetcher support checks, score parsing, feedback routes, iteration routes, and commentary workers.
 - **`lib/api/feed-results.ts`** — shared feed execution for `/api/public/feed`, `/api/v1/feed`, and MCP `ax_radar_feed`; surface adapters own auth/rate-limit/ETag and serializers, while this helper owns paired item + `total` queries and pagination defaults.
@@ -74,11 +75,12 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 3. Call `publicEndpointRateLimit(req, "<endpoint-key>")` at the top
 4. Build a stable `etagSignal({ ... })` — anything that changes when content updates
 5. Use `publicCachedJson(req, { endpoint: "<endpoint-key>", etagFamily: "public-<name>", signal, body })` for 200/304, `publicError(msg, code)` for 4xx/5xx
-6. Strip LLM internals before returning
-7. Update `/openapi.yaml` (in `app/openapi.yaml/route.ts`) with the new path
-8. Update `/skill.md` (in `app/skill.md/route.ts`) intent table if user-visible
-9. Update `/robots.ts` allow list if needed
-10. Add unit test under `tests/api/`
+6. Parse query strings with `parseQueryParams(req, schema)` from `lib/api/query-params.ts`; use `publicInvalidQuery(issues)` for public validation errors
+7. Strip LLM internals before returning
+8. Update `/openapi.yaml` (in `app/openapi.yaml/route.ts`) with the new path
+9. Update `/skill.md` (in `app/skill.md/route.ts`) intent table if user-visible
+10. Update `/robots.ts` allow list if needed
+11. Add unit test under `tests/api/`
 
 ## Discovery files
 
@@ -92,6 +94,7 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 - `tests/api/public-ratelimit.test.ts` — threshold, IP isolation, family isolation, IPv4/IPv6 header fallback
 - `tests/api/public-rate-limit-contract.test.ts` — public route handlers, `/skill.md`, `/openapi.yaml`, `/agents`, and docs stay wired to the shared public rate-limit contract
 - `tests/api/feed-query-params.test.ts` — shared feed/search parameter defaults, source filter validation, max-limit ceilings, tag parsing, and `FeedQuery` mapping
+- `tests/api/query-params*.test.ts` — generic request query parsing and route source wiring stay centralized instead of hand-copying `Object.fromEntries(url.searchParams.entries())`
 - `tests/api/feed-tier-source.test.ts` — REST/MCP feed/search schemas, public/agent item source fields, cluster lead-pick typing, score parsing, and commentary workers stay wired to shared item-tier/feed-view/search-mode/source-filter tuples
 - `tests/api/runtime-contracts-source.test.ts` — app/source locales, fetcher-supported source kinds, feedback vote values, user roles, and iteration statuses stay wired to shared runtime tuples
 - `tests/api/feed-query-source.test.ts` — feed/search routes stay wired to shared query schemas and shared execution helpers
@@ -121,7 +124,7 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 - `tests/llm/usage-stats-source.test.ts` — admin/v1/MCP usage surfaces stay wired to all-time windows, model labels, and the shared agent summary contract
 - `tests/items/collections.test.ts` — saved collection assignment rejects cross-owner collection ids
 
-Run these with `bun test --env-file=.env.local tests/api/public-*.test.ts tests/api/feed-query-*.test.ts tests/api/source-catalog*.test.ts tests/api/skill-source.test.ts tests/api/item-detail*.test.ts tests/api/event-members*.test.ts tests/api/daily-columns*.test.ts tests/api/collection*.test.ts tests/api/tweak*.test.ts tests/api/mcp-contract-source.test.ts tests/api/usage-summary.test.ts tests/api/v1-saved-source.test.ts tests/llm/usage-display.test.ts tests/llm/usage-stats-source.test.ts tests/items/collections.test.ts`.
+Run these with `bun test --env-file=.env.local tests/api/public-*.test.ts tests/api/feed-query-*.test.ts tests/api/query-params*.test.ts tests/api/source-catalog*.test.ts tests/api/skill-source.test.ts tests/api/item-detail*.test.ts tests/api/event-members*.test.ts tests/api/daily-columns*.test.ts tests/api/collection*.test.ts tests/api/tweak*.test.ts tests/api/mcp-contract-source.test.ts tests/api/usage-summary.test.ts tests/api/v1-saved-source.test.ts tests/llm/usage-display.test.ts tests/llm/usage-stats-source.test.ts tests/items/collections.test.ts`.
 
 ## Operational notes
 
@@ -129,6 +132,7 @@ Run these with `bun test --env-file=.env.local tests/api/public-*.test.ts tests/
 - **Public endpoint configuration is centralized** — add or change endpoint budgets/cache in `lib/api/public-endpoint-config.ts` first, then wire routes through `publicEndpointRateLimit(req, "<endpoint-key>")` and `publicCachedJson(req, { endpoint: "<endpoint-key>", etagFamily, signal, body })`. `/skill.md`, `/openapi.yaml`, `/agents`, and this doc should never hand-copy a different limit or cache table.
 - **Field stripping is centralized for feed/search and item-detail surfaces** — `toPublicApiItem` strips HKR reasons for feed/search, while `toPublicItemDetail` strips detail-only LLM internals (`reasoning`, `body_rss`, HKR reasons). If adding a new domain field, update the relevant serializer and OpenAPI schema together.
 - **Feed/search query parsing is centralized** — `/api/public/feed`, `/api/public/search`, `/api/v1/feed`, and `/api/v1/search` share `lib/api/feed-query-params.ts`; only public/v1 max limits differ. Feed-facing tier values come from `VISIBLE_ITEM_TIERS`, highlight/deep-dive tier checks come from `HIGHLIGHT_ITEM_TIERS` / `isHighlightItemTier`, `today|archive` comes from `FEED_VIEWS`, `lexical|semantic` comes from `SEARCH_MODES`, and `source_group` / `source_kind` come from `SOURCE_GROUPS` / `SOURCE_KINDS`, all in `lib/types.ts`; MCP, `/skill.md`, and `/openapi.yaml` render or validate those same runtime tuples instead of repeating enum lists.
+- **Query extraction is centralized separately from envelopes** — REST query routes use `parseQueryParams` / `queryParamsRecord` from `lib/api/query-params.ts`, then surface adapters choose `publicInvalidQuery` or `v1InvalidQuery` so validation parsing cannot drift while response contracts remain surface-specific.
 - **Feed execution is centralized for REST + MCP** — `/api/public/feed`, `/api/v1/feed`, and MCP `ax_radar_feed` all call `runFeedQuery`; adapters keep only auth/rate-limit/ETag and item serialization while the helper keeps item rows and `total` counts paired.
 - **Search execution is centralized for REST + MCP** — `/api/public/search`, `/api/v1/search`, and MCP `ax_radar_search` all call `runSearchQuery`; lexical mode counts the full filtered match set for pagination, while semantic mode shares the same source/date/tier filter mapping.
 - **Source catalog serialization is centralized** — `/api/public/sources`, `/api/v1/sources`, and MCP `ax_radar_sources` share `lib/api/source-catalog.ts`; public strips operational diagnostics, v1 keeps them, MCP keeps a compact flat shape.

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import { newsletters } from "@/db/schema";
 import { etagSignal } from "@/lib/api/public-helpers";
+import { invalidQueryError } from "@/lib/api/query-params";
 import { DAILY_NEWSLETTER_KIND, NEWSLETTER_LOCALES } from "@/lib/types";
 
 const dailyColumnLocaleSchema = z.enum(NEWSLETTER_LOCALES).default("zh");
@@ -316,7 +317,7 @@ export async function getPublicDailyColumnIndex(
   if (!parsed.success) {
     return {
       ok: false,
-      error: `invalid_query: ${parsed.error.issues.map((i) => i.message).join("; ")}`,
+      error: invalidQueryError(parsed.error.issues),
       status: 400,
     };
   }

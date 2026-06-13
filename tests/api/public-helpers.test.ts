@@ -7,6 +7,7 @@ import {
   publicCachedJson,
   publicError,
   publicHeaders,
+  publicInvalidQuery,
   publicJson,
 } from "@/lib/api/public-helpers";
 
@@ -167,6 +168,18 @@ describe("public-helpers — etag + CORS + cache", () => {
       expect(res.headers.get("access-control-allow-origin")).toBe("*");
       const body = await res.json();
       expect(body).toEqual({ error: "invalid_query" });
+    });
+
+    it("formats validation issues for public invalid query responses", async () => {
+      const res = publicInvalidQuery([
+        { message: "Too small: expected number to be >=1" },
+      ]);
+
+      expect(res.status).toBe(400);
+      expect(res.headers.get("access-control-allow-origin")).toBe("*");
+      expect(await res.json()).toEqual({
+        error: "invalid_query: Too small: expected number to be >=1",
+      });
     });
   });
 });

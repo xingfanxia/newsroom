@@ -9,6 +9,7 @@
  * Window = today | week | month | all (default week).
  */
 import { z } from "zod";
+import { parseQueryParams } from "@/lib/api/query-params";
 import {
   runV1Route,
   v1Error,
@@ -26,11 +27,8 @@ const querySchema = z.object({
 
 export async function GET(req: Request) {
   return runV1Route(req, async () => {
-    const url = new URL(req.url);
-    const parsed = querySchema.safeParse(
-      Object.fromEntries(url.searchParams.entries()),
-    );
-    if (!parsed.success) return v1InvalidQuery();
+    const parsed = parseQueryParams(req, querySchema);
+    if (!parsed.ok) return v1InvalidQuery();
 
     const w = parsed.data.window;
 

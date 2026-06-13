@@ -122,6 +122,10 @@ Shipped cleanup:
   `/skill.md`, `/openapi.yaml`, `/agents`, and
   `docs/agent-access/README.md` render or verify the same endpoint count,
   limit labels, and cache policy instead of repeating budgets or 304 wiring.
+- Shared REST query-param extraction and validation plumbing through
+  `lib/api/query-params.ts`; public and v1 query routes now reuse one
+  Request/URLSearchParams parser while keeping their separate
+  `publicInvalidQuery` and `v1InvalidQuery` envelopes.
 - Shared RSS XML/HTTP response envelope, XML escaping, CDATA splitting, and
   lightweight markdown-to-HTML rendering through `lib/rss/render.ts`;
   `/api/rss/*`, the featured-locale feeds, and the legacy newsletter feeds now
@@ -204,7 +208,7 @@ Verification (2026-06-13):
 - `bun run code:dead:exports` — passed.
 - `bun run code:dead:types` — passed.
 - `bun run lint` — passed with no warnings.
-- `bun test --env-file=.env.local` — 759 pass, 1 skip, 0 fail.
+- `bun test --env-file=.env.local` — 765 pass, 1 skip, 0 fail.
 - `bun run build` — passed.
 - `git diff --check` — passed.
 

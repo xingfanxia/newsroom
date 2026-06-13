@@ -18,7 +18,9 @@ import {
   publicCachedJson,
   publicEndpointRateLimit,
   publicError,
+  publicInvalidQuery,
 } from "@/lib/api/public-helpers";
+import { parseQueryParams } from "@/lib/api/query-params";
 import { runFeedQuery } from "@/lib/api/feed-results";
 import { toPublicApiItem } from "@/lib/api/public-items";
 import {
@@ -34,14 +36,8 @@ export async function GET(req: Request) {
   if (limited) return limited;
 
   const url = new URL(req.url);
-  const params = Object.fromEntries(url.searchParams.entries());
-  const parsed = publicFeedQueryParamSchema.safeParse(params);
-  if (!parsed.success) {
-    return publicError(
-      `invalid_query: ${parsed.error.issues.map((i) => i.message).join("; ")}`,
-      400,
-    );
-  }
+  const parsed = parseQueryParams(url, publicFeedQueryParamSchema);
+  if (!parsed.ok) return publicInvalidQuery(parsed.issues);
   const q = parsed.data;
   const feedQuery = feedQueryFromParams(q);
 

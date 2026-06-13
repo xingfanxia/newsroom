@@ -37,6 +37,7 @@ import {
   v1InvalidQuery,
   v1Json,
 } from "@/lib/api/v1-route";
+import { parseQueryParams } from "@/lib/api/query-params";
 import { runFeedQuery } from "@/lib/api/feed-results";
 import { toAgentApiItem } from "@/lib/api/v1-items";
 import {
@@ -46,10 +47,8 @@ import {
 
 export async function GET(req: Request) {
   return runV1Route(req, async () => {
-    const url = new URL(req.url);
-    const params = Object.fromEntries(url.searchParams.entries());
-    const parsed = v1FeedQueryParamSchema.safeParse(params);
-    if (!parsed.success) return v1InvalidQuery(parsed.error.issues);
+    const parsed = parseQueryParams(req, v1FeedQueryParamSchema);
+    if (!parsed.ok) return v1InvalidQuery(parsed.issues);
 
     const q = parsed.data;
     const feedQuery = feedQueryFromParams(q);
