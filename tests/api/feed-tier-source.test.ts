@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import {
+  HIGHLIGHT_ITEM_TIERS,
+  isHighlightItemTier,
+  isVisibleItemTier,
+  VISIBLE_ITEM_TIERS,
+} from "@/lib/types";
 
 const root = process.cwd();
 const types = readFileSync(resolve(root, "lib/types.ts"), "utf8");
@@ -31,6 +37,16 @@ const allPage = readFileSync(
   "utf8",
 );
 const liveItems = readFileSync(resolve(root, "lib/items/live.ts"), "utf8");
+const itemDetail = readFileSync(resolve(root, "lib/items/detail.ts"), "utf8");
+const savedItems = readFileSync(resolve(root, "lib/items/saved.ts"), "utf8");
+const semanticSearch = readFileSync(
+  resolve(root, "lib/items/semantic-search.ts"),
+  "utf8",
+);
+const enrichTreatment = readFileSync(
+  resolve(root, "workers/enrich/treatment.ts"),
+  "utf8",
+);
 const enrichPrompt = readFileSync(resolve(root, "workers/enrich/prompt.ts"), "utf8");
 const itemCommentary = readFileSync(
   resolve(root, "workers/enrich/commentary.ts"),
@@ -40,15 +56,44 @@ const eventCommentary = readFileSync(
   resolve(root, "workers/cluster/commentary.ts"),
   "utf8",
 );
+const backfillStyle = readFileSync(
+  resolve(root, "scripts/ops/backfill-style.ts"),
+  "utf8",
+);
+const backfillChinese = readFileSync(
+  resolve(root, "scripts/ops/backfill-chinese.ts"),
+  "utf8",
+);
+const resetCuratedForBackfill = readFileSync(
+  resolve(root, "scripts/ops/reset-curated-for-backfill.ts"),
+  "utf8",
+);
+const regenCommentaryPreview = readFileSync(
+  resolve(root, "scripts/ops/regen-commentary-preview.ts"),
+  "utf8",
+);
 
 describe("feed tier/view source wiring", () => {
   test("feed-facing filter enums have one runtime source of truth", () => {
     expect(types).toContain("export const ITEM_TIERS");
     expect(types).toContain("export const VISIBLE_ITEM_TIERS");
+    expect(types).toContain("export const HIGHLIGHT_ITEM_TIERS");
+    expect(types).toContain("export function isVisibleItemTier");
+    expect(types).toContain("export function isHighlightItemTier");
     expect(types).toContain("export const FEED_VIEWS");
     expect(types).toContain("export const SOURCE_GROUPS");
     expect(types).toContain("export const SOURCE_KINDS");
     expect(types).toContain("export const SEARCH_MODES");
+  });
+
+  test("highlight tier helpers encode the featured/p1 subset once", () => {
+    expect(VISIBLE_ITEM_TIERS).toEqual(["featured", "p1", "all"]);
+    expect(HIGHLIGHT_ITEM_TIERS).toEqual(["featured", "p1"]);
+    expect(isVisibleItemTier("all")).toBe(true);
+    expect(isVisibleItemTier("excluded")).toBe(false);
+    expect(isHighlightItemTier("featured")).toBe(true);
+    expect(isHighlightItemTier("p1")).toBe(true);
+    expect(isHighlightItemTier("all")).toBe(false);
   });
 
   test("feed-facing schemas use shared visible tiers, views, and source filters", () => {
@@ -99,6 +144,38 @@ describe("feed tier/view source wiring", () => {
     expect(enrichPrompt).toContain("z.enum(ITEM_TIERS)");
     expect(itemCommentary).toContain("VISIBLE_ITEM_TIERS");
     expect(eventCommentary).toContain("VISIBLE_ITEM_TIERS");
+  });
+
+  test("highlight tier decisions use the shared helper", () => {
+    for (const source of [
+      liveItems,
+      itemDetail,
+      savedItems,
+      semanticSearch,
+      enrichTreatment,
+      itemCommentary,
+      eventCommentary,
+      backfillStyle,
+      backfillChinese,
+    ]) {
+      expect(source).toContain("isHighlightItemTier");
+      expect(source).not.toMatch(
+        /(?:tier|eventTier|effectiveTier|r\.tier|item\.tier|c\.eventTier) === "featured" \|\| (?:tier|eventTier|effectiveTier|r\.tier|item\.tier|c\.eventTier) === "p1"/,
+      );
+    }
+  });
+
+  test("operator commentary scripts reuse visible tier tuples", () => {
+    for (const source of [
+      backfillStyle,
+      resetCuratedForBackfill,
+      regenCommentaryPreview,
+    ]) {
+      expect(source).toContain("VISIBLE_ITEM_TIERS");
+      expect(source).not.toContain('["featured", "p1", "all"]');
+    }
+    expect(backfillStyle).toContain("HIGHLIGHT_ITEM_TIERS");
+    expect(backfillStyle).toContain("isVisibleItemTier");
   });
 
   test("public item and lead-pick source contracts use shared source types", () => {

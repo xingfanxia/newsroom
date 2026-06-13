@@ -65,6 +65,10 @@ Shipped cleanup:
   cannot drift on `featured|p1|all|excluded`, `today|archive`,
   `lexical|semantic`,
   `source_group`, or `source_kind`.
+- Shared the `featured|p1` highlight/deep-dive tier subset through
+  `HIGHLIGHT_ITEM_TIERS` and `isHighlightItemTier` in `lib/types.ts`, so
+  feed serializers, item/event commentary dispatch, treatment routing, and
+  operator backfill scripts no longer repeat that decision locally.
 - Shared public/agent API item source-field types and cluster lead-pick source
   authority types through `SourceGroup` / `SourceKind` from `lib/types.ts`;
   the archived s9 MCP plan is now labeled historical so old enum examples

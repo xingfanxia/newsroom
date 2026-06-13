@@ -19,6 +19,7 @@
  */
 
 import { describe, it, expect } from "bun:test";
+import { isHighlightItemTier } from "@/lib/types";
 import {
   eventCommentaryUserPrompt,
   eventCommentarySystem,
@@ -467,7 +468,7 @@ describe("event commentary tier dispatch", () => {
   /** Mirrors the runtime check used in workers/cluster/commentary.ts +
    *  scripts/ops/backfill-style.ts: featured/p1 → full schema, all → note. */
   function shouldUseFullSchema(eventTier: string | null): boolean {
-    return eventTier === "featured" || eventTier === "p1";
+    return isHighlightItemTier(eventTier);
   }
 
   it("featured → full deep-dive schema", () => {

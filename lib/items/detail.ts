@@ -1,7 +1,7 @@
 import { and, eq, isNotNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items, sources } from "@/db/schema";
-import type { AppLocale, Story } from "@/lib/types";
+import { isHighlightItemTier, type AppLocale, type Story } from "@/lib/types";
 
 type Locale = AppLocale;
 
@@ -98,7 +98,7 @@ export async function getItemDetail(
       localeCode: (r.sourceLocale ?? "multi") as Story["source"]["localeCode"],
       groupCode: r.sourceGroup as Story["source"]["groupCode"],
     },
-    featured: r.tier === "featured" || r.tier === "p1",
+    featured: isHighlightItemTier(r.tier),
     title,
     summary:
       locale === "en"

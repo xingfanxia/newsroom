@@ -22,7 +22,13 @@ import { and, eq, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items, sources, clusters, halfvecToDriver } from "@/db/schema";
 import { embed } from "@/lib/llm";
-import type { AppLocale, SourceGroup, SourceKind, Story } from "@/lib/types";
+import {
+  isHighlightItemTier,
+  type AppLocale,
+  type SourceGroup,
+  type SourceKind,
+  type Story,
+} from "@/lib/types";
 
 export type SemanticFilters = {
   locale?: AppLocale;
@@ -167,7 +173,7 @@ export async function semanticSearch(
         localeCode: (r.sourceLocale ?? "multi") as Story["source"]["localeCode"],
         groupCode: r.sourceGroup as Story["source"]["groupCode"],
       },
-      featured: r.tier === "featured" || r.tier === "p1",
+      featured: isHighlightItemTier(r.tier),
       title,
       summary:
         locale === "en"

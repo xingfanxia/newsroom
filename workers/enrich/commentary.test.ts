@@ -14,6 +14,7 @@
  *      the same input shape both paths use)
  */
 import { describe, it, expect } from "bun:test";
+import { isHighlightItemTier } from "@/lib/types";
 import {
   commentarySchema,
   commentaryNoteSchema,
@@ -143,7 +144,7 @@ describe("per-item commentary tier dispatch", () => {
   /** Mirrors the runtime check inside generateOneCommentary +
    *  backfillItem: featured/p1 → full schema, all → note-only. */
   function shouldUseFullSchema(tier: string | null): boolean {
-    return tier === "featured" || tier === "p1";
+    return isHighlightItemTier(tier);
   }
 
   it("featured → full deep-dive schema", () => {

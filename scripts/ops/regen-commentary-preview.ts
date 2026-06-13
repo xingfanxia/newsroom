@@ -13,6 +13,7 @@
 import { inArray } from "drizzle-orm";
 import { db, closeDb } from "@/db/client";
 import { items } from "@/db/schema";
+import { VISIBLE_ITEM_TIERS } from "@/lib/types";
 import { runCommentaryBackfill } from "@/workers/enrich/commentary";
 
 async function resolveTargets(args: string[]): Promise<number[]> {
@@ -20,7 +21,7 @@ async function resolveTargets(args: string[]): Promise<number[]> {
     const rows = await db()
       .select({ id: items.id })
       .from(items)
-      .where(inArray(items.tier, ["featured", "p1", "all"]));
+      .where(inArray(items.tier, VISIBLE_ITEM_TIERS));
     return rows.map((r) => r.id);
   }
   const ids = args

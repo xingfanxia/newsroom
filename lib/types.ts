@@ -112,6 +112,30 @@ export const VISIBLE_ITEM_TIERS = [
 ] as const satisfies readonly ItemTier[];
 export type VisibleItemTier = (typeof VISIBLE_ITEM_TIERS)[number];
 
+export const HIGHLIGHT_ITEM_TIERS = [
+  "featured",
+  "p1",
+] as const satisfies readonly VisibleItemTier[];
+export type HighlightItemTier = (typeof HIGHLIGHT_ITEM_TIERS)[number];
+
+export function isVisibleItemTier(
+  value: string | null | undefined,
+): value is VisibleItemTier {
+  return (
+    typeof value === "string" &&
+    (VISIBLE_ITEM_TIERS as readonly string[]).includes(value)
+  );
+}
+
+export function isHighlightItemTier(
+  value: string | null | undefined,
+): value is HighlightItemTier {
+  return (
+    typeof value === "string" &&
+    (HIGHLIGHT_ITEM_TIERS as readonly string[]).includes(value)
+  );
+}
+
 export const FEED_VIEWS = ["today", "archive"] as const;
 export type FeedView = (typeof FEED_VIEWS)[number];
 

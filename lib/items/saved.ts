@@ -1,7 +1,11 @@
 import { desc, eq, and, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items, sources, feedback, clusters } from "@/db/schema";
-import { FEEDBACK_SAVE_VOTE, type Story } from "@/lib/types";
+import {
+  FEEDBACK_SAVE_VOTE,
+  isHighlightItemTier,
+  type Story,
+} from "@/lib/types";
 
 /**
  * Fetch the current user's saved items (feedback.vote='save') joined with
@@ -143,7 +147,7 @@ export async function getSavedStories(
         localeCode: (r.sourceLocale ?? "multi") as Story["source"]["localeCode"],
         groupCode: r.sourceGroup as Story["source"]["groupCode"],
       },
-      featured: effectiveTier === "featured" || effectiveTier === "p1",
+      featured: isHighlightItemTier(effectiveTier),
       title,
       summary:
         locale === "en"

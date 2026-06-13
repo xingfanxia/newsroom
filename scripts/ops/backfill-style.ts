@@ -53,6 +53,13 @@ import {
   type EventMember,
 } from "@/workers/cluster/prompt";
 import { resolvePricing, computeCost } from "@/lib/llm/pricing";
+import {
+  HIGHLIGHT_ITEM_TIERS,
+  isHighlightItemTier,
+  isVisibleItemTier,
+  VISIBLE_ITEM_TIERS,
+  type VisibleItemTier,
+} from "@/lib/types";
 import { treatmentForScore } from "@/workers/enrich/treatment";
 
 type Capability = (typeof CAPABILITIES)[number];
@@ -76,7 +83,7 @@ interface Flags {
   batchSize: number;
   maxCostUsd: number;
   sinceDate: string;
-  tiers: string[];
+  tiers: VisibleItemTier[];
   targets: Targets;
   resume: boolean;
 }
@@ -107,7 +114,7 @@ function parseArgs(argv: string[]): Flags {
     batchSize: 30,
     maxCostUsd: 50,
     sinceDate: "2026-01-01",
-    tiers: ["featured", "p1"],
+    tiers: [...HIGHLIGHT_ITEM_TIERS],
     targets: "both",
     resume: false,
   };
@@ -138,9 +145,14 @@ function parseArgs(argv: string[]): Flags {
       f.sinceDate = v;
     } else if (a === "--tier") {
       const v = next(++i, a);
-      f.tiers = v === "all"
-        ? ["featured", "p1", "all"]
-        : v.split(",").map((s) => s.trim()).filter(Boolean);
+      const tiers =
+        v === "all"
+          ? [...VISIBLE_ITEM_TIERS]
+          : v.split(",").map((s) => s.trim()).filter(Boolean);
+      if (tiers.length === 0 || !tiers.every(isVisibleItemTier)) {
+        die(`--tier must be a comma-list of ${VISIBLE_ITEM_TIERS.join("|")}, got ${v}`);
+      }
+      f.tiers = tiers;
     } else if (a === "--targets") {
       const v = next(++i, a);
       if (v !== "items" && v !== "clusters" && v !== "both") {
@@ -203,7 +215,7 @@ async function getPolicyBumpTimestamp(): Promise<Date> {
 
 // ── Candidate queries ────────────────────────────────────────────────
 async function loadItemCandidates(args: {
-  tiers: string[];
+  tiers: VisibleItemTier[];
   sinceDate: string;
   policyBumpAt: Date;
   excludeIds: Set<number>;
@@ -239,7 +251,7 @@ interface ClusterCandidate {
 }
 
 async function loadClusterCandidates(args: {
-  tiers: string[];
+  tiers: VisibleItemTier[];
   sinceDate: string;
   policyBumpAt: Date;
   excludeIds: Set<number>;
@@ -248,10 +260,7 @@ async function loadClusterCandidates(args: {
   // path, see workers/cluster/commentary.ts). Pass through whichever tiers
   // the caller requested; the backfill function dispatches to the right
   // schema per cluster.
-  const eventTiers = args.tiers.filter(
-    (t) => t === "featured" || t === "p1" || t === "all",
-  );
-  if (eventTiers.length === 0) return [];
+  const eventTiers = args.tiers;
   const since = new Date(`${args.sinceDate}T00:00:00Z`);
   const rows = await db()
     .select({
@@ -344,7 +353,7 @@ async function backfillItem(item: Item): Promise<BackfillResult> {
     publishedAt: item.publishedAt.toISOString(),
   });
 
-  const isFull = item.tier === "featured" || item.tier === "p1";
+  const isFull = isHighlightItemTier(item.tier);
   const treatment = treatmentForScore({
     importance: item.importance,
     tier: item.tier,
@@ -475,7 +484,7 @@ async function backfillCluster(c: ClusterCandidate): Promise<BackfillResult | nu
     richestTitle: richest.title,
   });
 
-  const isFull = c.eventTier === "featured" || c.eventTier === "p1";
+  const isFull = isHighlightItemTier(c.eventTier);
   const treatment = treatmentForScore({
     importance: c.importance,
     tier: c.eventTier,

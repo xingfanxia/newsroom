@@ -13,6 +13,7 @@
  */
 import { db, closeDb } from "@/db/client";
 import { items } from "@/db/schema";
+import { VISIBLE_ITEM_TIERS } from "@/lib/types";
 import { ENRICH_CLAIM_RESET_VALUES } from "@/workers/enrich/claim-state";
 import { and, inArray, isNotNull, sql } from "drizzle-orm";
 
@@ -23,7 +24,7 @@ async function main() {
     .select({ tier: items.tier, n: sql<number>`count(*)::int` })
     .from(items)
     .where(
-      and(inArray(items.tier, ["featured", "p1", "all"]), isNotNull(items.enrichedAt)),
+      and(inArray(items.tier, VISIBLE_ITEM_TIERS), isNotNull(items.enrichedAt)),
     )
     .groupBy(items.tier);
   console.log("enriched curated by tier:", counts);
@@ -35,7 +36,7 @@ async function main() {
       ...ENRICH_CLAIM_RESET_VALUES,
     })
     .where(
-      and(inArray(items.tier, ["featured", "p1", "all"]), isNotNull(items.enrichedAt)),
+      and(inArray(items.tier, VISIBLE_ITEM_TIERS), isNotNull(items.enrichedAt)),
     )
     .returning({ id: items.id });
   console.log(`enriched_at reset: ${enrichedReset.length} items`);
@@ -44,7 +45,7 @@ async function main() {
     .update(items)
     .set({ commentaryAt: null })
     .where(
-      and(inArray(items.tier, ["featured", "p1", "all"]), isNotNull(items.commentaryAt)),
+      and(inArray(items.tier, VISIBLE_ITEM_TIERS), isNotNull(items.commentaryAt)),
     )
     .returning({ id: items.id });
   console.log(`commentary_at reset: ${commentaryReset.length} items`);

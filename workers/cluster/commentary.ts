@@ -22,7 +22,7 @@ import { and, desc, eq, inArray, isNull, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clusters, items } from "@/db/schema";
 import { generateStructured, profiles } from "@/lib/llm";
-import { VISIBLE_ITEM_TIERS } from "@/lib/types";
+import { isHighlightItemTier, VISIBLE_ITEM_TIERS } from "@/lib/types";
 import {
   eventCommentarySchema,
   eventCommentarySystem,
@@ -192,8 +192,7 @@ async function processOneCluster(candidate: ClusterCandidate): Promise<void> {
     richestTitle: richest.title,
   });
 
-  const isFull =
-    candidate.eventTier === "featured" || candidate.eventTier === "p1";
+  const isFull = isHighlightItemTier(candidate.eventTier);
   const treatment = treatmentForScore({
     importance: candidate.importance,
     tier: candidate.eventTier,

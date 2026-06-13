@@ -1,13 +1,14 @@
 import { and, eq, sql, isNotNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items, sources, clusters } from "@/db/schema";
-import type {
-  AppLocale,
-  FeedView,
-  SourceGroup,
-  SourceKind,
-  Story,
-  VisibleItemTier,
+import {
+  isHighlightItemTier,
+  type AppLocale,
+  type FeedView,
+  type SourceGroup,
+  type SourceKind,
+  type Story,
+  type VisibleItemTier,
 } from "@/lib/types";
 
 type Locale = AppLocale;
@@ -438,7 +439,7 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
           ? (r.sourceGroup as Story["source"]["groupCode"])
           : undefined,
       },
-      featured: effectiveTier === "featured" || effectiveTier === "p1",
+      featured: isHighlightItemTier(effectiveTier),
       title,
       summary:
         q.locale === "en"

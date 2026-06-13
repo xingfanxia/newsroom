@@ -31,6 +31,7 @@ import {
   eventCommentaryUserPrompt,
   type EventMember,
 } from "@/workers/cluster/prompt";
+import { isHighlightItemTier } from "@/lib/types";
 import { treatmentForScore } from "@/workers/enrich/treatment";
 
 type Capability = (typeof CAPABILITIES)[number];
@@ -463,7 +464,7 @@ async function rewriteClusterCommentary(c: ClusterCandidate, dryRun: boolean) {
     richestSourceId: richest.sourceId,
     richestTitle: richest.title,
   });
-  const full = c.eventTier === "featured" || c.eventTier === "p1";
+  const full = isHighlightItemTier(c.eventTier);
   const treatment = treatmentForScore({
     importance: c.importance,
     tier: c.eventTier,

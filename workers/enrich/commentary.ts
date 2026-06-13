@@ -21,7 +21,11 @@ import { and, eq, isNull, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items, clusters, type Item } from "@/db/schema";
 import { generateStructured, profiles } from "@/lib/llm";
-import { VISIBLE_ITEM_TIERS, type VisibleItemTier } from "@/lib/types";
+import {
+  isHighlightItemTier,
+  VISIBLE_ITEM_TIERS,
+  type VisibleItemTier,
+} from "@/lib/types";
 import {
   commentarySchema,
   COMMENTARY_SYSTEM,
@@ -146,7 +150,7 @@ async function generateOneCommentary(item: Item): Promise<void> {
     publishedAt: item.publishedAt.toISOString(),
   });
 
-  const isFull = item.tier === "featured" || item.tier === "p1";
+  const isFull = isHighlightItemTier(item.tier);
   const treatment = treatmentForScore({
     importance: item.importance,
     tier: item.tier,
