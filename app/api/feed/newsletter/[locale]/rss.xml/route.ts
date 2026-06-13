@@ -1,10 +1,10 @@
-import { NextResponse } from "next/server";
 import { db } from "@/db/client";
 import { newsletters } from "@/db/schema";
 import {
   escapeXml,
   renderMarkdownishHtml,
   renderRssFeed,
+  rssResponse,
   type RssItem,
 } from "@/lib/rss/render";
 import { publicUrl } from "@/lib/site";
@@ -93,14 +93,7 @@ ${renderMarkdownishHtml(commentary)}
     items,
   });
 
-  return new NextResponse(xml, {
-    status: 200,
-    headers: {
-      "content-type": "application/rss+xml; charset=utf-8",
-      "cache-control":
-        "public, max-age=600, s-maxage=600, stale-while-revalidate=3600",
-    },
-  });
+  return rssResponse(xml);
 }
 
 function formatRange(start: Date, end: Date, locale: "zh" | "en"): string {

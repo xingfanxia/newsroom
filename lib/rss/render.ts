@@ -1,7 +1,6 @@
 /**
  * RSS 2.0 envelope renderer with content:encoded support.
- * Pure function, no IO. Caller wraps in a NextResponse with the right
- * Content-Type + cache headers.
+ * Pure XML helpers plus the shared HTTP response envelope used by RSS routes.
  */
 
 export type RssItem = {
@@ -33,6 +32,20 @@ export type RssChannel = {
   generator?: string;
   namespaces?: Record<string, string>;
 };
+
+type RssCacheConfig = {
+  maxAge: number;
+  sMaxAge?: number;
+  staleWhileRevalidate?: number;
+};
+
+const RSS_DEFAULT_CACHE: RssCacheConfig = {
+  maxAge: 600,
+  sMaxAge: 600,
+  staleWhileRevalidate: 3600,
+};
+
+const RSS_CONTENT_TYPE = "application/rss+xml; charset=utf-8";
 
 export function escapeXml(s: string): string {
   return s
@@ -129,4 +142,26 @@ ${generator.trimEnd()}
 ${itemsXml}
   </channel>
 </rss>`;
+}
+
+export function rssResponse(
+  xml: string,
+  cache: RssCacheConfig = RSS_DEFAULT_CACHE,
+): Response {
+  return new Response(xml, {
+    status: 200,
+    headers: {
+      "content-type": RSS_CONTENT_TYPE,
+      "cache-control": rssCacheControl(cache),
+    },
+  });
+}
+
+function rssCacheControl(cache: RssCacheConfig): string {
+  const parts = ["public", `max-age=${cache.maxAge}`];
+  if (cache.sMaxAge !== undefined) parts.push(`s-maxage=${cache.sMaxAge}`);
+  if (cache.staleWhileRevalidate !== undefined) {
+    parts.push(`stale-while-revalidate=${cache.staleWhileRevalidate}`);
+  }
+  return parts.join(", ");
 }

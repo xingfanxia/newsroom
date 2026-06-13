@@ -1,9 +1,9 @@
-import { NextResponse } from "next/server";
 import { getFeaturedStories } from "@/lib/items/live";
 import {
   escapeXml,
   renderMarkdownishHtml,
   renderRssFeed,
+  rssResponse,
   type RssItem,
 } from "@/lib/rss/render";
 import { PUBLIC_SITE_HOST, publicUrl } from "@/lib/site";
@@ -70,14 +70,7 @@ export async function GET(
     items,
   });
 
-  return new NextResponse(xml, {
-    status: 200,
-    headers: {
-      "content-type": "application/rss+xml; charset=utf-8",
-      "cache-control":
-        "public, max-age=600, s-maxage=600, stale-while-revalidate=3600",
-    },
-  });
+  return rssResponse(xml);
 }
 
 function buildContentHtml(s: {

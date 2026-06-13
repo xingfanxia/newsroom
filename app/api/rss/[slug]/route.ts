@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { renderRssFeed, type RssItem } from "@/lib/rss/render";
+import { renderRssFeed, rssResponse, type RssItem } from "@/lib/rss/render";
 import { rssRateLimit } from "@/lib/rate-limit/rss";
 import { publicUrl } from "@/lib/site";
 import {
@@ -52,12 +52,7 @@ export async function GET(
       ? await renderDailyFeed(meta, slug)
       : await renderLaneFeed(slug as "today" | "curated", meta);
 
-  return new Response(xml, {
-    headers: {
-      "Content-Type": "application/rss+xml; charset=utf-8",
-      "Cache-Control": "public, max-age=900",
-    },
-  });
+  return rssResponse(xml, { maxAge: 900 });
 }
 
 async function renderDailyFeed(

@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
   renderMarkdownishHtml,
   renderRssFeed,
+  rssResponse,
   type RssItem,
 } from "@/lib/rss/render";
 
@@ -132,5 +133,26 @@ describe("renderRssFeed", () => {
     expect(html).toContain("<h2>Title</h2>");
     expect(html).toContain("<ul><li>one</li>\n<li>two</li>\n</ul>");
     expect(html).toContain("<p>plain &amp; &lt;text&gt;</p>");
+  });
+});
+
+describe("rssResponse", () => {
+  it("wraps RSS XML with the shared content type and default cache policy", async () => {
+    const res = rssResponse("<rss />");
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe(
+      "application/rss+xml; charset=utf-8",
+    );
+    expect(res.headers.get("cache-control")).toBe(
+      "public, max-age=600, s-maxage=600, stale-while-revalidate=3600",
+    );
+    expect(await res.text()).toBe("<rss />");
+  });
+
+  it("supports explicit cache policies for RSS variants", () => {
+    const res = rssResponse("<rss />", { maxAge: 900 });
+
+    expect(res.headers.get("cache-control")).toBe("public, max-age=900");
   });
 });

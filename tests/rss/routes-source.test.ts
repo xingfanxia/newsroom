@@ -19,6 +19,10 @@ describe("RSS route source contracts", () => {
     for (const route of [mainFeedRoute, newsletterFeedRoute, dailyFeedRoute]) {
       expect(route).toContain("@/lib/rss/render");
       expect(route).toContain("renderRssFeed");
+      expect(route).toContain("rssResponse");
+      expect(route).not.toContain("new NextResponse(xml");
+      expect(route).not.toContain("new Response(xml");
+      expect(route).not.toContain("application/rss+xml; charset=utf-8");
     }
   });
 
