@@ -1,5 +1,9 @@
 import { describe, expect, it } from "bun:test";
-import { cadenceMinutesFromCron } from "@/lib/shell/system-stats";
+import {
+  cadenceMinutesFromCron,
+  systemCronSnapshots,
+} from "@/lib/shell/system-cron";
+import vercelConfig from "@/vercel.json";
 
 describe("cadenceMinutesFromCron", () => {
   it("derives common Vercel cron cadences from the schedule expression", () => {
@@ -16,5 +20,27 @@ describe("cadenceMinutesFromCron", () => {
     expect(cadenceMinutesFromCron("bad schedule")).toBeNull();
     expect(cadenceMinutesFromCron("0 9 1 1 *")).toBeNull();
     expect(cadenceMinutesFromCron("0,10,25 * * * *")).toBeNull();
+  });
+
+  it("builds the admin cron table from vercel.json with cadence labels", () => {
+    const expected = (
+      (vercelConfig as { crons?: Array<{ path: string; schedule: string }> })
+        .crons ?? []
+    ).map((c) => ({
+      name: c.path.replace(/^\/api\/cron\//, ""),
+      schedule: c.schedule,
+    }));
+
+    const snapshots = systemCronSnapshots();
+    expect(snapshots.map(({ name, schedule }) => ({ name, schedule }))).toEqual(
+      expected,
+    );
+    expect(snapshots.find((c) => c.name === "article-body")?.next).toBe(
+      "~15m cadence",
+    );
+    expect(snapshots.find((c) => c.name === "newsletter-daily")?.next).toBe(
+      "~24h cadence",
+    );
+    expect(snapshots.every((c) => c.last === "—")).toBe(true);
   });
 });

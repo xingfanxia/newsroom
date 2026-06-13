@@ -25,8 +25,9 @@ Shipped cleanup:
   remains visible to operator scripts/backfills but no longer spends every
   cluster cron tick by default.
 - Removed the separate `/admin/system` cron cadence path map; cadence labels
-  are now inferred from the `vercel.json` cron expressions, so schedule and
-  display cannot drift when a cron path changes.
+  are now inferred from the `vercel.json` cron expressions via
+  `lib/shell/system-cron.ts`, so schedule parsing stays out of
+  `getSystemSnapshot` and display cannot drift when a cron path changes.
 - Shared `/api/admin/iterations/[id]` route-id parsing through `lib/policy/iterations.ts` so fetch/apply/reject stay behaviorally aligned.
 - Shared admin auth JSON-error mapping for protected `/api/admin/*` data routes through `lib/api/admin-auth.ts`.
 - Shared cookie-session auth JSON-error mapping for required-session user routes (`/api/feedback*`, `/api/tweaks`) through `lib/api/session-auth.ts`.
@@ -259,7 +260,7 @@ Known caveat:
   cost-big hero + monthly cap (default $1000 via env) + 30d daily-spend
   SVG sparkline + token-mix hbar tiles + cost-by-task table with share
   bars + cost-by-model table + 25 most recent calls. Range switcher
-  via `?range=today|week|month` (server-rendered, no client JS needed).
+  via `?range=today|week|month|all` (server-rendered, no client JS needed).
 - **`/admin/system`** rebuilt per `Admin - System.html` demo: 4 hero
   tiles (services up / queue depth / errors 24h / cron jobs) + warn
   banner when any enabled source is erroring + services grid from
