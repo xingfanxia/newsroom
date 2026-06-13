@@ -17,8 +17,7 @@
  */
 import { runV1Route, v1Error, v1Json } from "@/lib/api/v1-route";
 import {
-  getItemDetailRow,
-  parseItemDetailRouteId,
+  getItemDetailRouteRow,
   toV1ItemDetail,
 } from "@/lib/api/item-detail";
 
@@ -28,17 +27,13 @@ export async function GET(
 ) {
   return runV1Route(req, async () => {
     const { id: idRaw } = await ctx.params;
-    const parsed = parseItemDetailRouteId(idRaw);
-    if (!parsed.ok) {
-      return v1Error(parsed.error, 400);
-    }
 
     try {
-      const row = await getItemDetailRow(parsed.id);
-      if (!row) {
-        return v1Error("not_found", 404);
+      const found = await getItemDetailRouteRow(idRaw);
+      if (!found.ok) {
+        return v1Error(found.error, found.status);
       }
-      return v1Json(toV1ItemDetail(row));
+      return v1Json(toV1ItemDetail(found.row));
     } catch (err) {
       console.error("[api/v1/items/:id] failed", err);
       return v1Error("server_error", 500);

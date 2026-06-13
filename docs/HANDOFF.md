@@ -67,6 +67,9 @@ Shipped cleanup:
 - Shared REST/MCP feed execution through `lib/api/feed-results.ts`;
   adapters now own only auth/rate-limit/ETag/serialization, while the helper
   owns paired item + full-match total queries and pagination defaults.
+- Shared v1/public item-detail route lookup through
+  `getItemDetailRouteRow` in `lib/api/item-detail.ts`; route files now own
+  only auth/cache/error-envelope mapping and surface-specific serialization.
 - Shared bearer-agent usage summary serialization through
   `lib/api/usage-summary.ts`; `/api/v1/usage/summary` and MCP
   `ax_radar_usage` now share the same totals, `by_task`, `by_model`, and

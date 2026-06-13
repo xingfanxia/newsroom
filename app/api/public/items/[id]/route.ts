@@ -13,8 +13,7 @@ import {
   publicError,
 } from "@/lib/api/public-helpers";
 import {
-  getItemDetailRow,
-  parseItemDetailRouteId,
+  getItemDetailRouteRow,
   publicItemDetailEtagSignal,
   toPublicItemDetail,
 } from "@/lib/api/item-detail";
@@ -30,18 +29,16 @@ export async function GET(
   if (limited) return limited;
 
   const { id: idRaw } = await ctx.params;
-  const parsed = parseItemDetailRouteId(idRaw);
-  if (!parsed.ok) return publicError(parsed.error, 400);
 
   try {
-    const row = await getItemDetailRow(parsed.id);
-    if (!row) return publicError("not_found", 404);
+    const found = await getItemDetailRouteRow(idRaw);
+    if (!found.ok) return publicError(found.error, found.status);
 
     return publicCachedJson(req, {
       endpoint: "item",
       etagFamily: "public-item",
-      signal: publicItemDetailEtagSignal(row),
-      body: toPublicItemDetail(row),
+      signal: publicItemDetailEtagSignal(found.row),
+      body: toPublicItemDetail(found.row),
     });
   } catch (err) {
     console.error("[api/public/items/:id] failed", err);

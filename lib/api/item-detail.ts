@@ -3,6 +3,7 @@ import { db } from "@/db/client";
 import { clusters, items, sources } from "@/db/schema";
 import { etagSignal } from "@/lib/api/public-helpers";
 import {
+  INVALID_ROUTE_ID_ERROR,
   parsePositiveRouteId,
   type PositiveRouteIdResult,
 } from "@/lib/api/route-params";
@@ -17,7 +18,7 @@ type DetailTags = {
   topics: string[];
 };
 
-export async function getItemDetailRow(id: number) {
+async function getItemDetailRow(id: number) {
   const [row] = await db()
     .select({
       id: items.id,
@@ -118,6 +119,10 @@ type V1DetailEvent = DetailEvent & {
 };
 
 export type ItemDetailRouteId = PositiveRouteIdResult;
+type ItemDetailRouteLookupError = typeof INVALID_ROUTE_ID_ERROR | "not_found";
+type ItemDetailRouteLookup =
+  | { ok: true; id: number; row: ItemDetailRow }
+  | { ok: false; error: ItemDetailRouteLookupError; status: 400 | 404 };
 
 export type V1ItemDetail = {
   id: string;
@@ -156,6 +161,22 @@ export type PublicItemDetail = Omit<
 
 export function parseItemDetailRouteId(rawId: string): ItemDetailRouteId {
   return parsePositiveRouteId(rawId);
+}
+
+export async function getItemDetailRouteRow(
+  rawId: string,
+): Promise<ItemDetailRouteLookup> {
+  const parsed = parseItemDetailRouteId(rawId);
+  if (!parsed.ok) {
+    return { ok: false, error: parsed.error, status: 400 };
+  }
+
+  const row = await getItemDetailRow(parsed.id);
+  if (!row) {
+    return { ok: false, error: "not_found", status: 404 };
+  }
+
+  return { ok: true, id: parsed.id, row };
 }
 
 function iso(d: Date | null | undefined): string | null {
