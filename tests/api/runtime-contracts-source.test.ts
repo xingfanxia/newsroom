@@ -13,6 +13,7 @@ const schema = read("db/schema.ts");
 const feedParams = read("lib/api/feed-query-params.ts");
 const eventMembers = read("lib/api/event-members.ts");
 const dailyColumns = read("lib/api/daily-columns.ts");
+const savedRequests = read("lib/api/saved-requests.ts");
 const feedbackToggle = read("lib/feedback/toggle.ts");
 const feedbackMetrics = read("lib/feedback/metrics.ts");
 const savedCollections = read("lib/items/collections.ts");
@@ -42,11 +43,12 @@ describe("runtime contract source wiring", () => {
       feedParams,
       eventMembers,
       mcpRoute,
-      v1SavedRoute,
+      savedRequests,
       sitemap,
     ]) {
       expect(source).toContain("APP_LOCALES");
     }
+    expect(v1SavedRoute).toContain("@/lib/api/saved-requests");
     expect(dailyColumns).toContain("NEWSLETTER_LOCALES");
     expect(dailyColumns).toContain("z.enum(NEWSLETTER_LOCALES)");
 

@@ -44,6 +44,15 @@ describe("required session route source wiring", () => {
     }
   });
 
+  test("saved move route shares request validation with saved API schemas", () => {
+    const source = read("app/api/feedback/move/route.ts");
+
+    expect(source).toContain("@/lib/api/saved-requests");
+    expect(source).toContain("feedbackMoveBodySchema");
+    expect(source).not.toContain('from "zod"');
+    expect(source).not.toContain("const bodySchema = z.object");
+  });
+
   test("optional saved export keeps its fallback-user semantics explicit", () => {
     const source = read("app/api/saved/export/route.ts");
 

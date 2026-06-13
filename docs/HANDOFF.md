@@ -55,6 +55,10 @@ Shipped cleanup:
   `lib/api/collection-routes.ts`, so both surfaces reuse the same
   `duplicate_name` and `not_found` decisions while keeping their own auth,
   request schemas, and response envelopes.
+- Shared saved-item request schemas through `lib/api/saved-requests.ts`;
+  `/api/v1/saved` and `/api/feedback/move` now reuse the same positive item
+  id, positive collection id, inbox-null, locale, and pagination validation
+  instead of carrying route-local Zod objects.
 - Shared cookie/v1 tweaks persistence through `lib/api/tweak-routes.ts`, so
   user upsert, preferences/watchlist loading, DB patch construction, and
   `empty_body` decisions stay aligned while each route keeps its own auth and
@@ -231,7 +235,7 @@ Verification (2026-06-13):
 - `bun run code:dead:exports` — passed.
 - `bun run code:dead:types` — passed.
 - `bun run lint` — passed with no warnings.
-- `bun test --env-file=.env.local` — 780 pass, 1 skip, 0 fail.
+- `bun test --env-file=.env.local` — 786 pass, 1 skip, 0 fail.
 - `bun run build` — passed.
 - `git diff --check` — passed.
 

@@ -1,5 +1,5 @@
-import { z } from "zod";
 import { parseJsonRequestBody } from "@/lib/api/json-body";
+import { feedbackMoveBodySchema } from "@/lib/api/saved-requests";
 import {
   runSessionRoute,
   sessionError,
@@ -8,11 +8,6 @@ import {
 } from "@/lib/api/session-route";
 import { upsertAppUser } from "@/lib/auth/session";
 import { moveItemToCollection } from "@/lib/items/collections";
-
-const bodySchema = z.object({
-  itemId: z.number().int().positive(),
-  targetCollectionId: z.number().int().positive().nullable(),
-});
 
 /**
  * POST /api/feedback/move — reparent a saved item into a named collection
@@ -25,7 +20,9 @@ export async function POST(req: Request) {
   return runSessionRoute(async (user) => {
     await upsertAppUser(user);
 
-    const parsed = await parseJsonRequestBody(req, bodySchema, { envelope: "ok" });
+    const parsed = await parseJsonRequestBody(req, feedbackMoveBodySchema, {
+      envelope: "ok",
+    });
     if (!parsed.ok) return parsed.response;
 
     try {

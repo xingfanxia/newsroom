@@ -9,6 +9,15 @@ const savedRoute = readFileSync(
 );
 
 describe("/api/v1/saved source wiring", () => {
+  test("route shares saved request schemas instead of declaring local zod objects", () => {
+    expect(savedRoute).toContain("@/lib/api/saved-requests");
+    expect(savedRoute).toContain("v1SavedQuerySchema");
+    expect(savedRoute).toContain("v1SavedPostBodySchema");
+    expect(savedRoute).not.toContain('from "zod"');
+    expect(savedRoute).not.toContain("const getQuerySchema = z.object");
+    expect(savedRoute).not.toContain("const postBodySchema = z.object");
+  });
+
   test("list endpoint uses the shared saved agent serializer", () => {
     expect(savedRoute).toContain(
       'import { toSavedAgentApiItem } from "@/lib/api/v1-items";',

@@ -65,6 +65,7 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 - **`lib/rss/legacy-feeds.ts`** — shared feed metadata, row queries, and RSS item mapping for `/api/rss/{daily,today,curated}.xml`; the dynamic slug route owns only rate-limit/slug validation/404/response mapping.
 - **`lib/rss/newsletter-feed.ts`** — shared locale normalization, structured-digest query, and RSS item/channel mapping for `/api/feed/newsletter/{locale}/rss.xml`; the route owns only the HTTP response envelope.
 - **`lib/api/collection-requests.ts`** — shared saved-collection request schemas and duplicate-name detection used by cookie-gated `/api/admin/collections` and bearer-gated `/api/v1/collections`; each route still owns its auth and response envelope.
+- **`lib/api/saved-requests.ts`** — shared saved-item query/mutation schemas used by bearer-gated `/api/v1/saved` and the browser saved-item move route; route files still own auth, envelopes, and domain result mapping.
 - **`lib/api/usage-summary.ts`** — shared bearer-gated LLM usage summary contract used by `/api/v1/usage/summary` and MCP `ax_radar_usage`, with totals, task/model breakdowns, and recent call provider/model labels.
 - **`lib/tweaks.ts` + `lib/api/tweak-requests.ts`** — shared tweak option contracts, defaults, PATCH validation, and DB patch construction used by the client site-config provider, cookie-gated `/api/tweaks`, and bearer-gated `/api/v1/tweaks`.
 
@@ -112,11 +113,12 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 - `tests/api/daily-columns-source.test.ts` — public daily routes and MCP daily resources stay wired to shared daily-column lookup/payload helpers
 - `tests/api/collection-requests.test.ts` — shared saved-collection request schemas for admin camelCase bodies and v1 snake_case bodies
 - `tests/api/collections-source.test.ts` — admin/v1 collection routes stay wired to shared collection request schemas
+- `tests/api/saved-requests.test.ts` — shared saved-item query, mutation, and move request schemas
 - `tests/api/tweak-requests.test.ts` — shared tweak PATCH validation and DB patch construction for browser + bearer surfaces
 - `tests/api/tweaks-source.test.ts` — cookie/v1 tweak routes and the client provider stay wired to shared tweak contracts
 - `tests/api/mcp-contract-source.test.ts` — MCP feed/search stay wired to shared execution helpers and the shared v1 item serializer
 - `tests/api/usage-summary.test.ts` — bearer-gated usage summary serializes totals, task/model breakdowns, and recent calls for agents
-- `tests/api/v1-saved-source.test.ts` — `/api/v1/saved` stays wired to the shared saved-item serializer and owner-aware collection helper
+- `tests/api/v1-saved-source.test.ts` — `/api/v1/saved` stays wired to shared saved request schemas, the shared saved-item serializer, and owner-aware collection helpers
 - `tests/site/public-origin.test.ts` — public discovery surfaces stay wired to the canonical public origin helper and the README uses the same production URL
 - `tests/rss/legacy-feeds.test.ts` + `tests/rss/routes-source.test.ts` — legacy RSS slug feeds keep slug parsing/item mapping covered and route feed construction delegated
 - `tests/rss/newsletter-feed.test.ts` — legacy structured newsletter RSS keeps locale fallback and item-content mapping covered
@@ -124,7 +126,7 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 - `tests/llm/usage-stats-source.test.ts` — admin/v1/MCP usage surfaces stay wired to all-time windows, model labels, and the shared agent summary contract
 - `tests/items/collections.test.ts` — saved collection assignment rejects cross-owner collection ids
 
-Run these with `bun test --env-file=.env.local tests/api/public-*.test.ts tests/api/feed-query-*.test.ts tests/api/query-params*.test.ts tests/api/source-catalog*.test.ts tests/api/skill-source.test.ts tests/api/item-detail*.test.ts tests/api/event-members*.test.ts tests/api/daily-columns*.test.ts tests/api/collection*.test.ts tests/api/tweak*.test.ts tests/api/mcp-contract-source.test.ts tests/api/usage-summary.test.ts tests/api/v1-route-*.test.ts tests/api/v1-saved-source.test.ts tests/llm/usage-display.test.ts tests/llm/usage-stats-source.test.ts tests/items/collections.test.ts`.
+Run these with `bun test --env-file=.env.local tests/api/public-*.test.ts tests/api/feed-query-*.test.ts tests/api/query-params*.test.ts tests/api/source-catalog*.test.ts tests/api/skill-source.test.ts tests/api/item-detail*.test.ts tests/api/event-members*.test.ts tests/api/daily-columns*.test.ts tests/api/collection*.test.ts tests/api/saved-requests.test.ts tests/api/tweak*.test.ts tests/api/mcp-contract-source.test.ts tests/api/usage-summary.test.ts tests/api/v1-route-*.test.ts tests/api/v1-saved-source.test.ts tests/llm/usage-display.test.ts tests/llm/usage-stats-source.test.ts tests/items/collections.test.ts`.
 
 ## Operational notes
 
@@ -140,6 +142,7 @@ Run these with `bun test --env-file=.env.local tests/api/public-*.test.ts tests/
 - **Bearer agent item serialization is shared across REST + MCP** — `/api/v1/feed`, `/api/v1/search`, MCP `ax_radar_feed`, and MCP `ax_radar_search` all use `toAgentApiItem`; `/api/v1/saved` extends it via `toSavedAgentApiItem`.
 - **Saved collection assignment is owner-aware** — `/api/v1/saved`, MCP `ax_radar_save`, and browser move actions all delegate to `assignSavedItemCollection` so a user cannot attach a save to another user's collection id.
 - **Saved collection request validation is shared across auth surfaces** — `/api/admin/collections` accepts browser camelCase bodies while `/api/v1/collections` accepts agent snake_case bodies, but both normalize through `lib/api/collection-requests.ts` before calling `lib/items/collections.ts`.
+- **Saved item request validation is shared across saved write surfaces** — `/api/v1/saved` and `/api/feedback/move` parse through `lib/api/saved-requests.ts`; `APP_LOCALES` remains the locale source for saved queries, and inbox moves preserve `targetCollectionId: null`.
 - **Tweak validation is shared across browser + agent surfaces** — `lib/tweaks.ts` owns site-config option values and defaults, while `/api/tweaks` and `/api/v1/tweaks` both parse PATCH bodies and build DB patches through `lib/api/tweak-requests.ts`.
 - **Event-member payload execution is shared across surfaces** — `/api/events/*`, `/api/public/events/*`, and `/api/v1/events/*` call `getEventMembersRoutePayload` for route-id parsing, locale validation, DB lookup, and `{ cluster_id, members, total }` assembly. MCP `ax_radar_event_members` calls `getEventMembersPayload` directly after its Zod input validation. Positive route IDs still come from `lib/api/route-params.ts`; adapters keep only auth/rate-limit/cache/error-envelope choices.
 - **Daily-column lookup and serialization is centralized across REST, RSS, site pages, and MCP** — `lib/api/daily-columns.ts` owns `newsletters` queries for `DAILY_NEWSLETTER_KIND` rows with `column_title IS NOT NULL`, public JSON bodies + ETag signals, route-ready public lookup results, UTC date-window lookup, RSS/page row listing, and MCP markdown text. Public daily routes keep only rate-limit/cache/error-envelope mapping; MCP daily resources keep only resource envelope mapping. Newsletter kind and locale labels come from `NEWSLETTER_KINDS` / `NEWSLETTER_LOCALES` in `lib/types.ts`. The legacy structured-digest rows (where `headline IS NOT NULL`) ship separately via `/api/feed/newsletter/{locale}/rss.xml`.
@@ -148,7 +151,7 @@ Run these with `bun test --env-file=.env.local tests/api/public-*.test.ts tests/
 - **Legacy newsletter RSS construction is centralized** — `/api/feed/newsletter/{locale}/rss.xml` delegates locale fallback, legacy structured-digest filtering (`headline IS NOT NULL`), content HTML, and channel metadata to `lib/rss/newsletter-feed.ts`; the route file keeps only `rssResponse`.
 - **Usage summary serialization is centralized across bearer agent surfaces** — `/api/v1/usage/summary` and MCP `ax_radar_usage` both call `getUsageSummary`; the helper owns the `today|week|month|all` window set, totals, `by_task`, `by_model`, and `recent_calls` shape.
 - **Usage presentation is centralized for the admin surface** — `lib/llm/usage-display.ts` owns usage range labels, task badge tones, compact token/call formatting, sparkline date labels, and task-model summaries; tests keep those helpers exhaustive over `USAGE_WINDOWS` and `LLM_TASKS`.
-- **v1 bearer auth + plain JSON envelopes are centralized** — route handlers under `/api/v1/*` should call `runV1Route(req, async (user) => ...)` and return `v1Json`, `v1Error`, `v1InvalidQuery`, or `v1ServerError`. Do not call `requireApiToken`, `Response.json`, or hand-copy `console.error` plus `server_error` responses directly in v1 leaf routes; keep request schemas and domain helper calls local to the route.
+- **v1 bearer auth + plain JSON envelopes are centralized** — route handlers under `/api/v1/*` should call `runV1Route(req, async (user) => ...)` and return `v1Json`, `v1Error`, `v1InvalidQuery`, or `v1ServerError`. Do not call `requireApiToken`, `Response.json`, or hand-copy `console.error` plus `server_error` responses directly in v1 leaf routes. Put reusable or contract-bearing request schemas in `lib/api/*-requests.ts`; keep surface-specific domain result mapping in the route unless a shared route helper already owns that behavior.
 
 ## Related
 

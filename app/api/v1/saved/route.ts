@@ -14,9 +14,12 @@
  * Body (POST):
  *   { item_id: number, on: boolean, collection_id?: number, note?: string }
  */
-import { z } from "zod";
 import { parseJsonRequestBody } from "@/lib/api/json-body";
 import { parseQueryParams } from "@/lib/api/query-params";
+import {
+  v1SavedPostBodySchema,
+  v1SavedQuerySchema,
+} from "@/lib/api/saved-requests";
 import {
   runV1Route,
   v1Error,
@@ -26,7 +29,7 @@ import {
 } from "@/lib/api/v1-route";
 import { applyFeedbackToggle } from "@/lib/feedback/toggle";
 import { toSavedAgentApiItem } from "@/lib/api/v1-items";
-import { APP_LOCALES, FEEDBACK_SAVE_VOTE } from "@/lib/types";
+import { FEEDBACK_SAVE_VOTE } from "@/lib/types";
 import {
   assignSavedItemCollection,
   getSavedItemCollectionId,
@@ -34,24 +37,9 @@ import {
 } from "@/lib/items/collections";
 import { getSavedStories } from "@/lib/items/saved";
 
-const getQuerySchema = z.object({
-  collection: z
-    .union([z.literal("inbox"), z.coerce.number().int().positive()])
-    .optional(),
-  limit: z.coerce.number().int().min(1).max(200).optional().default(80),
-  locale: z.enum(APP_LOCALES).optional().default("en"),
-});
-
-const postBodySchema = z.object({
-  item_id: z.number().int().positive(),
-  on: z.boolean(),
-  collection_id: z.number().int().positive().optional(),
-  note: z.string().max(500).optional(),
-});
-
 export async function GET(req: Request) {
   return runV1Route(req, async (user) => {
-    const parsed = parseQueryParams(req, getQuerySchema);
+    const parsed = parseQueryParams(req, v1SavedQuerySchema);
     if (!parsed.ok) return v1InvalidQuery(parsed.issues);
 
     const q = parsed.data;
@@ -73,7 +61,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   return runV1Route(req, async (user) => {
-    const parsed = await parseJsonRequestBody(req, postBodySchema, {
+    const parsed = await parseJsonRequestBody(req, v1SavedPostBodySchema, {
       envelope: "plain",
     });
     if (!parsed.ok) return parsed.response;
