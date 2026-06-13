@@ -1,7 +1,10 @@
 import { createHmac } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import {
+  ADMIN_SESSION_COOKIE,
   ADMIN_SESSION_MAX_AGE_SECONDS,
+  expiredAdminSessionCookie,
+  freshAdminSessionCookie,
   isValidPassword,
   mintSessionCookie,
   verifySessionCookie,
@@ -85,5 +88,31 @@ describe("session cookie round-trip", () => {
 
   it("ADMIN_SESSION_MAX_AGE_SECONDS is 30 days", () => {
     expect(ADMIN_SESSION_MAX_AGE_SECONDS).toBe(30 * 86400);
+  });
+
+  it("freshAdminSessionCookie centralizes login cookie attributes", () => {
+    const cookie = freshAdminSessionCookie();
+
+    expect(cookie).toMatchObject({
+      name: ADMIN_SESSION_COOKIE,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: ADMIN_SESSION_MAX_AGE_SECONDS,
+    });
+    expect(verifySessionCookie(cookie.value)).toBe(true);
+  });
+
+  it("expiredAdminSessionCookie centralizes logout cookie attributes", () => {
+    expect(expiredAdminSessionCookie()).toEqual({
+      name: ADMIN_SESSION_COOKIE,
+      value: "",
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 0,
+    });
   });
 });

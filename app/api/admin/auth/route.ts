@@ -2,10 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { parseJsonRequestBody } from "@/lib/api/json-body";
 import {
-  ADMIN_SESSION_COOKIE,
-  ADMIN_SESSION_MAX_AGE_SECONDS,
+  freshAdminSessionCookie,
   isValidPassword,
-  mintSessionCookie,
 } from "@/lib/auth/password";
 
 export const dynamic = "force-dynamic";
@@ -43,15 +41,7 @@ export async function POST(req: Request) {
     ok: true,
     next: sanitiseNext(parsed.data.next),
   });
-  res.cookies.set({
-    name: ADMIN_SESSION_COOKIE,
-    value: mintSessionCookie(),
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: ADMIN_SESSION_MAX_AGE_SECONDS,
-  });
+  res.cookies.set(freshAdminSessionCookie());
   return res;
 }
 

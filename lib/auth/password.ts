@@ -15,6 +15,16 @@ export const ADMIN_SESSION_COOKIE = "ax_admin";
 /** 30-day rolling session — re-issued on every authenticated request. */
 export const ADMIN_SESSION_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
 
+export type AdminSessionCookieOptions = {
+  name: typeof ADMIN_SESSION_COOKIE;
+  value: string;
+  httpOnly: true;
+  secure: boolean;
+  sameSite: "lax";
+  path: "/";
+  maxAge: number;
+};
+
 function getPassword(): string {
   const pw = process.env.ADMIN_PASSWORD;
   if (!pw) {
@@ -42,6 +52,32 @@ export function mintSessionCookie(): string {
   const expiresMs = Date.now() + ADMIN_SESSION_MAX_AGE_SECONDS * 1000;
   const payload = String(expiresMs);
   return `${payload}.${sign(payload)}`;
+}
+
+function adminSessionCookieOptions(
+  value: string,
+  maxAge: number,
+): AdminSessionCookieOptions {
+  return {
+    name: ADMIN_SESSION_COOKIE,
+    value,
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge,
+  };
+}
+
+export function freshAdminSessionCookie(): AdminSessionCookieOptions {
+  return adminSessionCookieOptions(
+    mintSessionCookie(),
+    ADMIN_SESSION_MAX_AGE_SECONDS,
+  );
+}
+
+export function expiredAdminSessionCookie(): AdminSessionCookieOptions {
+  return adminSessionCookieOptions("", 0);
 }
 
 /** True when the cookie value is well-formed, unexpired, and HMAC matches. */

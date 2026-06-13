@@ -47,6 +47,10 @@ Shipped cleanup:
 - Shared feedback vote values through `FEEDBACK_VOTES`, `FEEDBACK_SIGNAL_VOTES`,
   and `FEEDBACK_SAVE_VOTE` in `lib/types.ts`, so the DB enum, feedback request
   schema, admin metrics, and saved-item queries cannot drift on `up|down|save`.
+- Shared admin session cookie set/clear options through
+  `freshAdminSessionCookie` and `expiredAdminSessionCookie` in
+  `lib/auth/password.ts`, so login/logout cannot drift on cookie name,
+  `httpOnly`, `secure`, `sameSite`, path, or max-age attributes.
 - Shared user roles and iteration statuses through `USER_ROLES`,
   `ITERATION_STATUSES`, and named status constants in `lib/types.ts`, so DB
   enums, auth upserts, iteration routes, agent runtime writes, and the admin
@@ -219,7 +223,7 @@ Verification (2026-06-13):
 - `bun run code:dead:exports` — passed.
 - `bun run code:dead:types` — passed.
 - `bun run lint` — passed with no warnings.
-- `bun test --env-file=.env.local` — 774 pass, 1 skip, 0 fail.
+- `bun test --env-file=.env.local` — 778 pass, 1 skip, 0 fail.
 - `bun run build` — passed.
 - `git diff --check` — passed.
 
