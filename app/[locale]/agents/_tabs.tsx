@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import {
   PUBLIC_RATE_LIMIT_DOC_GROUPS,
   publicRateLimitReqLabel,
-} from "@/lib/rate-limit/public-config";
+} from "@/lib/api/public-endpoint-config";
 
 type Tab = "skill" | "rss" | "api";
 type Lang = "en" | "zh";

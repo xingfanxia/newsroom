@@ -5,7 +5,10 @@
  * the requested UTC date. 404 if no column for that date.
  */
 import { publicRateLimit } from "@/lib/rate-limit/public";
-import { publicRateLimitConfig } from "@/lib/rate-limit/public-config";
+import {
+  publicCacheConfig,
+  publicRateLimitConfig,
+} from "@/lib/api/public-endpoint-config";
 import {
   computeEtag,
   ifNoneMatch,
@@ -58,10 +61,7 @@ export async function GET(
     if (ifNoneMatch(req, etag)) return notModified(etag);
 
     // Historical dailies are immutable — aggressive cache.
-    return publicJson(body, etag, {
-      sMaxAge: 3600,
-      staleWhileRevalidate: 86_400,
-    });
+    return publicJson(body, etag, publicCacheConfig("dailyByDate"));
   } catch (err) {
     console.error("[api/public/daily/:date] failed", err);
     return publicError("server_error", 500);

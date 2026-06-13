@@ -12,9 +12,9 @@
 import {
   PUBLIC_RATE_LIMIT_DEFAULT,
   type RateLimitConfig,
-} from "@/lib/rate-limit/public-config";
+} from "@/lib/api/public-endpoint-config";
 
-export type { RateLimitConfig } from "@/lib/rate-limit/public-config";
+export type { RateLimitConfig } from "@/lib/api/public-endpoint-config";
 
 const buckets = new Map<string, { count: number; resetAt: number }>();
 

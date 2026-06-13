@@ -6,7 +6,10 @@
  * "does AX Radar cover X publisher?" before issuing a filtered feed query.
  */
 import { publicRateLimit } from "@/lib/rate-limit/public";
-import { publicRateLimitConfig } from "@/lib/rate-limit/public-config";
+import {
+  publicCacheConfig,
+  publicRateLimitConfig,
+} from "@/lib/api/public-endpoint-config";
 import {
   computeEtag,
   etagSignal,
@@ -47,10 +50,7 @@ export async function GET(req: Request) {
     if (ifNoneMatch(req, etag)) return notModified(etag);
 
     // Catalog rarely changes — long stale-while-revalidate.
-    return publicJson(body, etag, {
-      sMaxAge: 300,
-      staleWhileRevalidate: 3600,
-    });
+    return publicJson(body, etag, publicCacheConfig("sources"));
   } catch (err) {
     console.error("[api/public/sources] failed", err);
     return publicError("server_error", 500);

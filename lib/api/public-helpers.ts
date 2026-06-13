@@ -12,6 +12,10 @@
  * and ETag shape so the surface stays consistent.
  */
 import { createHash } from "node:crypto";
+import {
+  PUBLIC_CACHE_DEFAULT,
+  type PublicCacheConfig,
+} from "@/lib/api/public-endpoint-config";
 
 /** Generate `W/"<family>-<sha1[:16]>"` — weak so reverse proxies can vary. */
 export function computeEtag(family: string, signal: string): string {
@@ -28,14 +32,12 @@ export function ifNoneMatch(req: Request, etag: string): boolean {
 /** Headers every public response gets — CORS, cache hint, ETag. */
 export function publicHeaders(
   etag: string,
-  cache: { sMaxAge?: number; staleWhileRevalidate?: number } = {},
+  cache: PublicCacheConfig = PUBLIC_CACHE_DEFAULT,
   extra: Record<string, string> = {},
 ): Record<string, string> {
-  const sMaxAge = cache.sMaxAge ?? 60;
-  const swr = cache.staleWhileRevalidate ?? 300;
   return {
     etag,
-    "cache-control": `public, s-maxage=${sMaxAge}, stale-while-revalidate=${swr}`,
+    "cache-control": `public, s-maxage=${cache.sMaxAge}, stale-while-revalidate=${cache.staleWhileRevalidate}`,
     "access-control-allow-origin": "*",
     "access-control-allow-methods": "GET, OPTIONS",
     "access-control-allow-headers": "if-none-match, content-type",
@@ -53,7 +55,7 @@ export function notModified(etag: string): Response {
 export function publicJson(
   body: unknown,
   etag: string,
-  cache?: { sMaxAge?: number; staleWhileRevalidate?: number },
+  cache?: PublicCacheConfig,
 ): Response {
   return Response.json(body, {
     status: 200,

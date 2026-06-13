@@ -4,6 +4,7 @@ import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
 import { getRadarStats, getPulseData } from "@/lib/shell/dashboard-stats";
 import { AgentsTabs } from "./_tabs";
+import { PUBLIC_ENDPOINT_COUNT } from "@/lib/api/public-endpoint-config";
 
 export const dynamic = "force-dynamic";
 
@@ -12,8 +13,6 @@ export const metadata: Metadata = {
   description:
     "把 AX Radar 接进 Claude Code / RSS reader / 任意 Agent — Skill / RSS / REST API 三轨匿名访问。",
 };
-
-const ENDPOINT_COUNT = 8; // /api/public/* surface — kept in sync with route count
 
 export default async function AgentsPage({
   params,
@@ -48,7 +47,7 @@ export default async function AgentsPage({
         <PageHead
           en="agent access"
           cjk="Agent 接入"
-          count={ENDPOINT_COUNT}
+          count={PUBLIC_ENDPOINT_COUNT}
           countLabel="endpoints"
           extra={
             <span

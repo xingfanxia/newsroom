@@ -8,7 +8,10 @@
  * Same item shape and field stripping as /api/public/feed.
  */
 import { publicRateLimit } from "@/lib/rate-limit/public";
-import { publicRateLimitConfig } from "@/lib/rate-limit/public-config";
+import {
+  publicCacheConfig,
+  publicRateLimitConfig,
+} from "@/lib/api/public-endpoint-config";
 import {
   computeEtag,
   etagSignal,
@@ -72,6 +75,7 @@ export async function GET(req: Request) {
           latency_ms: result.latencyMs,
         },
         etag,
+        publicCacheConfig("search"),
       );
     }
 
@@ -90,6 +94,7 @@ export async function GET(req: Request) {
         offset: result.offset,
       },
       etag,
+      publicCacheConfig("search"),
     );
   } catch (err) {
     console.error("[api/public/search] failed", err);

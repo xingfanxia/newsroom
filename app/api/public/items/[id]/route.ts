@@ -8,7 +8,10 @@
  *   - body_md kept (transcript / article text); body_rss (raw HTML) dropped
  */
 import { publicRateLimit } from "@/lib/rate-limit/public";
-import { publicRateLimitConfig } from "@/lib/rate-limit/public-config";
+import {
+  publicCacheConfig,
+  publicRateLimitConfig,
+} from "@/lib/api/public-endpoint-config";
 import {
   computeEtag,
   ifNoneMatch,
@@ -47,10 +50,7 @@ export async function GET(
     );
     if (ifNoneMatch(req, etag)) return notModified(etag);
 
-    return publicJson(toPublicItemDetail(row), etag, {
-      sMaxAge: 120,
-      staleWhileRevalidate: 600,
-    });
+    return publicJson(toPublicItemDetail(row), etag, publicCacheConfig("item"));
   } catch (err) {
     console.error("[api/public/items/:id] failed", err);
     return publicError("server_error", 500);

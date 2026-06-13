@@ -14,7 +14,10 @@
  *   curated_only / include_source_tags / exclude_source_tags / limit / offset / locale
  */
 import { publicRateLimit } from "@/lib/rate-limit/public";
-import { publicRateLimitConfig } from "@/lib/rate-limit/public-config";
+import {
+  publicCacheConfig,
+  publicRateLimitConfig,
+} from "@/lib/api/public-endpoint-config";
 import {
   computeEtag,
   etagSignal,
@@ -73,6 +76,7 @@ export async function GET(req: Request) {
         view: result.view,
       },
       etag,
+      publicCacheConfig("feed"),
     );
   } catch (err) {
     console.error("[api/public/feed] failed", err);

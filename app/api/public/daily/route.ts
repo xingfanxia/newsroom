@@ -9,7 +9,10 @@
  * locale=zh default. Only zh is generated today.
  */
 import { publicRateLimit } from "@/lib/rate-limit/public";
-import { publicRateLimitConfig } from "@/lib/rate-limit/public-config";
+import {
+  publicCacheConfig,
+  publicRateLimitConfig,
+} from "@/lib/api/public-endpoint-config";
 import {
   computeEtag,
   ifNoneMatch,
@@ -49,10 +52,7 @@ export async function GET(req: Request) {
     if (ifNoneMatch(req, etag)) return notModified(etag);
 
     // Daily column lands once per day; long stale-while-revalidate.
-    return publicJson(body, etag, {
-      sMaxAge: 300,
-      staleWhileRevalidate: 86_400,
-    });
+    return publicJson(body, etag, publicCacheConfig("daily"));
   } catch (err) {
     console.error("[api/public/daily] failed", err);
     return publicError("server_error", 500);

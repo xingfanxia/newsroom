@@ -14,7 +14,10 @@ import {
 } from "@/lib/api/event-members";
 import { getEventMembers } from "@/lib/items/live";
 import { publicRateLimit } from "@/lib/rate-limit/public";
-import { publicRateLimitConfig } from "@/lib/rate-limit/public-config";
+import {
+  publicCacheConfig,
+  publicRateLimitConfig,
+} from "@/lib/api/public-endpoint-config";
 import {
   computeEtag,
   etagSignal,
@@ -59,10 +62,7 @@ export async function GET(
       }),
     );
     if (ifNoneMatch(req, etag)) return notModified(etag);
-    return publicJson(body, etag, {
-      sMaxAge: 180,
-      staleWhileRevalidate: 900,
-    });
+    return publicJson(body, etag, publicCacheConfig("eventMembers"));
   } catch (err) {
     console.error("[api/public/events/:id/members] failed", err);
     return publicError("server_error", 500);

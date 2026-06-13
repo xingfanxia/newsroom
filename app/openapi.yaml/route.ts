@@ -17,7 +17,7 @@ import {
   SOURCE_LOCALES,
   VISIBLE_ITEM_TIERS,
 } from "@/lib/types";
-import { publicRateLimitPerIpLabel } from "@/lib/rate-limit/public-config";
+import { publicRateLimitPerIpLabel } from "@/lib/api/public-endpoint-config";
 
 function yamlInlineEnum(values: readonly (string | null)[]): string {
   return `[${values.map((value) => (value === null ? "null" : value)).join(", ")}]`;

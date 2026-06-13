@@ -8,7 +8,10 @@
  * take: 1..180, default 30. Strict 400 on out-of-range.
  */
 import { publicRateLimit } from "@/lib/rate-limit/public";
-import { publicRateLimitConfig } from "@/lib/rate-limit/public-config";
+import {
+  publicCacheConfig,
+  publicRateLimitConfig,
+} from "@/lib/api/public-endpoint-config";
 import {
   computeEtag,
   ifNoneMatch,
@@ -51,10 +54,7 @@ export async function GET(req: Request) {
     );
     if (ifNoneMatch(req, etag)) return notModified(etag);
 
-    return publicJson(body, etag, {
-      sMaxAge: 300,
-      staleWhileRevalidate: 3600,
-    });
+    return publicJson(body, etag, publicCacheConfig("dailies"));
   } catch (err) {
     console.error("[api/public/dailies] failed", err);
     return publicError("server_error", 500);

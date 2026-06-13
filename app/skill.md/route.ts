@@ -23,7 +23,7 @@ import {
 import {
   PUBLIC_RATE_LIMIT_DOC_GROUPS,
   publicRateLimitLabel,
-} from "@/lib/rate-limit/public-config";
+} from "@/lib/api/public-endpoint-config";
 
 function markdownCodeUnion(values: readonly string[]): string {
   return values.map((value) => `\`${value}\``).join(" | ");
