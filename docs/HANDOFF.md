@@ -46,6 +46,10 @@ Shipped cleanup:
 - Shared newsletter kind and locale labels through `NEWSLETTER_KINDS` and
   `NEWSLETTER_LOCALES` in `lib/types.ts`; digest workers, daily-column queries,
   and backfill scripts no longer carry local `daily|monthly` / `zh|en` unions.
+- Shared newsletter window calculations through `workers/newsletter/windows.ts`;
+  daily digest, daily-column selection, monthly digest, and daily-column
+  backfill scripts now reuse the same snapped UTC window and period-start
+  replay helpers instead of repeating 24h/30d math locally.
 - Shared positive route-id parsing through `lib/api/route-params.ts`; item
   detail, event-member, and admin iteration routes now reuse the same coercion
   and `invalid_id` error label.

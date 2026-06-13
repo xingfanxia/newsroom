@@ -17,6 +17,11 @@ function read(path: string): string {
 const typesSrc = read("lib/types.ts");
 const newsletterWorkerSrc = read("workers/newsletter/index.ts");
 const dailyColumnWorkerSrc = read("workers/newsletter/run-daily-column.ts");
+const dailyColumnSelectSrc = read("workers/newsletter/select.ts");
+const newsletterWindowsSrc = read("workers/newsletter/windows.ts");
+const dailyColumnBackfillSrc = read("scripts/ops/backfill-daily-columns.ts");
+const dailyColumnRegenSrc = read("scripts/ops/regen-daily-column.ts");
+const dailyColumnWeekBackfillSrc = read("scripts/ops/backfill-daily-week.ts");
 const dailyColumnApiSrc = read("lib/api/daily-columns.ts");
 
 describe("newsletter runtime contracts", () => {
@@ -49,5 +54,24 @@ describe("newsletter runtime contracts", () => {
     expect(dailyColumnApiSrc).toContain("DAILY_NEWSLETTER_KIND");
     expect(dailyColumnApiSrc).toContain("NEWSLETTER_LOCALES");
     expect(dailyColumnApiSrc).toContain("z.enum(NEWSLETTER_LOCALES)");
+  });
+
+  test("newsletter workers share window calculations", () => {
+    expect(newsletterWindowsSrc).toContain("computeNewsletterWindow");
+    expect(newsletterWorkerSrc).toContain("@/workers/newsletter/windows");
+    expect(newsletterWorkerSrc).toContain("computeNewsletterWindow(kind, now)");
+    expect(newsletterWorkerSrc).not.toContain("function computeWindow");
+
+    expect(dailyColumnSelectSrc).toContain("@/workers/newsletter/windows");
+    expect(dailyColumnSelectSrc).toContain("computeDailyNewsletterWindow(now)");
+
+    expect(dailyColumnBackfillSrc).toContain("runTimeForDailyPeriodStart");
+    expect(dailyColumnBackfillSrc).not.toContain(
+      "new Date(periodStartIso).getTime() + 24 * 60 * 60 * 1000",
+    );
+    expect(dailyColumnRegenSrc).toContain("runTimeForDailyColumnDate");
+    expect(dailyColumnRegenSrc).not.toContain("T05:00:00Z");
+    expect(dailyColumnWeekBackfillSrc).toContain("previousDailyColumnRunTimes");
+    expect(dailyColumnWeekBackfillSrc).not.toContain("setUTCHours(5");
   });
 });

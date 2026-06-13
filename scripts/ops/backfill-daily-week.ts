@@ -1,10 +1,10 @@
 import { runDailyColumn } from "@/workers/newsletter/run-daily-column";
+import { previousDailyColumnRunTimes } from "@/workers/newsletter/windows";
 
-const today = new Date();
-today.setUTCHours(5, 0, 0, 0);
 const reports = [];
-for (let i = 1; i <= 7; i++) {
-  const t = new Date(today.getTime() - i * 24 * 60 * 60 * 1000);
+const runTimes = previousDailyColumnRunTimes(7);
+for (const [idx, t] of runTimes.entries()) {
+  const i = idx + 1;
   const date = t.toISOString().slice(0, 10);
   console.log(`[${i}/7] regenerating column for ${date} (window ending ${t.toISOString()})...`);
   try {

@@ -22,6 +22,7 @@ import {
   type NewsletterKind,
   type NewsletterLocale,
 } from "@/lib/types";
+import { computeNewsletterWindow } from "@/workers/newsletter/windows";
 
 const DAILY_TOP_N = 25;
 const MONTHLY_TOP_N = 75;
@@ -64,45 +65,13 @@ const newsletterSchema = z.object({
 });
 type NewsletterOutput = z.infer<typeof newsletterSchema>;
 
-/**
- * Get the [start, end) window for a given kind + reference time.
- * Daily: rolling past 24 hours from `now` — so a 09:00 UTC cron covers
- *   9am yesterday → 9am today. Uniqueness index uses periodStart so
- *   re-runs within the same hour coalesce into the same row.
- * Monthly: rolling past 30 days from `now`.
- */
-function computeWindow(
-  kind: NewsletterKind,
-  now: Date = new Date(),
-): { start: Date; end: Date } {
-  if (kind === "daily") {
-    // Snap to the hour so re-runs within 60 min land on the same periodStart
-    const end = new Date(
-      Date.UTC(
-        now.getUTCFullYear(),
-        now.getUTCMonth(),
-        now.getUTCDate(),
-        now.getUTCHours(),
-      ),
-    );
-    const start = new Date(end.getTime() - 24 * 60 * 60 * 1000);
-    return { start, end };
-  }
-  // monthly: past 30 days, snapped to day for idempotency within the run-day
-  const end = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
-  );
-  const start = new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
-  return { start, end };
-}
-
 export async function runNewsletterBatch(
   kind: NewsletterKind,
   opts: { now?: Date; force?: boolean } = {},
 ): Promise<NewsletterReport> {
   const started = Date.now();
   const now = opts.now ?? new Date();
-  const { start, end } = computeWindow(kind, now);
+  const { start, end } = computeNewsletterWindow(kind, now);
   const topN = kind === DAILY_NEWSLETTER_KIND ? DAILY_TOP_N : MONTHLY_TOP_N;
   const client = db();
 

@@ -7,6 +7,7 @@
  */
 import { sql } from "drizzle-orm";
 import { db } from "@/db/client";
+import { computeDailyNewsletterWindow } from "@/workers/newsletter/windows";
 
 export type SelectedRow = {
   id: number;
@@ -49,16 +50,7 @@ export function computeColumnWindow(now: Date): {
   start: Date;
   end: Date;
 } {
-  const end = new Date(
-    Date.UTC(
-      now.getUTCFullYear(),
-      now.getUTCMonth(),
-      now.getUTCDate(),
-      now.getUTCHours(),
-    ),
-  );
-  const start = new Date(end.getTime() - 24 * 60 * 60 * 1000);
-  return { start, end };
+  return computeDailyNewsletterWindow(now);
 }
 
 type RawRow = {
@@ -119,7 +111,7 @@ function rawToSelected(r: RawRow): SelectedRow {
 export async function selectDailyColumnPool(
   now: Date,
 ): Promise<SelectionResult> {
-  const { start, end } = computeColumnWindow(now);
+  const { start, end } = computeDailyNewsletterWindow(now);
   const client = db();
 
   const curatedRaw = (await client.execute(sql`

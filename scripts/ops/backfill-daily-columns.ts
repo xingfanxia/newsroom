@@ -13,6 +13,7 @@ import { closeDb, db } from "@/db/client";
 import { newsletters } from "@/db/schema";
 import { DAILY_NEWSLETTER_KIND, type NewsletterLocale } from "@/lib/types";
 import { runDailyColumn } from "@/workers/newsletter/run-daily-column";
+import { runTimeForDailyPeriodStart } from "@/workers/newsletter/windows";
 
 const DAILY_COLUMN_LOCALE = "zh" satisfies NewsletterLocale;
 
@@ -128,10 +129,6 @@ function endOfUtcDate(date: string): Date {
   return new Date(`${date}T23:59:59.999Z`);
 }
 
-function runTimeForPeriodStart(periodStartIso: string): Date {
-  return new Date(new Date(periodStartIso).getTime() + 24 * 60 * 60 * 1000);
-}
-
 async function loadExistingDailyPeriods(flags: Flags): Promise<string[]> {
   const filters = [
     sql`${newsletters.kind} = ${DAILY_NEWSLETTER_KIND}`,
@@ -178,7 +175,7 @@ async function main(): Promise<void> {
       limit(async () => {
         try {
           const report = await runDailyColumn({
-            now: runTimeForPeriodStart(date),
+            now: runTimeForDailyPeriodStart(date),
             force: true,
           });
           state.donePeriods.push(date);
