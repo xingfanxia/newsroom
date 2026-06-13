@@ -26,6 +26,10 @@ Shipped cleanup:
 - Shared feedback vote values through `FEEDBACK_VOTES`, `FEEDBACK_SIGNAL_VOTES`,
   and `FEEDBACK_SAVE_VOTE` in `lib/types.ts`, so the DB enum, feedback request
   schema, admin metrics, and saved-item queries cannot drift on `up|down|save`.
+- Shared user roles and iteration statuses through `USER_ROLES`,
+  `ITERATION_STATUSES`, and named status constants in `lib/types.ts`, so DB
+  enums, auth upserts, iteration routes, agent runtime writes, and the admin
+  iteration UI cannot drift.
 - Shared REST/MCP search execution through `lib/api/search-results.ts`;
   adapters now own only auth/rate-limit/ETag/serialization, while the helper
   owns lexical full-match totals and semantic source/date/tier filters.

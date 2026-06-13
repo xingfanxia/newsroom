@@ -3,7 +3,6 @@ import { MetricCard } from "@/components/admin/metric-card";
 import { FeedbackItem } from "@/components/admin/feedback-item";
 import { VersionPill } from "@/components/admin/version-pill";
 import { IterationRunner } from "@/components/admin/iteration-runner";
-import type { RunnerStatus } from "@/components/admin/iteration-runner";
 import { VersionTimeline } from "@/components/admin/version-timeline";
 import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
@@ -20,27 +19,21 @@ import {
   type IterationProposal,
 } from "@/workers/agent/prompt";
 import { SKILL_NAME } from "@/workers/agent/iterate";
+import {
+  ITERATION_FAILED_STATUS,
+  ITERATION_IDLE_STATUS,
+  ITERATION_PROPOSED_STATUS,
+  isIterationStatus,
+  type IterationRunnerStatus,
+} from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 function deriveStatus(
   run: { status: string } | null,
-): RunnerStatus {
-  if (!run) return "idle";
-  switch (run.status) {
-    case "running":
-      return "running";
-    case "proposed":
-      return "proposed";
-    case "applied":
-      return "applied";
-    case "rejected":
-      return "rejected";
-    case "failed":
-      return "failed";
-    default:
-      return "idle";
-  }
+): IterationRunnerStatus {
+  if (!run) return ITERATION_IDLE_STATUS;
+  return isIterationStatus(run.status) ? run.status : ITERATION_IDLE_STATUS;
 }
 
 export default async function IterationsPage({
@@ -68,7 +61,7 @@ export default async function IterationsPage({
   const status = deriveStatus(latestRun);
 
   let diff: DiffLine[] | null = null;
-  if (status === "proposed" && latestRun?.agentOutput) {
+  if (status === ITERATION_PROPOSED_STATUS && latestRun?.agentOutput) {
     diff = narrativeDiff(
       latestRun.agentOutput as IterationProposal,
       {
@@ -196,10 +189,12 @@ export default async function IterationsPage({
             feedbackCount={total}
             diff={diff}
             reasoningSummary={
-              status === "proposed" ? latestRun?.reasoningSummary ?? null : null
+              status === ITERATION_PROPOSED_STATUS
+                ? latestRun?.reasoningSummary ?? null
+                : null
             }
             errorDetail={
-              status === "failed" ? latestRun?.error ?? null : null
+              status === ITERATION_FAILED_STATUS ? latestRun?.error ?? null : null
             }
             minFeedbackToIterate={MIN_FEEDBACK_TO_ITERATE}
           />

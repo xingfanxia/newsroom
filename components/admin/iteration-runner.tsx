@@ -6,15 +6,20 @@ import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { AgentConsole } from "./agent-console";
 import { DiffViewer } from "./diff-viewer";
-import type { DiffLine, IterationConsoleLine } from "@/lib/types";
+import {
+  ITERATION_APPLIED_STATUS,
+  ITERATION_FAILED_STATUS,
+  ITERATION_IDLE_STATUS,
+  ITERATION_PROPOSED_STATUS,
+  ITERATION_REJECTED_STATUS,
+  ITERATION_RUNNING_STATUS,
+  ITERATION_RUNNER_TERMINAL_STATUSES,
+  type DiffLine,
+  type IterationConsoleLine,
+  type IterationRunnerStatus,
+} from "@/lib/types";
 
-export type RunnerStatus =
-  | "idle"
-  | "running"
-  | "proposed"
-  | "applied"
-  | "rejected"
-  | "failed";
+export type RunnerStatus = IterationRunnerStatus;
 
 type Props = {
   /** Current derived status — computed server-side from latest iteration row. */
@@ -36,7 +41,7 @@ type Props = {
   minFeedbackToIterate: number;
 };
 
-const TERMINAL: readonly RunnerStatus[] = ["idle", "applied", "rejected", "failed"];
+const TERMINAL: readonly RunnerStatus[] = ITERATION_RUNNER_TERMINAL_STATUSES;
 
 export function IterationRunner(props: Props) {
   const router = useRouter();
@@ -46,7 +51,7 @@ export function IterationRunner(props: Props) {
 
   async function handleStart() {
     setPending(true);
-    setStatus("running");
+    setStatus(ITERATION_RUNNING_STATUS);
     try {
       const res = await fetch("/api/admin/iterations/run", {
         method: "POST",
@@ -72,14 +77,14 @@ export function IterationRunner(props: Props) {
             ? `${t("errors.agentFailed")} (${body.detail})`
             : t("errors.agentFailed"),
         );
-        setStatus("failed");
+        setStatus(ITERATION_FAILED_STATUS);
         return;
       }
       router.refresh();
     } catch (err) {
       console.error(err);
       toast.error(t("errors.generic"));
-      setStatus("failed");
+      setStatus(ITERATION_FAILED_STATUS);
     } finally {
       setPending(false);
     }
@@ -144,7 +149,7 @@ export function IterationRunner(props: Props) {
   });
 
   const canStart = TERMINAL.includes(status);
-  const showDiffSection = status === "proposed" && props.diff;
+  const showDiffSection = status === ITERATION_PROPOSED_STATUS && props.diff;
 
   return (
     <>
@@ -158,8 +163,10 @@ export function IterationRunner(props: Props) {
             disabled={!canStart || pending}
             style={{ cursor: !canStart || pending ? "not-allowed" : "pointer" }}
           >
-            <span>{status === "running" || pending ? "◐" : "▶"}</span>
-            {status === "running" || pending
+            <span>
+              {status === ITERATION_RUNNING_STATUS || pending ? "◐" : "▶"}
+            </span>
+            {status === ITERATION_RUNNING_STATUS || pending
               ? t("console.running")
               : t("console.start")}
           </button>
@@ -262,7 +269,7 @@ function buildConsoleLines(args: {
       params: { total: args.feedbackCount, agreed: "?", disagreed: "?" },
     },
   ];
-  if (args.status === "idle") {
+  if (args.status === ITERATION_IDLE_STATUS) {
     head.push({
       key: "idle",
       kind: "info",
@@ -270,18 +277,18 @@ function buildConsoleLines(args: {
     });
     return head;
   }
-  if (args.status === "running") {
+  if (args.status === ITERATION_RUNNING_STATUS) {
     head.push({ key: "agentStart", kind: "reading" });
     head.push({ key: "working", kind: "reading" });
     return head;
   }
-  if (args.status === "proposed") {
+  if (args.status === ITERATION_PROPOSED_STATUS) {
     head.push({ key: "sessionOpen", kind: "done" });
     head.push({ key: "finishing", kind: "done" });
     head.push({ key: "awaitingReview", kind: "success" });
     return head;
   }
-  if (args.status === "applied") {
+  if (args.status === ITERATION_APPLIED_STATUS) {
     head.push({
       key: "applied",
       kind: "success",
@@ -289,7 +296,7 @@ function buildConsoleLines(args: {
     });
     return head;
   }
-  if (args.status === "rejected") {
+  if (args.status === ITERATION_REJECTED_STATUS) {
     head.push({ key: "rejected", kind: "info" });
     return head;
   }

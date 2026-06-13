@@ -15,6 +15,7 @@ import {
   ADMIN_SESSION_COOKIE,
   verifySessionCookie,
 } from "./password";
+import { USER_ADMIN_ROLE, USER_READER_ROLE } from "@/lib/types";
 
 export const ADMIN_USER_ID = "admin-local";
 const ADMIN_USER_EMAIL = "admin@local";
@@ -75,13 +76,13 @@ export async function upsertAppUser(
     .values({
       id: user.id,
       email: user.email,
-      role: user.isAdmin ? "admin" : "reader",
+      role: user.isAdmin ? USER_ADMIN_ROLE : USER_READER_ROLE,
     })
     .onConflictDoUpdate({
       target: schema.users.id,
       set: {
         email: user.email,
-        role: user.isAdmin ? "admin" : "reader",
+        role: user.isAdmin ? USER_ADMIN_ROLE : USER_READER_ROLE,
         updatedAt: sql`now()`,
       },
     });

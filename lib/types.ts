@@ -48,6 +48,49 @@ export const SOURCE_HEALTH_STATUSES = [
 ] as const;
 export type SourceHealthStatus = (typeof SOURCE_HEALTH_STATUSES)[number];
 
+export const USER_ADMIN_ROLE = "admin";
+const USER_EDITOR_ROLE = "editor";
+export const USER_READER_ROLE = "reader";
+export const USER_ROLES = [
+  USER_ADMIN_ROLE,
+  USER_EDITOR_ROLE,
+  USER_READER_ROLE,
+] as const;
+
+export const ITERATION_RUNNING_STATUS = "running";
+export const ITERATION_PROPOSED_STATUS = "proposed";
+export const ITERATION_APPLIED_STATUS = "applied";
+export const ITERATION_REJECTED_STATUS = "rejected";
+export const ITERATION_FAILED_STATUS = "failed";
+export const ITERATION_STATUSES = [
+  ITERATION_RUNNING_STATUS,
+  ITERATION_PROPOSED_STATUS,
+  ITERATION_APPLIED_STATUS,
+  ITERATION_REJECTED_STATUS,
+  ITERATION_FAILED_STATUS,
+] as const;
+export type IterationStatus = (typeof ITERATION_STATUSES)[number];
+
+export const ITERATION_IDLE_STATUS = "idle";
+export type IterationRunnerStatus =
+  | typeof ITERATION_IDLE_STATUS
+  | IterationStatus;
+
+const ITERATION_TERMINAL_STATUSES = [
+  ITERATION_APPLIED_STATUS,
+  ITERATION_REJECTED_STATUS,
+  ITERATION_FAILED_STATUS,
+] as const satisfies readonly IterationStatus[];
+
+export const ITERATION_RUNNER_TERMINAL_STATUSES = [
+  ITERATION_IDLE_STATUS,
+  ...ITERATION_TERMINAL_STATUSES,
+] as const satisfies readonly IterationRunnerStatus[];
+
+export function isIterationStatus(value: string): value is IterationStatus {
+  return (ITERATION_STATUSES as readonly string[]).includes(value);
+}
+
 export const ITEM_TIERS = ["featured", "p1", "all", "excluded"] as const;
 export type ItemTier = (typeof ITEM_TIERS)[number];
 

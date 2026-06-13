@@ -12,6 +12,11 @@ import { getActiveSkill } from "@/lib/policy/skill";
 import { getRecentFeedback } from "@/lib/feedback/metrics";
 import { generateStructured, profiles } from "@/lib/llm";
 import {
+  ITERATION_FAILED_STATUS,
+  ITERATION_PROPOSED_STATUS,
+  ITERATION_RUNNING_STATUS,
+} from "@/lib/types";
+import {
   AGENT_SYSTEM,
   agentUserPrompt,
   iterationProposalSchema,
@@ -35,12 +40,12 @@ export class IterationGuardError extends Error {
 
 export type IterationResult =
   | {
-      status: "proposed";
+      status: typeof ITERATION_PROPOSED_STATUS;
       run: IterationRun;
       proposal: IterationProposal;
     }
   | {
-      status: "failed";
+      status: typeof ITERATION_FAILED_STATUS;
       run: IterationRun;
       error: string;
     };
@@ -80,7 +85,7 @@ export async function runIteration(
     .insert(iterationRuns)
     .values({
       skillName: SKILL_NAME,
-      status: "running",
+      status: ITERATION_RUNNING_STATUS,
       baseVersion: skill.version,
       feedbackSample: agentFeedback,
       feedbackCount: agentFeedback.length,
@@ -118,7 +123,7 @@ export async function runIteration(
     const [updated] = await client
       .update(iterationRuns)
       .set({
-        status: "proposed",
+        status: ITERATION_PROPOSED_STATUS,
         proposedContent: proposal.proposedContent,
         reasoningSummary: proposal.reasoningSummary,
         agentOutput: proposal,
@@ -126,18 +131,18 @@ export async function runIteration(
       })
       .where(eq(iterationRuns.id, opened.id))
       .returning();
-    return { status: "proposed", run: updated, proposal };
+    return { status: ITERATION_PROPOSED_STATUS, run: updated, proposal };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const [updated] = await client
       .update(iterationRuns)
       .set({
-        status: "failed",
+        status: ITERATION_FAILED_STATUS,
         error: message,
         completedAt: new Date(),
       })
       .where(eq(iterationRuns.id, opened.id))
       .returning();
-    return { status: "failed", run: updated, error: message };
+    return { status: ITERATION_FAILED_STATUS, run: updated, error: message };
   }
 }

@@ -4,6 +4,10 @@ import { db } from "@/db/client";
 import { iterationRuns } from "@/db/schema";
 import { requireAdminForRoute } from "@/lib/api/admin-auth";
 import { parseIterationRunRouteId } from "@/lib/policy/iterations";
+import {
+  ITERATION_PROPOSED_STATUS,
+  ITERATION_REJECTED_STATUS,
+} from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -33,8 +37,13 @@ export async function POST(
 
   const [updated] = await db()
     .update(iterationRuns)
-    .set({ status: "rejected", completedAt: new Date() })
-    .where(and(eq(iterationRuns.id, id), eq(iterationRuns.status, "proposed")))
+    .set({ status: ITERATION_REJECTED_STATUS, completedAt: new Date() })
+    .where(
+      and(
+        eq(iterationRuns.id, id),
+        eq(iterationRuns.status, ITERATION_PROPOSED_STATUS),
+      ),
+    )
     .returning();
 
   if (!updated) {

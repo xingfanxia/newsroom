@@ -16,10 +16,12 @@ import {
 import {
   CADENCES,
   FEEDBACK_VOTES,
+  ITERATION_STATUSES,
   SOURCE_GROUPS,
   SOURCE_HEALTH_STATUSES,
   SOURCE_KINDS,
   SOURCE_LOCALES,
+  USER_ROLES,
 } from "@/lib/types";
 import type {
   SourceKind as TSourceKind,
@@ -95,19 +97,13 @@ export const healthStatusEnum = pgEnum("health_status", SOURCE_HEALTH_STATUSES);
 
 /** App-level role. `admin` sees /admin/*, `editor` reserved for future authoring
  *  tools, `reader` is the default for anyone who signs in. */
-export const userRoleEnum = pgEnum("user_role", ["admin", "editor", "reader"]);
+export const userRoleEnum = pgEnum("user_role", USER_ROLES);
 
 /** Feedback vote kind. `up` / `down` are mutually exclusive per (item, user);
  *  `save` is an independent bookmark slot that can coexist with either. */
 export const feedbackVoteEnum = pgEnum("feedback_vote", FEEDBACK_VOTES);
 
-export const iterationStatusEnum = pgEnum("iteration_status", [
-  "running",
-  "proposed",
-  "applied",
-  "rejected",
-  "failed",
-]);
+export const iterationStatusEnum = pgEnum("iteration_status", ITERATION_STATUSES);
 
 // ── Tables ──────────────────────────────────────────────────────
 

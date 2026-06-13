@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { requireAdminForRoute } from "@/lib/api/admin-auth";
+import {
+  ITERATION_FAILED_STATUS,
+  ITERATION_PROPOSED_STATUS,
+} from "@/lib/types";
 import { IterationGuardError, runIteration } from "@/workers/agent/iterate";
 
 export const dynamic = "force-dynamic";
@@ -28,12 +32,12 @@ export async function POST() {
 
   try {
     const result = await runIteration({ requestedBy: admin.email });
-    if (result.status === "failed") {
+    if (result.status === ITERATION_FAILED_STATUS) {
       return NextResponse.json(
         {
           ok: false,
           runId: result.run.id,
-          status: "failed",
+          status: ITERATION_FAILED_STATUS,
           error: "agent_failed",
           detail: result.error,
         },
@@ -44,7 +48,7 @@ export async function POST() {
       {
         ok: true,
         runId: result.run.id,
-        status: "proposed",
+        status: ITERATION_PROPOSED_STATUS,
         baseVersion: result.run.baseVersion,
         proposal: result.proposal,
       },

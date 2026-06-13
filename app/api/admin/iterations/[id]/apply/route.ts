@@ -5,6 +5,10 @@ import { iterationRuns } from "@/db/schema";
 import { requireAdminForRoute } from "@/lib/api/admin-auth";
 import { parseIterationRunRouteId } from "@/lib/policy/iterations";
 import { commitSkillVersion } from "@/lib/policy/skill";
+import {
+  ITERATION_APPLIED_STATUS,
+  ITERATION_PROPOSED_STATUS,
+} from "@/lib/types";
 import { invalidatePolicyCache } from "@/workers/enrich/policy";
 import { SKILL_NAME } from "@/workers/agent/iterate";
 
@@ -52,7 +56,7 @@ export async function POST(
       { status: 404 },
     );
   }
-  if (run.status !== "proposed" || !run.proposedContent) {
+  if (run.status !== ITERATION_PROPOSED_STATUS || !run.proposedContent) {
     return NextResponse.json(
       {
         ok: false,
@@ -74,8 +78,13 @@ export async function POST(
 
   await client
     .update(iterationRuns)
-    .set({ status: "applied", completedAt: new Date() })
-    .where(and(eq(iterationRuns.id, id), eq(iterationRuns.status, "proposed")));
+    .set({ status: ITERATION_APPLIED_STATUS, completedAt: new Date() })
+    .where(
+      and(
+        eq(iterationRuns.id, id),
+        eq(iterationRuns.status, ITERATION_PROPOSED_STATUS),
+      ),
+    );
 
   if (run.skillName === SKILL_NAME) invalidatePolicyCache();
 
