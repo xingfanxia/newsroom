@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { feedback, savedCollections } from "@/db/schema";
+import { FEEDBACK_SAVE_VOTE } from "@/lib/types";
 
 export type SavedCollection = {
   id: number;
@@ -33,7 +34,7 @@ export async function listCollections(userId: string): Promise<SavedCollection[]
       count: sql<number>`
         (SELECT count(*) FROM ${feedback}
          WHERE ${feedback.userId} = ${savedCollections.userId}
-           AND ${feedback.vote} = 'save'
+           AND ${feedback.vote} = ${FEEDBACK_SAVE_VOTE}
            AND ${feedback.collectionId} = ${savedCollections.id})::int
       `,
     })
@@ -64,7 +65,7 @@ export async function getInboxCount(userId: string): Promise<number> {
     .where(
       and(
         eq(feedback.userId, userId),
-        eq(feedback.vote, "save"),
+        eq(feedback.vote, FEEDBACK_SAVE_VOTE),
         sql`${feedback.collectionId} IS NULL`,
       ),
     );
@@ -172,7 +173,7 @@ export async function getSavedItemCollectionId(
       and(
         eq(feedback.userId, userId),
         eq(feedback.itemId, itemId),
-        eq(feedback.vote, "save"),
+        eq(feedback.vote, FEEDBACK_SAVE_VOTE),
       ),
     )
     .limit(1);
@@ -225,7 +226,7 @@ export async function assignSavedItemCollection(input: {
       and(
         eq(feedback.userId, input.userId),
         eq(feedback.itemId, input.itemId),
-        eq(feedback.vote, "save"),
+        eq(feedback.vote, FEEDBACK_SAVE_VOTE),
       ),
     )
     .returning({ collectionId: feedback.collectionId });

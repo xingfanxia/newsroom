@@ -23,6 +23,9 @@ Shipped cleanup:
 - Shared admin auth JSON-error mapping for protected `/api/admin/*` data routes through `lib/api/admin-auth.ts`.
 - Shared cookie-session auth JSON-error mapping for required-session user routes (`/api/feedback*`, `/api/tweaks`) through `lib/api/session-auth.ts`.
 - Shared mutating route JSON body parsing and Zod error-envelope handling through `lib/api/json-body.ts`.
+- Shared feedback vote values through `FEEDBACK_VOTES`, `FEEDBACK_SIGNAL_VOTES`,
+  and `FEEDBACK_SAVE_VOTE` in `lib/types.ts`, so the DB enum, feedback request
+  schema, admin metrics, and saved-item queries cannot drift on `up|down|save`.
 - Shared REST/MCP search execution through `lib/api/search-results.ts`;
   adapters now own only auth/rate-limit/ETag/serialization, while the helper
   owns lexical full-match totals and semantic source/date/tier filters.

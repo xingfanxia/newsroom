@@ -21,9 +21,11 @@ describe("/api/v1/saved source wiring", () => {
   });
 
   test("write endpoint delegates collection assignment to owner-aware helpers", () => {
+    expect(savedRoute).toContain("FEEDBACK_SAVE_VOTE");
     expect(savedRoute).toContain("assignSavedItemCollection");
     expect(savedRoute).toContain("getSavedItemCollectionId");
     expect(savedRoute).toContain("userOwnsSavedCollection");
+    expect(savedRoute).not.toContain('vote: "save"');
     expect(savedRoute).not.toContain(".update(feedback)");
     expect(savedRoute).not.toContain("void sql");
   });

@@ -5,7 +5,7 @@ import { EventBadge } from "./event-badge";
 import { CoverageChip } from "./coverage-chip";
 import { SignalDrawer } from "./signal-drawer";
 import { useTweaks } from "@/hooks/use-tweaks";
-import type { Story } from "@/lib/types";
+import { FEEDBACK_SAVE_VOTE, type Story } from "@/lib/types";
 
 type Props = {
   story: Story;
@@ -68,7 +68,7 @@ export function Item({ story, locale }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           itemId: Number(story.id),
-          vote: "save",
+          vote: FEEDBACK_SAVE_VOTE,
           on: next,
         }),
       });

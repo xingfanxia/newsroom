@@ -19,7 +19,7 @@ import { parseJsonRequestBody } from "@/lib/api/json-body";
 import { requireApiToken } from "@/lib/auth/api-token";
 import { applyFeedbackToggle } from "@/lib/feedback/toggle";
 import { toSavedAgentApiItem } from "@/lib/api/v1-items";
-import { APP_LOCALES } from "@/lib/types";
+import { APP_LOCALES, FEEDBACK_SAVE_VOTE } from "@/lib/types";
 import {
   assignSavedItemCollection,
   getSavedItemCollectionId,
@@ -97,7 +97,7 @@ export async function POST(req: Request) {
 
     const votes = await applyFeedbackToggle(user, {
       itemId: b.item_id,
-      vote: "save",
+      vote: FEEDBACK_SAVE_VOTE,
       on: b.on,
       note: b.note,
     });

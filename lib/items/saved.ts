@@ -1,7 +1,7 @@
 import { desc, eq, and, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items, sources, feedback, clusters } from "@/db/schema";
-import type { Story } from "@/lib/types";
+import { FEEDBACK_SAVE_VOTE, type Story } from "@/lib/types";
 
 /**
  * Fetch the current user's saved items (feedback.vote='save') joined with
@@ -74,7 +74,7 @@ export async function getSavedStories(
     .where(
       and(
         eq(feedback.userId, userId),
-        eq(feedback.vote, "save"),
+        eq(feedback.vote, FEEDBACK_SAVE_VOTE),
         ...(collectionFilter ? [collectionFilter] : []),
       ),
     )
@@ -191,7 +191,9 @@ export async function getSavedTotals(userId: string): Promise<{
       month: sql<number>`count(*) filter (where ${feedback.createdAt} > now() - interval '30 days')::int`,
     })
     .from(feedback)
-    .where(and(eq(feedback.userId, userId), eq(feedback.vote, "save")));
+    .where(
+      and(eq(feedback.userId, userId), eq(feedback.vote, FEEDBACK_SAVE_VOTE)),
+    );
   return {
     total: row?.total ?? 0,
     thisWeek: row?.week ?? 0,
@@ -222,7 +224,7 @@ export async function getSavedTags(
         || coalesce(${items.tags}->'topics',       '[]'::jsonb)
       ) AS t
     WHERE ${feedback.userId} = ${userId}
-      AND ${feedback.vote} = 'save'
+      AND ${feedback.vote} = ${FEEDBACK_SAVE_VOTE}
       ${collectionCond}
     GROUP BY t
     ORDER BY n DESC

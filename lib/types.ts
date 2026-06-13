@@ -64,6 +64,17 @@ export type FeedView = (typeof FEED_VIEWS)[number];
 export const SEARCH_MODES = ["lexical", "semantic"] as const;
 export type SearchMode = (typeof SEARCH_MODES)[number];
 
+export const FEEDBACK_VOTES = ["up", "down", "save"] as const;
+export type FeedbackVote = (typeof FEEDBACK_VOTES)[number];
+
+export const FEEDBACK_SIGNAL_VOTES = [
+  "up",
+  "down",
+] as const satisfies readonly FeedbackVote[];
+export type FeedbackSignalVote = (typeof FEEDBACK_SIGNAL_VOTES)[number];
+
+export const FEEDBACK_SAVE_VOTE = "save" satisfies FeedbackVote;
+
 export type Source = {
   id: string;
   name: { en: string; zh: string };
@@ -157,7 +168,7 @@ export type Story = {
 
 export type FeedbackEntry = {
   id: string;
-  verdict: "up" | "down";
+  verdict: FeedbackSignalVote;
   title: string;
   note: string;
   createdAt: string; // ISO

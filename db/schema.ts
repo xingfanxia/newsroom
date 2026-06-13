@@ -15,6 +15,7 @@ import {
 } from "drizzle-orm/pg-core";
 import {
   CADENCES,
+  FEEDBACK_VOTES,
   SOURCE_GROUPS,
   SOURCE_HEALTH_STATUSES,
   SOURCE_KINDS,
@@ -98,7 +99,7 @@ export const userRoleEnum = pgEnum("user_role", ["admin", "editor", "reader"]);
 
 /** Feedback vote kind. `up` / `down` are mutually exclusive per (item, user);
  *  `save` is an independent bookmark slot that can coexist with either. */
-export const feedbackVoteEnum = pgEnum("feedback_vote", ["up", "down", "save"]);
+export const feedbackVoteEnum = pgEnum("feedback_vote", FEEDBACK_VOTES);
 
 export const iterationStatusEnum = pgEnum("iteration_status", [
   "running",

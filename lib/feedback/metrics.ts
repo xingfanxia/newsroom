@@ -1,6 +1,10 @@
 import { desc, eq, inArray, sql } from "drizzle-orm";
 import { db, schema } from "@/db/client";
-import type { FeedbackEntry } from "@/lib/types";
+import {
+  FEEDBACK_SIGNAL_VOTES,
+  type FeedbackEntry,
+  type FeedbackVote,
+} from "@/lib/types";
 
 export type FeedbackCounts = {
   total: number;
@@ -25,7 +29,7 @@ export async function getFeedbackCounts(): Promise<FeedbackCounts> {
     .groupBy(schema.feedback.vote);
 
   const by = Object.fromEntries(rows.map((r) => [r.vote, r.n])) as Partial<
-    Record<"up" | "down" | "save", number>
+    Record<FeedbackVote, number>
   >;
   const agreed = by.up ?? 0;
   const disagreed = by.down ?? 0;
@@ -55,7 +59,7 @@ export async function getRecentFeedback(
     })
     .from(schema.feedback)
     .innerJoin(schema.items, eq(schema.items.id, schema.feedback.itemId))
-    .where(inArray(schema.feedback.vote, ["up", "down"]))
+    .where(inArray(schema.feedback.vote, FEEDBACK_SIGNAL_VOTES))
     .orderBy(desc(schema.feedback.createdAt))
     .limit(limit);
 

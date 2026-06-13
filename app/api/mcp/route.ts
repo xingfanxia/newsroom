@@ -76,6 +76,7 @@ import {
 } from "@/lib/api/usage-summary";
 import {
   APP_LOCALES,
+  FEEDBACK_SAVE_VOTE,
   FEED_VIEWS,
   SEARCH_MODES,
   SOURCE_GROUPS,
@@ -312,7 +313,7 @@ function buildServer(user: SessionUser): McpServer {
 
         const votes = await applyFeedbackToggle(user, {
           itemId: item_id,
-          vote: "save",
+          vote: FEEDBACK_SAVE_VOTE,
           on,
           note,
         });

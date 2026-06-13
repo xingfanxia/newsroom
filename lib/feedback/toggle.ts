@@ -2,6 +2,12 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, schema } from "@/db/client";
 import { upsertAppUser, type SessionUser } from "@/lib/auth/session";
+import {
+  FEEDBACK_SIGNAL_VOTES,
+  FEEDBACK_VOTES,
+  type FeedbackSignalVote,
+  type FeedbackVote,
+} from "@/lib/types";
 
 /**
  * Request body for POST /api/feedback.
@@ -13,7 +19,7 @@ import { upsertAppUser, type SessionUser } from "@/lib/auth/session";
  */
 export const feedbackBodySchema = z.object({
   itemId: z.number().int().positive(),
-  vote: z.enum(["up", "down", "save"]),
+  vote: z.enum(FEEDBACK_VOTES),
   on: z.boolean(),
   note: z.string().max(500).optional(),
 });
@@ -21,11 +27,22 @@ export const feedbackBodySchema = z.object({
 export type FeedbackBody = z.infer<typeof feedbackBodySchema>;
 
 /** Per-user vote state returned after every toggle so the UI can reconcile. */
-export type UserVotes = {
-  up: boolean;
-  down: boolean;
-  save: boolean;
-};
+export type UserVotes = Record<FeedbackVote, boolean>;
+
+const OPPOSING_FEEDBACK_SIGNAL_VOTE = {
+  up: "down",
+  down: "up",
+} satisfies Record<FeedbackSignalVote, FeedbackSignalVote>;
+
+function isFeedbackSignalVote(vote: FeedbackVote): vote is FeedbackSignalVote {
+  return FEEDBACK_SIGNAL_VOTES.includes(vote as FeedbackSignalVote);
+}
+
+function emptyUserVotes(): UserVotes {
+  return Object.fromEntries(
+    FEEDBACK_VOTES.map((vote) => [vote, false]),
+  ) as UserVotes;
+}
 
 /**
  * Apply a toggle. Enforces up/down mutual exclusion: setting `up=on` clears
@@ -43,8 +60,8 @@ export async function applyFeedbackToggle(
 
   await db().transaction(async (tx) => {
     if (body.on) {
-      if (body.vote === "up" || body.vote === "down") {
-        const opposing = body.vote === "up" ? "down" : "up";
+      if (isFeedbackSignalVote(body.vote)) {
+        const opposing = OPPOSING_FEEDBACK_SIGNAL_VOTE[body.vote];
         await tx
           .delete(schema.feedback)
           .where(
@@ -100,7 +117,7 @@ export async function currentVotes(
         eq(schema.feedback.itemId, itemId),
       ),
     );
-  const state: UserVotes = { up: false, down: false, save: false };
+  const state = emptyUserVotes();
   for (const r of rows) state[r.vote] = true;
   return state;
 }

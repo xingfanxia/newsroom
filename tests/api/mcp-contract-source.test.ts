@@ -65,12 +65,15 @@ describe("MCP contract source wiring", () => {
   });
 
   test("save tool uses the shared owner-aware collection assignment helper", () => {
+    expect(mcpRoute).toContain("FEEDBACK_SAVE_VOTE");
     expect(mcpRoute).toContain("assignSavedItemCollection");
     expect(mcpRoute).toContain("getSavedItemCollectionId");
     expect(mcpRoute).toContain("userOwnsSavedCollection");
+    expect(saveTool).toContain("FEEDBACK_SAVE_VOTE");
     expect(saveTool).toContain("assignSavedItemCollection");
     expect(saveTool).toContain("getSavedItemCollectionId");
     expect(saveTool).toContain("userOwnsSavedCollection");
+    expect(saveTool).not.toContain('vote: "save"');
     expect(saveTool).not.toContain(".update(feedback)");
     expect(saveTool).not.toContain("collection_id ?? null");
   });

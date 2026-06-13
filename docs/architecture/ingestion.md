@@ -170,7 +170,7 @@ items            (id, source_id, title, summary_zh, summary_en, url, published_a
 item_tags        (item_id, axis, tag) — composite PK
 item_scores      (item_id, policy_version, importance, tier, reasoning)
 clusters         (id, lead_item_id, member_item_ids int[])
-feedback         (id, user_id, item_id, verdict "up" | "down" | "save", note, created_at)
+feedback         (id, user_id, item_id, vote from FEEDBACK_VOTES: up | down | save, note, created_at)
 policy_versions  (version, skill_md, committed_by, committed_at, parent_version, notes)
 iteration_runs   (id, started_at, finished_at, parent_version, new_version, feedback_ids int[], diff_jsonb, status)
 users            (id, email, role "editor" | "admin" | "reader")

@@ -3,6 +3,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useTweaks } from "@/hooks/use-tweaks";
+import { FEEDBACK_SAVE_VOTE } from "@/lib/types";
 import type { SavedCollection } from "@/lib/items/collections";
 
 type Props = {
@@ -78,7 +79,7 @@ export function SavedMetaStrip({
       const res = await fetch("/api/feedback", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemId, vote: "save", on: false }),
+        body: JSON.stringify({ itemId, vote: FEEDBACK_SAVE_VOTE, on: false }),
       });
       if (!res.ok) {
         toast.error(zh ? "取消失败" : "remove failed");

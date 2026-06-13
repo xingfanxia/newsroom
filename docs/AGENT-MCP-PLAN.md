@@ -113,7 +113,7 @@ in v2 if multi-agent sharing becomes relevant.
 
 ### `POST /api/v1/saved`
 Body: `{ item_id: number, on: boolean, collection_id?: number }`.
-Thin wrapper over existing `applyFeedbackToggle({vote: "save"})`. Agents
+Thin wrapper over existing `applyFeedbackToggle({ vote: FEEDBACK_SAVE_VOTE })`. Agents
 use this to bookmark hits for the human to review later.
 
 ### `POST /api/v1/collections`
