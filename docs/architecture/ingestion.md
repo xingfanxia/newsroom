@@ -77,6 +77,11 @@ Grouping for the `信源` UI: same enum as `group` above, with labels/order from
   (`cron:fetch-hourly`, `cron:article-body`, `cron:score-backfill`,
   `cron:newsletter-daily`, etc.); short aliases such as `cron:hourly`,
   `cron:body`, `cron:score`, and `cron:yt` remain available.
+- HTTP cron route handlers share `app/api/cron/_route.ts` for `CRON_SECRET`
+  auth, `at` timestamping, and JSON response envelopes. Leaf route files keep
+  only static Next route config plus worker payload mapping; sequencing lives
+  in worker helpers such as `workers/fetcher/pipeline.ts` and
+  `workers/cluster/pipeline.ts`.
 - RSS/Atom parsing via `fast-xml-parser`.
 - RSSHub routes hit `https://rsshub.app/{route}` (public instance) or self-hosted fallback.
 - Supported fetch kinds are `rss`, `atom`, `rsshub`, `x-api`, and

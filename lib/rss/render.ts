@@ -17,7 +17,7 @@ export type RssItem = {
   extraElements?: RssExtraElement[];
 };
 
-export type RssExtraElement = {
+type RssExtraElement = {
   name: string;
   value: string | number | boolean | null | undefined;
 };

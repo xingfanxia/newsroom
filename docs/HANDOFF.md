@@ -106,6 +106,9 @@ Shipped cleanup:
   featured-locale feeds, and the legacy newsletter feeds now use the same
   renderer while keeping feed-specific metadata such as radar extension fields.
 - Shared hourly/daily/weekly fetch+normalize sequencing through `workers/fetcher/pipeline.ts`, with HTTP route wiring in `app/api/cron/_fetch-bucket-route.ts` and local cron scripts using the same helper.
+- Shared cron HTTP auth/timestamp/JSON envelopes through
+  `app/api/cron/_route.ts`, so cron leaf route files only declare static Next
+  route config and map worker reports into response payloads.
 - Shared article body + YouTube transcript prefetch sequencing through
   `workers/fetcher/content-prefetch.ts`, so `/api/cron/article-body` and
   `bun scripts/ops/run-cron.ts body` use the same production path.

@@ -4,11 +4,9 @@ export const INVALID_ROUTE_ID_ERROR = "invalid_id";
 
 const positiveRouteIdSchema = z.coerce.number().int().positive();
 
-export type InvalidRouteIdError = typeof INVALID_ROUTE_ID_ERROR;
-
 export type PositiveRouteIdResult =
   | { ok: true; id: number }
-  | { ok: false; error: InvalidRouteIdError };
+  | { ok: false; error: typeof INVALID_ROUTE_ID_ERROR };
 
 export function parsePositiveRouteId(rawId: string): PositiveRouteIdResult {
   const parsed = positiveRouteIdSchema.safeParse(rawId);

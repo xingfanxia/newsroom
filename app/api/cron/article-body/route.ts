@@ -1,6 +1,5 @@
-import { NextResponse } from "next/server";
 import { runContentPrefetch } from "@/workers/fetcher/content-prefetch";
-import { verifyCron } from "../_auth";
+import { runCronJsonRoute } from "../_route";
 
 // Article body / transcript prefetch — split out of /api/cron/enrich so
 // it doesn't eat the enrich function's budget. Jina (HTTP fetch) and
@@ -12,14 +11,12 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
-  const deny = verifyCron(req);
-  if (deny) return deny;
-
-  const report = await runContentPrefetch();
-  return NextResponse.json({
-    kind: "article-body",
-    at: new Date().toISOString(),
-    articleBody: report.articleBody,
-    youtubeTranscript: report.youtubeTranscript,
+  return runCronJsonRoute(req, async () => {
+    const report = await runContentPrefetch();
+    return {
+      kind: "article-body",
+      articleBody: report.articleBody,
+      youtubeTranscript: report.youtubeTranscript,
+    };
   });
 }

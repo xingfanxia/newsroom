@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "../..");
 const routeHelperPath = resolve(root, "app/api/cron/_fetch-bucket-route.ts");
+const envelopeHelperPath = resolve(root, "app/api/cron/_route.ts");
 const workerHelperPath = resolve(root, "workers/fetcher/pipeline.ts");
 const scriptPath = resolve(root, "scripts/ops/run-cron.ts");
 
@@ -24,17 +25,28 @@ describe("fetch cron routes", () => {
     expect(helper).toContain("return { fetch, normalize }");
   });
 
-  it("centralizes auth and JSON response wiring in the HTTP route helper", () => {
+  it("centralizes auth and JSON response wiring in the shared cron route helper", () => {
+    expect(existsSync(envelopeHelperPath)).toBe(true);
+    const helper = readFileSync(envelopeHelperPath, "utf8");
+
+    expect(helper).toContain("runCronJsonRoute");
+    expect(helper).toContain("verifyCron");
+    expect(helper).toContain("NextResponse.json");
+    expect(helper).toContain("at: new Date().toISOString()");
+  });
+
+  it("keeps the fetch HTTP helper focused on payload mapping", () => {
     expect(existsSync(routeHelperPath)).toBe(true);
     const helper = readFileSync(routeHelperPath, "utf8");
 
     expect(helper).toContain("runFetchAndNormalize");
-    expect(helper).toContain("verifyCron");
-    expect(helper).toContain("NextResponse.json");
+    expect(helper).toContain("runCronJsonRoute");
     expect(helper).toContain("fetch: report.fetch");
     expect(helper).toContain("normalize: report.normalize");
     expect(helper).not.toContain("runFetchBucket(");
     expect(helper).not.toContain("runNormalizer(");
+    expect(helper).not.toContain("verifyCron(");
+    expect(helper).not.toContain("NextResponse");
   });
 
   it("keeps leaf routes limited to their public kind and source cadences", () => {

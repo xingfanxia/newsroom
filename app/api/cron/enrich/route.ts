@@ -1,6 +1,5 @@
-import { NextResponse } from "next/server";
 import { runEnrichBatch } from "@/workers/enrich";
-import { verifyCron } from "../_auth";
+import { runCronJsonRoute } from "../_route";
 
 // Stages 1+2+3 (summary/tags → embed → score) for unenriched items.
 // Article-body prefetch, score-backfill, and commentary now have their
@@ -13,13 +12,8 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
-  const deny = verifyCron(req);
-  if (deny) return deny;
-
-  const enrich = await runEnrichBatch();
-  return NextResponse.json({
+  return runCronJsonRoute(req, async () => ({
     kind: "enrich",
-    at: new Date().toISOString(),
-    enrich,
-  });
+    enrich: await runEnrichBatch(),
+  }));
 }

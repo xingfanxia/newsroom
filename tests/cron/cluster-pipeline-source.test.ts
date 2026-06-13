@@ -33,13 +33,14 @@ describe("cluster cron pipeline wiring", () => {
     expect(src).toContain("recencyHours: EVENT_COMMENTARY_CRON_RECENCY_HOURS");
   });
 
-  it("keeps the HTTP route as auth plus response wiring", () => {
+  it("keeps the HTTP route as shared cron envelope plus response mapping", () => {
     const src = readFileSync(routePath, "utf8");
 
     expect(src).toContain("runClusterPipeline");
-    expect(src).toContain("verifyCron");
-    expect(src).toContain("NextResponse.json");
+    expect(src).toContain("runCronJsonRoute");
     expect(src).toContain("merge: report.merge");
+    expect(src).not.toContain("verifyCron(");
+    expect(src).not.toContain("NextResponse");
     expect(src).not.toContain("runClusterBatch()");
     expect(src).not.toContain("runArbitrationBatch()");
     expect(src).not.toContain("runCanonicalTitleBatch()");

@@ -1,6 +1,5 @@
-import { NextResponse } from "next/server";
 import { runCommentaryBackfill } from "@/workers/enrich/commentary";
-import { verifyCron } from "../_auth";
+import { runCronJsonRoute } from "../_route";
 
 // Item-level editor-note / analysis backfill — runs against featured/p1
 // items with `enriched_at IS NOT NULL`. Each call is ~30-40s of standard
@@ -11,13 +10,8 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
-  const deny = verifyCron(req);
-  if (deny) return deny;
-
-  const commentary = await runCommentaryBackfill();
-  return NextResponse.json({
+  return runCronJsonRoute(req, async () => ({
     kind: "commentary",
-    at: new Date().toISOString(),
-    commentary,
-  });
+    commentary: await runCommentaryBackfill(),
+  }));
 }

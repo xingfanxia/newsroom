@@ -108,7 +108,6 @@ export const PUBLIC_ENDPOINTS = {
 } as const satisfies Record<string, PublicEndpointConfig>;
 
 export type PublicEndpointKey = keyof typeof PUBLIC_ENDPOINTS;
-export type PublicRateLimitKey = PublicEndpointKey;
 
 export const PUBLIC_ENDPOINT_COUNT = Object.keys(PUBLIC_ENDPOINTS).length;
 

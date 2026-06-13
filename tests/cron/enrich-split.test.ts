@@ -34,8 +34,9 @@ describe("split enrich cron — each worker has its own route", () => {
     expect(src).not.toContain("runEnrichBatch");
     expect(src).not.toContain("runScoreBackfill");
     expect(src).not.toContain("runCommentaryBackfill");
-    // Auth + maxDuration wired
-    expect(src).toContain("verifyCron");
+    // Shared cron envelope + maxDuration wired
+    expect(src).toContain("runCronJsonRoute");
+    expect(src).not.toContain("verifyCron(");
     expect(src).toMatch(/maxDuration\s*=\s*\d+/);
   });
 
@@ -47,7 +48,8 @@ describe("split enrich cron — each worker has its own route", () => {
     expect(src).not.toContain("runEnrichBatch");
     expect(src).not.toContain("runArticleBodyFetch");
     expect(src).not.toContain("runCommentaryBackfill");
-    expect(src).toContain("verifyCron");
+    expect(src).toContain("runCronJsonRoute");
+    expect(src).not.toContain("verifyCron(");
   });
 
   it("/api/cron/commentary route exists and runs only commentary backfill", () => {
@@ -58,7 +60,8 @@ describe("split enrich cron — each worker has its own route", () => {
     expect(src).not.toContain("runEnrichBatch");
     expect(src).not.toContain("runArticleBodyFetch");
     expect(src).not.toContain("runScoreBackfill");
-    expect(src).toContain("verifyCron");
+    expect(src).toContain("runCronJsonRoute");
+    expect(src).not.toContain("verifyCron(");
   });
 
   it("/api/cron/enrich route now ONLY runs enrich (no chained workers)", () => {

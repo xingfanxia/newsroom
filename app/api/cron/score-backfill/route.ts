@@ -1,6 +1,5 @@
-import { NextResponse } from "next/server";
 import { runScoreBackfill } from "@/workers/enrich/score-backfill";
-import { verifyCron } from "../_auth";
+import { runCronJsonRoute } from "../_route";
 
 // Score-only backfill — picks items that were enriched before HKR was
 // part of the schema (or before the bilingual reasoning columns landed)
@@ -11,13 +10,8 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
-  const deny = verifyCron(req);
-  if (deny) return deny;
-
-  const score = await runScoreBackfill();
-  return NextResponse.json({
+  return runCronJsonRoute(req, async () => ({
     kind: "score-backfill",
-    at: new Date().toISOString(),
-    score,
-  });
+    score: await runScoreBackfill(),
+  }));
 }
