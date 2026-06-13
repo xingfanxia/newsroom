@@ -1,4 +1,5 @@
 import { requireSessionForRoute } from "@/lib/api/session-auth";
+import { okEmpty, okError, okJson } from "@/lib/api/ok-response";
 import type { SessionUser } from "@/lib/auth/session";
 
 type SessionRouteHandler = (user: SessionUser) => Response | Promise<Response>;
@@ -11,21 +12,6 @@ export async function runSessionRoute(
   return handler(auth.user);
 }
 
-export function sessionJson(
-  body: Record<string, unknown>,
-  init?: ResponseInit,
-): Response {
-  return Response.json({ ok: true, ...body }, init);
-}
-
-export function sessionOk(init?: ResponseInit): Response {
-  return Response.json({ ok: true }, init);
-}
-
-export function sessionError(
-  error: string,
-  status: number,
-  extra: Record<string, unknown> = {},
-): Response {
-  return Response.json({ ok: false, ...extra, error }, { status });
-}
+export const sessionJson = okJson;
+export const sessionOk = okEmpty;
+export const sessionError = okError;

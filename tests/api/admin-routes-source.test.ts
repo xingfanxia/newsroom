@@ -18,14 +18,16 @@ function read(path: string): string {
 }
 
 describe("protected admin route source wiring", () => {
-  test("admin route helper centralizes auth and ok/error envelopes", () => {
+  test("admin route helper centralizes auth and aliases shared ok/error envelopes", () => {
     const source = read("lib/api/admin-route.ts");
 
     expect(source).toContain("@/lib/api/admin-auth");
+    expect(source).toContain("@/lib/api/ok-response");
     expect(source).toContain("runAdminRoute");
     expect(source).toContain("adminJson");
     expect(source).toContain("adminOk");
     expect(source).toContain("adminError");
+    expect(source).not.toContain("Response.json({ ok:");
   });
 
   test("all protected admin routes share admin auth response handling", () => {

@@ -15,14 +15,16 @@ function read(path: string): string {
 }
 
 describe("required session route source wiring", () => {
-  test("session route helper centralizes auth and ok/error envelopes", () => {
+  test("session route helper centralizes auth and aliases shared ok/error envelopes", () => {
     const source = read("lib/api/session-route.ts");
 
     expect(source).toContain("@/lib/api/session-auth");
+    expect(source).toContain("@/lib/api/ok-response");
     expect(source).toContain("runSessionRoute");
     expect(source).toContain("sessionJson");
     expect(source).toContain("sessionOk");
     expect(source).toContain("sessionError");
+    expect(source).not.toContain("Response.json({ ok:");
   });
 
   test("cookie-gated user routes share session auth response handling", () => {

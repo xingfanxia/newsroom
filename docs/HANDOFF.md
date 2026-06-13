@@ -36,6 +36,9 @@ Shipped cleanup:
   required-session user routes (`/api/feedback*`, `/api/tweaks`) through
   `lib/api/session-route.ts`, wrapping the lower-level
   `lib/api/session-auth.ts` auth-required response.
+- Shared the underlying `{ ok: true }` / `{ ok: false, error }` response
+  envelope construction through `lib/api/ok-response.ts`; admin/session route
+  helpers now alias that implementation while keeping domain-specific names.
 - Shared mutating route JSON body parsing and Zod error-envelope handling through `lib/api/json-body.ts`.
 - Shared feedback vote values through `FEEDBACK_VOTES`, `FEEDBACK_SIGNAL_VOTES`,
   and `FEEDBACK_SAVE_VOTE` in `lib/types.ts`, so the DB enum, feedback request
