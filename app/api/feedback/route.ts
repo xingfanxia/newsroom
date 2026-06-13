@@ -1,6 +1,9 @@
-import { NextResponse } from "next/server";
 import { parseJsonRequestBody } from "@/lib/api/json-body";
-import { requireSessionForRoute } from "@/lib/api/session-auth";
+import {
+  runSessionRoute,
+  sessionError,
+  sessionJson,
+} from "@/lib/api/session-route";
 import {
   applyFeedbackToggle,
   feedbackBodySchema,
@@ -15,23 +18,18 @@ import {
  * - 500 on unexpected server error (logged, not exposed)
  */
 export async function POST(req: Request) {
-  const auth = await requireSessionForRoute();
-  if (!auth.ok) return auth.response;
-  const user = auth.user;
+  return runSessionRoute(async (user) => {
+    const parsed = await parseJsonRequestBody(req, feedbackBodySchema, {
+      envelope: "ok",
+    });
+    if (!parsed.ok) return parsed.response;
 
-  const parsed = await parseJsonRequestBody(req, feedbackBodySchema, {
-    envelope: "ok",
+    try {
+      const userVotes = await applyFeedbackToggle(user, parsed.data);
+      return sessionJson({ userVotes });
+    } catch (err) {
+      console.error("[api/feedback] failed", err);
+      return sessionError("server_error", 500);
+    }
   });
-  if (!parsed.ok) return parsed.response;
-
-  try {
-    const userVotes = await applyFeedbackToggle(user, parsed.data);
-    return NextResponse.json({ ok: true, userVotes });
-  } catch (err) {
-    console.error("[api/feedback] failed", err);
-    return NextResponse.json(
-      { ok: false, error: "server_error" },
-      { status: 500 },
-    );
-  }
 }

@@ -32,7 +32,12 @@ export type SessionUser = {
  * otherwise null. Never throws.
  */
 export async function getSessionUser(): Promise<SessionUser | null> {
-  const store = await cookies();
+  let store: Awaited<ReturnType<typeof cookies>>;
+  try {
+    store = await cookies();
+  } catch {
+    return null;
+  }
   const value = store.get(ADMIN_SESSION_COOKIE)?.value;
   if (!verifySessionCookie(value)) return null;
   return {

@@ -30,7 +30,10 @@ Shipped cleanup:
   `getSystemSnapshot` and display cannot drift when a cron path changes.
 - Shared `/api/admin/iterations/[id]` route-id parsing through `lib/policy/iterations.ts` so fetch/apply/reject stay behaviorally aligned.
 - Shared admin auth JSON-error mapping for protected `/api/admin/*` data routes through `lib/api/admin-auth.ts`.
-- Shared cookie-session auth JSON-error mapping for required-session user routes (`/api/feedback*`, `/api/tweaks`) through `lib/api/session-auth.ts`.
+- Shared cookie-session route auth and ok/error JSON envelopes for
+  required-session user routes (`/api/feedback*`, `/api/tweaks`) through
+  `lib/api/session-route.ts`, wrapping the lower-level
+  `lib/api/session-auth.ts` auth-required response.
 - Shared mutating route JSON body parsing and Zod error-envelope handling through `lib/api/json-body.ts`.
 - Shared feedback vote values through `FEEDBACK_VOTES`, `FEEDBACK_SIGNAL_VOTES`,
   and `FEEDBACK_SAVE_VOTE` in `lib/types.ts`, so the DB enum, feedback request

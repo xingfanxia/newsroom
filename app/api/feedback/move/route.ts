@@ -1,8 +1,11 @@
-import { NextResponse } from "next/server";
 import { z } from "zod";
 import { parseJsonRequestBody } from "@/lib/api/json-body";
+import {
+  runSessionRoute,
+  sessionError,
+  sessionOk,
+} from "@/lib/api/session-route";
 import { upsertAppUser } from "@/lib/auth/session";
-import { requireSessionForRoute } from "@/lib/api/session-auth";
 import { moveItemToCollection } from "@/lib/items/collections";
 
 const bodySchema = z.object({
@@ -18,30 +21,23 @@ const bodySchema = z.object({
  * 404 if the save doesn't exist for this user.
  */
 export async function POST(req: Request) {
-  const auth = await requireSessionForRoute();
-  if (!auth.ok) return auth.response;
-  const user = auth.user;
+  return runSessionRoute(async (user) => {
+    await upsertAppUser(user);
 
-  await upsertAppUser(user);
+    const parsed = await parseJsonRequestBody(req, bodySchema, { envelope: "ok" });
+    if (!parsed.ok) return parsed.response;
 
-  const parsed = await parseJsonRequestBody(req, bodySchema, { envelope: "ok" });
-  if (!parsed.ok) return parsed.response;
-
-  try {
-    const ok = await moveItemToCollection({
-      userId: user.id,
-      itemId: parsed.data.itemId,
-      targetCollectionId: parsed.data.targetCollectionId,
-    });
-    if (!ok) {
-      return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
+    try {
+      const ok = await moveItemToCollection({
+        userId: user.id,
+        itemId: parsed.data.itemId,
+        targetCollectionId: parsed.data.targetCollectionId,
+      });
+      if (!ok) return sessionError("not_found", 404);
+      return sessionOk();
+    } catch (err) {
+      console.error("[api/feedback/move] failed", err);
+      return sessionError("server_error", 500);
     }
-    return NextResponse.json({ ok: true });
-  } catch (err) {
-    console.error("[api/feedback/move] failed", err);
-    return NextResponse.json(
-      { ok: false, error: "server_error" },
-      { status: 500 },
-    );
-  }
+  });
 }
