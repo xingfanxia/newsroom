@@ -106,13 +106,13 @@ Shipped cleanup:
   `lib/api/daily-columns.ts`; public daily route files now own only
   rate-limit/cache/error-envelope mapping, while MCP daily resources own only
   resource envelope mapping.
-- Shared bearer-agent usage summary serialization through
+- Shared bearer-agent usage summary request parsing and serialization through
   `lib/api/usage-summary.ts`; `/api/v1/usage/summary` and MCP
-  `ax_radar_usage` now share the same totals, `by_task`, `by_model`, and
-  `recent_calls` contract.
+  `ax_radar_usage` now share the window schema/default plus the same totals,
+  `by_task`, `by_model`, and `recent_calls` contract.
 - Shared usage window keys through `USAGE_WINDOWS` in `lib/llm/stats.ts`, so
   the admin usage page, v1 usage summary, and MCP usage tool cannot drift on
-  the `today|week|month|all` window set.
+  the `today|week|month|all` window set or its default `week` behavior.
 - Shared admin usage presentation helpers through `lib/llm/usage-display.ts`,
   so range labels, task badge tones, token/call compaction, sparkline dates,
   and task-model summaries stay exhaustive over `USAGE_WINDOWS` and

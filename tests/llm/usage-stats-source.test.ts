@@ -27,9 +27,12 @@ describe("usage stats surfaces", () => {
     expect(page).not.toContain('const RANGES = ["today", "week", "month", "all"]');
     expect(page).not.toContain("const RANGE_LABEL");
     expect(summary).toContain("USAGE_WINDOWS");
+    expect(summary).toContain("usageSummaryWindowSchema");
+    expect(summary).toContain("DEFAULT_USAGE_WINDOW");
     expect(summary).not.toContain('export const USAGE_WINDOWS = ["today", "week", "month", "all"]');
-    expect(route).toContain("USAGE_WINDOWS");
-    expect(mcp).toContain("USAGE_WINDOWS");
+    expect(route).toContain("parseUsageSummaryQueryRequest");
+    expect(mcp).toContain("usageSummaryWindowSchema");
+    expect(mcp).toContain("usageWindowOrDefault");
   });
 
   it("includes task-level model breakdowns for the task spend table", () => {
@@ -73,6 +76,13 @@ describe("usage stats surfaces", () => {
     expect(mcp).toContain("@/lib/api/usage-summary");
     expect(route).toContain("getUsageSummary");
     expect(mcp).toContain("getUsageSummary");
+    expect(route).toContain("parseUsageSummaryQueryRequest");
+    expect(route).not.toContain('from "zod"');
+    expect(route).not.toContain("parseQueryParams");
+    expect(mcp).toContain("usageSummaryWindowSchema");
+    expect(mcp).toContain("usageWindowOrDefault");
+    expect(mcp).not.toContain('window: z.enum(USAGE_WINDOWS).optional()');
+    expect(mcp).not.toContain('window ?? "week"');
     expect(route).not.toContain("totalsByWindow");
     expect(route).not.toContain("breakdownByTask");
     expect(mcp).not.toContain("totalsByWindow");

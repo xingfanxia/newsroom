@@ -1,9 +1,12 @@
+import { z } from "zod";
+import { parseQueryParams } from "@/lib/api/query-params";
 import {
   breakdownByModel,
   breakdownByTask,
   dailySpend,
   recentCalls,
   totalsByWindow,
+  USAGE_WINDOWS,
   type DailySpendPoint,
   type ModelBreakdown,
   type RecentCall,
@@ -13,6 +16,20 @@ import {
 } from "@/lib/llm/stats";
 export { USAGE_WINDOWS } from "@/lib/llm/stats";
 export type { WindowKey, WindowTotals } from "@/lib/llm/stats";
+
+const DEFAULT_USAGE_WINDOW = "week" satisfies WindowKey;
+export const usageSummaryWindowSchema = z.enum(USAGE_WINDOWS).optional();
+const usageSummaryQuerySchema = z.object({
+  window: usageSummaryWindowSchema.default(DEFAULT_USAGE_WINDOW),
+});
+
+export function usageWindowOrDefault(window: WindowKey | undefined): WindowKey {
+  return window ?? DEFAULT_USAGE_WINDOW;
+}
+
+export function parseUsageSummaryQueryRequest(req: Request) {
+  return parseQueryParams(req, usageSummaryQuerySchema);
+}
 
 export type UsageSummaryApi = {
   window: WindowKey;
@@ -121,7 +138,7 @@ export function toUsageSummaryApi(args: {
 }
 
 export async function getUsageSummary(
-  window: WindowKey = "week",
+  window: WindowKey = DEFAULT_USAGE_WINDOW,
   opts: { recentLimit?: number } = {},
 ): Promise<UsageSummaryApi> {
   const [totals, byTask, byModel, recent] = await Promise.all([
@@ -139,7 +156,7 @@ export async function getUsageSummary(
 }
 
 export async function getUsageDashboardSummary(
-  window: WindowKey = "week",
+  window: WindowKey = DEFAULT_USAGE_WINDOW,
   opts: { recentLimit?: number; dailyDays?: number } = {},
 ): Promise<UsageDashboardSummary> {
   const [selected, today, week, month, all, byTask, byModel, recent, daily] =

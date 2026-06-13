@@ -6,7 +6,6 @@ const root = process.cwd();
 
 const queryRoutePaths = [
   "app/api/v1/saved/route.ts",
-  "app/api/v1/usage/summary/route.ts",
 ] as const;
 
 function read(path: string): string {
@@ -35,6 +34,13 @@ describe("query param source wiring", () => {
     expect(publicFeed).not.toContain("@/lib/api/query-params");
     expect(feedQueryParams).toContain("@/lib/api/query-params");
     expect(feedQueryParams).toContain("parseFeedRequestQuery");
+
+    const usageRoute = read("app/api/v1/usage/summary/route.ts");
+    const usageSummary = read("lib/api/usage-summary.ts");
+    expect(usageRoute).toContain("parseUsageSummaryQueryRequest");
+    expect(usageRoute).not.toContain("@/lib/api/query-params");
+    expect(usageSummary).toContain("@/lib/api/query-params");
+    expect(usageSummary).toContain("parseUsageSummaryQueryRequest");
   });
 
   test("public invalid-query messages use the shared formatter", () => {

@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { toUsageSummaryApi } from "@/lib/api/usage-summary";
+import {
+  parseUsageSummaryQueryRequest,
+  toUsageSummaryApi,
+  usageWindowOrDefault,
+} from "@/lib/api/usage-summary";
 
 describe("usage summary API serialization", () => {
   test("serializes totals, task/model breakdowns, and recent calls for agents", () => {
@@ -110,5 +114,36 @@ describe("usage summary API serialization", () => {
         },
       ],
     });
+  });
+});
+
+describe("usage summary request parsing", () => {
+  test("defaults requests and MCP inputs to the shared week window", () => {
+    const parsed = parseUsageSummaryQueryRequest(
+      new Request("https://example.test/api/v1/usage/summary"),
+    );
+
+    expect(parsed).toMatchObject({
+      ok: true,
+      data: { window: "week" },
+    });
+    expect(usageWindowOrDefault(undefined)).toBe("week");
+  });
+
+  test("accepts all-time windows and rejects unknown values before DB work", () => {
+    expect(
+      parseUsageSummaryQueryRequest(
+        new Request("https://example.test/api/v1/usage/summary?window=all"),
+      ),
+    ).toMatchObject({
+      ok: true,
+      data: { window: "all" },
+    });
+
+    const invalid = parseUsageSummaryQueryRequest(
+      new Request("https://example.test/api/v1/usage/summary?window=forever"),
+    );
+    expect(invalid.ok).toBe(false);
+    if (!invalid.ok) expect(invalid.issues.length).toBeGreaterThan(0);
   });
 });

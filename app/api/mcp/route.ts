@@ -61,7 +61,8 @@ import {
 } from "@/lib/api/daily-columns";
 import {
   getUsageSummary,
-  USAGE_WINDOWS,
+  usageSummaryWindowSchema,
+  usageWindowOrDefault,
 } from "@/lib/api/usage-summary";
 import {
   APP_LOCALES,
@@ -327,11 +328,11 @@ function buildServer(user: SessionUser): McpServer {
       description:
         "Return recent LLM cost + token usage for a time window. Useful for chatty agents to budget check before firing a batch. Fields: totals, by_task, by_model, and recent_calls with provider/model labels.",
       inputSchema: {
-        window: z.enum(USAGE_WINDOWS).optional(),
+        window: usageSummaryWindowSchema,
       },
     },
     async ({ window }) => {
-      const w = window ?? "week";
+      const w = usageWindowOrDefault(window);
       return text(await getUsageSummary(w));
     },
   );

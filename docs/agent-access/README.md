@@ -67,7 +67,7 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 - **`lib/api/collection-requests.ts`** — shared saved-collection request schemas and duplicate-name detection used by cookie-gated `/api/admin/collections` and bearer-gated `/api/v1/collections`; each route still owns its auth and response envelope.
 - **`lib/api/saved-requests.ts`** — shared saved-item query/mutation schemas used by bearer-gated `/api/v1/saved` and the browser saved-item move route; route files still own auth and envelopes, while shared route helpers own any cross-surface mutation semantics.
 - **`lib/api/saved-routes.ts`** — shared saved-item mutation result helper used by bearer-gated `/api/v1/saved` and MCP `ax_radar_save`; it owns save toggling, owner-aware collection assignment, assigned-collection payloads, and missing-item FK-to-`item_not_found` mapping while adapters keep their response envelopes.
-- **`lib/api/usage-summary.ts`** — shared bearer-gated LLM usage summary contract used by `/api/v1/usage/summary` and MCP `ax_radar_usage`, with totals, task/model breakdowns, and recent call provider/model labels.
+- **`lib/api/usage-summary.ts`** — shared bearer-gated LLM usage summary contract used by `/api/v1/usage/summary` and MCP `ax_radar_usage`, with request/window parsing, the default usage window, totals, task/model breakdowns, and recent call provider/model labels.
 - **`lib/tweaks.ts` + `lib/api/tweak-requests.ts`** — shared tweak option contracts, defaults, PATCH validation, and DB patch construction used by the client site-config provider, cookie-gated `/api/tweaks`, and bearer-gated `/api/v1/tweaks`.
 
 ## Adding a new public endpoint
@@ -77,7 +77,7 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 3. Call `publicEndpointRateLimit(req, "<endpoint-key>")` at the top
 4. Build a stable `etagSignal({ ... })` — anything that changes when content updates
 5. Use `publicCachedJson(req, { endpoint: "<endpoint-key>", etagFamily: "public-<name>", signal, body })` for 200/304, `publicError(msg, code)` for explicit 4xx, and `publicServerError("<route-label>", err)` for catch-all 5xx
-6. Parse query strings with `parseQueryParams(req, schema)` from `lib/api/query-params.ts`; use `publicInvalidQuery(issues)` for public validation errors
+6. Reuse an existing domain request helper when one owns the endpoint contract; otherwise parse query strings with `parseQueryParams(req, schema)` from `lib/api/query-params.ts`; use `publicInvalidQuery(issues)` for public validation errors
 7. Strip LLM internals before returning
 8. Update `/openapi.yaml` (in `app/openapi.yaml/route.ts`) with the new path
 9. Update `/skill.md` (in `app/skill.md/route.ts`) intent table if user-visible
@@ -119,7 +119,7 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 - `tests/api/tweak-requests.test.ts` — shared tweak PATCH validation and DB patch construction for browser + bearer surfaces
 - `tests/api/tweaks-source.test.ts` — cookie/v1 tweak routes and the client provider stay wired to shared tweak contracts
 - `tests/api/mcp-contract-source.test.ts` — MCP feed/search stay wired to shared execution helpers and the shared v1 item serializer
-- `tests/api/usage-summary.test.ts` — bearer-gated usage summary serializes totals, task/model breakdowns, and recent calls for agents
+- `tests/api/usage-summary.test.ts` — bearer-gated usage summary parses request windows and serializes totals, task/model breakdowns, and recent calls for agents
 - `tests/api/v1-saved-source.test.ts` — `/api/v1/saved` stays wired to shared saved request schemas, the shared saved-item serializer, and the shared saved mutation helper
 - `tests/site/public-origin.test.ts` — public discovery surfaces stay wired to the canonical public origin helper and the README uses the same production URL
 - `tests/rss/legacy-feeds.test.ts` + `tests/rss/routes-source.test.ts` — legacy RSS slug feeds keep slug parsing/item mapping covered and route feed construction delegated
@@ -151,7 +151,7 @@ Run these with `bun test --env-file=.env.local tests/api/public-*.test.ts tests/
 - **RSS rendering is centralized across feed families** — `lib/rss/render.ts` owns the RSS XML envelope, response content type/cache headers, XML escaping, `content:encoded` CDATA safety, namespaces, and extension fields; route files choose data and channel metadata only.
 - **Legacy RSS slug feed construction is centralized** — `/api/rss/{daily,today,curated}.xml` delegates feed metadata, DB row queries, and `RssItem` mapping to `lib/rss/legacy-feeds.ts`; the route file keeps only rate-limit, slug validation, 404 handling, and `rssResponse`.
 - **Legacy newsletter RSS construction is centralized** — `/api/feed/newsletter/{locale}/rss.xml` delegates locale fallback, legacy structured-digest filtering (`headline IS NOT NULL`), content HTML, and channel metadata to `lib/rss/newsletter-feed.ts`; the route file keeps only `rssResponse`.
-- **Usage summary serialization is centralized across bearer agent surfaces** — `/api/v1/usage/summary` and MCP `ax_radar_usage` both call `getUsageSummary`; the helper owns the `today|week|month|all` window set, totals, `by_task`, `by_model`, and `recent_calls` shape.
+- **Usage summary request parsing and serialization is centralized across bearer agent surfaces** — `/api/v1/usage/summary` parses requests through `parseUsageSummaryQueryRequest`, while MCP `ax_radar_usage` uses `usageSummaryWindowSchema` and `usageWindowOrDefault`; both call `getUsageSummary`. The helper owns the `today|week|month|all` window set, default `week` window, totals, `by_task`, `by_model`, and `recent_calls` shape.
 - **Usage presentation is centralized for the admin surface** — `lib/llm/usage-display.ts` owns usage range labels, task badge tones, compact token/call formatting, sparkline date labels, and task-model summaries; tests keep those helpers exhaustive over `USAGE_WINDOWS` and `LLM_TASKS`.
 - **v1 bearer auth + plain JSON envelopes are centralized** — route handlers under `/api/v1/*` should call `runV1Route(req, async (user) => ...)` and return `v1Json`, `v1Error`, `v1InvalidQuery`, or `v1ServerError`. Do not call `requireApiToken`, `Response.json`, or hand-copy `console.error` plus `server_error` responses directly in v1 leaf routes. Put reusable or contract-bearing request schemas in `lib/api/*-requests.ts`; keep surface-specific domain result mapping in the route unless a shared route helper already owns that behavior.
 

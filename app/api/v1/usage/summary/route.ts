@@ -8,8 +8,6 @@
  * Fields are all lifetime-to-date counters scoped to the specified window.
  * Window = today | week | month | all (default week).
  */
-import { z } from "zod";
-import { parseQueryParams } from "@/lib/api/query-params";
 import {
   runV1Route,
   v1InvalidQuery,
@@ -18,16 +16,12 @@ import {
 } from "@/lib/api/v1-route";
 import {
   getUsageSummary,
-  USAGE_WINDOWS,
+  parseUsageSummaryQueryRequest,
 } from "@/lib/api/usage-summary";
-
-const querySchema = z.object({
-  window: z.enum(USAGE_WINDOWS).optional().default("week"),
-});
 
 export async function GET(req: Request) {
   return runV1Route(req, async () => {
-    const parsed = parseQueryParams(req, querySchema);
+    const parsed = parseUsageSummaryQueryRequest(req);
     if (!parsed.ok) return v1InvalidQuery();
 
     const w = parsed.data.window;
