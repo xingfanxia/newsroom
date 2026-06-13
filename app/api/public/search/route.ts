@@ -14,9 +14,8 @@ import {
   publicInvalidQuery,
   publicServerError,
 } from "@/lib/api/public-helpers";
-import { parseQueryParams } from "@/lib/api/query-params";
 import { toPublicApiItem } from "@/lib/api/public-items";
-import { publicSearchQueryParamSchema } from "@/lib/api/feed-query-params";
+import { parsePublicSearchQueryRequest } from "@/lib/api/feed-query-params";
 import { runSearchQuery } from "@/lib/api/search-results";
 
 export const dynamic = "force-dynamic";
@@ -27,15 +26,14 @@ export async function GET(req: Request) {
   const limited = publicEndpointRateLimit(req, "search");
   if (limited) return limited;
 
-  const url = new URL(req.url);
-  const parsed = parseQueryParams(url, publicSearchQueryParamSchema);
+  const parsed = parsePublicSearchQueryRequest(req);
   if (!parsed.ok) return publicInvalidQuery(parsed.issues);
   const p = parsed.data;
 
   // ETag binds to query — same q + filters produces stable etag while corpus
   // doesn't grow new matches.
   const baseSignal = etagSignal({
-    qs: url.search,
+    qs: parsed.search,
     mode: p.mode,
   });
 

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { parseQueryParams } from "@/lib/api/query-params";
 import type { FeedQuery } from "@/lib/items/live";
 import {
   APP_LOCALES,
@@ -100,6 +101,23 @@ export type SearchQueryParams =
   | z.infer<typeof v1SearchQueryParamSchema>
   | z.infer<typeof publicSearchQueryParamSchema>;
 
+type V1FeedQueryParams = z.infer<typeof v1FeedQueryParamSchema>;
+type PublicFeedQueryParams = z.infer<typeof publicFeedQueryParamSchema>;
+type V1SearchQueryParams = z.infer<typeof v1SearchQueryParamSchema>;
+type PublicSearchQueryParams = z.infer<typeof publicSearchQueryParamSchema>;
+
+type QueryRequestParseResult<T> =
+  | { ok: true; data: T; search: string }
+  | { ok: false; issues: unknown[] };
+
+type RequestQuerySchema<T> = {
+  safeParse(
+    input: Record<string, string>,
+  ):
+    | { success: true; data: T }
+    | { success: false; error: { issues: unknown[] } };
+};
+
 export function parseCommaList(s: string | undefined): string[] | undefined {
   if (!s) return undefined;
   const values = s
@@ -107,6 +125,40 @@ export function parseCommaList(s: string | undefined): string[] | undefined {
     .map((v) => v.trim())
     .filter(Boolean);
   return values.length > 0 ? values : undefined;
+}
+
+function parseFeedRequestQuery<T>(
+  req: Request,
+  schema: RequestQuerySchema<T>,
+): QueryRequestParseResult<T> {
+  const url = new URL(req.url);
+  const parsed = parseQueryParams(url, schema);
+  if (!parsed.ok) return parsed;
+  return { ok: true, data: parsed.data, search: url.search };
+}
+
+export function parseV1FeedQueryRequest(
+  req: Request,
+): QueryRequestParseResult<V1FeedQueryParams> {
+  return parseFeedRequestQuery(req, v1FeedQueryParamSchema);
+}
+
+export function parsePublicFeedQueryRequest(
+  req: Request,
+): QueryRequestParseResult<PublicFeedQueryParams> {
+  return parseFeedRequestQuery(req, publicFeedQueryParamSchema);
+}
+
+export function parseV1SearchQueryRequest(
+  req: Request,
+): QueryRequestParseResult<V1SearchQueryParams> {
+  return parseFeedRequestQuery(req, v1SearchQueryParamSchema);
+}
+
+export function parsePublicSearchQueryRequest(
+  req: Request,
+): QueryRequestParseResult<PublicSearchQueryParams> {
+  return parseFeedRequestQuery(req, publicSearchQueryParamSchema);
 }
 
 export function feedQueryFromParams(q: FeedQueryParams): FeedQuery {

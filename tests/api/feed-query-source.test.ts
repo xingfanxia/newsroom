@@ -14,6 +14,8 @@ function read(path: string): string {
   return readFileSync(resolve(root, path), "utf8");
 }
 
+const feedQueryParams = read("lib/api/feed-query-params.ts");
+
 describe("feed/search route query parsing source wiring", () => {
   test("feed/search routes use the shared query schema module", () => {
     for (const path of routePaths) {
@@ -25,19 +27,35 @@ describe("feed/search route query parsing source wiring", () => {
     }
   });
 
-  test("routes keep their intended public vs bearer limit contracts", () => {
+  test("routes delegate public vs bearer query parsing to request helpers", () => {
     expect(read("app/api/v1/feed/route.ts")).toContain(
-      "parseQueryParams(req, v1FeedQueryParamSchema)",
+      "parseV1FeedQueryRequest(req)",
     );
     expect(read("app/api/public/feed/route.ts")).toContain(
-      "parseQueryParams(url, publicFeedQueryParamSchema)",
+      "parsePublicFeedQueryRequest(req)",
     );
     expect(read("app/api/v1/search/route.ts")).toContain(
-      "parseQueryParams(req, v1SearchQueryParamSchema)",
+      "parseV1SearchQueryRequest(req)",
     );
     expect(read("app/api/public/search/route.ts")).toContain(
-      "parseQueryParams(url, publicSearchQueryParamSchema)",
+      "parsePublicSearchQueryRequest(req)",
     );
+
+    for (const path of routePaths) {
+      const source = read(path);
+      expect(source).not.toContain("@/lib/api/query-params");
+      expect(source).not.toContain("parseQueryParams(");
+      expect(source).not.toContain("new URL(req.url)");
+      expect(source).not.toContain("publicFeedQueryParamSchema");
+      expect(source).not.toContain("publicSearchQueryParamSchema");
+      expect(source).not.toContain("v1FeedQueryParamSchema");
+      expect(source).not.toContain("v1SearchQueryParamSchema");
+    }
+
+    expect(feedQueryParams).toContain("@/lib/api/query-params");
+    expect(feedQueryParams).toContain("parseFeedRequestQuery");
+    expect(feedQueryParams).toContain("publicFeedQueryParamSchema");
+    expect(feedQueryParams).toContain("v1SearchQueryParamSchema");
   });
 
   test("search routes share execution so lexical totals and semantic options cannot drift", () => {

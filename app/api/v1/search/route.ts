@@ -28,14 +28,13 @@ import {
   v1Json,
   v1ServerError,
 } from "@/lib/api/v1-route";
-import { parseQueryParams } from "@/lib/api/query-params";
 import { toAgentApiItem } from "@/lib/api/v1-items";
-import { v1SearchQueryParamSchema } from "@/lib/api/feed-query-params";
+import { parseV1SearchQueryRequest } from "@/lib/api/feed-query-params";
 import { runSearchQuery } from "@/lib/api/search-results";
 
 export async function GET(req: Request) {
   return runV1Route(req, async () => {
-    const parsed = parseQueryParams(req, v1SearchQueryParamSchema);
+    const parsed = parseV1SearchQueryRequest(req);
     if (!parsed.ok) return v1InvalidQuery(parsed.issues);
 
     const p = parsed.data;

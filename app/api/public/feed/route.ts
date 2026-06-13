@@ -20,12 +20,11 @@ import {
   publicInvalidQuery,
   publicServerError,
 } from "@/lib/api/public-helpers";
-import { parseQueryParams } from "@/lib/api/query-params";
 import { runFeedQuery } from "@/lib/api/feed-results";
 import { toPublicApiItem } from "@/lib/api/public-items";
 import {
   feedQueryFromParams,
-  publicFeedQueryParamSchema,
+  parsePublicFeedQueryRequest,
 } from "@/lib/api/feed-query-params";
 
 export const dynamic = "force-dynamic";
@@ -35,8 +34,7 @@ export async function GET(req: Request) {
   const limited = publicEndpointRateLimit(req, "feed");
   if (limited) return limited;
 
-  const url = new URL(req.url);
-  const parsed = parseQueryParams(url, publicFeedQueryParamSchema);
+  const parsed = parsePublicFeedQueryRequest(req);
   if (!parsed.ok) return publicInvalidQuery(parsed.issues);
   const q = parsed.data;
   const feedQuery = feedQueryFromParams(q);
@@ -52,7 +50,7 @@ export async function GET(req: Request) {
         total: result.total,
         first_id: result.items[0]?.id ?? "",
         latest_at: result.items[0]?.publishedAt ?? "",
-        qs: url.search,
+        qs: parsed.search,
       }),
       body: {
         items: result.items.map((s) => toPublicApiItem(s, q.locale)),

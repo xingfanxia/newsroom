@@ -2,6 +2,10 @@ import { describe, expect, test } from "bun:test";
 import {
   feedQueryFromParams,
   parseCommaList,
+  parsePublicFeedQueryRequest,
+  parsePublicSearchQueryRequest,
+  parseV1FeedQueryRequest,
+  parseV1SearchQueryRequest,
   publicFeedQueryParamSchema,
   publicSearchQueryParamSchema,
   searchFeedQueryFromParams,
@@ -181,5 +185,43 @@ describe("search query param schemas", () => {
     ]);
     expect(parseCommaList(" , , ")).toBeUndefined();
     expect(parseCommaList(undefined)).toBeUndefined();
+  });
+});
+
+describe("feed/search request query helpers", () => {
+  test("parse route requests and preserve the raw query string for public etags", () => {
+    const publicFeed = parsePublicFeedQueryRequest(
+      new Request("https://example.test/api/public/feed?limit=5&locale=zh"),
+    );
+    expect(publicFeed).toMatchObject({
+      ok: true,
+      search: "?limit=5&locale=zh",
+      data: { limit: 5, locale: "zh" },
+    });
+
+    const v1Search = parseV1SearchQueryRequest(
+      new Request("https://example.test/api/v1/search?q=agent&limit=100"),
+    );
+    expect(v1Search).toMatchObject({
+      ok: true,
+      search: "?q=agent&limit=100",
+      data: { q: "agent", limit: 100 },
+    });
+  });
+
+  test("keep public and bearer ceilings in the shared request helpers", () => {
+    const publicSearch = parsePublicSearchQueryRequest(
+      new Request("https://example.test/api/public/search?q=agent&limit=51"),
+    );
+    expect(publicSearch.ok).toBe(false);
+    if (!publicSearch.ok) expect(publicSearch.issues.length).toBeGreaterThan(0);
+
+    const v1Feed = parseV1FeedQueryRequest(
+      new Request("https://example.test/api/v1/feed?limit=500"),
+    );
+    expect(v1Feed).toMatchObject({
+      ok: true,
+      data: { limit: 500 },
+    });
   });
 });

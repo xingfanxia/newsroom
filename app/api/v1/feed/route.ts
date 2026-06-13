@@ -37,17 +37,16 @@ import {
   v1Json,
   v1ServerError,
 } from "@/lib/api/v1-route";
-import { parseQueryParams } from "@/lib/api/query-params";
 import { runFeedQuery } from "@/lib/api/feed-results";
 import { toAgentApiItem } from "@/lib/api/v1-items";
 import {
   feedQueryFromParams,
-  v1FeedQueryParamSchema,
+  parseV1FeedQueryRequest,
 } from "@/lib/api/feed-query-params";
 
 export async function GET(req: Request) {
   return runV1Route(req, async () => {
-    const parsed = parseQueryParams(req, v1FeedQueryParamSchema);
+    const parsed = parseV1FeedQueryRequest(req);
     if (!parsed.ok) return v1InvalidQuery(parsed.issues);
 
     const q = parsed.data;

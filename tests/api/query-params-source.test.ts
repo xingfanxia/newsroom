@@ -5,10 +5,6 @@ import { resolve } from "node:path";
 const root = process.cwd();
 
 const queryRoutePaths = [
-  "app/api/public/feed/route.ts",
-  "app/api/public/search/route.ts",
-  "app/api/v1/feed/route.ts",
-  "app/api/v1/search/route.ts",
   "app/api/v1/saved/route.ts",
   "app/api/v1/usage/summary/route.ts",
 ] as const;
@@ -32,6 +28,13 @@ describe("query param source wiring", () => {
     expect(dailies).not.toContain("@/lib/api/query-params");
     expect(dailyColumns).toContain("@/lib/api/query-params");
     expect(dailyColumns).toContain("queryParamsRecord(req)");
+
+    const publicFeed = read("app/api/public/feed/route.ts");
+    const feedQueryParams = read("lib/api/feed-query-params.ts");
+    expect(publicFeed).toContain("parsePublicFeedQueryRequest");
+    expect(publicFeed).not.toContain("@/lib/api/query-params");
+    expect(feedQueryParams).toContain("@/lib/api/query-params");
+    expect(feedQueryParams).toContain("parseFeedRequestQuery");
   });
 
   test("public invalid-query messages use the shared formatter", () => {
