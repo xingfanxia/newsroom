@@ -2,8 +2,8 @@
  * GET  /api/v1/saved  — list the caller's saved items.
  * POST /api/v1/saved  — toggle the save slot for an item on/off.
  *
- * Both operations are thin wrappers around the same helpers the browser
- * UI uses (getSavedStories, applyFeedbackToggle) so the agent-facing and
+ * Both operations are thin wrappers around shared saved helpers
+ * (getSavedStories, saveItemRoutePayload) so the agent-facing and
  * human-facing surfaces can never drift.
  *
  * Query params (GET):
@@ -20,6 +20,7 @@ import {
   v1SavedPostBodySchema,
   v1SavedQuerySchema,
 } from "@/lib/api/saved-requests";
+import { saveItemRoutePayload } from "@/lib/api/saved-routes";
 import {
   runV1Route,
   v1Error,
@@ -27,14 +28,7 @@ import {
   v1Json,
   v1ServerError,
 } from "@/lib/api/v1-route";
-import { applyFeedbackToggle } from "@/lib/feedback/toggle";
 import { toSavedAgentApiItem } from "@/lib/api/v1-items";
-import { FEEDBACK_SAVE_VOTE } from "@/lib/types";
-import {
-  assignSavedItemCollection,
-  getSavedItemCollectionId,
-  userOwnsSavedCollection,
-} from "@/lib/items/collections";
 import { getSavedStories } from "@/lib/items/saved";
 
 export async function GET(req: Request) {
@@ -69,47 +63,15 @@ export async function POST(req: Request) {
     const b = parsed.data;
 
     try {
-      if (
-        b.on &&
-        b.collection_id !== undefined &&
-        !(await userOwnsSavedCollection(user.id, b.collection_id))
-      ) {
-        return v1Error("collection_not_found", 404);
-      }
-
-      const votes = await applyFeedbackToggle(user, {
+      const result = await saveItemRoutePayload(user, {
         itemId: b.item_id,
-        vote: FEEDBACK_SAVE_VOTE,
         on: b.on,
+        collectionId: b.collection_id,
         note: b.note,
       });
-
-      let collectionId: number | null = null;
-      if (votes.save && b.collection_id !== undefined) {
-        const assigned = await assignSavedItemCollection({
-          userId: user.id,
-          itemId: b.item_id,
-          targetCollectionId: b.collection_id,
-        });
-        if (!assigned.ok) {
-          return v1Error(assigned.reason, 404);
-        }
-        collectionId = assigned.collectionId;
-      } else if (votes.save) {
-        collectionId = await getSavedItemCollectionId(user.id, b.item_id);
-      }
-
-      return v1Json({
-        item_id: b.item_id,
-        saved: votes.save,
-        collection_id: collectionId,
-      });
+      if (!result.ok) return v1Error(result.error, result.status);
+      return v1Json(result.payload);
     } catch (err) {
-      // FK-violation on item_id → 404 rather than 500 (caller gave a bad id).
-      const msg = err instanceof Error ? err.message : String(err);
-      if (/foreign key|not present/i.test(msg)) {
-        return v1Error("item_not_found", 404);
-      }
       return v1ServerError("api/v1/saved POST", err);
     }
   });

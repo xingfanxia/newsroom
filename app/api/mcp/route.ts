@@ -49,13 +49,8 @@ import { runSearchQuery } from "@/lib/api/search-results";
 import { getItemDetail } from "@/lib/items/detail";
 import { toAgentApiItem } from "@/lib/api/v1-items";
 import { getEventMembersPayload } from "@/lib/api/event-members";
-import { applyFeedbackToggle } from "@/lib/feedback/toggle";
-import {
-  assignSavedItemCollection,
-  getSavedItemCollectionId,
-  listCollections,
-  userOwnsSavedCollection,
-} from "@/lib/items/collections";
+import { saveItemRoutePayload } from "@/lib/api/saved-routes";
+import { listCollections } from "@/lib/items/collections";
 import {
   listSourceCatalogRows,
   toMcpSourceApiItem,
@@ -70,7 +65,6 @@ import {
 } from "@/lib/api/usage-summary";
 import {
   APP_LOCALES,
-  FEEDBACK_SAVE_VOTE,
   FEED_VIEWS,
   SEARCH_MODES,
   SOURCE_GROUPS,
@@ -292,46 +286,21 @@ function buildServer(user: SessionUser): McpServer {
     },
     async ({ item_id, on, collection_id, note }) => {
       try {
-        if (
-          on &&
-          collection_id !== undefined &&
-          !(await userOwnsSavedCollection(user.id, collection_id))
-        ) {
-          return error("collection_not_found");
-        }
-
-        const votes = await applyFeedbackToggle(user, {
+        const result = await saveItemRoutePayload(user, {
           itemId: item_id,
-          vote: FEEDBACK_SAVE_VOTE,
           on,
+          collectionId: collection_id,
           note,
         });
-
-        let collectionId: number | null = null;
-        if (votes.save && collection_id !== undefined) {
-          const assigned = await assignSavedItemCollection({
-            userId: user.id,
-            itemId: item_id,
-            targetCollectionId: collection_id,
-          });
-          if (!assigned.ok) {
-            return error(assigned.reason);
-          }
-          collectionId = assigned.collectionId;
-        } else if (votes.save) {
-          collectionId = await getSavedItemCollectionId(user.id, item_id);
+        if (!result.ok) {
+          return result.error === "item_not_found"
+            ? error(`item ${item_id} not found`)
+            : error(result.error);
         }
 
-        return text({
-          item_id,
-          saved: votes.save,
-          collection_id: collectionId,
-        });
+        return text(result.payload);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        if (/foreign key|not present/i.test(msg)) {
-          return error(`item ${item_id} not found`);
-        }
         return error(msg);
       }
     },

@@ -59,6 +59,10 @@ Shipped cleanup:
   `/api/v1/saved` and `/api/feedback/move` now reuse the same positive item
   id, positive collection id, inbox-null, locale, and pagination validation
   instead of carrying route-local Zod objects.
+- Shared saved-item mutation semantics through `lib/api/saved-routes.ts`;
+  `/api/v1/saved` and MCP `ax_radar_save` now reuse the same save toggle,
+  owner-aware collection assignment, assigned-collection response payload,
+  and missing-item FK-to-`item_not_found` mapping.
 - Shared cookie/v1 tweaks persistence through `lib/api/tweak-routes.ts`, so
   user upsert, preferences/watchlist loading, DB patch construction, and
   `empty_body` decisions stay aligned while each route keeps its own auth and

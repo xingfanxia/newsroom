@@ -64,15 +64,14 @@ describe("MCP contract source wiring", () => {
     expect(feedSearchTools).not.toContain("const isEvent = (s.coverage");
   });
 
-  test("save tool uses the shared owner-aware collection assignment helper", () => {
-    expect(mcpRoute).toContain("FEEDBACK_SAVE_VOTE");
-    expect(mcpRoute).toContain("assignSavedItemCollection");
-    expect(mcpRoute).toContain("getSavedItemCollectionId");
-    expect(mcpRoute).toContain("userOwnsSavedCollection");
-    expect(saveTool).toContain("FEEDBACK_SAVE_VOTE");
-    expect(saveTool).toContain("assignSavedItemCollection");
-    expect(saveTool).toContain("getSavedItemCollectionId");
-    expect(saveTool).toContain("userOwnsSavedCollection");
+  test("save tool uses the shared saved route mutation helper", () => {
+    expect(mcpRoute).toContain("@/lib/api/saved-routes");
+    expect(mcpRoute).toContain("saveItemRoutePayload");
+    expect(saveTool).toContain("saveItemRoutePayload");
+    expect(saveTool).not.toContain("FEEDBACK_SAVE_VOTE");
+    expect(saveTool).not.toContain("assignSavedItemCollection");
+    expect(saveTool).not.toContain("getSavedItemCollectionId");
+    expect(saveTool).not.toContain("userOwnsSavedCollection");
     expect(saveTool).not.toContain('vote: "save"');
     expect(saveTool).not.toContain(".update(feedback)");
     expect(saveTool).not.toContain("collection_id ?? null");

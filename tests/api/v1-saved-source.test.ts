@@ -29,11 +29,13 @@ describe("/api/v1/saved source wiring", () => {
     expect(savedRoute).not.toContain("published_at: s.publishedAt");
   });
 
-  test("write endpoint delegates collection assignment to owner-aware helpers", () => {
-    expect(savedRoute).toContain("FEEDBACK_SAVE_VOTE");
-    expect(savedRoute).toContain("assignSavedItemCollection");
-    expect(savedRoute).toContain("getSavedItemCollectionId");
-    expect(savedRoute).toContain("userOwnsSavedCollection");
+  test("write endpoint delegates save mutation semantics to the shared route helper", () => {
+    expect(savedRoute).toContain("@/lib/api/saved-routes");
+    expect(savedRoute).toContain("saveItemRoutePayload");
+    expect(savedRoute).not.toContain("FEEDBACK_SAVE_VOTE");
+    expect(savedRoute).not.toContain("assignSavedItemCollection");
+    expect(savedRoute).not.toContain("getSavedItemCollectionId");
+    expect(savedRoute).not.toContain("userOwnsSavedCollection");
     expect(savedRoute).not.toContain('vote: "save"');
     expect(savedRoute).not.toContain(".update(feedback)");
     expect(savedRoute).not.toContain("void sql");
