@@ -21,6 +21,7 @@ import { and, eq, isNull, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items, clusters, type Item } from "@/db/schema";
 import { generateStructured, profiles } from "@/lib/llm";
+import { VISIBLE_ITEM_TIERS, type VisibleItemTier } from "@/lib/types";
 import {
   commentarySchema,
   COMMENTARY_SYSTEM,
@@ -68,7 +69,7 @@ export async function runCommentaryBackfill(): Promise<CommentaryBackfillReport>
     .leftJoin(clusters, eq(items.clusterId, clusters.id))
     .where(
       and(
-        inArray(items.tier, ["featured", "p1", "all"]),
+        inArray(items.tier, VISIBLE_ITEM_TIERS),
         isNull(items.commentaryAt),
         // Keep singletons and unclustered items; skip multi-member clusters.
         sql`(${items.clusterId} IS NULL OR COALESCE(${clusters.memberCount}, 1) < 2)`,
@@ -133,7 +134,7 @@ async function generateOneCommentary(item: Item): Promise<void> {
     bodyMd: item.bodyMd,
     summaryZh: item.summaryZh ?? "",
     summaryEn: item.summaryEn ?? "",
-    tier: item.tier as "featured" | "p1" | "all",
+    tier: item.tier as VisibleItemTier,
     importance: item.importance ?? 0,
     tags: {
       capabilities: (tagBag.capabilities ?? []) as Capability[],

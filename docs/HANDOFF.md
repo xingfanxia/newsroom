@@ -39,6 +39,10 @@ Shipped cleanup:
 - Shared source kind/group/cadence runtime tuples through `lib/types.ts` and
   source group display metadata through `lib/sources/groups.ts`, so DB enums
   and the `/sources` group order/labels cannot drift from catalog types.
+- Shared item tier and feed view runtime tuples through `lib/types.ts`, so
+  REST feed/search schemas, MCP feed input schema, item/event commentary
+  workers, and score prompt parsing cannot drift on `featured|p1|all|excluded`
+  or `today|archive`.
 - Shared hourly/daily/weekly fetch+normalize sequencing through `workers/fetcher/pipeline.ts`, with HTTP route wiring in `app/api/cron/_fetch-bucket-route.ts` and local cron scripts using the same helper.
 - Shared article body + YouTube transcript prefetch sequencing through
   `workers/fetcher/content-prefetch.ts`, so `/api/cron/article-body` and
@@ -75,7 +79,7 @@ Verification:
 - `bun run code:dead:exports` — passed.
 - `bun run code:dead:types` — passed.
 - `bun run lint` — passed with no warnings.
-- `bun test --env-file=.env.local` — 623 pass, 1 skip, 0 fail.
+- `bun test --env-file=.env.local` — 626 pass, 1 skip, 0 fail.
 - `bun run build` — passed.
 - `git diff --check` — passed.
 

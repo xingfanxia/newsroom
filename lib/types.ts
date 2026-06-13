@@ -25,6 +25,19 @@ export type SourceGroup = (typeof SOURCE_GROUPS)[number];
 export const CADENCES = ["live", "hourly", "daily", "weekly"] as const;
 export type Cadence = (typeof CADENCES)[number];
 
+export const ITEM_TIERS = ["featured", "p1", "all", "excluded"] as const;
+export type ItemTier = (typeof ITEM_TIERS)[number];
+
+export const VISIBLE_ITEM_TIERS = [
+  "featured",
+  "p1",
+  "all",
+] as const satisfies readonly ItemTier[];
+export type VisibleItemTier = (typeof VISIBLE_ITEM_TIERS)[number];
+
+export const FEED_VIEWS = ["today", "archive"] as const;
+export type FeedView = (typeof FEED_VIEWS)[number];
+
 export type Source = {
   id: string;
   name: { en: string; zh: string };
@@ -67,7 +80,7 @@ export type Story = {
   /** Canonical English tag IDs — UI translates via i18n (tags.*). */
   tags: string[];
   importance: number;
-  tier: "featured" | "all" | "p1" | "excluded";
+  tier: ItemTier;
   publishedAt: string; // ISO
   url: string;
   crossSourceCount?: number;

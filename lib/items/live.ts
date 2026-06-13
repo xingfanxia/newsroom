@@ -1,13 +1,12 @@
 import { and, eq, sql, isNotNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items, sources, clusters } from "@/db/schema";
-import type { Story } from "@/lib/types";
+import type { FeedView, Story, VisibleItemTier } from "@/lib/types";
 
-type Tier = "featured" | "all" | "p1";
 type Locale = "zh" | "en";
 
 export type FeedQuery = {
-  tier?: Tier;
+  tier?: VisibleItemTier;
   locale?: Locale;
   limit?: number;
   /** Skip the first N items — for pagination. Defaults to 0. */
@@ -54,7 +53,7 @@ export type FeedQuery = {
    *               firstSeenAt DESC then importance DESC.
    *   Default: 'archive' (backwards-compatible with existing home-feed
    *   behavior until UI cutover sets 'today' explicitly). */
-  view?: "today" | "archive";
+  view?: FeedView;
   /** Hot window in hours for the Today view's "still-developing" cutoff.
    *  Defaults to 24. Wider window keeps multi-day stories visible longer. */
   hotWindowHours?: number;
@@ -87,7 +86,7 @@ export type FeedQuery = {
  * actually-returned rows.
  */
 function buildFeedWhere(q: FeedQuery) {
-  const tier: Tier = q.tier ?? "featured";
+  const tier: VisibleItemTier = q.tier ?? "featured";
   const view = q.view ?? "archive";
   const hotH = q.hotWindowHours ?? 24;
 

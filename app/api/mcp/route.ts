@@ -74,6 +74,7 @@ import {
   getUsageSummary,
   USAGE_WINDOWS,
 } from "@/lib/api/usage-summary";
+import { FEED_VIEWS, VISIBLE_ITEM_TIERS } from "@/lib/types";
 import type { SessionUser } from "@/lib/auth/session";
 
 type ToolOutput = {
@@ -115,8 +116,8 @@ function buildServer(user: SessionUser): McpServer {
       description:
         "Return curated items from the AX Radar timeline. Each row is a single editorial card: a singleton article OR a multi-source EVENT (multiple publishers covering the same real-world story merged into one card). When `coverage > 1` the row is an event — use ax_radar_event_members to see all the sources covering it. `view=today` is the importance-sorted hot feed (热点聚合) — what matters today, including events still developing. `view=archive` (default) is the chronological calendar timeline keyed on the lead's published_at. `tier=featured` is today's signal, `tier=all` spans everything non-excluded. Set `curated_only=true` for the operator-curated AX严选 stream (hand-picked publishers like 鸭哥/grapeot, 群聊日报). Use source_id/source_group/source_kind or source tag filters when you need a narrower slice.",
       inputSchema: {
-        tier: z.enum(["featured", "p1", "all"]).optional(),
-        view: z.enum(["today", "archive"]).optional(),
+        tier: z.enum(VISIBLE_ITEM_TIERS).optional(),
+        view: z.enum(FEED_VIEWS).optional(),
         hot_window_hours: z.number().int().min(1).max(168).optional(),
         source_id: z.string().optional(),
         source_group: z.string().optional(),

@@ -22,6 +22,7 @@ import { and, desc, eq, inArray, isNull, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clusters, items } from "@/db/schema";
 import { generateStructured, profiles } from "@/lib/llm";
+import { VISIBLE_ITEM_TIERS } from "@/lib/types";
 import {
   eventCommentarySchema,
   eventCommentarySystem,
@@ -83,7 +84,7 @@ export async function runEventCommentaryBatch(): Promise<EventCommentaryReport> 
     .from(clusters)
     .where(
       and(
-        inArray(clusters.eventTier, ["featured", "p1", "all"]),
+        inArray(clusters.eventTier, VISIBLE_ITEM_TIERS),
         sql`${clusters.memberCount} >= 2`,
         isNull(clusters.commentaryAt),
       ),

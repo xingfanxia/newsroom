@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { FeedQuery } from "@/lib/items/live";
+import { FEED_VIEWS, VISIBLE_ITEM_TIERS } from "@/lib/types";
 
 const ymdSchema = z
   .string()
@@ -20,8 +21,8 @@ function makeFeedQueryParamSchema(options: {
   defaultLimit: number;
 }) {
   return z.object({
-    tier: z.enum(["featured", "p1", "all"]).optional().default("featured"),
-    view: z.enum(["today", "archive"]).optional().default("archive"),
+    tier: z.enum(VISIBLE_ITEM_TIERS).optional().default("featured"),
+    view: z.enum(FEED_VIEWS).optional().default("archive"),
     hot_window_hours: z.coerce
       .number()
       .int()
@@ -51,7 +52,7 @@ function makeSearchQueryParamSchema(options: {
   return z.object({
     q: z.string().min(1, "q is required"),
     mode: z.enum(["lexical", "semantic"]).optional().default("lexical"),
-    tier: z.enum(["featured", "p1", "all"]).optional().default("all"),
+    tier: z.enum(VISIBLE_ITEM_TIERS).optional().default("all"),
     date: ymdSchema,
     date_from: z.string().datetime().optional(),
     date_to: z.string().datetime().optional(),

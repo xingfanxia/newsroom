@@ -130,7 +130,10 @@ All enrichments cached by `(item_id, enricher_version)` so enricher-version bump
 Separate pass after enrich, because policy can change without re-enriching:
 
 - **Input**: item + current `editorial.skill.md` (the policy).
-- **Output**: `{ importance: int(0, 100), reasoning: string, tier: "featured" | "all" | "P1" | "excluded" }`.
+- **Output**: `{ importance: int(0, 100), reasoning: string, tier: "featured" | "all" | "p1" | "excluded" }`.
+  Runtime item-tier values live in `ITEM_TIERS` / `VISIBLE_ITEM_TIERS` in
+  `lib/types.ts`; REST, MCP, score parsing, and commentary candidate queries
+  should import those tuples instead of rewriting tier arrays.
 - Model: Azure AI Foundry DeepSeek V4 Pro for high treatment and DeepSeek V4 Flash for low-value treatment, with Pro fallback when Flash output fails schema validation.
 - Cached by `(item_id, policy_version)`.
 

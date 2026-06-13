@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ITEM_TIERS, type ItemTier } from "@/lib/types";
 
 // ── Shared style guardrails ─────────────────────────────────────
 // These rules anchor the entire editorial voice. We list them explicitly
@@ -365,11 +366,9 @@ export const scoreSchema = z.object({
     .min(0)
     .max(100)
     .describe("0-100 importance score per the policy's bands"),
-  tier: z
-    .enum(["featured", "all", "p1", "excluded"])
-    .describe(
-      "featured = >=72 and passes HKR. all = interesting but not featured. p1 = >=85 and all three HKR. excluded = hard-exclusion rule triggered OR <40.",
-    ),
+  tier: z.enum(ITEM_TIERS).describe(
+    "featured = >=72 and passes HKR. all = interesting but not featured. p1 = >=85 and all three HKR. excluded = hard-exclusion rule triggered OR <40.",
+  ),
   hkr: z
     .object({
       h: z
@@ -678,7 +677,7 @@ export function commentaryUserPrompt(item: {
   bodyMd?: string | null;
   summaryZh: string;
   summaryEn: string;
-  tier: "featured" | "p1" | "all" | "excluded";
+  tier: ItemTier;
   importance: number;
   tags: EnrichOutput["tags"];
   url: string;

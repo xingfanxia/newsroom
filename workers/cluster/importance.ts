@@ -27,7 +27,9 @@
  * event-level signal.
  */
 
-export type EventTier = "featured" | "p1" | "all" | "excluded";
+import type { ItemTier } from "@/lib/types";
+
+export type EventTier = ItemTier;
 
 export interface MemberImportanceInput {
   importance: number | null | undefined;
