@@ -46,6 +46,11 @@ Shipped cleanup:
   REST feed/search schemas, MCP feed input schema, item/event commentary
   workers, and score prompt parsing cannot drift on `featured|p1|all|excluded`
   or `today|archive`.
+- Shared `/openapi.yaml` public contract enums through the same `lib/types.ts`
+  runtime tuples, including app/source locales, source group/kind/cadence,
+  item tiers, and feed views; the source catalog description no longer embeds
+  a stale monitored-source count, and MCP source-tool copy avoids fixed counts
+  for the same reason.
 - Shared hourly/daily/weekly fetch+normalize sequencing through `workers/fetcher/pipeline.ts`, with HTTP route wiring in `app/api/cron/_fetch-bucket-route.ts` and local cron scripts using the same helper.
 - Shared article body + YouTube transcript prefetch sequencing through
   `workers/fetcher/content-prefetch.ts`, so `/api/cron/article-body` and

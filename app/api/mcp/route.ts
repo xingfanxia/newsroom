@@ -268,7 +268,7 @@ function buildServer(user: SessionUser): McpServer {
     {
       title: "List monitored sources + live health",
       description:
-        "Return the 52-source catalog (podcasts, newsletters, vendor blogs, deep-report feeds, X handles, ...) with current health: status, consecutive failures, last success, total items ingested. Useful for answering 'do we even watch X?' before phrasing a broader query.",
+        "Return the monitored source catalog (podcasts, newsletters, vendor blogs, deep-report feeds, X handles, ...) with current health: status, consecutive failures, last success, total items ingested. Useful for answering 'do we even watch X?' before phrasing a broader query.",
       inputSchema: {},
     },
     async () => {

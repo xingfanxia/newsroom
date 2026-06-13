@@ -91,7 +91,7 @@ Cost: 1 embed call per query (~$0.00002), already within normal pipeline
 budget. Warm up the HNSW for sub-100ms retrieval on 6k+ items.
 
 ### `GET /api/v1/sources`
-Returns the 59-source catalog with current health (`status`,
+Returns the monitored source catalog with current health (`status`,
 `consecutive_failures`, `last_success_at`, `total_items_count`). Useful
 for agents that want to verify coverage before asking a question.
 

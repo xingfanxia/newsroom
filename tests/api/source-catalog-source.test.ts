@@ -1,6 +1,17 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { GET as getOpenApiYaml } from "@/app/openapi.yaml/route";
+import {
+  APP_LOCALES,
+  CADENCES,
+  FEED_VIEWS,
+  ITEM_TIERS,
+  SOURCE_GROUPS,
+  SOURCE_KINDS,
+  SOURCE_LOCALES,
+  VISIBLE_ITEM_TIERS,
+} from "@/lib/types";
 
 const root = process.cwd();
 const v1SourcesRoute = readFileSync(
@@ -21,6 +32,10 @@ const openapiRoute = readFileSync(
   resolve(root, "app/openapi.yaml/route.ts"),
   "utf8",
 );
+
+function inlineEnum(values: readonly (string | null)[]): string {
+  return `[${values.map((value) => (value === null ? "null" : value)).join(", ")}]`;
+}
 
 describe("source catalog source wiring", () => {
   test("public and v1 routes delegate source serialization to the shared module", () => {
@@ -48,6 +63,66 @@ describe("source catalog source wiring", () => {
     expect(schema).toContain('pgEnum("source_kind", SOURCE_KINDS)');
     expect(schema).toContain('pgEnum("source_group", SOURCE_GROUPS)');
     expect(schema).toContain('pgEnum("cadence", CADENCES)');
+  });
+
+  test("OpenAPI derives shared public contract enums from runtime tuples", () => {
+    expect(openapiRoute).toContain("@/lib/types");
+    for (const tupleName of [
+      "APP_LOCALES",
+      "CADENCES",
+      "FEED_VIEWS",
+      "ITEM_TIERS",
+      "SOURCE_GROUPS",
+      "SOURCE_KINDS",
+      "SOURCE_LOCALES",
+      "VISIBLE_ITEM_TIERS",
+    ]) {
+      expect(openapiRoute).toContain(tupleName);
+    }
+    expect(openapiRoute).toContain("yamlInlineEnum");
+    expect(openapiRoute).not.toContain("description: 52 sources monitored");
+
+    for (const duplicatedEnum of [
+      "enum: [featured, p1, all], default: featured",
+      "enum: [featured, p1, all], default: all",
+      "enum: [featured, p1, all, excluded]",
+      "enum: [today, archive]",
+      "enum: [vendor-official, media, newsletter, research, social, product, podcast, policy, market]",
+      "enum: [rss, atom, api, rsshub, scrape, x-api, aihot-api]",
+      "enum: [live, hourly, daily, weekly]",
+      "enum: [zh, en]",
+    ]) {
+      expect(openapiRoute).not.toContain(duplicatedEnum);
+    }
+
+    expect(openapiRoute).not.toContain(
+      "source_group, in: query, schema: { type: string }",
+    );
+    expect(openapiRoute).not.toContain(
+      "source_kind, in: query, schema: { type: string }",
+    );
+  });
+
+  test("OpenAPI response expands shared runtime tuples for clients", async () => {
+    const res = await getOpenApiYaml();
+    const text = await res.text();
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("application/yaml");
+    for (const values of [
+      APP_LOCALES,
+      CADENCES,
+      FEED_VIEWS,
+      ITEM_TIERS,
+      SOURCE_KINDS,
+      SOURCE_LOCALES,
+      VISIBLE_ITEM_TIERS,
+    ]) {
+      expect(text).toContain(`enum: ${inlineEnum(values)}`);
+    }
+    expect(text).toContain(`enum: ${inlineEnum(SOURCE_GROUPS)}`);
+    expect(text).toContain(`enum: ${inlineEnum([...SOURCE_GROUPS, null])}`);
+    expect(text).not.toContain("52 sources monitored");
   });
 
   test("sources page uses shared group order and labels", () => {

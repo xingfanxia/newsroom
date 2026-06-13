@@ -79,6 +79,9 @@ describe("MCP contract source wiring", () => {
     expect(mcpRoute).toContain("toMcpSourceApiItem");
     expect(sourcesTool).toContain('listSourceCatalogRows("id")');
     expect(sourcesTool).toContain("rows.map(toMcpSourceApiItem)");
+    expect(sourcesTool).toContain("Return the monitored source catalog");
+    expect(sourcesTool).not.toContain("52-source catalog");
+    expect(sourcesTool).not.toContain("59-source catalog");
     expect(sourcesTool).not.toContain("sourceHealth.");
     expect(sourcesTool).not.toContain(".select({");
   });

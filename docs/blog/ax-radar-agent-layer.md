@@ -68,7 +68,7 @@ Pullquote candidate:
 |---|---|---|
 | `/api/v1/feed` | GET | Browse curated items with filters |
 | `/api/v1/items/:id` | GET | Full detail + bilingual commentary + transcript |
-| `/api/v1/sources` | GET | 59-source catalog + live health |
+| `/api/v1/sources` | GET | Monitored source catalog + live health |
 | `/api/v1/search` | GET | Lexical **or** semantic search |
 | `/api/v1/saved` | GET, POST | List bookmarks / toggle save |
 | `/api/v1/collections` | GET, POST, PATCH, DELETE | Named bookmark folders |

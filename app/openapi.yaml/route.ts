@@ -5,6 +5,31 @@
  * Kept inline as a template literal so it's editable in one place — no
  * build step, no YAML parser to maintain.
  */
+import {
+  APP_LOCALES,
+  CADENCES,
+  FEED_VIEWS,
+  ITEM_TIERS,
+  SOURCE_GROUPS,
+  SOURCE_KINDS,
+  SOURCE_LOCALES,
+  VISIBLE_ITEM_TIERS,
+} from "@/lib/types";
+
+function yamlInlineEnum(values: readonly (string | null)[]): string {
+  return `[${values.map((value) => (value === null ? "null" : value)).join(", ")}]`;
+}
+
+const APP_LOCALE_ENUM = yamlInlineEnum(APP_LOCALES);
+const CADENCE_ENUM = yamlInlineEnum(CADENCES);
+const FEED_VIEW_ENUM = yamlInlineEnum(FEED_VIEWS);
+const ITEM_TIER_ENUM = yamlInlineEnum(ITEM_TIERS);
+const SOURCE_GROUP_ENUM = yamlInlineEnum(SOURCE_GROUPS);
+const SOURCE_GROUP_NULLABLE_ENUM = yamlInlineEnum([...SOURCE_GROUPS, null]);
+const SOURCE_KIND_ENUM = yamlInlineEnum(SOURCE_KINDS);
+const SOURCE_LOCALE_ENUM = yamlInlineEnum(SOURCE_LOCALES);
+const VISIBLE_ITEM_TIER_ENUM = yamlInlineEnum(VISIBLE_ITEM_TIERS);
+
 const OPENAPI_YAML = `openapi: 3.1.0
 info:
   title: AX Radar Public API
@@ -53,21 +78,21 @@ paths:
         \`/events/{id}/members\` to drill in). Default returns today's hot
         signal (\`tier=featured\`, \`view=today\`).
       parameters:
-        - { name: tier, in: query, schema: { type: string, enum: [featured, p1, all], default: featured } }
-        - { name: view, in: query, schema: { type: string, enum: [today, archive], default: archive } }
+        - { name: tier, in: query, schema: { type: string, enum: ${VISIBLE_ITEM_TIER_ENUM}, default: featured } }
+        - { name: view, in: query, schema: { type: string, enum: ${FEED_VIEW_ENUM}, default: archive } }
         - { name: hot_window_hours, in: query, schema: { type: integer, minimum: 1, maximum: 168, default: 24 } }
         - { name: date, in: query, schema: { type: string, pattern: '^\\d{4}-\\d{2}-\\d{2}$' } }
         - { name: date_from, in: query, schema: { type: string, format: date-time } }
         - { name: date_to, in: query, schema: { type: string, format: date-time } }
         - { name: source_id, in: query, schema: { type: string } }
-        - { name: source_group, in: query, schema: { type: string, enum: [vendor-official, media, newsletter, research, social, product, podcast, policy, market] } }
-        - { name: source_kind, in: query, schema: { type: string, enum: [rss, atom, api, rsshub, scrape, x-api, aihot-api] } }
+        - { name: source_group, in: query, schema: { type: string, enum: ${SOURCE_GROUP_ENUM} } }
+        - { name: source_kind, in: query, schema: { type: string, enum: ${SOURCE_KIND_ENUM} } }
         - { name: curated_only, in: query, schema: { type: string, enum: ['true', 'false', '1', '0'] }, description: "Limit to AX 严选 / curated sources only" }
         - { name: include_source_tags, in: query, schema: { type: string }, description: "Comma-separated source tag list" }
         - { name: exclude_source_tags, in: query, schema: { type: string } }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 40 } }
         - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
-        - { name: locale, in: query, schema: { type: string, enum: [zh, en], default: en } }
+        - { name: locale, in: query, schema: { type: string, enum: ${APP_LOCALE_ENUM}, default: en } }
       responses:
         '200':
           description: OK
@@ -119,15 +144,15 @@ paths:
       parameters:
         - { name: q, in: query, required: true, schema: { type: string, minLength: 1 } }
         - { name: mode, in: query, schema: { type: string, enum: [lexical, semantic], default: lexical } }
-        - { name: tier, in: query, schema: { type: string, enum: [featured, p1, all], default: all } }
+        - { name: tier, in: query, schema: { type: string, enum: ${VISIBLE_ITEM_TIER_ENUM}, default: all } }
         - { name: date_from, in: query, schema: { type: string, format: date-time } }
         - { name: date_to, in: query, schema: { type: string, format: date-time } }
         - { name: source_id, in: query, schema: { type: string } }
-        - { name: source_group, in: query, schema: { type: string } }
-        - { name: source_kind, in: query, schema: { type: string } }
+        - { name: source_group, in: query, schema: { type: string, enum: ${SOURCE_GROUP_ENUM} } }
+        - { name: source_kind, in: query, schema: { type: string, enum: ${SOURCE_KIND_ENUM} } }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
         - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 }, description: "lexical mode only" }
-        - { name: locale, in: query, schema: { type: string, enum: [zh, en], default: en } }
+        - { name: locale, in: query, schema: { type: string, enum: ${APP_LOCALE_ENUM}, default: en } }
       responses:
         '200':
           description: OK
@@ -143,7 +168,7 @@ paths:
     get:
       tags: [sources]
       summary: Source catalog + live health
-      description: 52 sources monitored — podcasts / newsletters / vendor blogs / deep-report feeds / X handles. Use to answer "is X covered?" before filtering a feed query.
+      description: Source catalog monitored by AX Radar — podcasts / newsletters / vendor blogs / deep-report feeds / X handles. Use to answer "is X covered?" before filtering a feed query.
       responses:
         '200':
           description: OK
@@ -166,7 +191,7 @@ paths:
         agents can degrade gracefully without a separate error path.
       parameters:
         - { name: cluster_id, in: path, required: true, schema: { type: integer } }
-        - { name: locale, in: query, schema: { type: string, enum: [zh, en], default: en } }
+        - { name: locale, in: query, schema: { type: string, enum: ${APP_LOCALE_ENUM}, default: en } }
       responses:
         '200':
           description: OK
@@ -188,7 +213,7 @@ paths:
         theme tag (≤8 字), summary_md (numbered 1-5 list with backlinks),
         narrative_md (2500-4500 字 narrative).
       parameters:
-        - { name: locale, in: query, schema: { type: string, enum: [zh, en], default: zh }, description: "Only zh is generated today" }
+        - { name: locale, in: query, schema: { type: string, enum: ${APP_LOCALE_ENUM}, default: zh }, description: "Only zh is generated today" }
       responses:
         '200':
           description: OK
@@ -207,7 +232,7 @@ paths:
       summary: Daily AI column for a specific date
       parameters:
         - { name: date, in: path, required: true, schema: { type: string, pattern: '^\\d{4}-\\d{2}-\\d{2}$' } }
-        - { name: locale, in: query, schema: { type: string, enum: [zh, en], default: zh } }
+        - { name: locale, in: query, schema: { type: string, enum: ${APP_LOCALE_ENUM}, default: zh } }
       responses:
         '200':
           description: OK
@@ -227,7 +252,7 @@ paths:
       description: Recent daily columns in reverse-chronological order — metadata only (no body), useful for "which dates have columns" enumeration.
       parameters:
         - { name: take, in: query, schema: { type: integer, minimum: 1, maximum: 180, default: 30 } }
-        - { name: locale, in: query, schema: { type: string, enum: [zh, en], default: zh } }
+        - { name: locale, in: query, schema: { type: string, enum: ${APP_LOCALE_ENUM}, default: zh } }
       responses:
         '200':
           description: OK
@@ -250,9 +275,9 @@ components:
         summary: { type: string }
         publisher: { type: string, description: "Display name of the source" }
         source_id: { type: string, description: "Canonical source id, e.g. 'dwarkesh-yt'. Use this for filters, not publisher." }
-        source_group: { type: string, nullable: true, enum: [vendor-official, media, newsletter, research, social, product, podcast, policy, market, null] }
-        source_kind: { type: string, enum: [rss, atom, api, rsshub, scrape, x-api, aihot-api] }
-        tier: { type: string, enum: [featured, p1, all, excluded] }
+        source_group: { type: string, nullable: true, enum: ${SOURCE_GROUP_NULLABLE_ENUM} }
+        source_kind: { type: string, enum: ${SOURCE_KIND_ENUM} }
+        tier: { type: string, enum: ${ITEM_TIER_ENUM} }
         importance: { type: integer, minimum: 0, description: "Editorial importance score" }
         hkr:
           nullable: true
@@ -284,7 +309,7 @@ components:
         total: { type: integer }
         limit: { type: integer }
         offset: { type: integer }
-        view: { type: string, enum: [today, archive] }
+        view: { type: string, enum: ${FEED_VIEW_ENUM} }
 
     ItemDetail:
       type: object
@@ -297,9 +322,9 @@ components:
             id: { type: string }
             name_en: { type: string, nullable: true }
             name_zh: { type: string, nullable: true }
-            kind: { type: string }
-            group: { type: string }
-            locale: { type: string }
+            kind: { type: string, enum: ${SOURCE_KIND_ENUM} }
+            group: { type: string, enum: ${SOURCE_GROUP_ENUM} }
+            locale: { type: string, enum: ${SOURCE_LOCALE_ENUM} }
             url: { type: string, format: uri }
         title:
           type: object
@@ -337,7 +362,7 @@ components:
             entities:     { type: array, items: { type: string } }
             topics:       { type: array, items: { type: string } }
         importance: { type: integer }
-        tier: { type: string, enum: [featured, p1, all, excluded] }
+        tier: { type: string, enum: ${ITEM_TIER_ENUM} }
         url: { type: string, format: uri }
         canonical_url: { type: string, format: uri, nullable: true }
         author: { type: string, nullable: true }
@@ -417,10 +442,10 @@ components:
         name_en: { type: string, nullable: true }
         name_zh: { type: string, nullable: true }
         url: { type: string, format: uri }
-        kind: { type: string }
-        group: { type: string }
-        locale: { type: string }
-        cadence: { type: string, enum: [live, hourly, daily, weekly] }
+        kind: { type: string, enum: ${SOURCE_KIND_ENUM} }
+        group: { type: string, enum: ${SOURCE_GROUP_ENUM} }
+        locale: { type: string, enum: ${SOURCE_LOCALE_ENUM} }
+        cadence: { type: string, enum: ${CADENCE_ENUM} }
         priority: { type: integer, minimum: 1, maximum: 3 }
         tags: { type: array, items: { type: string } }
         enabled: { type: boolean }
@@ -446,7 +471,7 @@ components:
       required: [id, locale, date, generated_at, window_start, window_end]
       properties:
         id: { type: integer }
-        locale: { type: string, enum: [zh, en] }
+        locale: { type: string, enum: ${APP_LOCALE_ENUM} }
         date: { type: string, description: "YYYY-MM-DD UTC of period_start" }
         generated_at: { type: string, format: date-time }
         window_start: { type: string, format: date-time }

@@ -16,7 +16,7 @@
 
 AX's AI RADAR is a dashboard for editors and analysts who cover the AI industry. It does four things:
 
-1. **Ingests** 52 curated sources (RSS, Atom, RSSHub, APIs, scraping) — vendor blogs, media, newsletters, deep-report feeds, social signal, podcasts, policy, market, and product sources.
+1. **Ingests** the monitored source catalog (RSS, Atom, RSSHub, APIs, scraping) — vendor blogs, media, newsletters, deep-report feeds, social signal, podcasts, policy, market, and product sources.
 2. **Enriches** each story via LLM — Chinese / English summary, friend-readable commentary, 0–100 importance score, multi-axis taxonomy (capability / entity / topic), and cross-source clustering.
 3. **Curates** with a human-readable `editorial.skill.md` policy file. Editors click 👍 / 👎 / ⭐ and add notes.
 4. **Iterates itself** — a Claude Agent reads accumulated feedback, diffs `editorial.skill.md`, shows the change for approval, and ships it as v-next. Workers pick up the new policy on the next enrichment pass.
@@ -120,7 +120,7 @@ Docs routing starts at [`docs/README.md`](./docs/README.md). Full blueprint + de
 
 AX 的 AI 雷达是一款面向 AI 行业编辑和分析师的情报工作台，由四个环节组成：
 
-1. **拉取**：52 个精选信源（RSS / Atom / RSSHub / API / 网页抓取）——厂商博客、媒体、新闻信、深度报告、社交信号、播客、政策、市场和产品源。
+1. **拉取**：已监控的精选信源目录（RSS / Atom / RSSHub / API / 网页抓取）——厂商博客、媒体、新闻信、深度报告、社交信号、播客、政策、市场和产品源。
 2. **加工**：每篇内容经 LLM 管线处理——中英文摘要、像朋友分享一样的点评、0–100 的 importance 分数、多轴标签（能力 / 实体 / 话题）和跨源聚类。
 3. **精选**：以人类可读的 `editorial.skill.md` 作为精选策略。编辑点 👍 / 👎 / ⭐ 并写文字反馈。
 4. **策略自迭代**：Claude Agent 读取累积的反馈，生成 `editorial.skill.md` 的 diff，编辑审核后发布为下一个版本，Worker 下次 enrich 自动使用新策略。
