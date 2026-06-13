@@ -18,6 +18,7 @@ import {
   VISIBLE_ITEM_TIERS,
 } from "@/lib/types";
 import { publicRateLimitPerIpLabel } from "@/lib/api/public-endpoint-config";
+import { PUBLIC_SITE_URL, publicUrl } from "@/lib/site";
 
 function yamlInlineEnum(values: readonly (string | null)[]): string {
   return `[${values.map((value) => (value === null ? "null" : value)).join(", ")}]`;
@@ -41,7 +42,7 @@ info:
   title: AX Radar Public API
   version: "1.0.0"
   description: |
-    Anonymous read-only API for AX Radar (https://news.ax0x.ai) — AI intelligence
+    Anonymous read-only API for AX Radar (${PUBLIC_SITE_URL}) — AI intelligence
     radar with curated featured items, hand-picked editor stream (AX 严选),
     multi-source event clustering, and daily AI columns in a clear editorial
     voice.
@@ -53,11 +54,11 @@ info:
     Testing phase — endpoints + shapes may change. Don't hard-depend in production.
   contact:
     name: AX
-    url: https://news.ax0x.ai/zh/agents
+    url: ${publicUrl("/zh/agents")}
   license:
     name: MIT
 servers:
-  - url: https://news.ax0x.ai
+  - url: ${PUBLIC_SITE_URL}
     description: production
 tags:
   - name: feed

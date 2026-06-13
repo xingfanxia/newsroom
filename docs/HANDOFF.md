@@ -189,6 +189,7 @@ Shipped code changes:
 - Removed paper surfaces from catalog, navigation, sitemap, RSS, MCP, public skill, OpenAPI, and `/papers`.
 - Added `scripts/ops/cleanup-paper-sources.ts`, `scripts/ops/backfill-chinese.ts`, and `scripts/ops/backfill-daily-columns.ts`.
 - Added singleton reclustering so recent singleton items get another chance to join existing events before duplicate-cluster merge.
+- Centralized the canonical public origin in `lib/site.ts` so sitemap, robots, RSS, `/skill.md`, `/openapi.yaml`, and `/agents` share `https://news.ax0x.ai` instead of mixing the production domain with the Vercel alias.
 
 Backfill/DB state verified on 2026-06-10:
 - Chinese backfill state: `enrich=14909`, `score=14909`, `commentary=6774`, `clusters=1660`.

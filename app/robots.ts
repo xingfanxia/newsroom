@@ -1,6 +1,5 @@
 import type { MetadataRoute } from "next";
-
-const SITE_URL = "https://news.ax0x.ai";
+import { PUBLIC_SITE_URL, publicUrl } from "@/lib/site";
 
 export default function robots(): MetadataRoute.Robots {
   return {
@@ -33,7 +32,7 @@ export default function robots(): MetadataRoute.Robots {
         ],
       },
     ],
-    sitemap: `${SITE_URL}/sitemap.xml`,
-    host: SITE_URL,
+    sitemap: publicUrl("/sitemap.xml"),
+    host: PUBLIC_SITE_URL,
   };
 }

@@ -6,11 +6,12 @@ import {
   PUBLIC_RATE_LIMIT_DOC_GROUPS,
   publicRateLimitReqLabel,
 } from "@/lib/api/public-endpoint-config";
+import { PUBLIC_SITE_URL } from "@/lib/site";
 
 type Tab = "skill" | "rss" | "api";
 type Lang = "en" | "zh";
 
-const SITE = "https://news.ax0x.ai";
+const SITE = PUBLIC_SITE_URL;
 
 export function AgentsTabs() {
   const { tweaks } = useTweaks();

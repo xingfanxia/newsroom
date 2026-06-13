@@ -4,7 +4,7 @@
  * Any agent (Claude Code / Codex CLI / Cursor / Gemini CLI / GitHub Copilot /
  * OpenCode / Cline / Windsurf …) can install this by URL:
  *
- *   帮我安装这个 skill: https://news.ax0x.ai/skill.md
+ *   帮我安装这个 skill: <canonical site URL>/skill.md
  *
  * The agent fetches this file, parses the frontmatter + body, and saves it
  * under its skills directory. From then on the agent uses the intent→endpoint
@@ -24,6 +24,7 @@ import {
   PUBLIC_RATE_LIMIT_DOC_GROUPS,
   publicRateLimitLabel,
 } from "@/lib/api/public-endpoint-config";
+import { PUBLIC_SITE_URL, publicUrl } from "@/lib/site";
 
 function markdownCodeUnion(values: readonly string[]): string {
   return values.map((value) => `\`${value}\``).join(" | ");
@@ -50,7 +51,7 @@ const SEARCH_RATE_LIMIT_LABEL = publicRateLimitLabel("search");
 
 const SKILL_MARKDOWN = `---
 name: ax-radar
-description: 用最自然的中文 / 英文一句话拿到 AX Radar (https://news.ax0x.ai) 的精选 AI 动态、AX 严选、每日 AI 日报、多源事件覆盖。匿名免费,无需 token,无需配 MCP server。
+description: 用最自然的中文 / 英文一句话拿到 AX Radar (${PUBLIC_SITE_URL}) 的精选 AI 动态、AX 严选、每日 AI 日报、多源事件覆盖。匿名免费,无需 token,无需配 MCP server。
 triggers:
   - 今天 AI 圈
   - AI 日报
@@ -60,8 +61,8 @@ triggers:
   - what's new in AI today
   - AX Radar
 license: MIT
-homepage: https://news.ax0x.ai/zh/agents
-api: https://news.ax0x.ai/openapi.yaml
+homepage: ${publicUrl("/zh/agents")}
+api: ${publicUrl("/openapi.yaml")}
 ---
 
 # AX Radar — Skill
@@ -110,7 +111,7 @@ Skill 根据用户提问关键词智能分流。默认走 **精选 + view=today*
 1. **{title}** ({publisher}) — {一句话点评 / 单 source 的话用编辑 note}
 2. ...
 
-想看完整长篇日报: https://news.ax0x.ai/zh/daily
+想看完整长篇日报: ${publicUrl("/zh/daily")}
 \`\`\`
 
 ## 鉴权 / Auth
@@ -131,11 +132,11 @@ ${RATE_LIMIT_ROWS}
 
 \`\`\`bash
 # 第一次: 200 + ETag
-curl -D - 'https://news.ax0x.ai/api/public/feed?tier=featured&view=today'
+curl -D - '${publicUrl("/api/public/feed?tier=featured&view=today")}'
 
 # 第二次带回 ETag: 304 (空 body)
 curl -H 'If-None-Match: W/"public-feed-xxxxxxxxxxxxxxxx"' \\
-     -D - 'https://news.ax0x.ai/api/public/feed?tier=featured&view=today'
+     -D - '${publicUrl("/api/public/feed?tier=featured&view=today")}'
 \`\`\`
 
 ## 翻页 / Pagination
@@ -205,11 +206,11 @@ curl -H 'If-None-Match: W/"public-feed-xxxxxxxxxxxxxxxx"' \\
 
 - **原文为准**: 摘要 + 编辑锐评由 LLM 生成,引用前用 \`url\` 字段回原文核对
 - **测试版**: \`/api/public/*\` 三轨 (RSS / REST API / Skill) 都处于测试阶段,服务器扛不住或滥用可能会临时下线、调整接口、加访问限制。**生产业务请勿强依赖。**
-- **反馈**: https://news.ax0x.ai/zh/agents
+- **反馈**: ${publicUrl("/zh/agents")}
 
 ## 完整 OpenAPI
 
-\`https://news.ax0x.ai/openapi.yaml\` — 含完整 schema、所有错误响应、所有参数边界。
+\`${publicUrl("/openapi.yaml")}\` — 含完整 schema、所有错误响应、所有参数边界。
 `;
 
 export const dynamic = "force-static";

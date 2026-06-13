@@ -7,12 +7,12 @@ import {
   renderRssFeed,
   type RssItem,
 } from "@/lib/rss/render";
+import { publicUrl } from "@/lib/site";
 import { sql, desc } from "drizzle-orm";
 
 /** Cache for 10 min — daily newsletter lands once a day; cheap to refresh. */
 export const revalidate = 600;
 
-const SITE_URL = "https://newsroom-orpin.vercel.app";
 const BRAND = {
   en: "AX's AI RADAR — Daily + Monthly Brief",
   zh: "AX 的 AI 雷达 · 每日/每月 速递",
@@ -74,7 +74,7 @@ ${renderMarkdownishHtml(commentary)}
 
     return {
       title,
-      link: SITE_URL + path,
+      link: publicUrl(path),
       description: overview,
       pubDate: n.publishedAt,
       guid: `newsletter-${n.id}`,
@@ -85,11 +85,11 @@ ${renderMarkdownishHtml(commentary)}
 
   const xml = renderRssFeed({
     title: BRAND[locale],
-    link: `${SITE_URL}/${locale}`,
+    link: publicUrl(`/${locale}`),
     description: DESCRIPTION[locale],
     language: locale === "zh" ? "zh-CN" : "en-US",
     lastBuildDate: items[0]?.pubDate ?? new Date(),
-    selfLink: `${SITE_URL}/api/feed/newsletter/${locale}/rss.xml`,
+    selfLink: publicUrl(`/api/feed/newsletter/${locale}/rss.xml`),
     items,
   });
 

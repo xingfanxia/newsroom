@@ -3,7 +3,7 @@
 > **A bilingual AI intelligence radar with a self-iterating editorial agent.** Monitored sources in, curated signal out.
 > Terminal-forward command-center aesthetic with HKR score rings; JetBrains Mono + Noto Sans/Serif SC; zh/en locale-first.
 
-🌐 **Live**: [newsroom-orpin.vercel.app](https://newsroom-orpin.vercel.app) → redirects to `/zh`
+🌐 **Live**: [news.ax0x.ai](https://news.ax0x.ai) → redirects to `/zh`
 📦 **Repo**: [github.com/xingfanxia/newsroom](https://github.com/xingfanxia/newsroom)
 
 [中文](#中文) · [English](#english)

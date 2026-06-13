@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { renderRssFeed, type RssItem } from "@/lib/rss/render";
 import { rssRateLimit } from "@/lib/rate-limit/rss";
+import { publicUrl } from "@/lib/site";
 import {
   dailyColumnDateKey,
   listDailyColumnRows,
@@ -9,8 +10,6 @@ import {
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
-const SITE = "https://news.ax0x.ai";
 
 const FEED_META: Record<
   string,
@@ -69,7 +68,7 @@ async function renderDailyFeed(
 
   const items: RssItem[] = rows.map((r) => {
     const dk = dailyColumnDateKey(r.periodStart);
-    const link = `${SITE}/zh/daily/${dk}`;
+    const link = publicUrl(`/zh/daily/${dk}`);
     const issueId = `AX 的 AI 日报 · ${dk}`;
     const subtitle = r.columnTitle ?? "";
     return {
@@ -85,11 +84,11 @@ async function renderDailyFeed(
 
   return renderRssFeed({
     title: meta.title,
-    link: `${SITE}${meta.route}`,
+    link: publicUrl(meta.route),
     description: meta.description,
     lastBuildDate: items[0]?.pubDate ?? new Date(),
     items,
-    selfLink: `${SITE}/api/rss/${slug}.xml`,
+    selfLink: publicUrl(`/api/rss/${slug}.xml`),
   });
 }
 
@@ -126,7 +125,7 @@ async function renderLaneFeed(
 
   const items: RssItem[] = rows.map((r) => ({
     title: r.title_zh ?? r.title_en ?? r.title,
-    link: `${SITE}/zh/items/${r.id}`,
+    link: publicUrl(`/zh/items/${r.id}`),
     description: r.summary_zh ?? r.summary_en ?? "",
     pubDate: r.published_at instanceof Date ? r.published_at : new Date(r.published_at),
     guid: r.url,
@@ -134,10 +133,10 @@ async function renderLaneFeed(
 
   return renderRssFeed({
     title: meta.title,
-    link: `${SITE}${meta.route}`,
+    link: publicUrl(meta.route),
     description: meta.description,
     lastBuildDate: items[0]?.pubDate ?? new Date(),
     items,
-    selfLink: `${SITE}/api/rss/${slug}.xml`,
+    selfLink: publicUrl(`/api/rss/${slug}.xml`),
   });
 }

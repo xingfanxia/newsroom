@@ -5,6 +5,7 @@ import { PageHead } from "@/components/shell/page-head";
 import { getRadarStats, getPulseData } from "@/lib/shell/dashboard-stats";
 import { AgentsTabs } from "./_tabs";
 import { PUBLIC_ENDPOINT_COUNT } from "@/lib/api/public-endpoint-config";
+import { publicUrl } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +42,7 @@ export default async function AgentsPage({
       }}
       pulse={pulse}
       crumb="~/agents"
-      cmd="curl https://news.ax0x.ai/api/public/feed"
+      cmd={`curl ${publicUrl("/api/public/feed")}`}
     >
       <main className="main">
         <PageHead

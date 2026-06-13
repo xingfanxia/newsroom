@@ -7,9 +7,8 @@
  * dynamic enumerator here when SEO traction justifies the cost.
  */
 import type { MetadataRoute } from "next";
+import { publicUrl } from "@/lib/site";
 import { APP_LOCALES } from "@/lib/types";
-
-const SITE_URL = "https://news.ax0x.ai";
 
 const PRIMARY_ROUTES = [
   "",          // /[locale]
@@ -27,7 +26,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
   const localePages: MetadataRoute.Sitemap = APP_LOCALES.flatMap((locale) =>
     PRIMARY_ROUTES.map((route) => ({
-      url: `${SITE_URL}/${locale}${route}`,
+      url: publicUrl(`/${locale}${route}`),
       lastModified: now,
       changeFrequency:
         route === ""
@@ -47,13 +46,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
   return [
     ...localePages,
     {
-      url: `${SITE_URL}/skill.md`,
+      url: publicUrl("/skill.md"),
       lastModified: now,
       changeFrequency: "monthly" as const,
       priority: 0.8,
     },
     {
-      url: `${SITE_URL}/openapi.yaml`,
+      url: publicUrl("/openapi.yaml"),
       lastModified: now,
       changeFrequency: "monthly" as const,
       priority: 0.7,

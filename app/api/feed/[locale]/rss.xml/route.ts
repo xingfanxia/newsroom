@@ -6,12 +6,12 @@ import {
   renderRssFeed,
   type RssItem,
 } from "@/lib/rss/render";
+import { PUBLIC_SITE_HOST, publicUrl } from "@/lib/site";
 import type { Story } from "@/lib/types";
 
 /** Cache for 10 min — the underlying feed updates every 15 min via enrich cron. */
 export const revalidate = 600;
 
-const SITE_URL = "https://newsroom-orpin.vercel.app";
 const BRAND = { en: "AX's AI RADAR", zh: "AX 的 AI 雷达" };
 const DESCRIPTION = {
   en: "Bilingual AI intelligence radar — curated daily signal from the monitored source catalog.",
@@ -58,14 +58,14 @@ export async function GET(
 
   const xml = renderRssFeed({
     title: BRAND[locale],
-    link: `${SITE_URL}/${locale}`,
+    link: publicUrl(`/${locale}`),
     description: DESCRIPTION[locale],
     language: locale === "zh" ? "zh-CN" : "en-US",
     lastBuildDate: items[0]?.pubDate ?? new Date(),
-    selfLink: `${SITE_URL}/api/feed/${locale}/rss.xml`,
-    generator: `${BRAND[locale]} (newsroom-orpin.vercel.app)`,
+    selfLink: publicUrl(`/api/feed/${locale}/rss.xml`),
+    generator: `${BRAND[locale]} (${PUBLIC_SITE_HOST})`,
     namespaces: {
-      radar: `${SITE_URL}/schemas/radar/1.0`,
+      radar: publicUrl("/schemas/radar/1.0"),
     },
     items,
   });

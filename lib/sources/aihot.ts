@@ -8,11 +8,12 @@
  * The pagination cursor is opaque — we never decode/parse/increment it.
  * Roundtrip from response → next request only.
  */
+import { PUBLIC_SITE_URL } from "@/lib/site";
 import type { FeedItem } from "@/workers/fetcher/rss";
 
 const DEFAULT_BASE_URL = "https://aihot.virxact.com";
 const DEFAULT_USER_AGENT =
-  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 ax-radar/1.0 (+https://news.ax0x.ai)";
+  `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 ax-radar/1.0 (+${PUBLIC_SITE_URL})`;
 const DEFAULT_TIMEOUT_MS = 15_000;
 const PAGE_DELAY_MS = 80;
 
