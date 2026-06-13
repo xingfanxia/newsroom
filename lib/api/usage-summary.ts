@@ -1,8 +1,10 @@
 import {
   breakdownByModel,
   breakdownByTask,
+  dailySpend,
   recentCalls,
   totalsByWindow,
+  type DailySpendPoint,
   type ModelBreakdown,
   type RecentCall,
   type TaskBreakdown,
@@ -10,6 +12,7 @@ import {
   type WindowTotals,
 } from "@/lib/llm/stats";
 export { USAGE_WINDOWS } from "@/lib/llm/stats";
+export type { WindowKey, WindowTotals } from "@/lib/llm/stats";
 
 export type UsageSummaryApi = {
   window: WindowKey;
@@ -54,6 +57,15 @@ export type UsageSummaryApi = {
     item_id: number | null;
     created_at: string;
   }>;
+};
+
+export type UsageDashboardSummary = {
+  selected: WindowTotals;
+  windowTotals: Record<WindowKey, WindowTotals | null>;
+  byTask: TaskBreakdown[];
+  byModel: ModelBreakdown[];
+  recentCalls: RecentCall[];
+  dailySpend: DailySpendPoint[];
 };
 
 export function toUsageSummaryApi(args: {
@@ -124,4 +136,42 @@ export async function getUsageSummary(
     byModel,
     recentCalls: recent,
   });
+}
+
+export async function getUsageDashboardSummary(
+  window: WindowKey = "week",
+  opts: { recentLimit?: number; dailyDays?: number } = {},
+): Promise<UsageDashboardSummary> {
+  const [selected, today, week, month, all, byTask, byModel, recent, daily] =
+    await Promise.all([
+      totalsByWindow(window),
+      withUsageFallback(totalsByWindow("today"), null),
+      withUsageFallback(totalsByWindow("week"), null),
+      withUsageFallback(totalsByWindow("month"), null),
+      withUsageFallback(totalsByWindow("all"), null),
+      withUsageFallback(breakdownByTask(window), []),
+      withUsageFallback(breakdownByModel(window), []),
+      withUsageFallback(recentCalls(opts.recentLimit ?? 25), []),
+      withUsageFallback(dailySpend(opts.dailyDays ?? 30), []),
+    ]);
+
+  return {
+    selected,
+    windowTotals: { today, week, month, all },
+    byTask,
+    byModel,
+    recentCalls: recent,
+    dailySpend: daily,
+  };
+}
+
+async function withUsageFallback<T>(
+  promise: Promise<T>,
+  fallback: T,
+): Promise<T> {
+  try {
+    return await promise;
+  } catch {
+    return fallback;
+  }
 }

@@ -55,6 +55,19 @@ describe("usage stats surfaces", () => {
     expect(page).not.toContain("function formatShortDate");
   });
 
+  it("keeps the admin usage page on the shared usage summary boundary", () => {
+    expect(page).toContain("@/lib/api/usage-summary");
+    expect(page).toContain("getUsageDashboardSummary");
+    expect(summary).toContain("export async function getUsageDashboardSummary");
+    expect(summary).toContain("dailySpend(opts.dailyDays");
+    expect(page).not.toContain("@/lib/llm/stats");
+    expect(page).not.toContain("totalsByWindow(");
+    expect(page).not.toContain("breakdownByTask(");
+    expect(page).not.toContain("breakdownByModel(");
+    expect(page).not.toContain("recentCalls(");
+    expect(page).not.toContain("dailySpend(");
+  });
+
   it("v1 and MCP usage share the same agent summary contract", () => {
     expect(route).toContain("@/lib/api/usage-summary");
     expect(mcp).toContain("@/lib/api/usage-summary");

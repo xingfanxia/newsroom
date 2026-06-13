@@ -4,15 +4,11 @@ import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
 import { getRadarStats } from "@/lib/shell/dashboard-stats";
 import {
-  totalsByWindow,
-  breakdownByTask,
-  breakdownByModel,
-  recentCalls,
-  dailySpend,
+  getUsageDashboardSummary,
   USAGE_WINDOWS,
   type WindowKey,
   type WindowTotals,
-} from "@/lib/llm/stats";
+} from "@/lib/api/usage-summary";
 import {
   USAGE_RANGE_LABELS,
   formatUsageCount,
@@ -50,24 +46,23 @@ export default async function UsagePage({
     ? (sp.range as WindowKey)
     : "week";
 
-  const [selected, today, week, month, all, byTask, byModel, recent, daily, stats] =
-    await Promise.all([
-      totalsByWindow(range),
-      totalsByWindow("today").catch(() => null),
-      totalsByWindow("week").catch(() => null),
-      totalsByWindow("month").catch(() => null),
-      totalsByWindow("all").catch(() => null),
-      breakdownByTask(range).catch(() => []),
-      breakdownByModel(range).catch(() => []),
-      recentCalls(25).catch(() => []),
-      dailySpend(30).catch(() => []),
-      getRadarStats().catch(() => ({
-        items_today: 0,
-        items_p1: 0,
-        items_featured: 0,
-        tracked_sources: 0,
-      })),
-    ]);
+  const [usage, stats] = await Promise.all([
+    getUsageDashboardSummary(range, { recentLimit: 25, dailyDays: 30 }),
+    getRadarStats().catch(() => ({
+      items_today: 0,
+      items_p1: 0,
+      items_featured: 0,
+      tracked_sources: 0,
+    })),
+  ]);
+  const {
+    selected,
+    byTask,
+    byModel,
+    recentCalls: recent,
+    dailySpend: daily,
+  } = usage;
+  const { today, week, month, all } = usage.windowTotals;
 
   const totalTaskCost = byTask.reduce((a, t) => a + t.costUsd, 0) || 1;
   const peakDaily = Math.max(1, ...daily.map((d) => d.spend));

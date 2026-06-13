@@ -155,6 +155,10 @@ Shipped cleanup:
 - Shared Story DB select aliases through `lib/items/story-select.ts`; those
   same Story surfaces now reuse one item/source field set and one event field
   set instead of copying column aliases into each query.
+- Shared admin usage dashboard aggregation through
+  `lib/api/usage-summary.ts`; `/admin/usage`, `/api/v1/usage/summary`, and
+  MCP usage now all enter through the same summary boundary instead of the
+  page importing low-level LLM stat queries directly.
 - Shared bearer-gated `/api/v1/*` auth and plain JSON/error envelopes through
   `lib/api/v1-route.ts`; v1 route files now call `runV1Route` and return
   `v1Json` / `v1Error` / `v1InvalidQuery`, so token verification and response
@@ -200,7 +204,7 @@ Verification (2026-06-13):
 - `bun run code:dead:exports` — passed.
 - `bun run code:dead:types` — passed.
 - `bun run lint` — passed with no warnings.
-- `bun test --env-file=.env.local` — 758 pass, 1 skip, 0 fail.
+- `bun test --env-file=.env.local` — 759 pass, 1 skip, 0 fail.
 - `bun run build` — passed.
 - `git diff --check` — passed.
 
