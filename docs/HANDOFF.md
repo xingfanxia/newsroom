@@ -39,6 +39,10 @@ Shipped cleanup:
 - Shared the underlying `{ ok: true }` / `{ ok: false, error }` response
   envelope construction through `lib/api/ok-response.ts`; admin/session route
   helpers now alias that implementation while keeping domain-specific names.
+- Shared plain JSON success/error envelopes for small legacy/internal routes
+  through `lib/api/plain-response.ts`; `/api/events/:id/members` and
+  `/api/sources/active` no longer hand-copy `Response.json` or catch-all
+  `console.error` server-error branches.
 - Shared mutating route JSON body parsing and Zod error-envelope handling through `lib/api/json-body.ts`.
 - Shared feedback vote values through `FEEDBACK_VOTES`, `FEEDBACK_SIGNAL_VOTES`,
   and `FEEDBACK_SAVE_VOTE` in `lib/types.ts`, so the DB enum, feedback request
@@ -215,7 +219,7 @@ Verification (2026-06-13):
 - `bun run code:dead:exports` — passed.
 - `bun run code:dead:types` — passed.
 - `bun run lint` — passed with no warnings.
-- `bun test --env-file=.env.local` — 769 pass, 1 skip, 0 fail.
+- `bun test --env-file=.env.local` — 774 pass, 1 skip, 0 fail.
 - `bun run build` — passed.
 - `git diff --check` — passed.
 

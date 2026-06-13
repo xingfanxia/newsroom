@@ -50,4 +50,15 @@ describe("event member route source wiring", () => {
       'defaultLocale: "en"',
     );
   });
+
+  test("legacy UI event-member route delegates plain JSON envelopes", () => {
+    const source = read("app/api/events/[id]/members/route.ts");
+
+    expect(source).toContain("@/lib/api/plain-response");
+    expect(source).toContain("plainJson");
+    expect(source).toContain("plainError");
+    expect(source).toContain("plainServerError");
+    expect(source).not.toContain("Response.json(");
+    expect(source).not.toContain('console.error("[api/events');
+  });
 });

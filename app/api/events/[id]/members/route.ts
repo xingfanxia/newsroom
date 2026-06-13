@@ -16,6 +16,11 @@
  * drawer can degrade gracefully without a separate error path.
  */
 import { getEventMembersRoutePayload } from "@/lib/api/event-members";
+import {
+  plainError,
+  plainJson,
+  plainServerError,
+} from "@/lib/api/plain-response";
 
 export async function GET(
   req: Request,
@@ -31,18 +36,14 @@ export async function GET(
       defaultLocale: "zh",
     });
     if (!result.ok) {
-      return Response.json(
-        { error: result.error },
-        { status: result.status },
-      );
+      return plainError(result.error, result.status);
     }
 
-    return Response.json({
+    return plainJson({
       members: result.payload.members,
       total: result.payload.total,
     });
   } catch (err) {
-    console.error("[api/events/:id/members] failed", err);
-    return Response.json({ error: "server_error" }, { status: 500 });
+    return plainServerError("api/events/:id/members", err);
   }
 }

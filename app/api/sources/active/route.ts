@@ -1,6 +1,7 @@
 import { asc, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { sources } from "@/db/schema";
+import { plainJson, plainServerError } from "@/lib/api/plain-response";
 
 export const revalidate = 300;
 
@@ -25,7 +26,7 @@ export async function GET() {
       .from(sources)
       .where(eq(sources.enabled, true))
       .orderBy(asc(sources.group), asc(sources.nameEn));
-    return Response.json({
+    return plainJson({
       sources: rows.map((r) => ({
         id: r.id,
         name_en: r.nameEn,
@@ -37,7 +38,6 @@ export async function GET() {
       total: rows.length,
     });
   } catch (err) {
-    console.error("[api/sources/active] failed", err);
-    return Response.json({ error: "server_error" }, { status: 500 });
+    return plainServerError("api/sources/active", err);
   }
 }
