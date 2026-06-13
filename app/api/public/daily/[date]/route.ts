@@ -9,13 +9,7 @@ import {
   publicEndpointRateLimit,
   publicError,
 } from "@/lib/api/public-helpers";
-import {
-  dailyColumnDateSchema,
-  dailyColumnLocaleSchema,
-  getDailyColumnRowByDate,
-  publicDailyColumnEtagSignal,
-  toPublicDailyColumn,
-} from "@/lib/api/daily-columns";
+import { getPublicDailyColumnByDate } from "@/lib/api/daily-columns";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -28,31 +22,21 @@ export async function GET(
   if (limited) return limited;
 
   const { date: rawDate } = await ctx.params;
-  const parsedDate = dailyColumnDateSchema.safeParse(rawDate);
-  if (!parsedDate.success) return publicError("invalid_date", 400);
-
   const url = new URL(req.url);
-  const parsedLocale = dailyColumnLocaleSchema.safeParse(
-    url.searchParams.get("locale") ?? "zh",
-  );
-  if (!parsedLocale.success) return publicError("invalid_locale", 400);
 
   try {
-    const row = await getDailyColumnRowByDate(
-      parsedDate.data,
-      parsedLocale.data,
-    );
-    if (!row) {
-      return publicError(`no_daily_for_${parsedDate.data}`, 404);
-    }
+    const result = await getPublicDailyColumnByDate({
+      rawDate,
+      rawLocale: url.searchParams.get("locale"),
+    });
+    if (!result.ok) return publicError(result.error, result.status);
 
-    const body = toPublicDailyColumn(row);
     // Historical dailies are immutable — aggressive cache.
     return publicCachedJson(req, {
       endpoint: "dailyByDate",
       etagFamily: "public-daily-date",
-      signal: publicDailyColumnEtagSignal(row),
-      body,
+      signal: result.payload.etagSignal,
+      body: result.payload.body,
     });
   } catch (err) {
     console.error("[api/public/daily/:date] failed", err);

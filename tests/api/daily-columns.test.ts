@@ -3,11 +3,17 @@ import {
   dailyColumnDateSchema,
   dailyColumnDateKey,
   dailyColumnDayWindow,
+  getDailyColumnMarkdownByDate,
+  getLatestPublicDailyColumn,
+  getPublicDailyColumnByDate,
+  getPublicDailyColumnIndex,
   publicDailyColumnEtagSignal,
   publicDailyColumnIndexEtagSignal,
   renderDailyColumnMarkdown,
   toPublicDailyColumn,
   toPublicDailyColumnIndex,
+  toPublicDailyColumnIndexPayload,
+  toPublicDailyColumnPayload,
   type DailyColumnIndexRow,
   type DailyColumnRow,
 } from "@/lib/api/daily-columns";
@@ -119,6 +125,24 @@ describe("daily column public API serialization", () => {
       "count=1|first_id=216|first_gen=2026-06-12T05:01:00.000Z|locale=zh|take=30",
     );
   });
+
+  test("builds route-ready public payloads with body and ETag signal", () => {
+    expect(toPublicDailyColumnPayload(dailyRow())).toEqual({
+      body: toPublicDailyColumn(dailyRow()),
+      etagSignal: "id=216|generated=2026-06-12T05:01:00.000Z",
+    });
+
+    expect(
+      toPublicDailyColumnIndexPayload([indexRow()], {
+        locale: "zh",
+        take: 30,
+      }),
+    ).toEqual({
+      body: toPublicDailyColumnIndex([indexRow()]),
+      etagSignal:
+        "count=1|first_id=216|first_gen=2026-06-12T05:01:00.000Z|locale=zh|take=30",
+    });
+  });
 });
 
 describe("daily column shared date helpers", () => {
@@ -156,5 +180,40 @@ describe("daily column shared date helpers", () => {
         "长文正文",
       ].join("\n"),
     );
+  });
+
+  test("public route helpers return validation errors before lookup", async () => {
+    await expect(getLatestPublicDailyColumn("ja")).resolves.toEqual({
+      ok: false,
+      error: "invalid_locale",
+      status: 400,
+    });
+
+    await expect(
+      getPublicDailyColumnByDate({
+        rawDate: "2026-02-30",
+        rawLocale: "zh",
+      }),
+    ).resolves.toEqual({ ok: false, error: "invalid_date", status: 400 });
+
+    await expect(
+      getPublicDailyColumnByDate({
+        rawDate: "2026-06-11",
+        rawLocale: "ja",
+      }),
+    ).resolves.toEqual({ ok: false, error: "invalid_locale", status: 400 });
+
+    await expect(getPublicDailyColumnIndex({ take: "0" })).resolves.toEqual({
+      ok: false,
+      error:
+        "invalid_query: Too small: expected number to be >=1",
+      status: 400,
+    });
+  });
+
+  test("MCP markdown helper returns validation text before lookup", async () => {
+    await expect(
+      getDailyColumnMarkdownByDate("2026-99-99", "zh"),
+    ).resolves.toBe("_invalid date format — expected YYYY-MM-DD_");
   });
 });

@@ -74,6 +74,10 @@ Shipped cleanup:
   `getEventMembersRoutePayload` / `getEventMembersPayload` in
   `lib/api/event-members.ts`; UI-internal, public, v1, and MCP adapters now
   own only their auth/rate-limit/cache/envelope mapping.
+- Shared daily-column public lookup payloads and MCP markdown lookups through
+  `lib/api/daily-columns.ts`; public daily route files now own only
+  rate-limit/cache/error-envelope mapping, while MCP daily resources own only
+  resource envelope mapping.
 - Shared bearer-agent usage summary serialization through
   `lib/api/usage-summary.ts`; `/api/v1/usage/summary` and MCP
   `ax_radar_usage` now share the same totals, `by_task`, `by_model`, and
@@ -168,7 +172,7 @@ Verification (2026-06-13):
 - `bun run code:dead:exports` — passed.
 - `bun run code:dead:types` — passed.
 - `bun run lint` — passed with no warnings.
-- `bun test --env-file=.env.local` — 724 pass, 1 skip, 0 fail.
+- `bun test --env-file=.env.local` — 727 pass, 1 skip, 0 fail.
 - `bun run build` — passed.
 - `git diff --check` — passed.
 

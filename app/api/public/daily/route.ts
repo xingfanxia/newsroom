@@ -13,12 +13,7 @@ import {
   publicEndpointRateLimit,
   publicError,
 } from "@/lib/api/public-helpers";
-import {
-  dailyColumnLocaleSchema,
-  getLatestDailyColumnRow,
-  publicDailyColumnEtagSignal,
-  toPublicDailyColumn,
-} from "@/lib/api/daily-columns";
+import { getLatestPublicDailyColumn } from "@/lib/api/daily-columns";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -28,25 +23,19 @@ export async function GET(req: Request) {
   if (limited) return limited;
 
   const url = new URL(req.url);
-  const parsedLocale = dailyColumnLocaleSchema.safeParse(
-    url.searchParams.get("locale") ?? "zh",
-  );
-  if (!parsedLocale.success) return publicError("invalid_locale", 400);
-  const locale = parsedLocale.data;
 
   try {
-    const row = await getLatestDailyColumnRow(locale);
-    if (!row) {
-      return publicError("no_daily_yet", 404);
-    }
+    const result = await getLatestPublicDailyColumn(
+      url.searchParams.get("locale"),
+    );
+    if (!result.ok) return publicError(result.error, result.status);
 
-    const body = toPublicDailyColumn(row);
     // Daily column lands once per day; long stale-while-revalidate.
     return publicCachedJson(req, {
       endpoint: "daily",
       etagFamily: "public-daily",
-      signal: publicDailyColumnEtagSignal(row),
-      body,
+      signal: result.payload.etagSignal,
+      body: result.payload.body,
     });
   } catch (err) {
     console.error("[api/public/daily] failed", err);

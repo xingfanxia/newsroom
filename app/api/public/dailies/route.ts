@@ -12,12 +12,7 @@ import {
   publicEndpointRateLimit,
   publicError,
 } from "@/lib/api/public-helpers";
-import {
-  dailyColumnIndexQuerySchema,
-  listDailyColumnIndexRows,
-  publicDailyColumnIndexEtagSignal,
-  toPublicDailyColumnIndex,
-} from "@/lib/api/daily-columns";
+import { getPublicDailyColumnIndex } from "@/lib/api/daily-columns";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -27,25 +22,18 @@ export async function GET(req: Request) {
   if (limited) return limited;
 
   const url = new URL(req.url);
-  const parsed = dailyColumnIndexQuerySchema.safeParse(
-    Object.fromEntries(url.searchParams.entries()),
-  );
-  if (!parsed.success) {
-    return publicError(
-      `invalid_query: ${parsed.error.issues.map((i) => i.message).join("; ")}`,
-      400,
-    );
-  }
-  const q = parsed.data;
 
   try {
-    const rows = await listDailyColumnIndexRows(q);
-    const body = toPublicDailyColumnIndex(rows);
+    const result = await getPublicDailyColumnIndex(
+      Object.fromEntries(url.searchParams.entries()),
+    );
+    if (!result.ok) return publicError(result.error, result.status);
+
     return publicCachedJson(req, {
       endpoint: "dailies",
       etagFamily: "public-dailies",
-      signal: publicDailyColumnIndexEtagSignal(rows, q),
-      body,
+      signal: result.payload.etagSignal,
+      body: result.payload.body,
     });
   } catch (err) {
     console.error("[api/public/dailies] failed", err);

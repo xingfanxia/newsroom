@@ -43,15 +43,21 @@ describe("daily-column API source wiring", () => {
       expect(source).not.toContain(".select({");
       expect(source).not.toContain("from(newsletters)");
       expect(source).not.toContain("function dateKey");
+      expect(source).not.toContain("dailyColumnLocaleSchema");
+      expect(source).not.toContain("dailyColumnDateSchema");
+      expect(source).not.toContain("toPublicDailyColumn(");
+      expect(source).not.toContain("toPublicDailyColumnIndex(");
+      expect(source).not.toContain("publicDailyColumnEtagSignal(");
+      expect(source).not.toContain("publicDailyColumnIndexEtagSignal(");
     }
     expect(read("app/api/public/daily/route.ts")).toContain(
-      "getLatestDailyColumnRow",
+      "getLatestPublicDailyColumn",
     );
     expect(read("app/api/public/daily/[date]/route.ts")).toContain(
-      "getDailyColumnRowByDate",
+      "getPublicDailyColumnByDate",
     );
     expect(read("app/api/public/dailies/route.ts")).toContain(
-      "listDailyColumnIndexRows",
+      "getPublicDailyColumnIndex",
     );
   });
 
@@ -77,9 +83,12 @@ describe("daily-column API source wiring", () => {
 
   test("MCP daily resources use the same daily-column module", () => {
     expect(mcpRoute).toContain("@/lib/api/daily-columns");
-    expect(mcpDailyResources).toContain("getLatestDailyColumnRow");
-    expect(mcpDailyResources).toContain("getDailyColumnRowByDate");
-    expect(mcpDailyResources).toContain("renderDailyColumnMarkdown");
+    expect(mcpDailyResources).toContain("getLatestDailyColumnMarkdown");
+    expect(mcpDailyResources).toContain("getDailyColumnMarkdownByDate");
+    expect(mcpDailyResources).not.toContain("dailyColumnDateSchema");
+    expect(mcpDailyResources).not.toContain("getLatestDailyColumnRow");
+    expect(mcpDailyResources).not.toContain("getDailyColumnRowByDate");
+    expect(mcpDailyResources).not.toContain("renderDailyColumnMarkdown");
     expect(mcpDailyResources).not.toContain(".select({");
     expect(mcpDailyResources).not.toContain("from(newsletters)");
     expect(mcpDailyResources).not.toContain("function dateKey");

@@ -5,7 +5,7 @@ import { newsletters } from "@/db/schema";
 import { etagSignal } from "@/lib/api/public-helpers";
 import { DAILY_NEWSLETTER_KIND, NEWSLETTER_LOCALES } from "@/lib/types";
 
-export const dailyColumnLocaleSchema = z.enum(NEWSLETTER_LOCALES).default("zh");
+const dailyColumnLocaleSchema = z.enum(NEWSLETTER_LOCALES).default("zh");
 export type DailyColumnLocale = z.infer<typeof dailyColumnLocaleSchema>;
 
 export const dailyColumnDateSchema = z
@@ -21,7 +21,7 @@ export const dailyColumnDateSchema = z
     },
   );
 
-export const dailyColumnIndexQuerySchema = z.object({
+const dailyColumnIndexQuerySchema = z.object({
   take: z.coerce.number().int().min(1).max(180).optional().default(30),
   locale: dailyColumnLocaleSchema.optional().default("zh"),
 });
@@ -74,7 +74,7 @@ export function dailyColumnDayWindow(date: string): {
   return { start, end };
 }
 
-export async function getLatestDailyColumnRow(locale: DailyColumnLocale) {
+async function getLatestDailyColumnRow(locale: DailyColumnLocale) {
   const [row] = await listDailyColumnRows({ locale, take: 1 });
 
   return row ?? null;
@@ -116,7 +116,7 @@ export async function getDailyColumnRowByDate(
   return row ?? null;
 }
 
-export async function listDailyColumnIndexRows(
+async function listDailyColumnIndexRows(
   query: DailyColumnIndexQuery,
 ) {
   return db()
@@ -163,6 +163,24 @@ export type PublicDailyColumnIndex = {
   count: number;
   items: PublicDailyColumnIndexItem[];
 };
+
+export type PublicDailyColumnPayload = {
+  body: PublicDailyColumn;
+  etagSignal: string;
+};
+
+export type PublicDailyColumnIndexPayload = {
+  body: PublicDailyColumnIndex;
+  etagSignal: string;
+};
+
+type PublicDailyColumnResult =
+  | { ok: true; payload: PublicDailyColumnPayload }
+  | { ok: false; error: string; status: 400 | 404 };
+
+type PublicDailyColumnIndexResult =
+  | { ok: true; payload: PublicDailyColumnIndexPayload }
+  | { ok: false; error: string; status: 400 };
 
 export function toPublicDailyColumn(row: DailyColumnRow): PublicDailyColumn {
   return {
@@ -224,6 +242,92 @@ export function publicDailyColumnIndexEtagSignal(
   });
 }
 
+export function toPublicDailyColumnPayload(
+  row: DailyColumnRow,
+): PublicDailyColumnPayload {
+  return {
+    body: toPublicDailyColumn(row),
+    etagSignal: publicDailyColumnEtagSignal(row),
+  };
+}
+
+export function toPublicDailyColumnIndexPayload(
+  rows: DailyColumnIndexRow[],
+  query: DailyColumnIndexQuery,
+): PublicDailyColumnIndexPayload {
+  return {
+    body: toPublicDailyColumnIndex(rows),
+    etagSignal: publicDailyColumnIndexEtagSignal(rows, query),
+  };
+}
+
+export async function getLatestPublicDailyColumn(
+  rawLocale: string | null,
+): Promise<PublicDailyColumnResult> {
+  const parsedLocale = dailyColumnLocaleSchema.safeParse(rawLocale ?? "zh");
+  if (!parsedLocale.success) {
+    return { ok: false, error: "invalid_locale", status: 400 };
+  }
+
+  const row = await getLatestDailyColumnRow(parsedLocale.data);
+  if (!row) {
+    return { ok: false, error: "no_daily_yet", status: 404 };
+  }
+
+  return { ok: true, payload: toPublicDailyColumnPayload(row) };
+}
+
+export async function getPublicDailyColumnByDate({
+  rawDate,
+  rawLocale,
+}: {
+  rawDate: string;
+  rawLocale: string | null;
+}): Promise<PublicDailyColumnResult> {
+  const parsedDate = dailyColumnDateSchema.safeParse(rawDate);
+  if (!parsedDate.success) {
+    return { ok: false, error: "invalid_date", status: 400 };
+  }
+
+  const parsedLocale = dailyColumnLocaleSchema.safeParse(rawLocale ?? "zh");
+  if (!parsedLocale.success) {
+    return { ok: false, error: "invalid_locale", status: 400 };
+  }
+
+  const row = await getDailyColumnRowByDate(
+    parsedDate.data,
+    parsedLocale.data,
+  );
+  if (!row) {
+    return {
+      ok: false,
+      error: `no_daily_for_${parsedDate.data}`,
+      status: 404,
+    };
+  }
+
+  return { ok: true, payload: toPublicDailyColumnPayload(row) };
+}
+
+export async function getPublicDailyColumnIndex(
+  rawQuery: Record<string, string>,
+): Promise<PublicDailyColumnIndexResult> {
+  const parsed = dailyColumnIndexQuerySchema.safeParse(rawQuery);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: `invalid_query: ${parsed.error.issues.map((i) => i.message).join("; ")}`,
+      status: 400,
+    };
+  }
+
+  const rows = await listDailyColumnIndexRows(parsed.data);
+  return {
+    ok: true,
+    payload: toPublicDailyColumnIndexPayload(rows, parsed.data),
+  };
+}
+
 export function renderDailyColumnMarkdown(row: {
   columnTitle: string | null;
   columnSummaryMd: string | null;
@@ -234,4 +338,26 @@ export function renderDailyColumnMarkdown(row: {
   const date = dailyColumnDateKey(row.periodStart);
   const tag = row.columnThemeTag ? `\n\n_# ${row.columnThemeTag}_` : "";
   return `# AX 的 AI 日报 · ${date}\n\n## ${row.columnTitle ?? ""}${tag}\n\n${row.columnSummaryMd ?? ""}\n\n---\n\n${row.columnNarrativeMd ?? ""}`;
+}
+
+export async function getLatestDailyColumnMarkdown(
+  locale: DailyColumnLocale,
+): Promise<string> {
+  const row = await getLatestDailyColumnRow(locale);
+  return row ? renderDailyColumnMarkdown(row) : "_今日的日报还没生成_";
+}
+
+export async function getDailyColumnMarkdownByDate(
+  rawDate: string,
+  locale: DailyColumnLocale,
+): Promise<string> {
+  const parsedDate = dailyColumnDateSchema.safeParse(rawDate);
+  if (!parsedDate.success) {
+    return "_invalid date format — expected YYYY-MM-DD_";
+  }
+
+  const row = await getDailyColumnRowByDate(parsedDate.data, locale);
+  return row
+    ? renderDailyColumnMarkdown(row)
+    : `_no column for ${parsedDate.data}_`;
 }

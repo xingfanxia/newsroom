@@ -61,10 +61,8 @@ import {
   toMcpSourceApiItem,
 } from "@/lib/api/source-catalog";
 import {
-  dailyColumnDateSchema,
-  getDailyColumnRowByDate,
-  getLatestDailyColumnRow,
-  renderDailyColumnMarkdown,
+  getDailyColumnMarkdownByDate,
+  getLatestDailyColumnMarkdown,
 } from "@/lib/api/daily-columns";
 import {
   getUsageSummary,
@@ -477,24 +475,12 @@ function buildServer(user: SessionUser): McpServer {
       mimeType: "text/markdown",
     },
     async (uri) => {
-      const row = await getLatestDailyColumnRow("zh");
-      if (!row) {
-        return {
-          contents: [
-            {
-              uri: uri.href,
-              mimeType: "text/markdown",
-              text: "_今日的日报还没生成_",
-            },
-          ],
-        };
-      }
       return {
         contents: [
           {
             uri: uri.href,
             mimeType: "text/markdown",
-            text: renderDailyColumnMarkdown(row),
+            text: await getLatestDailyColumnMarkdown("zh"),
           },
         ],
       };
@@ -512,35 +498,12 @@ function buildServer(user: SessionUser): McpServer {
     },
     async (uri, variables) => {
       const date = String(variables.date ?? "");
-      if (!dailyColumnDateSchema.safeParse(date).success) {
-        return {
-          contents: [
-            {
-              uri: uri.href,
-              mimeType: "text/markdown",
-              text: "_invalid date format — expected YYYY-MM-DD_",
-            },
-          ],
-        };
-      }
-      const row = await getDailyColumnRowByDate(date, "zh");
-      if (!row) {
-        return {
-          contents: [
-            {
-              uri: uri.href,
-              mimeType: "text/markdown",
-              text: `_no column for ${date}_`,
-            },
-          ],
-        };
-      }
       return {
         contents: [
           {
             uri: uri.href,
             mimeType: "text/markdown",
-            text: renderDailyColumnMarkdown(row),
+            text: await getDailyColumnMarkdownByDate(date, "zh"),
           },
         ],
       };
