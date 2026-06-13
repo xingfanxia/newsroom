@@ -11,6 +11,32 @@
  * routing table to call the right /api/public/* endpoint based on the user's
  * question.
  */
+import {
+  APP_LOCALES,
+  FEED_VIEWS,
+  ITEM_TIERS,
+  SOURCE_GROUPS,
+  SOURCE_KINDS,
+  VISIBLE_ITEM_TIERS,
+} from "@/lib/types";
+
+function markdownCodeUnion(values: readonly string[]): string {
+  return values.map((value) => `\`${value}\``).join(" | ");
+}
+
+function compactUnion(values: readonly (string | null)[]): string {
+  return values.map((value) => (value === null ? "null" : value)).join("|");
+}
+
+const APP_LOCALE_OPTIONS = markdownCodeUnion(APP_LOCALES);
+const FEED_VIEW_OPTIONS = markdownCodeUnion(FEED_VIEWS);
+const ITEM_TIER_RESPONSE_OPTIONS = compactUnion(ITEM_TIERS);
+const SOURCE_GROUP_OPTIONS = markdownCodeUnion(SOURCE_GROUPS);
+const SOURCE_GROUP_RESPONSE_OPTIONS = compactUnion([...SOURCE_GROUPS, null]);
+const SOURCE_KIND_OPTIONS = markdownCodeUnion(SOURCE_KINDS);
+const SOURCE_KIND_RESPONSE_OPTIONS = compactUnion(SOURCE_KINDS);
+const VISIBLE_ITEM_TIER_OPTIONS = markdownCodeUnion(VISIBLE_ITEM_TIERS);
+
 const SKILL_MARKDOWN = `---
 name: ax-radar
 description: 用最自然的中文 / 英文一句话拿到 AX Radar (https://news.ax0x.ai) 的精选 AI 动态、AX 严选、每日 AI 日报、多源事件覆盖。匿名免费,无需 token,无需配 MCP server。
@@ -111,16 +137,18 @@ curl -H 'If-None-Match: W/"public-feed-xxxxxxxxxxxxxxxx"' \\
 
 \`/api/public/feed\` 完整参数:
 
-- \`tier\` = \`featured\` (default) | \`p1\` | \`all\`
-- \`view\` = \`today\` | \`archive\` (default)
+- \`tier\` = ${VISIBLE_ITEM_TIER_OPTIONS}, default \`featured\`
+- \`view\` = ${FEED_VIEW_OPTIONS}, default \`archive\`
 - \`hot_window_hours\` = 1..168, default 24 (only used for view=today)
 - \`date\` / \`date_from\` / \`date_to\` = filter by published_at
-- \`source_id\` / \`source_group\` / \`source_kind\` = filter by source
+- \`source_id\` = exact source id (e.g. \`dwarkesh-yt\`)
+- \`source_group\` = ${SOURCE_GROUP_OPTIONS}
+- \`source_kind\` = ${SOURCE_KIND_OPTIONS}
 - \`curated_only\` = true | false (AX 严选 tab)
 - \`include_source_tags\` / \`exclude_source_tags\` = comma list
 - \`limit\` = 1..100, default 40
 - \`offset\` = ≥0, default 0
-- \`locale\` = zh | en, default en (controls which language's title/summary returns)
+- \`locale\` = ${APP_LOCALE_OPTIONS}, default \`en\` (controls which language's title/summary returns)
 
 ## 响应 shape 关键不变量
 
@@ -133,8 +161,9 @@ curl -H 'If-None-Match: W/"public-feed-xxxxxxxxxxxxxxxx"' \\
   "summary": "string",
   "publisher": "string",
   "source_id": "string",
-  "source_group": "podcast|newsletter|...|null",
-  "tier": "featured|p1|all|excluded",
+  "source_group": "${SOURCE_GROUP_RESPONSE_OPTIONS}",
+  "source_kind": "${SOURCE_KIND_RESPONSE_OPTIONS}",
+  "tier": "${ITEM_TIER_RESPONSE_OPTIONS}",
   "importance": 0,
   "hkr": { "h": false, "k": false, "r": false } | null,
   "tags": ["string"],
