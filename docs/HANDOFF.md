@@ -36,6 +36,9 @@ Shipped cleanup:
 - Shared usage window keys through `USAGE_WINDOWS` in `lib/llm/stats.ts`, so
   the admin usage page, v1 usage summary, and MCP usage tool cannot drift on
   the `today|week|month|all` window set.
+- Shared source kind/group/cadence runtime tuples through `lib/types.ts` and
+  source group display metadata through `lib/sources/groups.ts`, so DB enums
+  and the `/sources` group order/labels cannot drift from catalog types.
 - Shared hourly/daily/weekly fetch+normalize sequencing through `workers/fetcher/pipeline.ts`, with HTTP route wiring in `app/api/cron/_fetch-bucket-route.ts` and local cron scripts using the same helper.
 - Shared article body + YouTube transcript prefetch sequencing through
   `workers/fetcher/content-prefetch.ts`, so `/api/cron/article-body` and
@@ -72,7 +75,7 @@ Verification:
 - `bun run code:dead:exports` — passed.
 - `bun run code:dead:types` — passed.
 - `bun run lint` — passed with no warnings.
-- `bun test --env-file=.env.local` — 621 pass, 1 skip, 0 fail.
+- `bun test --env-file=.env.local` — 623 pass, 1 skip, 0 fail.
 - `bun run build` — passed.
 - `git diff --check` — passed.
 

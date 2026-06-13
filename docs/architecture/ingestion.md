@@ -35,7 +35,10 @@ Each arrow is a durable step: a failed enrich doesn't re-fetch; a failed score d
 ## 2. Components
 
 ### 2.1 Source catalog (`lib/sources/catalog.ts`)
-A typed registry. Source entry shape (current as of 2026-06-10):
+A typed registry. Runtime source kind/group/cadence tuples live in
+`lib/types.ts` and feed both TypeScript contracts and Drizzle DB enums; source
+group order/labels for the `信源` UI live in `lib/sources/groups.ts`. Source
+entry shape (current as of 2026-06-12):
 
 ```ts
 type Source = {
@@ -55,7 +58,8 @@ type Source = {
 };
 ```
 
-Grouping for the `信源` UI: same enum as `group` above.
+Grouping for the `信源` UI: same enum as `group` above, with labels/order from
+`lib/sources/groups.ts`.
 
 **Adapter-routed kinds** (`x-api`, `aihot-api`): `url` field is informational; the fetcher dispatches by `kind` to a dedicated adapter (`workers/fetcher/x-api.ts`, `workers/fetcher/aihot.ts`) that owns the API contract. See §2.9 for AI HOT integration.
 

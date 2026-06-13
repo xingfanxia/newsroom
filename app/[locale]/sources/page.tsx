@@ -1,35 +1,12 @@
 import { setRequestLocale } from "next-intl/server";
 import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
+import { SOURCE_GROUP_LABELS, SOURCE_GROUPS } from "@/lib/sources/groups";
 import { getLiveSources, liveSourcesByGroup } from "@/lib/sources/live";
 import { getPulseData, getRadarStats } from "@/lib/shell/dashboard-stats";
 import { SourcesViewToggle, type SourcesView } from "./_view-toggle";
 
 export const dynamic = "force-dynamic";
-
-const GROUP_ORDER = [
-  "vendor-official",
-  "media",
-  "newsletter",
-  "research",
-  "social",
-  "product",
-  "podcast",
-  "policy",
-  "market",
-] as const;
-
-const GROUP_LABELS: Record<string, { en: string; zh: string }> = {
-  "vendor-official": { en: "vendor official", zh: "官网" },
-  media: { en: "media", zh: "媒体" },
-  newsletter: { en: "newsletter", zh: "通讯" },
-  research: { en: "research", zh: "研究" },
-  social: { en: "social", zh: "社交" },
-  product: { en: "product", zh: "产品" },
-  podcast: { en: "podcast", zh: "播客" },
-  policy: { en: "policy", zh: "政策" },
-  market: { en: "market", zh: "市场" },
-};
 
 export default async function SourcesPage({
   params,
@@ -86,10 +63,10 @@ export default async function SourcesPage({
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
-          {GROUP_ORDER.map((g) => {
+          {SOURCE_GROUPS.map((g) => {
             const itemsInGroup = byGroup.get(g);
             if (!itemsInGroup || itemsInGroup.length === 0) return null;
-            const label = GROUP_LABELS[g];
+            const label = SOURCE_GROUP_LABELS[g];
             return (
               <section key={g}>
                 <div

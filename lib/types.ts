@@ -1,22 +1,29 @@
-export type SourceKind =
-  | "rss"
-  | "atom"
-  | "api"
-  | "rsshub"
-  | "scrape"
-  | "x-api"
-  | "aihot-api";
-export type SourceGroup =
-  | "vendor-official"
-  | "media"
-  | "newsletter"
-  | "research"
-  | "social"
-  | "product"
-  | "podcast"
-  | "policy"
-  | "market";
-export type Cadence = "live" | "hourly" | "daily" | "weekly";
+export const SOURCE_KINDS = [
+  "rss",
+  "atom",
+  "api",
+  "rsshub",
+  "scrape",
+  "x-api",
+  "aihot-api",
+] as const;
+export type SourceKind = (typeof SOURCE_KINDS)[number];
+
+export const SOURCE_GROUPS = [
+  "vendor-official",
+  "media",
+  "newsletter",
+  "research",
+  "social",
+  "product",
+  "podcast",
+  "policy",
+  "market",
+] as const;
+export type SourceGroup = (typeof SOURCE_GROUPS)[number];
+
+export const CADENCES = ["live", "hourly", "daily", "weekly"] as const;
+export type Cadence = (typeof CADENCES)[number];
 
 export type Source = {
   id: string;

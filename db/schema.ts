@@ -13,6 +13,7 @@ import {
   customType,
   numeric,
 } from "drizzle-orm/pg-core";
+import { CADENCES, SOURCE_GROUPS, SOURCE_KINDS } from "@/lib/types";
 import type {
   SourceKind as TSourceKind,
   SourceGroup as TSourceGroup,
@@ -75,36 +76,13 @@ export const halfvec = customType<{
 });
 
 // ── Enums ───────────────────────────────────────────────────────
-export const sourceKindEnum = pgEnum("source_kind", [
-  "rss",
-  "atom",
-  "api",
-  "rsshub",
-  "scrape",
-  "x-api",
-  "aihot-api",
-]);
+export const sourceKindEnum = pgEnum("source_kind", SOURCE_KINDS);
 
-export const sourceGroupEnum = pgEnum("source_group", [
-  "vendor-official",
-  "media",
-  "newsletter",
-  "research",
-  "social",
-  "product",
-  "podcast",
-  "policy",
-  "market",
-]);
+export const sourceGroupEnum = pgEnum("source_group", SOURCE_GROUPS);
 
 export const localeEnum = pgEnum("locale_kind", ["en", "zh", "multi"]);
 
-export const cadenceEnum = pgEnum("cadence", [
-  "live",
-  "hourly",
-  "daily",
-  "weekly",
-]);
+export const cadenceEnum = pgEnum("cadence", CADENCES);
 
 export const healthStatusEnum = pgEnum("health_status", [
   "ok",
