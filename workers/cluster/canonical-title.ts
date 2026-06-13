@@ -3,8 +3,9 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import { clusters, items, sources } from "@/db/schema";
 import { generateStructured, LLMError } from "@/lib/llm";
+import type { SourceGroup } from "@/lib/types";
 import { canonicalTitleSystem, canonicalTitleUserPrompt } from "./prompt";
-import { pickBestLead, type SourceGroup } from "./lead-pick";
+import { pickBestLead } from "./lead-pick";
 
 const MAX_TITLES_PER_RUN = 15;
 

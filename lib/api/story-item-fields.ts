@@ -1,4 +1,4 @@
-import type { Story } from "@/lib/types";
+import type { SourceGroup, SourceKind, Story } from "@/lib/types";
 
 export type PublicHkr = { h: boolean; k: boolean; r: boolean };
 
@@ -8,8 +8,8 @@ export type ApiItemCommonFields<Hkr> = {
   summary: string;
   publisher: string;
   source_id: string;
-  source_group: string | null;
-  source_kind: string;
+  source_group: SourceGroup | null;
+  source_kind: SourceKind;
   tier: Story["tier"];
   importance: number;
   hkr: Hkr | null;

@@ -13,6 +13,18 @@ const sourcePresets = readFileSync(
   resolve(root, "app/[locale]/_source-presets.ts"),
   "utf8",
 );
+const storyItemFields = readFileSync(
+  resolve(root, "lib/api/story-item-fields.ts"),
+  "utf8",
+);
+const leadPick = readFileSync(
+  resolve(root, "workers/cluster/lead-pick.ts"),
+  "utf8",
+);
+const recomputeClusterLeads = readFileSync(
+  resolve(root, "scripts/migrations/recompute-cluster-leads.ts"),
+  "utf8",
+);
 const homePage = readFileSync(resolve(root, "app/[locale]/page.tsx"), "utf8");
 const allPage = readFileSync(
   resolve(root, "app/[locale]/all/page.tsx"),
@@ -78,5 +90,25 @@ describe("feed tier/view source wiring", () => {
     expect(enrichPrompt).toContain("z.enum(ITEM_TIERS)");
     expect(itemCommentary).toContain("VISIBLE_ITEM_TIERS");
     expect(eventCommentary).toContain("VISIBLE_ITEM_TIERS");
+  });
+
+  test("public item and lead-pick source contracts use shared source types", () => {
+    expect(storyItemFields).toContain("SourceGroup");
+    expect(storyItemFields).toContain("SourceKind");
+    expect(storyItemFields).toContain("source_group: SourceGroup | null");
+    expect(storyItemFields).toContain("source_kind: SourceKind");
+    expect(storyItemFields).not.toContain("source_group: string | null");
+    expect(storyItemFields).not.toContain("source_kind: string");
+
+    expect(leadPick).toContain('import type { SourceGroup } from "@/lib/types"');
+    expect(leadPick).not.toContain("sourceGroupEnum");
+    expect(leadPick).toContain("satisfies Record<SourceGroup, number>");
+
+    expect(recomputeClusterLeads).toContain(
+      'import type { SourceGroup } from "@/lib/types"',
+    );
+    expect(recomputeClusterLeads).not.toContain(
+      'type SourceGroup } from "@/workers/cluster/lead-pick"',
+    );
   });
 });

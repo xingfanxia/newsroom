@@ -47,6 +47,10 @@ Shipped cleanup:
   item/event commentary workers, score prompt parsing, and source filtering
   cannot drift on `featured|p1|all|excluded`, `today|archive`,
   `source_group`, or `source_kind`.
+- Shared public/agent API item source-field types and cluster lead-pick source
+  authority types through `SourceGroup` / `SourceKind` from `lib/types.ts`;
+  the archived s9 MCP plan is now labeled historical so old enum examples
+  are not mistaken for current implementation guidance.
 - Shared `/skill.md` and `/openapi.yaml` public contract enums through the same
   `lib/types.ts` runtime tuples, including app/source locales, source
   group/kind/cadence, item tiers, and feed views; the source catalog

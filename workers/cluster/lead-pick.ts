@@ -12,7 +12,7 @@
  * cluster's lead reflects its strongest factual member — used by Stage C
  * and (optionally) by the post-merge re-arbitration loop.
  *
- * Authority ladder (matches sourceGroupEnum in db/schema.ts):
+ * Authority ladder (matches SOURCE_GROUPS in lib/types.ts):
  *
  *   group              | base | rationale
  *   ───────────────────┼──────┼─────────────────────────────────────────────
@@ -39,11 +39,9 @@
  * is corroboration).
  */
 
-import type { sourceGroupEnum } from "@/db/schema";
+import type { SourceGroup } from "@/lib/types";
 
-export type SourceGroup = (typeof sourceGroupEnum)["enumValues"][number];
-
-const GROUP_AUTHORITY: Record<SourceGroup, number> = {
+const GROUP_AUTHORITY = {
   "vendor-official": 100,
   media: 80,
   research: 80,
@@ -53,7 +51,7 @@ const GROUP_AUTHORITY: Record<SourceGroup, number> = {
   podcast: 40,
   product: 40,
   social: 20,
-};
+} satisfies Record<SourceGroup, number>;
 
 /** Priority offset: each integer step from the default (2) shifts score by 20. */
 const PRIORITY_DEFAULT = 2;

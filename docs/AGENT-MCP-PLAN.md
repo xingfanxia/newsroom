@@ -1,12 +1,11 @@
 # AX Radar — Agent / MCP Integration Plan (s9 design)
 
-> **Status (2026-05-13)**: bearer-gated tracks (`/api/v1/*` + `/api/mcp`)
-> described here are **shipped and stable**. A third track —
-> **anonymous public mirror** `/api/public/*` + hosted `/skill.md` +
-> `/openapi.yaml` — shipped 2026-05-13 (PR #36) to lower the integration
-> floor to zero auth. See [`agent-access/README.md`](./agent-access/README.md)
-> for the shipped public surface; this doc remains the canonical design
-> record for the bearer track.
+> **Historical archive (2026-06-12)**: this file is the original s9 bearer
+> API/MCP design record, not current implementation guidance. Current
+> agent/API/MCP behavior lives in [`agent-access/README.md`](./agent-access/README.md).
+> Runtime contract enums, including `source_group` and `source_kind`, are
+> generated from [`../lib/types.ts`](../lib/types.ts); enum examples below may
+> preserve historical values for design context.
 
 Drafted end of session 8 (2026-04-20). The ask: expose AX Radar's feed,
 saved collections, commentary, and source health to agents so Claude (and

@@ -30,6 +30,7 @@ implementation instructions:
 | [`daily-column/PLAN.md`](./daily-column/PLAN.md) | Completed implementation plan. Do not execute its checklist or recreate retired `/papers`/`papers.xml` surfaces. |
 | [`daily-column/HANDOFF-2026-04-25.md`](./daily-column/HANDOFF-2026-04-25.md) | Historical voice/page iteration notes. Current voice has since been rebased; see [`HANDOFF.md`](./HANDOFF.md) and the runtime prompt. |
 | [`aggregation/HANDOFF*.md`](./aggregation/) | Historical clustering sessions. Useful for rationale, not as current runbook unless [`architecture/ingestion.md`](./architecture/ingestion.md) points to it. |
+| [`AGENT-MCP-PLAN.md`](./AGENT-MCP-PLAN.md) | Historical s9 bearer API/MCP design record. Current agent/API/MCP behavior lives in [`agent-access/README.md`](./agent-access/README.md), with runtime contract enums generated from [`../lib/types.ts`](../lib/types.ts). |
 | [`SESSION8-PUNCHLIST.md`](./SESSION8-PUNCHLIST.md) | Old punchlist snapshot; use current code, tests, and [`HANDOFF.md`](./HANDOFF.md) instead. |
 
 ## Maintenance Rule

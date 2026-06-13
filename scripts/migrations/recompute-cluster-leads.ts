@@ -23,7 +23,8 @@
 import { eq, sql } from "drizzle-orm";
 import { db, closeDb } from "@/db/client";
 import { clusters } from "@/db/schema";
-import { pickBestLead, type SourceGroup } from "@/workers/cluster/lead-pick";
+import type { SourceGroup } from "@/lib/types";
+import { pickBestLead } from "@/workers/cluster/lead-pick";
 
 type CliFlags = { apply: boolean; retitleBad: boolean };
 

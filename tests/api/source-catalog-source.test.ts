@@ -35,6 +35,11 @@ const sourcesPage = readFileSync(
   "utf8",
 );
 const readme = readFileSync(resolve(root, "README.md"), "utf8");
+const docsReadme = readFileSync(resolve(root, "docs/README.md"), "utf8");
+const agentMcpPlan = readFileSync(
+  resolve(root, "docs/AGENT-MCP-PLAN.md"),
+  "utf8",
+);
 const architectureDoc = readFileSync(
   resolve(root, "docs/architecture/ingestion.md"),
   "utf8",
@@ -173,5 +178,12 @@ describe("source catalog source wiring", () => {
     ]) {
       expect(currentCopy).not.toContain(staleCount);
     }
+  });
+
+  test("historical agent MCP plan is clearly archived", () => {
+    expect(docsReadme).toContain("[`AGENT-MCP-PLAN.md`](./AGENT-MCP-PLAN.md)");
+    expect(agentMcpPlan.slice(0, 700)).toContain("Historical archive");
+    expect(agentMcpPlan.slice(0, 700)).toContain("agent-access/README.md");
+    expect(agentMcpPlan.slice(0, 700)).toContain("lib/types.ts");
   });
 });
