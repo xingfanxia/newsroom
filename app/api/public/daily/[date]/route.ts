@@ -5,6 +5,7 @@
  * the requested UTC date. 404 if no column for that date.
  */
 import { publicRateLimit } from "@/lib/rate-limit/public";
+import { publicRateLimitConfig } from "@/lib/rate-limit/public-config";
 import {
   computeEtag,
   ifNoneMatch,
@@ -27,11 +28,7 @@ export async function GET(
   req: Request,
   ctx: { params: Promise<{ date: string }> },
 ) {
-  const limited = publicRateLimit(req, {
-    family: "public-daily",
-    windowMs: 60_000,
-    max: 300,
-  });
+  const limited = publicRateLimit(req, publicRateLimitConfig("dailyByDate"));
   if (limited) return limited;
 
   const { date: rawDate } = await ctx.params;

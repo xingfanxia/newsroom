@@ -8,6 +8,7 @@
  * Same item shape and field stripping as /api/public/feed.
  */
 import { publicRateLimit } from "@/lib/rate-limit/public";
+import { publicRateLimitConfig } from "@/lib/rate-limit/public-config";
 import {
   computeEtag,
   etagSignal,
@@ -27,11 +28,7 @@ export const runtime = "nodejs";
 
 export async function GET(req: Request) {
   // Semantic search has measurable LLM cost — tighter limit than feed.
-  const limited = publicRateLimit(req, {
-    family: "public-search",
-    windowMs: 60_000,
-    max: 120,
-  });
+  const limited = publicRateLimit(req, publicRateLimitConfig("search"));
   if (limited) return limited;
 
   const url = new URL(req.url);

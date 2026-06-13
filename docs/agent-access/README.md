@@ -44,7 +44,7 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 
 ## Shared infrastructure
 
-- **`lib/rate-limit/public.ts`** — parameterized IP token-bucket. Each route picks `{ family, windowMs, max }`. Family-isolated so `/feed` polling doesn't burn `/search` budget.
+- **`lib/rate-limit/public-config.ts` + `lib/rate-limit/public.ts`** — one public endpoint rate-limit contract plus the parameterized IP token-bucket. Routes call `publicRateLimitConfig("<endpoint-key>")`; public docs, `/skill.md`, `/openapi.yaml`, and `/agents` copy render or verify the same contract. Family-isolated so `/feed` polling doesn't burn `/search` budget.
 - **`lib/api/public-helpers.ts`** — `computeEtag`, `ifNoneMatch`, `notModified`, `publicJson`, `publicError`, `publicHeaders`. Every route returns CORS + cache headers via these.
 - **`lib/api/feed-query-params.ts`** — shared feed/search query schemas and snake_case-to-`FeedQuery` mapping for public + bearer-gated surfaces; route files only choose auth/rate-limit and per-surface limit ceilings.
 - **`lib/types.ts`** — shared item tier, highlight-tier subset, feed view, search mode, app/source locale, source group/kind, source-health status, feedback vote, user role, iteration status, and cadence runtime tuples used by REST/MCP schemas, public/agent item source fields, cluster lead-pick authority typing, `/skill.md`, `/openapi.yaml`, sitemap generation, DB enums, fetcher support checks, score parsing, feedback routes, iteration routes, and commentary workers.
@@ -65,14 +65,15 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 ## Adding a new public endpoint
 
 1. Create `app/api/public/<name>/route.ts`
-2. Call `publicRateLimit(req, { family: "public-<name>", windowMs: 60_000, max: ... })` at the top
-3. Build a stable `etagSignal({ ... })` — anything that changes when content updates
-4. Use `publicJson(body, etag, { sMaxAge, staleWhileRevalidate })` for 200, `publicError(msg, code)` for 4xx/5xx
-5. Strip LLM internals before returning
-6. Update `/openapi.yaml` (in `app/openapi.yaml/route.ts`) with the new path
-7. Update `/skill.md` (in `app/skill.md/route.ts`) intent table if user-visible
-8. Update `/robots.ts` allow list if needed
-9. Add unit test under `tests/api/`
+2. Add its key, family, limit, and doc grouping in `lib/rate-limit/public-config.ts`
+3. Call `publicRateLimit(req, publicRateLimitConfig("<endpoint-key>"))` at the top
+4. Build a stable `etagSignal({ ... })` — anything that changes when content updates
+5. Use `publicJson(body, etag, { sMaxAge, staleWhileRevalidate })` for 200, `publicError(msg, code)` for 4xx/5xx
+6. Strip LLM internals before returning
+7. Update `/openapi.yaml` (in `app/openapi.yaml/route.ts`) with the new path
+8. Update `/skill.md` (in `app/skill.md/route.ts`) intent table if user-visible
+9. Update `/robots.ts` allow list if needed
+10. Add unit test under `tests/api/`
 
 ## Discovery files
 
@@ -83,6 +84,7 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 
 - `tests/api/public-helpers.test.ts` — ETag determinism, family isolation, headers, CORS
 - `tests/api/public-ratelimit.test.ts` — threshold, IP isolation, family isolation, IPv4/IPv6 header fallback
+- `tests/api/public-rate-limit-contract.test.ts` — public route handlers, `/skill.md`, `/openapi.yaml`, `/agents`, and docs stay wired to the shared public rate-limit contract
 - `tests/api/feed-query-params.test.ts` — shared feed/search parameter defaults, source filter validation, max-limit ceilings, tag parsing, and `FeedQuery` mapping
 - `tests/api/feed-tier-source.test.ts` — REST/MCP feed/search schemas, public/agent item source fields, cluster lead-pick typing, score parsing, and commentary workers stay wired to shared item-tier/feed-view/search-mode/source-filter tuples
 - `tests/api/runtime-contracts-source.test.ts` — app/source locales, fetcher-supported source kinds, feedback vote values, user roles, and iteration statuses stay wired to shared runtime tuples
@@ -114,6 +116,7 @@ Run these with `bun test tests/api/public-*.test.ts tests/api/feed-query-*.test.
 ## Operational notes
 
 - **Rate limiter is Vercel-instance-local** — buckets don't survive cold starts. Treated as "discourage hammering" not "airtight cap." Real abuse defense lives at the CDN/WAF layer.
+- **Public rate-limit configuration is centralized** — add or change endpoint budgets in `lib/rate-limit/public-config.ts` first, then wire routes with `publicRateLimitConfig("<endpoint-key>")`. `/skill.md`, `/openapi.yaml`, `/agents`, and this doc should never hand-copy a different limit table.
 - **Field stripping is centralized for feed/search and item-detail surfaces** — `toPublicApiItem` strips HKR reasons for feed/search, while `toPublicItemDetail` strips detail-only LLM internals (`reasoning`, `body_rss`, HKR reasons). If adding a new domain field, update the relevant serializer and OpenAPI schema together.
 - **Feed/search query parsing is centralized** — `/api/public/feed`, `/api/public/search`, `/api/v1/feed`, and `/api/v1/search` share `lib/api/feed-query-params.ts`; only public/v1 max limits differ. Feed-facing tier values come from `VISIBLE_ITEM_TIERS`, highlight/deep-dive tier checks come from `HIGHLIGHT_ITEM_TIERS` / `isHighlightItemTier`, `today|archive` comes from `FEED_VIEWS`, `lexical|semantic` comes from `SEARCH_MODES`, and `source_group` / `source_kind` come from `SOURCE_GROUPS` / `SOURCE_KINDS`, all in `lib/types.ts`; MCP, `/skill.md`, and `/openapi.yaml` render or validate those same runtime tuples instead of repeating enum lists.
 - **Feed execution is centralized for REST + MCP** — `/api/public/feed`, `/api/v1/feed`, and MCP `ax_radar_feed` all call `runFeedQuery`; adapters keep only auth/rate-limit/ETag and item serialization while the helper keeps item rows and `total` counts paired.

@@ -9,19 +9,12 @@
  * Keyed on `ip + ':' + family` so a hot /feed poller doesn't burn the budget
  * for /daily on the same IP.
  */
-export type RateLimitConfig = {
-  /** Distinguishes endpoint families so they each get their own bucket. */
-  family: string;
-  windowMs: number;
-  max: number;
-};
+import {
+  PUBLIC_RATE_LIMIT_DEFAULT,
+  type RateLimitConfig,
+} from "@/lib/rate-limit/public-config";
 
-/** Sensible default — matches AI HOT's 600r/min/IP. */
-const PUBLIC_RL_DEFAULT: RateLimitConfig = {
-  family: "public-default",
-  windowMs: 60_000,
-  max: 600,
-};
+export type { RateLimitConfig } from "@/lib/rate-limit/public-config";
 
 const buckets = new Map<string, { count: number; resetAt: number }>();
 
@@ -35,7 +28,7 @@ function clientIp(req: Request): string {
 
 export function publicRateLimit(
   req: Request,
-  cfg: RateLimitConfig = PUBLIC_RL_DEFAULT,
+  cfg: RateLimitConfig = PUBLIC_RATE_LIMIT_DEFAULT,
 ): Response | null {
   const key = `${clientIp(req)}:${cfg.family}`;
   const now = Date.now();

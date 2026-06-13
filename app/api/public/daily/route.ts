@@ -9,6 +9,7 @@
  * locale=zh default. Only zh is generated today.
  */
 import { publicRateLimit } from "@/lib/rate-limit/public";
+import { publicRateLimitConfig } from "@/lib/rate-limit/public-config";
 import {
   computeEtag,
   ifNoneMatch,
@@ -27,11 +28,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
-  const limited = publicRateLimit(req, {
-    family: "public-daily",
-    windowMs: 60_000,
-    max: 300,
-  });
+  const limited = publicRateLimit(req, publicRateLimitConfig("daily"));
   if (limited) return limited;
 
   const url = new URL(req.url);

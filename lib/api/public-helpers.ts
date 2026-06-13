@@ -3,7 +3,7 @@
  * read-only JSON surfaces.
  *
  * Three things every public route should call:
- *   1. publicRateLimit(req)  — IP token bucket
+ *   1. publicRateLimit(req, publicRateLimitConfig("<endpoint-key>")) — IP token bucket
  *   2. computeEtag(family, signal) + ifNoneMatch(req, etag) → notModified()
  *   3. publicJson(body, etag) or publicError(...)
  *

@@ -14,6 +14,7 @@ import {
 } from "@/lib/api/event-members";
 import { getEventMembers } from "@/lib/items/live";
 import { publicRateLimit } from "@/lib/rate-limit/public";
+import { publicRateLimitConfig } from "@/lib/rate-limit/public-config";
 import {
   computeEtag,
   etagSignal,
@@ -30,11 +31,7 @@ export async function GET(
   req: Request,
   ctx: { params: Promise<{ id: string }> },
 ) {
-  const limited = publicRateLimit(req, {
-    family: "public-events",
-    windowMs: 60_000,
-    max: 600,
-  });
+  const limited = publicRateLimit(req, publicRateLimitConfig("eventMembers"));
   if (limited) return limited;
 
   const { id: idRaw } = await ctx.params;

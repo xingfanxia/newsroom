@@ -3,7 +3,7 @@
  *
  * Same shape as /api/v1/feed but:
  *   - no Bearer required
- *   - IP rate limit (600r/min/IP)
+ *   - IP rate limit
  *   - weak ETag + If-None-Match → 304 for cron pollers
  *   - CORS-open so browsers + agents can hit directly
  *   - strips LLM internal fields (reasoning, hkr.reasonsZh/En) — keeps everything
@@ -14,6 +14,7 @@
  *   curated_only / include_source_tags / exclude_source_tags / limit / offset / locale
  */
 import { publicRateLimit } from "@/lib/rate-limit/public";
+import { publicRateLimitConfig } from "@/lib/rate-limit/public-config";
 import {
   computeEtag,
   etagSignal,
@@ -33,11 +34,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
-  const limited = publicRateLimit(req, {
-    family: "public-feed",
-    windowMs: 60_000,
-    max: 600,
-  });
+  const limited = publicRateLimit(req, publicRateLimitConfig("feed"));
   if (limited) return limited;
 
   const url = new URL(req.url);

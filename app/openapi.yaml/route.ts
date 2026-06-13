@@ -17,6 +17,7 @@ import {
   SOURCE_LOCALES,
   VISIBLE_ITEM_TIERS,
 } from "@/lib/types";
+import { publicRateLimitPerIpLabel } from "@/lib/rate-limit/public-config";
 
 function yamlInlineEnum(values: readonly (string | null)[]): string {
   return `[${values.map((value) => (value === null ? "null" : value)).join(", ")}]`;
@@ -33,6 +34,7 @@ const SOURCE_HEALTH_STATUS_ENUM = yamlInlineEnum(SOURCE_HEALTH_STATUSES);
 const SOURCE_KIND_ENUM = yamlInlineEnum(SOURCE_KINDS);
 const SOURCE_LOCALE_ENUM = yamlInlineEnum(SOURCE_LOCALES);
 const VISIBLE_ITEM_TIER_ENUM = yamlInlineEnum(VISIBLE_ITEM_TIERS);
+const SEARCH_RATE_LIMIT_PER_IP = publicRateLimitPerIpLabel("search");
 
 const OPENAPI_YAML = `openapi: 3.1.0
 info:
@@ -144,7 +146,7 @@ paths:
         \`mode=lexical\` (default) does ILIKE substring against title/summary;
         \`mode=semantic\` embeds q via Azure text-embedding-3-large and ranks by
         pgvector cosine distance. Semantic mode is rate-limited tighter
-        (120/min/IP) due to LLM cost.
+        (${SEARCH_RATE_LIMIT_PER_IP}) due to LLM cost.
       parameters:
         - { name: q, in: query, required: true, schema: { type: string, minLength: 1 } }
         - { name: mode, in: query, schema: { type: string, enum: ${SEARCH_MODE_ENUM}, default: lexical } }

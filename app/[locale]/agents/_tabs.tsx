@@ -2,6 +2,10 @@
 import { useState, type ReactNode } from "react";
 import { useTweaks } from "@/hooks/use-tweaks";
 import { toast } from "sonner";
+import {
+  PUBLIC_RATE_LIMIT_DOC_GROUPS,
+  publicRateLimitReqLabel,
+} from "@/lib/rate-limit/public-config";
 
 type Tab = "skill" | "rss" | "api";
 type Lang = "en" | "zh";
@@ -646,20 +650,12 @@ curl -H 'If-None-Match: W/"public-feed-xxxxxxxxxxxxxxxx"' \\
         head={
           lang === "zh" ? ["端点家族", "限制"] : ["Endpoint family", "Limit"]
         }
-        rows={[
-          [
-            "/feed, /items/{id}, /events/{id}/members",
-            "600 req/min",
+        rows={PUBLIC_RATE_LIMIT_DOC_GROUPS.map(
+          (group): [string, string] => [
+            group.uiEndpoints.join(", "),
+            publicRateLimitReqLabel(group.keys[0]),
           ],
-          [
-            "/search (LLM cost)",
-            "120 req/min",
-          ],
-          [
-            "/daily{,/[date]}, /dailies, /sources",
-            "300 req/min",
-          ],
-        ]}
+        )}
       />
 
       <Subhead lang={lang} en="gotchas" zh="易错点" />

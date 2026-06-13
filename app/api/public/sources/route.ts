@@ -6,6 +6,7 @@
  * "does AX Radar cover X publisher?" before issuing a filtered feed query.
  */
 import { publicRateLimit } from "@/lib/rate-limit/public";
+import { publicRateLimitConfig } from "@/lib/rate-limit/public-config";
 import {
   computeEtag,
   etagSignal,
@@ -23,11 +24,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
-  const limited = publicRateLimit(req, {
-    family: "public-sources",
-    windowMs: 60_000,
-    max: 300,
-  });
+  const limited = publicRateLimit(req, publicRateLimitConfig("sources"));
   if (limited) return limited;
 
   try {

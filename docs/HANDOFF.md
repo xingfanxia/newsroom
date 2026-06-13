@@ -82,6 +82,11 @@ Shipped cleanup:
   group/kind/cadence, source-health statuses, item tiers, feed views, and search modes; the source catalog
   description no longer embeds a stale monitored-source count, and MCP
   source-tool copy avoids fixed counts for the same reason.
+- Shared public API rate-limit families and limits through
+  `lib/rate-limit/public-config.ts`; public route handlers now call
+  `publicRateLimitConfig("<endpoint-key>")`, while `/skill.md`,
+  `/openapi.yaml`, `/agents`, and `docs/agent-access/README.md` render or
+  verify the same limit labels instead of repeating endpoint budgets.
 - Shared hourly/daily/weekly fetch+normalize sequencing through `workers/fetcher/pipeline.ts`, with HTTP route wiring in `app/api/cron/_fetch-bucket-route.ts` and local cron scripts using the same helper.
 - Shared article body + YouTube transcript prefetch sequencing through
   `workers/fetcher/content-prefetch.ts`, so `/api/cron/article-body` and

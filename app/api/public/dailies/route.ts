@@ -8,6 +8,7 @@
  * take: 1..180, default 30. Strict 400 on out-of-range.
  */
 import { publicRateLimit } from "@/lib/rate-limit/public";
+import { publicRateLimitConfig } from "@/lib/rate-limit/public-config";
 import {
   computeEtag,
   ifNoneMatch,
@@ -26,11 +27,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
-  const limited = publicRateLimit(req, {
-    family: "public-dailies",
-    windowMs: 60_000,
-    max: 300,
-  });
+  const limited = publicRateLimit(req, publicRateLimitConfig("dailies"));
   if (limited) return limited;
 
   const url = new URL(req.url);

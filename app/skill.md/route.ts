@@ -20,6 +20,10 @@ import {
   SOURCE_KINDS,
   VISIBLE_ITEM_TIERS,
 } from "@/lib/types";
+import {
+  PUBLIC_RATE_LIMIT_DOC_GROUPS,
+  publicRateLimitLabel,
+} from "@/lib/rate-limit/public-config";
 
 function markdownCodeUnion(values: readonly string[]): string {
   return values.map((value) => `\`${value}\``).join(" | ");
@@ -38,6 +42,11 @@ const SOURCE_GROUP_RESPONSE_OPTIONS = compactUnion([...SOURCE_GROUPS, null]);
 const SOURCE_KIND_OPTIONS = markdownCodeUnion(SOURCE_KINDS);
 const SOURCE_KIND_RESPONSE_OPTIONS = compactUnion(SOURCE_KINDS);
 const VISIBLE_ITEM_TIER_OPTIONS = markdownCodeUnion(VISIBLE_ITEM_TIERS);
+const RATE_LIMIT_ROWS = PUBLIC_RATE_LIMIT_DOC_GROUPS.map(
+  (group) =>
+    `| ${group.skillEndpoints.join(" ")} | ${publicRateLimitLabel(group.keys[0])} |`,
+).join("\n");
+const SEARCH_RATE_LIMIT_LABEL = publicRateLimitLabel("search");
 
 const SKILL_MARKDOWN = `---
 name: ax-radar
@@ -112,9 +121,7 @@ Skill 根据用户提问关键词智能分流。默认走 **精选 + view=today*
 
 | 端点家族 / Family | 限制 / Limit |
 |---|---|
-| \`/api/public/feed\` \`/api/public/items/{id}\` \`/api/public/events/{id}/members\` | 600 r/min |
-| \`/api/public/search\` (有 LLM 成本 / has LLM cost) | 120 r/min |
-| \`/api/public/daily\` \`/api/public/dailies\` \`/api/public/sources\` | 300 r/min |
+${RATE_LIMIT_ROWS}
 
 超限返回 \`429\` + \`Retry-After\` (秒)。
 
@@ -192,7 +199,7 @@ curl -H 'If-None-Match: W/"public-feed-xxxxxxxxxxxxxxxx"' \\
 4. **拉日报别在 narrative_md 里搜关键词** — 那是长文,语义关键词用 \`/search?mode=semantic\`
 5. **publisher 是显示名,不是 id** — 过滤用 \`source_id\` (e.g. \`dwarkesh-yt\`),不是 \`?publisher=Dwarkesh\`
 6. **cluster_id 来自 feed 响应** — 不要瞎构造,只用 feed 给的值
-7. **\`mode=semantic\` 有 LLM 成本** — 限流更严 (120 r/min),不要无脑全切语义模式
+7. **\`mode=semantic\` 有 LLM 成本** — 限流更严 (${SEARCH_RATE_LIMIT_LABEL}),不要无脑全切语义模式
 
 ## 使用须知 / Caveats
 
