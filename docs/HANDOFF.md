@@ -137,6 +137,10 @@ Shipped cleanup:
   `lib/shell/system-cron.ts` / `lib/shell/system-stats.ts`; schedules still
   come from `vercel.json`, while jobs without a durable timestamp explicitly
   show `no signal`.
+- Shared relative-time display helpers through `lib/time/relative.ts`;
+  system cron rows, system source-health notes, daily index rows, and policy
+  summary labels now reuse the same date coercion / latest-date / compact-age
+  helpers instead of carrying local `ago` variants.
 - Shared bearer-gated `/api/v1/*` auth and plain JSON/error envelopes through
   `lib/api/v1-route.ts`; v1 route files now call `runV1Route` and return
   `v1Json` / `v1Error` / `v1InvalidQuery`, so token verification and response
@@ -182,7 +186,7 @@ Verification (2026-06-13):
 - `bun run code:dead:exports` — passed.
 - `bun run code:dead:types` — passed.
 - `bun run lint` — passed with no warnings.
-- `bun test --env-file=.env.local` — 736 pass, 1 skip, 0 fail.
+- `bun test --env-file=.env.local` — 743 pass, 1 skip, 0 fail.
 - `bun run build` — passed.
 - `git diff --check` — passed.
 

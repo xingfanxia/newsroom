@@ -73,6 +73,12 @@ describe("daily-column API source wiring", () => {
     expect(read("app/[locale]/daily/page.tsx")).toContain(
       "listDailyColumnRows",
     );
+    expect(read("app/[locale]/daily/page.tsx")).toContain(
+      "@/lib/time/relative",
+    );
+    expect(read("app/[locale]/daily/page.tsx")).not.toContain(
+      "function relativeAgo",
+    );
     expect(read("app/[locale]/daily/[date]/page.tsx")).toContain(
       "getDailyColumnRowByDate",
     );

@@ -8,7 +8,8 @@ const source = readFileSync(resolve(root, "lib/shell/system-stats.ts"), "utf8");
 describe("admin system stats source wiring", () => {
   it("derives cron schedules from vercel.json", () => {
     expect(source).toContain("@/lib/shell/system-cron");
-    expect(source).toContain("systemCronSnapshots({");
+    expect(source).toContain("systemCronSnapshots(");
+    expect(source).toContain("snapshotAt");
     expect(source).not.toContain("@/vercel.json");
     expect(source).not.toContain("VercelCronConfig");
     expect(source).not.toContain("cadenceMinutesFromCron");
@@ -18,9 +19,13 @@ describe("admin system stats source wiring", () => {
   });
 
   it("passes real DB activity signals into the cron table", () => {
+    expect(source).toContain("@/lib/time/relative");
     expect(source).toContain("latestFetchForCadences([\"live\", \"hourly\"])");
     expect(source).toContain("latestFetchForCadences([\"daily\"])");
     expect(source).toContain("latestFetchForCadences([\"weekly\"])");
+    expect(source).toContain("formatCompactRelativeTime");
+    expect(source).toContain("formatElapsedSince");
+    expect(source).toContain("latestDate");
     expect(source).toContain("lastNormalizedAt");
     expect(source).toContain("lastBodyFetchedAt");
     expect(source).toContain("lastEnrichedAt");
@@ -29,6 +34,8 @@ describe("admin system stats source wiring", () => {
     expect(source).toContain("lastDailyNewsletterAt");
     expect(source).toContain("lastMonthlyNewsletterAt");
     expect(source).toContain("\"score-backfill\": null");
+    expect(source).not.toContain("function ago");
+    expect(source).not.toContain("function uptimeFromFirstSuccess");
   });
 
   it("keeps item commentary queue aligned with the singleton-only worker", () => {

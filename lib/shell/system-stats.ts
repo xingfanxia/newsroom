@@ -28,6 +28,11 @@ import {
 import { EVENT_COMMENTARY_CRON_RECENCY_HOURS } from "@/lib/events/commentary-window";
 import { systemCronSnapshots, type SystemCron } from "@/lib/shell/system-cron";
 import { systemQueueSnapshot, type SystemQueue } from "@/lib/shell/system-queues";
+import {
+  formatCompactRelativeTime,
+  formatElapsedSince,
+  latestDate,
+} from "@/lib/time/relative";
 
 type SystemService = {
   id: string;
@@ -61,29 +66,8 @@ export type SystemSnapshot = {
   };
 };
 
-function ago(date: Date | null): string {
-  if (!date) return "never";
-  const ms = Date.now() - date.getTime();
-  const s = Math.round(ms / 1000);
-  if (s < 60) return `${s}s ago`;
-  const m = Math.round(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.round(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const d = Math.round(h / 24);
-  return `${d}d ago`;
-}
-
-function uptimeFromFirstSuccess(first: Date | null): string {
-  if (!first) return "—";
-  const ms = Date.now() - first.getTime();
-  const d = Math.floor(ms / (1000 * 60 * 60 * 24));
-  const h = Math.floor((ms % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-  if (d > 0) return `${d}d ${h}h`;
-  return `${h}h`;
-}
-
 export async function getSystemSnapshot(): Promise<SystemSnapshot> {
+  const snapshotAt = new Date();
   const client = db();
 
   // --- services from source_health + sources ---------------------
@@ -124,12 +108,12 @@ export async function getSystemSnapshot(): Promise<SystemSnapshot> {
         name: r.sourceId,
         status,
         version: r.kind,
-        uptime: uptimeFromFirstSuccess(lastOk),
+        uptime: formatElapsedSince(lastOk, { now: snapshotAt }),
         note:
           status === "error" || status === "degraded"
-            ? `${fails} consecutive ${fails === 1 ? "failure" : "failures"} · last ok ${ago(lastOk)}`
+            ? `${fails} consecutive ${fails === 1 ? "failure" : "failures"} · last ok ${formatCompactRelativeTime(lastOk, { now: snapshotAt, nullLabel: "never" })}`
             : lastFetch
-              ? `fetched ${ago(lastFetch)}`
+              ? `fetched ${formatCompactRelativeTime(lastFetch, { now: snapshotAt })}`
               : null,
       } satisfies SystemService;
     });
@@ -209,19 +193,22 @@ export async function getSystemSnapshot(): Promise<SystemSnapshot> {
         .filter((r) => cadences.includes(r.cadence))
         .map((r) => r.lastFetchedAt),
     );
-  const cron: SystemCron[] = systemCronSnapshots({
-    "fetch-hourly": latestFetchForCadences(["live", "hourly"]),
-    "fetch-daily": latestFetchForCadences(["daily"]),
-    "fetch-weekly": latestFetchForCadences(["weekly"]),
-    normalize: queueRow?.lastNormalizedAt ?? null,
-    "article-body": itemsRow?.lastBodyFetchedAt ?? null,
-    enrich: itemsRow?.lastEnrichedAt ?? null,
-    commentary: itemsRow?.lastItemCommentaryAt ?? null,
-    "score-backfill": null,
-    cluster: clustersRow?.lastClusterActivityAt ?? null,
-    "newsletter-daily": newsletterRow?.lastDailyNewsletterAt ?? null,
-    "newsletter-monthly": newsletterRow?.lastMonthlyNewsletterAt ?? null,
-  });
+  const cron: SystemCron[] = systemCronSnapshots(
+    {
+      "fetch-hourly": latestFetchForCadences(["live", "hourly"]),
+      "fetch-daily": latestFetchForCadences(["daily"]),
+      "fetch-weekly": latestFetchForCadences(["weekly"]),
+      normalize: queueRow?.lastNormalizedAt ?? null,
+      "article-body": itemsRow?.lastBodyFetchedAt ?? null,
+      enrich: itemsRow?.lastEnrichedAt ?? null,
+      commentary: itemsRow?.lastItemCommentaryAt ?? null,
+      "score-backfill": null,
+      cluster: clustersRow?.lastClusterActivityAt ?? null,
+      "newsletter-daily": newsletterRow?.lastDailyNewsletterAt ?? null,
+      "newsletter-monthly": newsletterRow?.lastMonthlyNewsletterAt ?? null,
+    },
+    snapshotAt,
+  );
 
   // --- errors from source_health.last_error -----------------------
   const errRows = await client
@@ -267,15 +254,4 @@ export async function getSystemSnapshot(): Promise<SystemSnapshot> {
   );
 
   return { services, queues, cron, errors, counts };
-}
-
-function latestDate(...dates: Array<Date | string | null | undefined>) {
-  let latest: Date | null = null;
-  for (const value of dates) {
-    if (!value) continue;
-    const date = value instanceof Date ? value : new Date(value);
-    if (!Number.isFinite(date.getTime())) continue;
-    if (!latest || date > latest) latest = date;
-  }
-  return latest;
 }

@@ -1,0 +1,85 @@
+export type DateLike = Date | string | null | undefined;
+
+type TimeOptions = {
+  now?: Date;
+  nullLabel?: string;
+};
+
+type CoarseTimeOptions = TimeOptions & {
+  currentLabel?: string;
+  hourSuffix?: string;
+  daySuffix?: string;
+  rounding?: "floor" | "round";
+};
+
+const SECOND_MS = 1_000;
+const MINUTE_MS = 60 * SECOND_MS;
+const HOUR_MS = 60 * MINUTE_MS;
+const DAY_MS = 24 * HOUR_MS;
+
+export function coerceDate(value: DateLike): Date | null {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isFinite(date.getTime()) ? date : null;
+}
+
+export function latestDate(...values: DateLike[]): Date | null {
+  let latest: Date | null = null;
+  for (const value of values) {
+    const date = coerceDate(value);
+    if (!date) continue;
+    if (!latest || date > latest) latest = date;
+  }
+  return latest;
+}
+
+export function formatCompactRelativeTime(
+  value: DateLike,
+  options: TimeOptions = {},
+): string {
+  const date = coerceDate(value);
+  if (!date) return options.nullLabel ?? "—";
+
+  const ms = elapsedMs(date, options.now);
+  const s = Math.round(ms / SECOND_MS);
+  if (s < 60) return `${s}s ago`;
+  const m = Math.round(ms / MINUTE_MS);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.round(ms / HOUR_MS);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.round(ms / DAY_MS);
+  return `${d}d ago`;
+}
+
+export function formatCoarseRelativeTime(
+  value: DateLike,
+  options: CoarseTimeOptions = {},
+): string {
+  const date = coerceDate(value);
+  if (!date) return options.nullLabel ?? "—";
+
+  const round = options.rounding === "round" ? Math.round : Math.floor;
+  const h = round(elapsedMs(date, options.now) / HOUR_MS);
+  if (h < 1) return options.currentLabel ?? "now";
+  if (h < 24) return `${h}${options.hourSuffix ?? "h"} ago`;
+  const d = round(h / 24);
+  return `${d}${options.daySuffix ?? "d"} ago`;
+}
+
+export function formatElapsedSince(
+  value: DateLike,
+  options: TimeOptions = {},
+): string {
+  const date = coerceDate(value);
+  if (!date) return options.nullLabel ?? "—";
+
+  const ms = elapsedMs(date, options.now);
+  const d = Math.floor(ms / DAY_MS);
+  const h = Math.floor((ms % DAY_MS) / HOUR_MS);
+  if (d > 0) return `${d}d ${h}h`;
+  return `${h}h`;
+}
+
+function elapsedMs(date: Date, now = new Date()): number {
+  return Math.max(0, now.getTime() - date.getTime());
+}

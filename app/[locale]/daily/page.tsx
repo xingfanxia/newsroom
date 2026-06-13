@@ -10,6 +10,7 @@ import {
   dailyColumnDateKey,
   listDailyColumnRows,
 } from "@/lib/api/daily-columns";
+import { formatCoarseRelativeTime } from "@/lib/time/relative";
 
 export const dynamic = "force-dynamic";
 
@@ -19,14 +20,6 @@ type Props = {
   params: Promise<{ locale: "zh" | "en" }>;
   searchParams: Promise<{ p?: string }>;
 };
-
-function relativeAgo(d: Date): string {
-  const diffH = Math.floor((Date.now() - d.getTime()) / 3_600_000);
-  const diffD = Math.floor(diffH / 24);
-  if (diffH < 1) return "now";
-  if (diffH < 24) return `${diffH}h ago`;
-  return `${diffD}d ago`;
-}
 
 function shortDate(d: Date): string {
   return `${String(d.getMonth() + 1).padStart(2, "0")}·${String(d.getDate()).padStart(2, "0")}`;
@@ -131,7 +124,9 @@ export default async function DailyLandingPage({
                   >
                     <div className="i-time">
                       <div className="hh">{shortDate(r.periodStart)}</div>
-                      <div className="ago">{relativeAgo(r.periodStart)}</div>
+                      <div className="ago">
+                        {formatCoarseRelativeTime(r.periodStart)}
+                      </div>
                     </div>
                     <div className="i-body">
                       <div className="i-meta">

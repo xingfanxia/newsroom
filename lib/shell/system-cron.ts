@@ -1,4 +1,5 @@
 import vercelConfig from "@/vercel.json";
+import { formatCompactRelativeTime } from "@/lib/time/relative";
 
 export type SystemCron = {
   name: string;
@@ -36,7 +37,10 @@ export function systemCronSnapshots(
       schedule: c.schedule,
       next: `~${cadenceLabel(minutes)} cadence`,
       last: hasActivitySignal
-        ? formatCronLastActivity(activityByName[name], now)
+        ? formatCompactRelativeTime(activityByName[name], {
+            now,
+            nullLabel: "no signal",
+          })
         : "—",
     };
   });
@@ -83,30 +87,6 @@ function cadenceLabel(minutes: number | null): string {
   if (!minutes) return "configured";
   if (minutes >= 60) return `${Math.round(minutes / 60)}h`;
   return `${minutes}m`;
-}
-
-function formatCronLastActivity(
-  value: Date | string | null | undefined,
-  now: Date,
-): string {
-  const date = coerceDate(value);
-  if (!date) return "no signal";
-
-  const ms = Math.max(0, now.getTime() - date.getTime());
-  const s = Math.round(ms / 1000);
-  if (s < 60) return `${s}s ago`;
-  const m = Math.round(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.round(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const d = Math.round(h / 24);
-  return `${d}d ago`;
-}
-
-function coerceDate(value: Date | string | null | undefined): Date | null {
-  if (!value) return null;
-  const date = value instanceof Date ? value : new Date(value);
-  return Number.isFinite(date.getTime()) ? date : null;
 }
 
 function evenlySpacedInterval(field: string, cycle: number): number | null {

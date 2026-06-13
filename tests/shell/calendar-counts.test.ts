@@ -60,6 +60,16 @@ describe("getDayCounts — filter contract with feed", () => {
   });
 });
 
+describe("dashboard stats display helpers", () => {
+  it("keeps policy summary relative-time formatting in the shared helper", () => {
+    expect(statsSrc).toContain("@/lib/time/relative");
+    expect(statsSrc).toContain("formatCoarseRelativeTime");
+    expect(statsSrc).not.toContain("const ageMs");
+    expect(statsSrc).not.toContain("const ageH");
+    expect(statsSrc).not.toContain("const ageD");
+  });
+});
+
 describe("page calendars pass the same filters as their feed", () => {
   const homeSrc = readFileSync(
     resolve(__dirname, "../../app/[locale]/page.tsx"),

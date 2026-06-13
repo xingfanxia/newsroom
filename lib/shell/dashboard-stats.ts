@@ -1,6 +1,7 @@
 import { and, eq, gte, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items, sources, policyVersions } from "@/db/schema";
+import { formatCoarseRelativeTime } from "@/lib/time/relative";
 import type { RadarStats } from "@/components/feed/radar-widget";
 import type { PulsePoint } from "@/components/shell/pulse-box";
 import type { TopicEntry } from "@/components/feed/right-rail";
@@ -201,11 +202,15 @@ export async function getPolicySummary(): Promise<{
   if (row.length === 0) {
     return { version: "v1", lastIterAt: null };
   }
-  const ageMs = Date.now() - row[0].committedAt.getTime();
-  const ageH = Math.round(ageMs / 3_600_000);
-  const ageD = Math.round(ageH / 24);
-  const ago = ageH < 1 ? "just now" : ageH < 24 ? `${ageH} hrs ago` : `${ageD} d ago`;
-  return { version: `v${row[0].version}`, lastIterAt: ago };
+  return {
+    version: `v${row[0].version}`,
+    lastIterAt: formatCoarseRelativeTime(row[0].committedAt, {
+      currentLabel: "just now",
+      hourSuffix: " hrs",
+      daySuffix: " d",
+      rounding: "round",
+    }),
+  };
 }
 
 // Avoid unused import warning — `and` / `isNotNull` kept for future composed filters.
