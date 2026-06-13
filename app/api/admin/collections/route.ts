@@ -1,6 +1,10 @@
-import { NextResponse } from "next/server";
 import { upsertAppUser } from "@/lib/auth/session";
-import { requireAdminForRoute } from "@/lib/api/admin-auth";
+import {
+  adminError,
+  adminJson,
+  adminOk,
+  runAdminRoute,
+} from "@/lib/api/admin-route";
 import { parseJsonRequestBody } from "@/lib/api/json-body";
 import {
   createCollection,
@@ -17,96 +21,72 @@ import {
 
 /** GET — list user's collections (used on the saved page + move dialog). */
 export async function GET() {
-  const auth = await requireAdminForRoute();
-  if (!auth.ok) return auth.response;
-  const user = auth.admin;
-
-  await upsertAppUser(user);
-  const collections = await listCollections(user.id);
-  return NextResponse.json({ ok: true, collections });
+  return runAdminRoute(async (user) => {
+    await upsertAppUser(user);
+    const collections = await listCollections(user.id);
+    return adminJson({ collections });
+  });
 }
 
 /** POST — create a new collection. */
 export async function POST(req: Request) {
-  const auth = await requireAdminForRoute();
-  if (!auth.ok) return auth.response;
-  const user = auth.admin;
+  return runAdminRoute(async (user) => {
+    await upsertAppUser(user);
 
-  await upsertAppUser(user);
-
-  const parsed = await parseJsonRequestBody(req, adminCollectionCreateBodySchema, {
-    envelope: "ok",
-  });
-  if (!parsed.ok) return parsed.response;
-
-  try {
-    const collection = await createCollection({
-      userId: user.id,
-      ...parsed.data,
+    const parsed = await parseJsonRequestBody(req, adminCollectionCreateBodySchema, {
+      envelope: "ok",
     });
-    return NextResponse.json({ ok: true, collection });
-  } catch (err) {
-    if (isDuplicateCollectionNameError(err)) {
-      return NextResponse.json(
-        { ok: false, error: "duplicate_name" },
-        { status: 409 },
-      );
+    if (!parsed.ok) return parsed.response;
+
+    try {
+      const collection = await createCollection({
+        userId: user.id,
+        ...parsed.data,
+      });
+      return adminJson({ collection });
+    } catch (err) {
+      if (isDuplicateCollectionNameError(err)) {
+        return adminError("duplicate_name", 409);
+      }
+      console.error("[api/admin/collections POST] failed", err);
+      return adminError("server_error", 500);
     }
-    console.error("[api/admin/collections POST] failed", err);
-    return NextResponse.json(
-      { ok: false, error: "server_error" },
-      { status: 500 },
-    );
-  }
+  });
 }
 
 /** PATCH — rename / pin / unpin. */
 export async function PATCH(req: Request) {
-  const auth = await requireAdminForRoute();
-  if (!auth.ok) return auth.response;
-  const user = auth.admin;
-
-  const parsed = await parseJsonRequestBody(req, adminCollectionUpdateBodySchema, {
-    envelope: "ok",
-  });
-  if (!parsed.ok) return parsed.response;
-
-  try {
-    const ok = await updateCollection({
-      userId: user.id,
-      ...parsed.data,
+  return runAdminRoute(async (user) => {
+    const parsed = await parseJsonRequestBody(req, adminCollectionUpdateBodySchema, {
+      envelope: "ok",
     });
-    if (!ok) {
-      return NextResponse.json(
-        { ok: false, error: "not_found" },
-        { status: 404 },
-      );
+    if (!parsed.ok) return parsed.response;
+
+    try {
+      const ok = await updateCollection({
+        userId: user.id,
+        ...parsed.data,
+      });
+      if (!ok) return adminError("not_found", 404);
+      return adminOk();
+    } catch (err) {
+      console.error("[api/admin/collections PATCH] failed", err);
+      return adminError("server_error", 500);
     }
-    return NextResponse.json({ ok: true });
-  } catch (err) {
-    console.error("[api/admin/collections PATCH] failed", err);
-    return NextResponse.json(
-      { ok: false, error: "server_error" },
-      { status: 500 },
-    );
-  }
+  });
 }
 
 /** DELETE — remove a collection. Saves get reparented to inbox (SET NULL). */
 export async function DELETE(req: Request) {
-  const auth = await requireAdminForRoute();
-  if (!auth.ok) return auth.response;
-  const user = auth.admin;
+  return runAdminRoute(async (user) => {
+    const parsed = await parseJsonRequestBody(req, collectionDeleteBodySchema, {
+      envelope: "ok",
+      includeIssues: false,
+    });
+    if (!parsed.ok) return parsed.response;
 
-  const parsed = await parseJsonRequestBody(req, collectionDeleteBodySchema, {
-    envelope: "ok",
-    includeIssues: false,
+    const ok = await deleteCollection(user.id, parsed.data.id);
+    if (!ok) return adminError("not_found", 404);
+    return adminOk();
   });
-  if (!parsed.ok) return parsed.response;
-
-  const ok = await deleteCollection(user.id, parsed.data.id);
-  if (!ok) {
-    return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
-  }
-  return NextResponse.json({ ok: true });
 }

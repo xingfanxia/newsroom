@@ -22,8 +22,11 @@ describe("admin iteration route source wiring", () => {
     for (const path of allIterationRoutePaths) {
       const source = read(path);
 
-      expect(source).toContain("@/lib/api/admin-auth");
-      expect(source).toContain("requireAdminForRoute");
+      expect(source).toContain("@/lib/api/admin-route");
+      expect(source).toContain("runAdminRoute");
+      expect(source).not.toContain("@/lib/api/admin-auth");
+      expect(source).not.toContain("requireAdminForRoute");
+      expect(source).not.toContain("NextResponse.json(");
       expect(source).not.toContain("UnauthorizedError");
       expect(source).not.toContain("ForbiddenError");
       expect(source).not.toContain("requireAdmin,");

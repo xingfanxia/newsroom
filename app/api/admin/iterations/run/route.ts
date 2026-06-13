@@ -1,5 +1,8 @@
-import { NextResponse } from "next/server";
-import { requireAdminForRoute } from "@/lib/api/admin-auth";
+import {
+  adminError,
+  adminJson,
+  runAdminRoute,
+} from "@/lib/api/admin-route";
 import {
   ITERATION_FAILED_STATUS,
   ITERATION_PROPOSED_STATUS,
@@ -26,49 +29,33 @@ export const maxDuration = 600;
  *   500 { error, detail }                          — agent call crashed; run row has status='failed'
  */
 export async function POST() {
-  const auth = await requireAdminForRoute();
-  if (!auth.ok) return auth.response;
-  const { admin } = auth;
-
-  try {
-    const result = await runIteration({ requestedBy: admin.email });
-    if (result.status === ITERATION_FAILED_STATUS) {
-      return NextResponse.json(
-        {
-          ok: false,
+  return runAdminRoute(async (admin) => {
+    try {
+      const result = await runIteration({ requestedBy: admin.email });
+      if (result.status === ITERATION_FAILED_STATUS) {
+        return adminError("agent_failed", 500, {
           runId: result.run.id,
           status: ITERATION_FAILED_STATUS,
-          error: "agent_failed",
           detail: result.error,
+        });
+      }
+      return adminJson(
+        {
+          runId: result.run.id,
+          status: ITERATION_PROPOSED_STATUS,
+          baseVersion: result.run.baseVersion,
+          proposal: result.proposal,
         },
-        { status: 500 },
+        { status: 202 },
       );
-    }
-    return NextResponse.json(
-      {
-        ok: true,
-        runId: result.run.id,
-        status: ITERATION_PROPOSED_STATUS,
-        baseVersion: result.run.baseVersion,
-        proposal: result.proposal,
-      },
-      { status: 202 },
-    );
-  } catch (err) {
-    if (err instanceof IterationGuardError) {
-      return NextResponse.json(
-        { ok: false, error: err.code, detail: err.message },
-        { status: 400 },
-      );
-    }
-    console.error("[api/admin/iterations/run] failed", err);
-    return NextResponse.json(
-      {
-        ok: false,
-        error: "server_error",
+    } catch (err) {
+      if (err instanceof IterationGuardError) {
+        return adminError(err.code, 400, { detail: err.message });
+      }
+      console.error("[api/admin/iterations/run] failed", err);
+      return adminError("server_error", 500, {
         detail: err instanceof Error ? err.message : String(err),
-      },
-      { status: 500 },
-    );
-  }
+      });
+    }
+  });
 }

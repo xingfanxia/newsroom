@@ -29,7 +29,9 @@ Shipped cleanup:
   `lib/shell/system-cron.ts`, so schedule parsing stays out of
   `getSystemSnapshot` and display cannot drift when a cron path changes.
 - Shared `/api/admin/iterations/[id]` route-id parsing through `lib/policy/iterations.ts` so fetch/apply/reject stay behaviorally aligned.
-- Shared admin auth JSON-error mapping for protected `/api/admin/*` data routes through `lib/api/admin-auth.ts`.
+- Shared protected-admin route auth and ok/error JSON envelopes through
+  `lib/api/admin-route.ts`, wrapping the lower-level
+  `lib/api/admin-auth.ts` auth/admin-required response mapping.
 - Shared cookie-session route auth and ok/error JSON envelopes for
   required-session user routes (`/api/feedback*`, `/api/tweaks`) through
   `lib/api/session-route.ts`, wrapping the lower-level

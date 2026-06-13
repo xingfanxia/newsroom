@@ -1,6 +1,9 @@
-import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAdminForRoute } from "@/lib/api/admin-auth";
+import {
+  adminError,
+  adminJson,
+  runAdminRoute,
+} from "@/lib/api/admin-route";
 import { parseJsonRequestBody } from "@/lib/api/json-body";
 import { commitSkillVersion } from "@/lib/policy/skill";
 
@@ -19,28 +22,23 @@ const bodySchema = z.object({
  * owned by the agent and carries proposal metadata. This one is direct.
  */
 export async function POST(req: Request) {
-  const auth = await requireAdminForRoute();
-  if (!auth.ok) return auth.response;
-  const user = auth.admin;
+  return runAdminRoute(async (user) => {
+    const parsed = await parseJsonRequestBody(req, bodySchema, { envelope: "ok" });
+    if (!parsed.ok) return parsed.response;
 
-  const parsed = await parseJsonRequestBody(req, bodySchema, { envelope: "ok" });
-  if (!parsed.ok) return parsed.response;
-
-  try {
-    const row = await commitSkillVersion({
-      skillName: parsed.data.skillName,
-      content: parsed.data.content,
-      reasoning: parsed.data.reasoning ?? null,
-      feedbackSample: null,
-      feedbackCount: 0,
-      committedBy: user.email,
-    });
-    return NextResponse.json({ ok: true, version: row.version });
-  } catch (err) {
-    console.error("[api/admin/policy/commit] failed", err);
-    return NextResponse.json(
-      { ok: false, error: "server_error" },
-      { status: 500 },
-    );
-  }
+    try {
+      const row = await commitSkillVersion({
+        skillName: parsed.data.skillName,
+        content: parsed.data.content,
+        reasoning: parsed.data.reasoning ?? null,
+        feedbackSample: null,
+        feedbackCount: 0,
+        committedBy: user.email,
+      });
+      return adminJson({ version: row.version });
+    } catch (err) {
+      console.error("[api/admin/policy/commit] failed", err);
+      return adminError("server_error", 500);
+    }
+  });
 }

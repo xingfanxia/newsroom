@@ -1,8 +1,11 @@
 import { and, eq } from "drizzle-orm";
-import { NextResponse } from "next/server";
 import { db } from "@/db/client";
 import { iterationRuns } from "@/db/schema";
-import { requireAdminForRoute } from "@/lib/api/admin-auth";
+import {
+  adminError,
+  adminJson,
+  runAdminRoute,
+} from "@/lib/api/admin-route";
 import { parseIterationRunRouteId } from "@/lib/policy/iterations";
 import { commitSkillVersion } from "@/lib/policy/skill";
 import {
@@ -30,67 +33,47 @@ export async function POST(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const auth = await requireAdminForRoute();
-  if (!auth.ok) return auth.response;
-  const { admin } = auth;
+  return runAdminRoute(async (admin) => {
+    const { id: rawId } = await params;
+    const parsedId = parseIterationRunRouteId(rawId);
+    if (!parsedId.ok) return adminError(parsedId.error, 400);
+    const { id } = parsedId;
 
-  const { id: rawId } = await params;
-  const parsedId = parseIterationRunRouteId(rawId);
-  if (!parsedId.ok) {
-    return NextResponse.json(
-      { ok: false, error: parsedId.error },
-      { status: 400 },
-    );
-  }
-  const { id } = parsedId;
+    const client = db();
+    const [run] = await client
+      .select()
+      .from(iterationRuns)
+      .where(eq(iterationRuns.id, id))
+      .limit(1);
+    if (!run) return adminError("not_found", 404);
+    if (run.status !== ITERATION_PROPOSED_STATUS || !run.proposedContent) {
+      return adminError("not_proposable", 400, { status: run.status });
+    }
 
-  const client = db();
-  const [run] = await client
-    .select()
-    .from(iterationRuns)
-    .where(eq(iterationRuns.id, id))
-    .limit(1);
-  if (!run) {
-    return NextResponse.json(
-      { ok: false, error: "not_found" },
-      { status: 404 },
-    );
-  }
-  if (run.status !== ITERATION_PROPOSED_STATUS || !run.proposedContent) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: "not_proposable",
-        status: run.status,
-      },
-      { status: 400 },
-    );
-  }
+    const committed = await commitSkillVersion({
+      skillName: run.skillName,
+      content: run.proposedContent,
+      reasoning: run.reasoningSummary,
+      feedbackSample: run.feedbackSample,
+      feedbackCount: run.feedbackCount,
+      committedBy: admin.email,
+    });
 
-  const committed = await commitSkillVersion({
-    skillName: run.skillName,
-    content: run.proposedContent,
-    reasoning: run.reasoningSummary,
-    feedbackSample: run.feedbackSample,
-    feedbackCount: run.feedbackCount,
-    committedBy: admin.email,
-  });
+    await client
+      .update(iterationRuns)
+      .set({ status: ITERATION_APPLIED_STATUS, completedAt: new Date() })
+      .where(
+        and(
+          eq(iterationRuns.id, id),
+          eq(iterationRuns.status, ITERATION_PROPOSED_STATUS),
+        ),
+      );
 
-  await client
-    .update(iterationRuns)
-    .set({ status: ITERATION_APPLIED_STATUS, completedAt: new Date() })
-    .where(
-      and(
-        eq(iterationRuns.id, id),
-        eq(iterationRuns.status, ITERATION_PROPOSED_STATUS),
-      ),
-    );
+    if (run.skillName === SKILL_NAME) invalidatePolicyCache();
 
-  if (run.skillName === SKILL_NAME) invalidatePolicyCache();
-
-  return NextResponse.json({
-    ok: true,
-    version: committed.version,
-    committedAt: committed.committedAt,
+    return adminJson({
+      version: committed.version,
+      committedAt: committed.committedAt,
+    });
   });
 }
