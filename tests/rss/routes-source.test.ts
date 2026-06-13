@@ -14,10 +14,11 @@ const newsletterFeedRoute = read(
 );
 const dailyFeedRoute = read("app/api/rss/[slug]/route.ts");
 const legacyFeeds = read("lib/rss/legacy-feeds.ts");
+const newsletterFeed = read("lib/rss/newsletter-feed.ts");
 
 describe("RSS route source contracts", () => {
   test("RSS routes share the envelope renderer", () => {
-    for (const route of [mainFeedRoute, newsletterFeedRoute]) {
+    for (const route of [mainFeedRoute]) {
       expect(route).toContain("@/lib/rss/render");
       expect(route).toContain("renderRssFeed");
       expect(route).toContain("rssResponse");
@@ -31,16 +32,24 @@ describe("RSS route source contracts", () => {
     expect(dailyFeedRoute).not.toContain("new NextResponse(xml");
     expect(dailyFeedRoute).not.toContain("new Response(xml");
     expect(dailyFeedRoute).not.toContain("application/rss+xml; charset=utf-8");
+
+    expect(newsletterFeedRoute).toContain("@/lib/rss/render");
+    expect(newsletterFeedRoute).toContain("rssResponse");
+    expect(newsletterFeedRoute).not.toContain("new NextResponse(xml");
+    expect(newsletterFeedRoute).not.toContain("new Response(xml");
+    expect(newsletterFeedRoute).not.toContain(
+      "application/rss+xml; charset=utf-8",
+    );
   });
 
   test("legacy RSS routes do not hand-roll XML escaping or markdown rendering", () => {
-    for (const route of [mainFeedRoute, newsletterFeedRoute]) {
-      expect(route).toContain("renderMarkdownishHtml");
-      expect(route).not.toContain("function buildRss");
-      expect(route).not.toContain("function mdToHtml");
-      expect(route).not.toContain("function escape(");
-      expect(route).not.toContain("content:encoded><![CDATA[");
-      expect(route).not.toContain("new Date().toUTCString()");
+    for (const source of [mainFeedRoute, newsletterFeed]) {
+      expect(source).toContain("renderMarkdownishHtml");
+      expect(source).not.toContain("function buildRss");
+      expect(source).not.toContain("function mdToHtml");
+      expect(source).not.toContain("function escape(");
+      expect(source).not.toContain("content:encoded><![CDATA[");
+      expect(source).not.toContain("new Date().toUTCString()");
     }
   });
 
@@ -68,5 +77,22 @@ describe("RSS route source contracts", () => {
     expect(legacyFeeds).toContain("listDailyColumnRows");
     expect(legacyFeeds).toContain("dailyColumnRssItem");
     expect(legacyFeeds).toContain("legacyLaneRssItem");
+  });
+
+  test("legacy newsletter RSS route delegates digest construction to a shared helper", () => {
+    expect(newsletterFeedRoute).toContain("@/lib/rss/newsletter-feed");
+    expect(newsletterFeedRoute).toContain("parseNewsletterRssLocale");
+    expect(newsletterFeedRoute).toContain("renderStructuredNewsletterRssFeed");
+    expect(newsletterFeedRoute).not.toContain("@/db/client");
+    expect(newsletterFeedRoute).not.toContain("@/db/schema");
+    expect(newsletterFeedRoute).not.toContain("from(newsletters)");
+    expect(newsletterFeedRoute).not.toContain("newsletters.headline");
+    expect(newsletterFeedRoute).not.toContain("BRAND");
+    expect(newsletterFeedRoute).not.toContain("DESCRIPTION");
+    expect(newsletterFeedRoute).not.toContain("formatRange");
+
+    expect(newsletterFeed).toContain("renderRssFeed");
+    expect(newsletterFeed).toContain("structuredNewsletterRssItem");
+    expect(newsletterFeed).toContain("headline} IS NOT NULL");
   });
 });
