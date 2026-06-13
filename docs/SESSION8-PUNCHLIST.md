@@ -1,5 +1,9 @@
 # Session 8 — issue punch list
 
+> Archived historical snapshot. Use `docs/README.md`, `docs/HANDOFF.md`, current
+> runtime code, and tests as implementation guidance. Checked items below may
+> have been resolved after this list was written.
+
 Written at the end of s7 (2026-04-19). User flagged "a lot of issues needs to be fixed" without specifying. This doc enumerates everything I suspect could be wrong, grouped by type + severity, so s8 can triage fast.
 
 **First thing s8 must do**: ask the user to list the specific issues they saw. Cross-reference against this doc. Anything matching → go straight to fix. Anything unmatched → add to this doc.
@@ -37,7 +41,7 @@ Written at the end of s7 (2026-04-19). User flagged "a lot of issues needs to be
 - [ ] **Watchlist: case-insensitive dedup missing** — adding `"GPT-6"` after `"gpt-6"` creates two entries. Normalize to lowercase before compare.
 - [ ] **X Monitor filter by handle uses `s.source.publisher` string match** — fragile. If two handles share a nameEn/nameZh string the filter leaks. Requires adding `sourceId` to `FeedQuery` (see Gotcha 11 in HANDOFF).
 - [ ] **Podcasts filter by source uses the same publisher match** — same bug class.
-- [ ] **Export MD omits `editor_analysis` long-form** — only includes `editor_note`. Intentional or oversight? Users who curate a collection for newsletter probably want the long form.
+- [x] **Export MD omits `editor_analysis` long-form** — resolved; saved export now includes `editor_analysis` when distinct from `editor_note`, and rendering lives in `lib/api/saved-export.ts`.
 - [ ] **CollectionSidebar "more" context menu** — positioned `right: 6; top: 100%` absolute. On the last row near the bottom of a short viewport, it renders below the fold / off-screen.
 - [ ] **Feedback move** endpoint returns 404 if the save doesn't exist. But the UI doesn't disambiguate "you don't own this save" vs "it's already been removed". Probably fine, document.
 - [ ] **Delete collection cascade** — saves get reparented to inbox (SET NULL). The UI optimistically routes to inbox via `go("inbox")` — but `router.refresh()` fetches the new inbox count, which might race with the DELETE. Verify the revalidation order.
@@ -63,7 +67,7 @@ Written at the end of s7 (2026-04-19). User flagged "a lot of issues needs to be
 - [ ] No integration tests for `/api/admin/collections` CRUD (create/patch/delete/list)
 - [ ] No test for `/api/feedback/move` reparent behaviour
 - [ ] No test for `/api/admin/policy/commit` writes correct `version+1`
-- [ ] No test for `/api/saved/export` markdown shape
+- [x] No test for `/api/saved/export` markdown shape — covered by `tests/api/saved-export.test.ts`.
 - [ ] No test for `/api/tweaks` GET+PATCH round-trip
 - [ ] `getFeaturedStories` per-source-filter workaround (client-side `s.source.publisher` match) has zero test coverage
 - [ ] `useTweaks` TweaksProvider not tested for context propagation

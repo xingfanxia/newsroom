@@ -67,6 +67,11 @@ Shipped cleanup:
   `/api/v1/saved` and MCP `ax_radar_save` now reuse the same save toggle,
   owner-aware collection assignment, assigned-collection response payload,
   and missing-item FK-to-`item_not_found` mapping.
+- Shared browser saved-export parsing/rendering through
+  `lib/api/saved-export.ts`; `/api/saved/export` now keeps only optional
+  cookie-session fallback semantics while the helper owns collection/locale
+  parsing, saved item and collection lookup, Markdown shape, deterministic
+  filenames, and attachment headers.
 - Shared cookie/v1 tweaks persistence through `lib/api/tweak-routes.ts`, so
   user upsert, preferences/watchlist loading, DB patch construction, and
   `empty_body` decisions stay aligned while each route keeps its own auth and
