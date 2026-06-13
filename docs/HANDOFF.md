@@ -16,6 +16,10 @@ Shipped cleanup:
 - Replaced stale `tsx` operator-script hints with `bun`.
 - Updated README / `.env.example` / architecture docs so Tavily is not advertised as wired, cron docs match the current split route set, and cluster docs match the 0.75 / 72h runtime.
 - Aligned `/admin/system` queue telemetry with worker predicates: item commentary now counts only singleton/unclustered item candidates, event commentary is shown as its own queue, and the cron table derives schedules from `vercel.json`.
+- Centralized `/admin/system` queue display metadata in
+  `lib/shell/system-queues.ts`; queue names, order, throughput labels, and
+  default latency/drift fields now have one tested source instead of inline
+  objects inside `getSystemSnapshot`.
 - Capped scheduled event-level commentary to active 24h events via
   `EVENT_COMMENTARY_CRON_RECENCY_HOURS`; historical event-commentary backlog
   remains visible to operator scripts/backfills but no longer spends every

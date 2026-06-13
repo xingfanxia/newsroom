@@ -19,6 +19,7 @@ import { and, eq, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clusters, items, rawItems, sources, sourceHealth } from "@/db/schema";
 import { EVENT_COMMENTARY_CRON_RECENCY_HOURS } from "@/lib/events/commentary-window";
+import { systemQueueSnapshot, type SystemQueue } from "@/lib/shell/system-queues";
 import vercelConfig from "@/vercel.json";
 
 type SystemService = {
@@ -30,14 +31,6 @@ type SystemService = {
   ram?: string;
   cpu?: string;
   note?: string | null;
-};
-
-type SystemQueue = {
-  name: string;
-  depth: number;
-  rate: string; // events/min estimate
-  p95Ms: number | null;
-  driftS: number;
 };
 
 type SystemError = {
@@ -258,41 +251,14 @@ export async function getSystemSnapshot(): Promise<SystemSnapshot> {
     .from(clusters);
 
   const queues: SystemQueue[] = [
-    {
-      name: "normalize",
-      depth: queueRow?.rawPending ?? 0,
-      rate: "≈ 280/hr",
-      p95Ms: null,
-      driftS: 0,
-    },
-    {
-      name: "enrich",
-      depth: itemsRow?.unenriched ?? 0,
-      rate: "≈ 60/15m",
-      p95Ms: null,
-      driftS: 0,
-    },
-    {
-      name: "commentary",
-      depth: itemsRow?.itemCommentaryPending ?? 0,
-      rate: "≈ 200/30m",
-      p95Ms: null,
-      driftS: 0,
-    },
-    {
-      name: "event-commentary",
-      depth: clustersRow?.eventCommentaryPending ?? 0,
-      rate: "≈ 8/30m",
-      p95Ms: null,
-      driftS: 0,
-    },
-    {
-      name: "score",
-      depth: itemsRow?.unscored ?? 0,
-      rate: "≈ 120/15m",
-      p95Ms: null,
-      driftS: 0,
-    },
+    systemQueueSnapshot("normalize", queueRow?.rawPending ?? 0),
+    systemQueueSnapshot("enrich", itemsRow?.unenriched ?? 0),
+    systemQueueSnapshot("commentary", itemsRow?.itemCommentaryPending ?? 0),
+    systemQueueSnapshot(
+      "event-commentary",
+      clustersRow?.eventCommentaryPending ?? 0,
+    ),
+    systemQueueSnapshot("score", itemsRow?.unscored ?? 0),
   ];
 
   // --- cron from vercel.json --------------------------------------
