@@ -108,6 +108,10 @@ Shipped cleanup:
   `/api/rss/*`, the featured-locale feeds, and the legacy newsletter feeds now
   use the same renderer/response helper while keeping feed-specific metadata
   such as radar extension fields.
+- Shared bearer-gated `/api/v1/*` auth and plain JSON/error envelopes through
+  `lib/api/v1-route.ts`; v1 route files now call `runV1Route` and return
+  `v1Json` / `v1Error` / `v1InvalidQuery`, so token verification and response
+  shape cannot drift between agent endpoints.
 - Shared hourly/daily/weekly fetch+normalize sequencing through `workers/fetcher/pipeline.ts`, with HTTP route wiring in `app/api/cron/_fetch-bucket-route.ts` and local cron scripts using the same helper.
 - Shared cron HTTP auth/timestamp/JSON envelopes through
   `app/api/cron/_route.ts`, so cron leaf route files only declare static Next

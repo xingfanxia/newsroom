@@ -10,7 +10,7 @@
  * PATCH   → update  { id, name?, name_cjk?, pinned? }
  * DELETE  → delete  { id }   (cascade-reparents saves to inbox)
  */
-import { requireApiToken } from "@/lib/auth/api-token";
+import { runV1Route, v1Error, v1Json } from "@/lib/api/v1-route";
 import {
   createCollection,
   deleteCollection,
@@ -27,86 +27,86 @@ import {
 import { parseJsonRequestBody } from "@/lib/api/json-body";
 
 export async function GET(req: Request) {
-  const auth = await requireApiToken(req);
-  if (auth instanceof Response) return auth;
-  const { user } = auth;
-
-  try {
-    await upsertAppUser(user);
-    const collections = await listCollections(user.id);
-    return Response.json({ collections, total: collections.length });
-  } catch (err) {
-    console.error("[api/v1/collections GET] failed", err);
-    return Response.json({ error: "server_error" }, { status: 500 });
-  }
+  return runV1Route(req, async (user) => {
+    try {
+      await upsertAppUser(user);
+      const collections = await listCollections(user.id);
+      return v1Json({ collections, total: collections.length });
+    } catch (err) {
+      console.error("[api/v1/collections GET] failed", err);
+      return v1Error("server_error", 500);
+    }
+  });
 }
 
 export async function POST(req: Request) {
-  const auth = await requireApiToken(req);
-  if (auth instanceof Response) return auth;
-  const { user } = auth;
+  return runV1Route(req, async (user) => {
+    const parsed = await parseJsonRequestBody(
+      req,
+      v1CollectionCreateBodySchema,
+      {
+        envelope: "plain",
+      },
+    );
+    if (!parsed.ok) return parsed.response;
 
-  const parsed = await parseJsonRequestBody(req, v1CollectionCreateBodySchema, {
-    envelope: "plain",
-  });
-  if (!parsed.ok) return parsed.response;
-
-  try {
-    await upsertAppUser(user);
-    const collection = await createCollection({
-      userId: user.id,
-      ...parsed.data,
-    });
-    return Response.json({ collection });
-  } catch (err) {
-    if (isDuplicateCollectionNameError(err)) {
-      return Response.json({ error: "duplicate_name" }, { status: 409 });
+    try {
+      await upsertAppUser(user);
+      const collection = await createCollection({
+        userId: user.id,
+        ...parsed.data,
+      });
+      return v1Json({ collection });
+    } catch (err) {
+      if (isDuplicateCollectionNameError(err)) {
+        return v1Error("duplicate_name", 409);
+      }
+      console.error("[api/v1/collections POST] failed", err);
+      return v1Error("server_error", 500);
     }
-    console.error("[api/v1/collections POST] failed", err);
-    return Response.json({ error: "server_error" }, { status: 500 });
-  }
+  });
 }
 
 export async function PATCH(req: Request) {
-  const auth = await requireApiToken(req);
-  if (auth instanceof Response) return auth;
-  const { user } = auth;
+  return runV1Route(req, async (user) => {
+    const parsed = await parseJsonRequestBody(
+      req,
+      v1CollectionUpdateBodySchema,
+      {
+        envelope: "plain",
+      },
+    );
+    if (!parsed.ok) return parsed.response;
 
-  const parsed = await parseJsonRequestBody(req, v1CollectionUpdateBodySchema, {
-    envelope: "plain",
+    try {
+      const ok = await updateCollection({
+        userId: user.id,
+        ...parsed.data,
+      });
+      if (!ok) return v1Error("not_found", 404);
+      return v1Json({ ok: true });
+    } catch (err) {
+      console.error("[api/v1/collections PATCH] failed", err);
+      return v1Error("server_error", 500);
+    }
   });
-  if (!parsed.ok) return parsed.response;
-
-  try {
-    const ok = await updateCollection({
-      userId: user.id,
-      ...parsed.data,
-    });
-    if (!ok) return Response.json({ error: "not_found" }, { status: 404 });
-    return Response.json({ ok: true });
-  } catch (err) {
-    console.error("[api/v1/collections PATCH] failed", err);
-    return Response.json({ error: "server_error" }, { status: 500 });
-  }
 }
 
 export async function DELETE(req: Request) {
-  const auth = await requireApiToken(req);
-  if (auth instanceof Response) return auth;
-  const { user } = auth;
+  return runV1Route(req, async (user) => {
+    const parsed = await parseJsonRequestBody(req, collectionDeleteBodySchema, {
+      envelope: "plain",
+      includeIssues: false,
+    });
+    if (!parsed.ok) return parsed.response;
 
-  const parsed = await parseJsonRequestBody(req, collectionDeleteBodySchema, {
-    envelope: "plain",
-    includeIssues: false,
+    try {
+      const ok = await deleteCollection(user.id, parsed.data.id);
+      if (!ok) return v1Error("not_found", 404);
+      return v1Json({ ok: true });
+    } catch (err) {
+      console.error("[api/v1/collections DELETE] failed", err);
+      return v1Error("server_error", 500);
+    }
   });
-  if (!parsed.ok) return parsed.response;
-
-  try {
-    const ok = await deleteCollection(user.id, parsed.data.id);
-    if (!ok) return Response.json({ error: "not_found" }, { status: 404 });
-    return Response.json({ ok: true });
-  } catch (err) {
-    console.error("[api/v1/collections DELETE] failed", err);
-    return Response.json({ error: "server_error" }, { status: 500 });
-  }
 }

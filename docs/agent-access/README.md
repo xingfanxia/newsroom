@@ -47,6 +47,7 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 - **`lib/site.ts`** — canonical public origin (`https://news.ax0x.ai`) and URL builder used by sitemap, robots, RSS feeds, `/skill.md`, `/openapi.yaml`, and the `/agents` integration page so public discovery surfaces do not drift across domains.
 - **`lib/api/public-endpoint-config.ts` + `lib/rate-limit/public.ts`** — one public endpoint contract for rate limits, cache policy, docs grouping, and endpoint count, plus the parameterized IP token-bucket. Public docs, `/skill.md`, `/openapi.yaml`, and `/agents` copy render or verify the same contract. Family-isolated so `/feed` polling doesn't burn `/search` budget.
 - **`lib/api/public-helpers.ts`** — `publicEndpointRateLimit(req, "<endpoint-key>")` applies the endpoint's IP token bucket, while `publicCachedJson(req, { endpoint: "<endpoint-key>", etagFamily, signal, body })` computes ETags, handles `If-None-Match` 304s, and applies the endpoint cache policy. `publicError`, `publicHeaders`, and the lower-level ETag helpers stay here for explicit error and test coverage paths.
+- **`lib/api/v1-route.ts`** — shared bearer-gated route envelope for `/api/v1/*`. It bridges `requireApiToken(req)` into a handler callback and owns the plain JSON/error helpers (`v1Json`, `v1Error`, `v1InvalidQuery`), leaving v1 route files responsible only for request parsing, business helpers, and logging.
 - **`lib/api/feed-query-params.ts`** — shared feed/search query schemas and snake_case-to-`FeedQuery` mapping for public + bearer-gated surfaces; route files only choose auth/rate-limit and per-surface limit ceilings.
 - **`lib/types.ts`** — shared item tier, highlight-tier subset, feed view, search mode, app/source locale, source group/kind, source-health status, feedback vote, user role, iteration status, and cadence runtime tuples used by REST/MCP schemas, public/agent item source fields, cluster lead-pick authority typing, `/skill.md`, `/openapi.yaml`, sitemap generation, DB enums, fetcher support checks, score parsing, feedback routes, iteration routes, and commentary workers.
 - **`lib/api/feed-results.ts`** — shared feed execution for `/api/public/feed`, `/api/v1/feed`, and MCP `ax_radar_feed`; surface adapters own auth/rate-limit/ETag and serializers, while this helper owns paired item + `total` queries and pagination defaults.
@@ -85,6 +86,7 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 ## Tests
 
 - `tests/api/public-helpers.test.ts` — ETag determinism, family isolation, headers, CORS
+- `tests/api/v1-route-helper.test.ts` + `tests/api/v1-route-source.test.ts` — bearer auth and plain JSON/error envelopes stay centralized for every `/api/v1/*` handler
 - `tests/api/public-ratelimit.test.ts` — threshold, IP isolation, family isolation, IPv4/IPv6 header fallback
 - `tests/api/public-rate-limit-contract.test.ts` — public route handlers, `/skill.md`, `/openapi.yaml`, `/agents`, and docs stay wired to the shared public rate-limit contract
 - `tests/api/feed-query-params.test.ts` — shared feed/search parameter defaults, source filter validation, max-limit ceilings, tag parsing, and `FeedQuery` mapping
@@ -135,6 +137,7 @@ Run these with `bun test tests/api/public-*.test.ts tests/api/feed-query-*.test.
 - **RSS rendering is centralized across feed families** — `lib/rss/render.ts` owns the RSS XML envelope, response content type/cache headers, XML escaping, `content:encoded` CDATA safety, namespaces, and extension fields; route files choose data and channel metadata only.
 - **Usage summary serialization is centralized across bearer agent surfaces** — `/api/v1/usage/summary` and MCP `ax_radar_usage` both call `getUsageSummary`; the helper owns the `today|week|month|all` window set, totals, `by_task`, `by_model`, and `recent_calls` shape.
 - **Usage presentation is centralized for the admin surface** — `lib/llm/usage-display.ts` owns usage range labels, task badge tones, compact token/call formatting, sparkline date labels, and task-model summaries; tests keep those helpers exhaustive over `USAGE_WINDOWS` and `LLM_TASKS`.
+- **v1 bearer auth + plain JSON envelopes are centralized** — route handlers under `/api/v1/*` should call `runV1Route(req, async (user) => ...)` and return `v1Json`, `v1Error`, or `v1InvalidQuery`. Do not call `requireApiToken` or `Response.json` directly in v1 leaf routes; keep request schemas and domain helper calls local to the route.
 
 ## Related
 

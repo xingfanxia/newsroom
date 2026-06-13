@@ -17,52 +17,48 @@ import {
   tweaksPatchBodySchema,
 } from "@/lib/api/tweak-requests";
 import { parseJsonRequestBody } from "@/lib/api/json-body";
-import { requireApiToken } from "@/lib/auth/api-token";
+import { runV1Route, v1Error, v1Json } from "@/lib/api/v1-route";
 import { upsertAppUser } from "@/lib/auth/session";
 
 export async function GET(req: Request) {
-  const auth = await requireApiToken(req);
-  if (auth instanceof Response) return auth;
-  const { user } = auth;
-
-  try {
-    await upsertAppUser(user);
-    const [row] = await db()
-      .select({ tweaks: users.tweaks, watchlist: users.watchlist })
-      .from(users)
-      .where(eq(users.id, user.id))
-      .limit(1);
-    return Response.json({
-      tweaks: row?.tweaks ?? null,
-      watchlist: (row?.watchlist as string[] | null) ?? null,
-    });
-  } catch (err) {
-    console.error("[api/v1/tweaks GET] failed", err);
-    return Response.json({ error: "server_error" }, { status: 500 });
-  }
+  return runV1Route(req, async (user) => {
+    try {
+      await upsertAppUser(user);
+      const [row] = await db()
+        .select({ tweaks: users.tweaks, watchlist: users.watchlist })
+        .from(users)
+        .where(eq(users.id, user.id))
+        .limit(1);
+      return v1Json({
+        tweaks: row?.tweaks ?? null,
+        watchlist: (row?.watchlist as string[] | null) ?? null,
+      });
+    } catch (err) {
+      console.error("[api/v1/tweaks GET] failed", err);
+      return v1Error("server_error", 500);
+    }
+  });
 }
 
 export async function PATCH(req: Request) {
-  const auth = await requireApiToken(req);
-  if (auth instanceof Response) return auth;
-  const { user } = auth;
+  return runV1Route(req, async (user) => {
+    const parsed = await parseJsonRequestBody(req, tweaksPatchBodySchema, {
+      envelope: "plain",
+    });
+    if (!parsed.ok) return parsed.response;
 
-  const parsed = await parseJsonRequestBody(req, tweaksPatchBodySchema, {
-    envelope: "plain",
+    const patch = buildTweaksDbPatch(parsed.data);
+    if (!patch) {
+      return v1Error("empty_body", 400);
+    }
+
+    try {
+      await upsertAppUser(user);
+      await db().update(users).set(patch).where(eq(users.id, user.id));
+      return v1Json({ ok: true });
+    } catch (err) {
+      console.error("[api/v1/tweaks PATCH] failed", err);
+      return v1Error("server_error", 500);
+    }
   });
-  if (!parsed.ok) return parsed.response;
-
-  const patch = buildTweaksDbPatch(parsed.data);
-  if (!patch) {
-    return Response.json({ error: "empty_body" }, { status: 400 });
-  }
-
-  try {
-    await upsertAppUser(user);
-    await db().update(users).set(patch).where(eq(users.id, user.id));
-    return Response.json({ ok: true });
-  } catch (err) {
-    console.error("[api/v1/tweaks PATCH] failed", err);
-    return Response.json({ error: "server_error" }, { status: 500 });
-  }
 }

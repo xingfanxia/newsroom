@@ -7,24 +7,23 @@
  * enabled=false — the operator may want to see what's in the catalog
  * even if the adapter is paused.
  */
-import { requireApiToken } from "@/lib/auth/api-token";
+import { runV1Route, v1Error, v1Json } from "@/lib/api/v1-route";
 import {
   listSourceCatalogRows,
   toV1SourceApiItem,
 } from "@/lib/api/source-catalog";
 
 export async function GET(req: Request) {
-  const auth = await requireApiToken(req);
-  if (auth instanceof Response) return auth;
-
-  try {
-    const rows = await listSourceCatalogRows("priority");
-    return Response.json({
-      sources: rows.map(toV1SourceApiItem),
-      total: rows.length,
-    });
-  } catch (err) {
-    console.error("[api/v1/sources] failed", err);
-    return Response.json({ error: "server_error" }, { status: 500 });
-  }
+  return runV1Route(req, async () => {
+    try {
+      const rows = await listSourceCatalogRows("priority");
+      return v1Json({
+        sources: rows.map(toV1SourceApiItem),
+        total: rows.length,
+      });
+    } catch (err) {
+      console.error("[api/v1/sources] failed", err);
+      return v1Error("server_error", 500);
+    }
+  });
 }

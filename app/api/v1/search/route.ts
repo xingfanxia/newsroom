@@ -22,54 +22,54 @@
  *   offset       = ≥0, default 0 (lexical only — semantic doesn't paginate)
  *   locale       = zh | en (default en)
  */
-import { requireApiToken } from "@/lib/auth/api-token";
+import {
+  runV1Route,
+  v1Error,
+  v1InvalidQuery,
+  v1Json,
+} from "@/lib/api/v1-route";
 import { toAgentApiItem } from "@/lib/api/v1-items";
 import { v1SearchQueryParamSchema } from "@/lib/api/feed-query-params";
 import { runSearchQuery } from "@/lib/api/search-results";
 
 export async function GET(req: Request) {
-  const auth = await requireApiToken(req);
-  if (auth instanceof Response) return auth;
+  return runV1Route(req, async () => {
+    const url = new URL(req.url);
+    const params = Object.fromEntries(url.searchParams.entries());
+    const parsed = v1SearchQueryParamSchema.safeParse(params);
+    if (!parsed.success) return v1InvalidQuery(parsed.error.issues);
 
-  const url = new URL(req.url);
-  const params = Object.fromEntries(url.searchParams.entries());
-  const parsed = v1SearchQueryParamSchema.safeParse(params);
-  if (!parsed.success) {
-    return Response.json(
-      { error: "invalid_query", issues: parsed.error.issues },
-      { status: 400 },
-    );
-  }
-  const p = parsed.data;
+    const p = parsed.data;
 
-  try {
-    const result = await runSearchQuery(p);
-    if (result.mode === "semantic") {
-      return Response.json({
-        mode: "semantic",
+    try {
+      const result = await runSearchQuery(p);
+      if (result.mode === "semantic") {
+        return v1Json({
+          mode: "semantic",
+          q: result.q,
+          items: result.items.map((s) => ({
+            ...toAgentApiItem(s, p.locale),
+            distance: s.distance,
+          })),
+          total: result.total,
+          limit: result.limit,
+          offset: result.offset,
+          embedding_dims: result.embeddingDims,
+          latency_ms: result.latencyMs,
+        });
+      }
+
+      return v1Json({
+        mode: result.mode,
         q: result.q,
-        items: result.items.map((s) => ({
-          ...toAgentApiItem(s, p.locale),
-          distance: s.distance,
-        })),
+        items: result.items.map((s) => toAgentApiItem(s, p.locale)),
         total: result.total,
         limit: result.limit,
         offset: result.offset,
-        embedding_dims: result.embeddingDims,
-        latency_ms: result.latencyMs,
       });
+    } catch (err) {
+      console.error("[api/v1/search] failed", err);
+      return v1Error("server_error", 500);
     }
-
-    return Response.json({
-      mode: result.mode,
-      q: result.q,
-      items: result.items.map((s) => toAgentApiItem(s, p.locale)),
-      total: result.total,
-      limit: result.limit,
-      offset: result.offset,
-    });
-  } catch (err) {
-    console.error("[api/v1/search] failed", err);
-    return Response.json({ error: "server_error" }, { status: 500 });
-  }
+  });
 }

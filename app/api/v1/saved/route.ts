@@ -16,7 +16,12 @@
  */
 import { z } from "zod";
 import { parseJsonRequestBody } from "@/lib/api/json-body";
-import { requireApiToken } from "@/lib/auth/api-token";
+import {
+  runV1Route,
+  v1Error,
+  v1InvalidQuery,
+  v1Json,
+} from "@/lib/api/v1-route";
 import { applyFeedbackToggle } from "@/lib/feedback/toggle";
 import { toSavedAgentApiItem } from "@/lib/api/v1-items";
 import { APP_LOCALES, FEEDBACK_SAVE_VOTE } from "@/lib/types";
@@ -43,92 +48,84 @@ const postBodySchema = z.object({
 });
 
 export async function GET(req: Request) {
-  const auth = await requireApiToken(req);
-  if (auth instanceof Response) return auth;
-  const { user } = auth;
-
-  const url = new URL(req.url);
-  const parsed = getQuerySchema.safeParse(
-    Object.fromEntries(url.searchParams.entries()),
-  );
-  if (!parsed.success) {
-    return Response.json(
-      { error: "invalid_query", issues: parsed.error.issues },
-      { status: 400 },
+  return runV1Route(req, async (user) => {
+    const url = new URL(req.url);
+    const parsed = getQuerySchema.safeParse(
+      Object.fromEntries(url.searchParams.entries()),
     );
-  }
-  const q = parsed.data;
+    if (!parsed.success) return v1InvalidQuery(parsed.error.issues);
 
-  try {
-    const stories = await getSavedStories(user.id, q.locale, {
-      limit: q.limit,
-      collection: q.collection ?? null,
-    });
-    return Response.json({
-      items: stories.map((s) => toSavedAgentApiItem(s, q.locale)),
-      total: stories.length,
-    });
-  } catch (err) {
-    console.error("[api/v1/saved GET] failed", err);
-    return Response.json({ error: "server_error" }, { status: 500 });
-  }
+    const q = parsed.data;
+
+    try {
+      const stories = await getSavedStories(user.id, q.locale, {
+        limit: q.limit,
+        collection: q.collection ?? null,
+      });
+      return v1Json({
+        items: stories.map((s) => toSavedAgentApiItem(s, q.locale)),
+        total: stories.length,
+      });
+    } catch (err) {
+      console.error("[api/v1/saved GET] failed", err);
+      return v1Error("server_error", 500);
+    }
+  });
 }
 
 export async function POST(req: Request) {
-  const auth = await requireApiToken(req);
-  if (auth instanceof Response) return auth;
-  const { user } = auth;
-
-  const parsed = await parseJsonRequestBody(req, postBodySchema, {
-    envelope: "plain",
-  });
-  if (!parsed.ok) return parsed.response;
-
-  const b = parsed.data;
-
-  try {
-    if (
-      b.on &&
-      b.collection_id !== undefined &&
-      !(await userOwnsSavedCollection(user.id, b.collection_id))
-    ) {
-      return Response.json({ error: "collection_not_found" }, { status: 404 });
-    }
-
-    const votes = await applyFeedbackToggle(user, {
-      itemId: b.item_id,
-      vote: FEEDBACK_SAVE_VOTE,
-      on: b.on,
-      note: b.note,
+  return runV1Route(req, async (user) => {
+    const parsed = await parseJsonRequestBody(req, postBodySchema, {
+      envelope: "plain",
     });
+    if (!parsed.ok) return parsed.response;
 
-    let collectionId: number | null = null;
-    if (votes.save && b.collection_id !== undefined) {
-      const assigned = await assignSavedItemCollection({
-        userId: user.id,
-        itemId: b.item_id,
-        targetCollectionId: b.collection_id,
-      });
-      if (!assigned.ok) {
-        return Response.json({ error: assigned.reason }, { status: 404 });
+    const b = parsed.data;
+
+    try {
+      if (
+        b.on &&
+        b.collection_id !== undefined &&
+        !(await userOwnsSavedCollection(user.id, b.collection_id))
+      ) {
+        return v1Error("collection_not_found", 404);
       }
-      collectionId = assigned.collectionId;
-    } else if (votes.save) {
-      collectionId = await getSavedItemCollectionId(user.id, b.item_id);
-    }
 
-    return Response.json({
-      item_id: b.item_id,
-      saved: votes.save,
-      collection_id: collectionId,
-    });
-  } catch (err) {
-    // FK-violation on item_id → 404 rather than 500 (caller gave a bad id).
-    const msg = err instanceof Error ? err.message : String(err);
-    if (/foreign key|not present/i.test(msg)) {
-      return Response.json({ error: "item_not_found" }, { status: 404 });
+      const votes = await applyFeedbackToggle(user, {
+        itemId: b.item_id,
+        vote: FEEDBACK_SAVE_VOTE,
+        on: b.on,
+        note: b.note,
+      });
+
+      let collectionId: number | null = null;
+      if (votes.save && b.collection_id !== undefined) {
+        const assigned = await assignSavedItemCollection({
+          userId: user.id,
+          itemId: b.item_id,
+          targetCollectionId: b.collection_id,
+        });
+        if (!assigned.ok) {
+          return v1Error(assigned.reason, 404);
+        }
+        collectionId = assigned.collectionId;
+      } else if (votes.save) {
+        collectionId = await getSavedItemCollectionId(user.id, b.item_id);
+      }
+
+      return v1Json({
+        item_id: b.item_id,
+        saved: votes.save,
+        collection_id: collectionId,
+      });
+    } catch (err) {
+      // FK-violation on item_id → 404 rather than 500 (caller gave a bad id).
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/foreign key|not present/i.test(msg)) {
+        return v1Error("item_not_found", 404);
+      }
+      console.error("[api/v1/saved POST] failed", err);
+      return v1Error("server_error", 500);
     }
-    console.error("[api/v1/saved POST] failed", err);
-    return Response.json({ error: "server_error" }, { status: 500 });
-  }
+  });
 }

@@ -15,7 +15,7 @@
  * Returns 404 on unknown id. No cluster dedup here — if the caller knows
  * the id they get exactly that row.
  */
-import { requireApiToken } from "@/lib/auth/api-token";
+import { runV1Route, v1Error, v1Json } from "@/lib/api/v1-route";
 import {
   getItemDetailRow,
   parseItemDetailRouteId,
@@ -26,23 +26,22 @@ export async function GET(
   req: Request,
   ctx: { params: Promise<{ id: string }> },
 ) {
-  const auth = await requireApiToken(req);
-  if (auth instanceof Response) return auth;
-
-  const { id: idRaw } = await ctx.params;
-  const parsed = parseItemDetailRouteId(idRaw);
-  if (!parsed.ok) {
-    return Response.json({ error: parsed.error }, { status: 400 });
-  }
-
-  try {
-    const row = await getItemDetailRow(parsed.id);
-    if (!row) {
-      return Response.json({ error: "not_found" }, { status: 404 });
+  return runV1Route(req, async () => {
+    const { id: idRaw } = await ctx.params;
+    const parsed = parseItemDetailRouteId(idRaw);
+    if (!parsed.ok) {
+      return v1Error(parsed.error, 400);
     }
-    return Response.json(toV1ItemDetail(row));
-  } catch (err) {
-    console.error("[api/v1/items/:id] failed", err);
-    return Response.json({ error: "server_error" }, { status: 500 });
-  }
+
+    try {
+      const row = await getItemDetailRow(parsed.id);
+      if (!row) {
+        return v1Error("not_found", 404);
+      }
+      return v1Json(toV1ItemDetail(row));
+    } catch (err) {
+      console.error("[api/v1/items/:id] failed", err);
+      return v1Error("server_error", 500);
+    }
+  });
 }

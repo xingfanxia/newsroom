@@ -9,7 +9,12 @@
  * Window = today | week | month | all (default week).
  */
 import { z } from "zod";
-import { requireApiToken } from "@/lib/auth/api-token";
+import {
+  runV1Route,
+  v1Error,
+  v1InvalidQuery,
+  v1Json,
+} from "@/lib/api/v1-route";
 import {
   getUsageSummary,
   USAGE_WINDOWS,
@@ -20,22 +25,20 @@ const querySchema = z.object({
 });
 
 export async function GET(req: Request) {
-  const auth = await requireApiToken(req);
-  if (auth instanceof Response) return auth;
+  return runV1Route(req, async () => {
+    const url = new URL(req.url);
+    const parsed = querySchema.safeParse(
+      Object.fromEntries(url.searchParams.entries()),
+    );
+    if (!parsed.success) return v1InvalidQuery();
 
-  const url = new URL(req.url);
-  const parsed = querySchema.safeParse(
-    Object.fromEntries(url.searchParams.entries()),
-  );
-  if (!parsed.success) {
-    return Response.json({ error: "invalid_query" }, { status: 400 });
-  }
-  const w = parsed.data.window;
+    const w = parsed.data.window;
 
-  try {
-    return Response.json(await getUsageSummary(w));
-  } catch (err) {
-    console.error("[api/v1/usage/summary] failed", err);
-    return Response.json({ error: "server_error" }, { status: 500 });
-  }
+    try {
+      return v1Json(await getUsageSummary(w));
+    } catch (err) {
+      console.error("[api/v1/usage/summary] failed", err);
+      return v1Error("server_error", 500);
+    }
+  });
 }

@@ -31,7 +31,12 @@
  *   offset           = ≥0, default 0
  *   locale           = zh | en (default en)
  */
-import { requireApiToken } from "@/lib/auth/api-token";
+import {
+  runV1Route,
+  v1Error,
+  v1InvalidQuery,
+  v1Json,
+} from "@/lib/api/v1-route";
 import { runFeedQuery } from "@/lib/api/feed-results";
 import { toAgentApiItem } from "@/lib/api/v1-items";
 import {
@@ -40,32 +45,27 @@ import {
 } from "@/lib/api/feed-query-params";
 
 export async function GET(req: Request) {
-  const auth = await requireApiToken(req);
-  if (auth instanceof Response) return auth;
+  return runV1Route(req, async () => {
+    const url = new URL(req.url);
+    const params = Object.fromEntries(url.searchParams.entries());
+    const parsed = v1FeedQueryParamSchema.safeParse(params);
+    if (!parsed.success) return v1InvalidQuery(parsed.error.issues);
 
-  const url = new URL(req.url);
-  const params = Object.fromEntries(url.searchParams.entries());
-  const parsed = v1FeedQueryParamSchema.safeParse(params);
-  if (!parsed.success) {
-    return Response.json(
-      { error: "invalid_query", issues: parsed.error.issues },
-      { status: 400 },
-    );
-  }
-  const q = parsed.data;
-  const feedQuery = feedQueryFromParams(q);
+    const q = parsed.data;
+    const feedQuery = feedQueryFromParams(q);
 
-  try {
-    const result = await runFeedQuery(feedQuery);
-    return Response.json({
-      items: result.items.map((s) => toAgentApiItem(s, q.locale)),
-      total: result.total,
-      limit: result.limit,
-      offset: result.offset,
-      view: result.view,
-    });
-  } catch (err) {
-    console.error("[api/v1/feed] failed", err);
-    return Response.json({ error: "server_error" }, { status: 500 });
-  }
+    try {
+      const result = await runFeedQuery(feedQuery);
+      return v1Json({
+        items: result.items.map((s) => toAgentApiItem(s, q.locale)),
+        total: result.total,
+        limit: result.limit,
+        offset: result.offset,
+        view: result.view,
+      });
+    } catch (err) {
+      console.error("[api/v1/feed] failed", err);
+      return v1Error("server_error", 500);
+    }
+  });
 }

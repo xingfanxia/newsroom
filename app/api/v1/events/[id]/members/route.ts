@@ -16,7 +16,7 @@
  * can degrade gracefully without a separate error path. Singleton clusters
  * (member_count = 1) just return their lone member.
  */
-import { requireApiToken } from "@/lib/auth/api-token";
+import { runV1Route, v1Error, v1Json } from "@/lib/api/v1-route";
 import {
   parseEventMemberRouteParams,
   toEventMemberApiItems,
@@ -27,28 +27,27 @@ export async function GET(
   req: Request,
   ctx: { params: Promise<{ id: string }> },
 ) {
-  const auth = await requireApiToken(req);
-  if (auth instanceof Response) return auth;
-
-  const { id: idRaw } = await ctx.params;
-  const url = new URL(req.url);
-  const parsed = parseEventMemberRouteParams({
-    rawId: idRaw,
-    rawLocale: url.searchParams.get("locale"),
-    defaultLocale: "zh",
-  });
-  if (!parsed.ok) {
-    return Response.json({ error: parsed.error }, { status: 400 });
-  }
-
-  try {
-    const members = await getEventMembers(parsed.clusterId, parsed.locale);
-    return Response.json({
-      members: toEventMemberApiItems(members),
-      total: members.length,
+  return runV1Route(req, async () => {
+    const { id: idRaw } = await ctx.params;
+    const url = new URL(req.url);
+    const parsed = parseEventMemberRouteParams({
+      rawId: idRaw,
+      rawLocale: url.searchParams.get("locale"),
+      defaultLocale: "zh",
     });
-  } catch (err) {
-    console.error("[api/v1/events/:id/members] failed", err);
-    return Response.json({ error: "server_error" }, { status: 500 });
-  }
+    if (!parsed.ok) {
+      return v1Error(parsed.error, 400);
+    }
+
+    try {
+      const members = await getEventMembers(parsed.clusterId, parsed.locale);
+      return v1Json({
+        members: toEventMemberApiItems(members),
+        total: members.length,
+      });
+    } catch (err) {
+      console.error("[api/v1/events/:id/members] failed", err);
+      return v1Error("server_error", 500);
+    }
+  });
 }
