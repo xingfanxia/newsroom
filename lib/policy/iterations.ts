@@ -4,22 +4,19 @@
  * doesn't pull in the LLM client just to list rows.
  */
 import { desc, eq } from "drizzle-orm";
-import { z } from "zod";
 import { db } from "@/db/client";
 import { iterationRuns, type IterationRun } from "@/db/schema";
+import {
+  parsePositiveRouteId,
+  type PositiveRouteIdResult,
+} from "@/lib/api/route-params";
 
-const iterationRunRouteIdSchema = z.coerce.number().int().positive();
-
-export type IterationRunRouteIdResult =
-  | { ok: true; id: number }
-  | { ok: false; error: "invalid_id" };
+export type IterationRunRouteIdResult = PositiveRouteIdResult;
 
 export function parseIterationRunRouteId(
   rawId: string,
 ): IterationRunRouteIdResult {
-  const parsed = iterationRunRouteIdSchema.safeParse(rawId);
-  if (!parsed.success) return { ok: false, error: "invalid_id" };
-  return { ok: true, id: parsed.data };
+  return parsePositiveRouteId(rawId);
 }
 
 /** Most recent iteration for a skill, regardless of status. */

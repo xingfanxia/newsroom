@@ -1,13 +1,15 @@
 import { eq } from "drizzle-orm";
-import { z } from "zod";
 import { db } from "@/db/client";
 import { clusters, items, sources } from "@/db/schema";
 import { etagSignal } from "@/lib/api/public-helpers";
+import {
+  parsePositiveRouteId,
+  type PositiveRouteIdResult,
+} from "@/lib/api/route-params";
 import { toPublicHkr, type PublicHkr } from "@/lib/api/story-item-fields";
 import type { Story } from "@/lib/types";
 
 type Hkr = Story["hkr"];
-const itemDetailIdSchema = z.coerce.number().int().positive();
 
 type DetailTags = {
   capabilities: string[];
@@ -115,9 +117,7 @@ type V1DetailEvent = DetailEvent & {
   commentary_at: string | null;
 };
 
-export type ItemDetailRouteId =
-  | { ok: true; id: number }
-  | { ok: false; error: "invalid_id" };
+export type ItemDetailRouteId = PositiveRouteIdResult;
 
 export type V1ItemDetail = {
   id: string;
@@ -155,9 +155,7 @@ export type PublicItemDetail = Omit<
 };
 
 export function parseItemDetailRouteId(rawId: string): ItemDetailRouteId {
-  const parsed = itemDetailIdSchema.safeParse(rawId);
-  if (!parsed.success) return { ok: false, error: "invalid_id" };
-  return { ok: true, id: parsed.data };
+  return parsePositiveRouteId(rawId);
 }
 
 function iso(d: Date | null | undefined): string | null {

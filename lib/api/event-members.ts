@@ -1,9 +1,12 @@
 import { z } from "zod";
+import {
+  INVALID_ROUTE_ID_ERROR,
+  parsePositiveRouteId,
+} from "@/lib/api/route-params";
 import { APP_LOCALES, type Story } from "@/lib/types";
 
 type EventMember = NonNullable<Story["members"]>[number];
 
-const eventMemberClusterIdSchema = z.coerce.number().int().positive();
 const eventMemberLocaleSchema = z.enum(APP_LOCALES);
 
 type EventMemberLocale = z.infer<typeof eventMemberLocaleSchema>;
@@ -30,8 +33,8 @@ export function parseEventMemberRouteParams({
   rawLocale: string | null;
   defaultLocale: EventMemberLocale;
 }): EventMemberRouteParams {
-  const parsedId = eventMemberClusterIdSchema.safeParse(rawId);
-  if (!parsedId.success) return { ok: false, error: "invalid_id" };
+  const parsedId = parsePositiveRouteId(rawId);
+  if (!parsedId.ok) return { ok: false, error: INVALID_ROUTE_ID_ERROR };
 
   const parsedLocale = eventMemberLocaleSchema.safeParse(
     rawLocale ?? defaultLocale,
@@ -42,7 +45,7 @@ export function parseEventMemberRouteParams({
 
   return {
     ok: true,
-    clusterId: parsedId.data,
+    clusterId: parsedId.id,
     locale: parsedLocale.data,
   };
 }

@@ -37,6 +37,9 @@ Shipped cleanup:
 - Shared newsletter kind and locale labels through `NEWSLETTER_KINDS` and
   `NEWSLETTER_LOCALES` in `lib/types.ts`; digest workers, daily-column queries,
   and backfill scripts no longer carry local `daily|monthly` / `zh|en` unions.
+- Shared positive route-id parsing through `lib/api/route-params.ts`; item
+  detail, event-member, and admin iteration routes now reuse the same coercion
+  and `invalid_id` error label.
 - Shared REST/MCP search execution through `lib/api/search-results.ts`;
   adapters now own only auth/rate-limit/ETag/serialization, while the helper
   owns lexical full-match totals and semantic source/date/tier filters.
