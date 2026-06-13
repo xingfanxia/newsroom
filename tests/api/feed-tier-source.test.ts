@@ -48,6 +48,7 @@ describe("feed tier/view source wiring", () => {
     expect(types).toContain("export const FEED_VIEWS");
     expect(types).toContain("export const SOURCE_GROUPS");
     expect(types).toContain("export const SOURCE_KINDS");
+    expect(types).toContain("export const SEARCH_MODES");
   });
 
   test("feed-facing schemas use shared visible tiers, views, and source filters", () => {
@@ -66,6 +67,14 @@ describe("feed tier/view source wiring", () => {
       expect(source).not.toContain("source_kind: z.string().min(1)");
       expect(source).not.toContain("source_group: z.string().optional()");
       expect(source).not.toContain("source_kind: z.string().optional()");
+    }
+  });
+
+  test("search-facing schemas use the shared mode tuple", () => {
+    for (const source of [feedParams, mcpRoute]) {
+      expect(source).toContain("SEARCH_MODES");
+      expect(source).toContain("z.enum(SEARCH_MODES)");
+      expect(source).not.toContain('z.enum(["lexical", "semantic"])');
     }
   });
 

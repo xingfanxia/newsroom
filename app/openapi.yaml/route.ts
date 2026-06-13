@@ -10,6 +10,7 @@ import {
   CADENCES,
   FEED_VIEWS,
   ITEM_TIERS,
+  SEARCH_MODES,
   SOURCE_GROUPS,
   SOURCE_KINDS,
   SOURCE_LOCALES,
@@ -24,6 +25,7 @@ const APP_LOCALE_ENUM = yamlInlineEnum(APP_LOCALES);
 const CADENCE_ENUM = yamlInlineEnum(CADENCES);
 const FEED_VIEW_ENUM = yamlInlineEnum(FEED_VIEWS);
 const ITEM_TIER_ENUM = yamlInlineEnum(ITEM_TIERS);
+const SEARCH_MODE_ENUM = yamlInlineEnum(SEARCH_MODES);
 const SOURCE_GROUP_ENUM = yamlInlineEnum(SOURCE_GROUPS);
 const SOURCE_GROUP_NULLABLE_ENUM = yamlInlineEnum([...SOURCE_GROUPS, null]);
 const SOURCE_KIND_ENUM = yamlInlineEnum(SOURCE_KINDS);
@@ -143,7 +145,7 @@ paths:
         (120/min/IP) due to LLM cost.
       parameters:
         - { name: q, in: query, required: true, schema: { type: string, minLength: 1 } }
-        - { name: mode, in: query, schema: { type: string, enum: [lexical, semantic], default: lexical } }
+        - { name: mode, in: query, schema: { type: string, enum: ${SEARCH_MODE_ENUM}, default: lexical } }
         - { name: tier, in: query, schema: { type: string, enum: ${VISIBLE_ITEM_TIER_ENUM}, default: all } }
         - { name: date_from, in: query, schema: { type: string, format: date-time } }
         - { name: date_to, in: query, schema: { type: string, format: date-time } }
@@ -402,7 +404,7 @@ components:
       type: object
       required: [mode, q, items, total, limit]
       properties:
-        mode: { type: string, enum: [lexical, semantic] }
+        mode: { type: string, enum: ${SEARCH_MODE_ENUM} }
         q: { type: string }
         items:
           type: array

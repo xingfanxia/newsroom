@@ -8,7 +8,7 @@ import {
   v1FeedQueryParamSchema,
   v1SearchQueryParamSchema,
 } from "@/lib/api/feed-query-params";
-import { SOURCE_GROUPS, SOURCE_KINDS } from "@/lib/types";
+import { SEARCH_MODES, SOURCE_GROUPS, SOURCE_KINDS } from "@/lib/types";
 
 describe("feed query param schemas", () => {
   test("share feed defaults while preserving v1/public limit ceilings", () => {
@@ -158,6 +158,18 @@ describe("search query param schemas", () => {
         q: "agent",
         source_kind: "not-a-kind",
       }).success,
+    ).toBe(false);
+  });
+
+  test("validates search mode against the runtime tuple", () => {
+    for (const mode of SEARCH_MODES) {
+      expect(
+        publicSearchQueryParamSchema.safeParse({ q: "agent", mode }).success,
+      ).toBe(true);
+    }
+    expect(
+      v1SearchQueryParamSchema.safeParse({ q: "agent", mode: "hybrid" })
+        .success,
     ).toBe(false);
   });
 

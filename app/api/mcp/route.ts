@@ -77,6 +77,7 @@ import {
 import {
   APP_LOCALES,
   FEED_VIEWS,
+  SEARCH_MODES,
   SOURCE_GROUPS,
   SOURCE_KINDS,
   VISIBLE_ITEM_TIERS,
@@ -217,7 +218,7 @@ function buildServer(user: SessionUser): McpServer {
         "Lexical mode (default) does case-insensitive substring match against title + summary. Semantic mode embeds your query and ranks items by pgvector cosine distance — better for conceptual queries where the exact phrase isn't in the text (e.g. 'autonomous coding agent' surfaces pieces about IDE automation). Semantic returns a `distance` field per hit (smaller = closer; ~-1 for near-identical vectors).",
       inputSchema: {
         q: z.string().min(1),
-        mode: z.enum(["lexical", "semantic"]).optional(),
+        mode: z.enum(SEARCH_MODES).optional(),
         source_id: z.string().optional(),
         source_group: z.enum(SOURCE_GROUPS).optional(),
         source_kind: z.enum(SOURCE_KINDS).optional(),

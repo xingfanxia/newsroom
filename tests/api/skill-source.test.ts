@@ -6,6 +6,7 @@ import {
   APP_LOCALES,
   FEED_VIEWS,
   ITEM_TIERS,
+  SEARCH_MODES,
   SOURCE_GROUPS,
   SOURCE_KINDS,
   VISIBLE_ITEM_TIERS,
@@ -29,6 +30,7 @@ describe("public skill contract source wiring", () => {
       "APP_LOCALES",
       "FEED_VIEWS",
       "ITEM_TIERS",
+      "SEARCH_MODES",
       "SOURCE_GROUPS",
       "SOURCE_KINDS",
       "VISIBLE_ITEM_TIERS",
@@ -64,6 +66,9 @@ describe("public skill contract source wiring", () => {
     );
     expect(text).toContain(
       `- \`source_kind\` = ${markdownCodeUnion(SOURCE_KINDS)}`,
+    );
+    expect(text).toContain(
+      `- \`mode\` = ${markdownCodeUnion(SEARCH_MODES)}, default \`lexical\``,
     );
     expect(text).toContain(
       `- \`locale\` = ${markdownCodeUnion(APP_LOCALES)}, default \`en\``,

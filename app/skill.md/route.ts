@@ -15,6 +15,7 @@ import {
   APP_LOCALES,
   FEED_VIEWS,
   ITEM_TIERS,
+  SEARCH_MODES,
   SOURCE_GROUPS,
   SOURCE_KINDS,
   VISIBLE_ITEM_TIERS,
@@ -31,6 +32,7 @@ function compactUnion(values: readonly (string | null)[]): string {
 const APP_LOCALE_OPTIONS = markdownCodeUnion(APP_LOCALES);
 const FEED_VIEW_OPTIONS = markdownCodeUnion(FEED_VIEWS);
 const ITEM_TIER_RESPONSE_OPTIONS = compactUnion(ITEM_TIERS);
+const SEARCH_MODE_OPTIONS = markdownCodeUnion(SEARCH_MODES);
 const SOURCE_GROUP_OPTIONS = markdownCodeUnion(SOURCE_GROUPS);
 const SOURCE_GROUP_RESPONSE_OPTIONS = compactUnion([...SOURCE_GROUPS, null]);
 const SOURCE_KIND_OPTIONS = markdownCodeUnion(SOURCE_KINDS);
@@ -149,6 +151,10 @@ curl -H 'If-None-Match: W/"public-feed-xxxxxxxxxxxxxxxx"' \\
 - \`limit\` = 1..100, default 40
 - \`offset\` = ≥0, default 0
 - \`locale\` = ${APP_LOCALE_OPTIONS}, default \`en\` (controls which language's title/summary returns)
+
+\`/api/public/search\` 额外参数:
+
+- \`mode\` = ${SEARCH_MODE_OPTIONS}, default \`lexical\`
 
 ## 响应 shape 关键不变量
 

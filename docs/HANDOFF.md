@@ -42,10 +42,11 @@ Shipped cleanup:
 - Shared app/source locale tuples and the fetcher-supported source-kind subset
   through `lib/types.ts`, so DB locale enums, REST/MCP locale schemas, sitemap
   locales, and fetcher support checks cannot drift.
-- Shared item tier, feed view, and source filter runtime tuples through
+- Shared item tier, feed view, search mode, and source filter runtime tuples through
   `lib/types.ts`, so REST feed/search schemas, MCP feed/search input schemas,
   item/event commentary workers, score prompt parsing, and source filtering
   cannot drift on `featured|p1|all|excluded`, `today|archive`,
+  `lexical|semantic`,
   `source_group`, or `source_kind`.
 - Shared public/agent API item source-field types and cluster lead-pick source
   authority types through `SourceGroup` / `SourceKind` from `lib/types.ts`;
@@ -53,7 +54,7 @@ Shipped cleanup:
   are not mistaken for current implementation guidance.
 - Shared `/skill.md` and `/openapi.yaml` public contract enums through the same
   `lib/types.ts` runtime tuples, including app/source locales, source
-  group/kind/cadence, item tiers, and feed views; the source catalog
+  group/kind/cadence, item tiers, feed views, and search modes; the source catalog
   description no longer embeds a stale monitored-source count, and MCP
   source-tool copy avoids fixed counts for the same reason.
 - Shared hourly/daily/weekly fetch+normalize sequencing through `workers/fetcher/pipeline.ts`, with HTTP route wiring in `app/api/cron/_fetch-bucket-route.ts` and local cron scripts using the same helper.

@@ -3,6 +3,7 @@ import type { FeedQuery } from "@/lib/items/live";
 import {
   APP_LOCALES,
   FEED_VIEWS,
+  SEARCH_MODES,
   SOURCE_GROUPS,
   SOURCE_KINDS,
   VISIBLE_ITEM_TIERS,
@@ -57,7 +58,7 @@ function makeSearchQueryParamSchema(options: {
 }) {
   return z.object({
     q: z.string().min(1, "q is required"),
-    mode: z.enum(["lexical", "semantic"]).optional().default("lexical"),
+    mode: z.enum(SEARCH_MODES).optional().default("lexical"),
     tier: z.enum(VISIBLE_ITEM_TIERS).optional().default("all"),
     date: ymdSchema,
     date_from: z.string().datetime().optional(),

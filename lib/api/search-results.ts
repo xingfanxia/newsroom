@@ -7,11 +7,12 @@ import {
   searchFeedQueryFromParams,
   type SearchQueryParams,
 } from "@/lib/api/feed-query-params";
-import type { Story } from "@/lib/types";
+import type { SearchMode, Story } from "@/lib/types";
 
 type SemanticStory = Story & { distance: number };
 
 export type SearchExecutionParams = SearchQueryParams & {
+  mode: SearchMode;
   /**
    * Override semantic excluded-tier inclusion for surfaces whose tier contract
    * does not map 1:1 to REST query params. REST keeps the default tier-driven

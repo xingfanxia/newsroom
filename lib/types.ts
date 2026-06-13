@@ -53,6 +53,9 @@ export type VisibleItemTier = (typeof VISIBLE_ITEM_TIERS)[number];
 export const FEED_VIEWS = ["today", "archive"] as const;
 export type FeedView = (typeof FEED_VIEWS)[number];
 
+export const SEARCH_MODES = ["lexical", "semantic"] as const;
+export type SearchMode = (typeof SEARCH_MODES)[number];
+
 export type Source = {
   id: string;
   name: { en: string; zh: string };
