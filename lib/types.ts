@@ -9,6 +9,15 @@ export const SOURCE_KINDS = [
 ] as const;
 export type SourceKind = (typeof SOURCE_KINDS)[number];
 
+export const FETCHABLE_SOURCE_KINDS = [
+  "rss",
+  "atom",
+  "rsshub",
+  "x-api",
+  "aihot-api",
+] as const satisfies readonly SourceKind[];
+export type FetchableSourceKind = (typeof FETCHABLE_SOURCE_KINDS)[number];
+
 export const SOURCE_GROUPS = [
   "vendor-official",
   "media",
@@ -24,6 +33,12 @@ export type SourceGroup = (typeof SOURCE_GROUPS)[number];
 
 export const CADENCES = ["live", "hourly", "daily", "weekly"] as const;
 export type Cadence = (typeof CADENCES)[number];
+
+export const APP_LOCALES = ["zh", "en"] as const;
+export type AppLocale = (typeof APP_LOCALES)[number];
+
+export const SOURCE_LOCALES = ["en", "zh", "multi"] as const;
+type SourceLocale = (typeof SOURCE_LOCALES)[number];
 
 export const ITEM_TIERS = ["featured", "p1", "all", "excluded"] as const;
 export type ItemTier = (typeof ITEM_TIERS)[number];
@@ -44,7 +59,7 @@ export type Source = {
   url: string;
   kind: SourceKind;
   group: SourceGroup;
-  locale: "en" | "zh" | "multi";
+  locale: SourceLocale;
   cadence: Cadence;
   priority: 1 | 2 | 3;
   tags: string[];
@@ -69,7 +84,7 @@ export type Story = {
     /** Canonical source kind — UI translates via i18n (sources.kindFilter.*). */
     kindCode: SourceKind;
     /** Source content locale — UI translates via i18n (sources.localeFilter.*). */
-    localeCode: "en" | "zh" | "multi";
+    localeCode: SourceLocale;
     /** Source group — podcast/vendor-official/media/... Optional because
      *  only some pages (podcasts) care about it. */
     groupCode?: SourceGroup;
@@ -84,7 +99,7 @@ export type Story = {
   publishedAt: string; // ISO
   url: string;
   crossSourceCount?: number;
-  locale: "en" | "zh" | "multi";
+  locale: SourceLocale;
   /** Optional editor commentary — populated for featured/p1 items only. */
   editorNote?: string;
   /** Optional long-form analysis (markdown). */

@@ -3,6 +3,7 @@ import { sql, and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import { sources, rawItems, sourceHealth } from "@/db/schema";
 import type { Source } from "@/db/schema";
+import { FETCHABLE_SOURCE_KINDS, type FetchableSourceKind } from "@/lib/types";
 import { fetchWithRetry, type FetchErrorCode } from "./http";
 import { parseFeed, type FeedItem } from "./rss";
 import {
@@ -16,10 +17,8 @@ const CONCURRENCY = 8;
 
 // Kinds we can fetch. Other kinds are kept in the catalog but skipped
 // (pending implementation) so they appear in source_health without polluting errors.
-const SUPPORTED_KINDS = ["rss", "atom", "rsshub", "x-api", "aihot-api"] as const;
-type SupportedKind = (typeof SUPPORTED_KINDS)[number];
-function isSupported(k: string): k is SupportedKind {
-  return (SUPPORTED_KINDS as readonly string[]).includes(k);
+function isSupported(k: string): k is FetchableSourceKind {
+  return (FETCHABLE_SOURCE_KINDS as readonly string[]).includes(k);
 }
 
 export type FetchReport = {

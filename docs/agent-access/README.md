@@ -47,7 +47,7 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 - **`lib/rate-limit/public.ts`** — parameterized IP token-bucket. Each route picks `{ family, windowMs, max }`. Family-isolated so `/feed` polling doesn't burn `/search` budget.
 - **`lib/api/public-helpers.ts`** — `computeEtag`, `ifNoneMatch`, `notModified`, `publicJson`, `publicError`, `publicHeaders`. Every route returns CORS + cache headers via these.
 - **`lib/api/feed-query-params.ts`** — shared feed/search query schemas and snake_case-to-`FeedQuery` mapping for public + bearer-gated surfaces; route files only choose auth/rate-limit and per-surface limit ceilings.
-- **`lib/types.ts`** — shared item tier and feed view runtime tuples used by REST feed/search schemas, MCP feed input schema, score parsing, and commentary workers.
+- **`lib/types.ts`** — shared item tier, feed view, app/source locale, and source-kind runtime tuples used by REST/MCP schemas, sitemap generation, DB enums, fetcher support checks, score parsing, and commentary workers.
 - **`lib/api/feed-results.ts`** — shared feed execution for `/api/public/feed`, `/api/v1/feed`, and MCP `ax_radar_feed`; surface adapters own auth/rate-limit/ETag and serializers, while this helper owns paired item + `total` queries and pagination defaults.
 - **`lib/api/search-results.ts`** — shared lexical/semantic search execution for `/api/public/search`, `/api/v1/search`, and MCP `ax_radar_search`; surface adapters own auth/rate-limit/ETag and serializers, while this helper owns lexical `total` counts and semantic filter mapping.
 - **`lib/api/source-catalog.ts`** — shared source catalog query + serializers used by `/api/public/sources`, `/api/v1/sources`, and MCP `ax_radar_sources`, with public/v1/MCP each owning only its exposure policy.
@@ -84,6 +84,7 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 - `tests/api/public-ratelimit.test.ts` — threshold, IP isolation, family isolation, IPv4/IPv6 header fallback
 - `tests/api/feed-query-params.test.ts` — shared feed/search parameter defaults, max-limit ceilings, tag parsing, and `FeedQuery` mapping
 - `tests/api/feed-tier-source.test.ts` — REST/MCP feed schemas, score parsing, and commentary workers stay wired to shared item-tier/feed-view tuples
+- `tests/api/runtime-contracts-source.test.ts` — app/source locales and fetcher-supported source kinds stay wired to shared runtime tuples
 - `tests/api/feed-query-source.test.ts` — feed/search routes stay wired to shared query schemas and shared execution helpers
 - `tests/api/public-feed.test.ts` — public feed reports a stable full-match `total` across page sizes
 - `tests/api/public-search.test.ts` — public lexical search reports a stable full-match `total` across page sizes

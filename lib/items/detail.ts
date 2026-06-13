@@ -1,9 +1,9 @@
 import { and, eq, isNotNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items, sources } from "@/db/schema";
-import type { Story } from "@/lib/types";
+import type { AppLocale, Story } from "@/lib/types";
 
-type Locale = "zh" | "en";
+type Locale = AppLocale;
 
 /**
  * Full detail for a single item — same locale-resolved surface as the list

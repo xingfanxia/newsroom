@@ -36,9 +36,12 @@ Shipped cleanup:
 - Shared usage window keys through `USAGE_WINDOWS` in `lib/llm/stats.ts`, so
   the admin usage page, v1 usage summary, and MCP usage tool cannot drift on
   the `today|week|month|all` window set.
-- Shared source kind/group/cadence runtime tuples through `lib/types.ts` and
+- Shared source kind/group/cadence/source-locale runtime tuples through `lib/types.ts` and
   source group display metadata through `lib/sources/groups.ts`, so DB enums
   and the `/sources` group order/labels cannot drift from catalog types.
+- Shared app/source locale tuples and the fetcher-supported source-kind subset
+  through `lib/types.ts`, so DB locale enums, REST/MCP locale schemas, sitemap
+  locales, and fetcher support checks cannot drift.
 - Shared item tier and feed view runtime tuples through `lib/types.ts`, so
   REST feed/search schemas, MCP feed input schema, item/event commentary
   workers, and score prompt parsing cannot drift on `featured|p1|all|excluded`
@@ -79,7 +82,7 @@ Verification:
 - `bun run code:dead:exports` — passed.
 - `bun run code:dead:types` — passed.
 - `bun run lint` — passed with no warnings.
-- `bun test --env-file=.env.local` — 626 pass, 1 skip, 0 fail.
+- `bun test --env-file=.env.local` — 628 pass, 1 skip, 0 fail.
 - `bun run build` — passed.
 - `git diff --check` — passed.
 

@@ -19,6 +19,7 @@ import { parseJsonRequestBody } from "@/lib/api/json-body";
 import { requireApiToken } from "@/lib/auth/api-token";
 import { applyFeedbackToggle } from "@/lib/feedback/toggle";
 import { toSavedAgentApiItem } from "@/lib/api/v1-items";
+import { APP_LOCALES } from "@/lib/types";
 import {
   assignSavedItemCollection,
   getSavedItemCollectionId,
@@ -31,7 +32,7 @@ const getQuerySchema = z.object({
     .union([z.literal("inbox"), z.coerce.number().int().positive()])
     .optional(),
   limit: z.coerce.number().int().min(1).max(200).optional().default(80),
-  locale: z.enum(["zh", "en"]).optional().default("en"),
+  locale: z.enum(APP_LOCALES).optional().default("en"),
 });
 
 const postBodySchema = z.object({

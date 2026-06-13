@@ -35,10 +35,12 @@ Each arrow is a durable step: a failed enrich doesn't re-fetch; a failed score d
 ## 2. Components
 
 ### 2.1 Source catalog (`lib/sources/catalog.ts`)
-A typed registry. Runtime source kind/group/cadence tuples live in
+A typed registry. Runtime source kind/group/cadence/source-locale tuples live in
 `lib/types.ts` and feed both TypeScript contracts and Drizzle DB enums; source
-group order/labels for the `信源` UI live in `lib/sources/groups.ts`. Source
-entry shape (current as of 2026-06-12):
+group order/labels for the `信源` UI live in `lib/sources/groups.ts`. The
+fetcher-supported source-kind subset also lives in `lib/types.ts` as
+`FETCHABLE_SOURCE_KINDS`, so catalog kinds and worker support checks cannot
+drift. Source entry shape (current as of 2026-06-12):
 
 ```ts
 type Source = {

@@ -74,7 +74,7 @@ import {
   getUsageSummary,
   USAGE_WINDOWS,
 } from "@/lib/api/usage-summary";
-import { FEED_VIEWS, VISIBLE_ITEM_TIERS } from "@/lib/types";
+import { APP_LOCALES, FEED_VIEWS, VISIBLE_ITEM_TIERS } from "@/lib/types";
 import type { SessionUser } from "@/lib/auth/session";
 
 type ToolOutput = {
@@ -130,7 +130,7 @@ function buildServer(user: SessionUser): McpServer {
         date_to: z.string().optional(),
         limit: z.number().int().min(1).max(200).optional(),
         offset: z.number().int().min(0).optional(),
-        locale: z.enum(["zh", "en"]).optional(),
+        locale: z.enum(APP_LOCALES).optional(),
       },
     },
     async (args) => {
@@ -172,7 +172,7 @@ function buildServer(user: SessionUser): McpServer {
         "Given a cluster_id from ax_radar_feed (rows where coverage > 1 are multi-source events), return the full list of items that comprise the event — title, source, url, importance — ordered by importance DESC. Use this to drill into 'who else covered this story?' or to cite multiple primary sources when summarizing.",
       inputSchema: {
         cluster_id: z.number().int().positive(),
-        locale: z.enum(["zh", "en"]).optional(),
+        locale: z.enum(APP_LOCALES).optional(),
       },
     },
     async ({ cluster_id, locale }) => {
@@ -193,7 +193,7 @@ function buildServer(user: SessionUser): McpServer {
         "Fetch the full payload for a given item id: both-locale title/summary, editor note, multi-paragraph editor_analysis, LLM reasoning, HKR breakdown with per-axis rationale, full body_md (transcript for YT, article text for RSS). Use this after ax_radar_feed or ax_radar_search to go deep on a hit.",
       inputSchema: {
         id: z.number().int().positive(),
-        locale: z.enum(["zh", "en"]).optional(),
+        locale: z.enum(APP_LOCALES).optional(),
       },
     },
     async ({ id, locale }) => {
@@ -218,7 +218,7 @@ function buildServer(user: SessionUser): McpServer {
         date_from: z.string().optional(),
         date_to: z.string().optional(),
         limit: z.number().int().min(1).max(100).optional(),
-        locale: z.enum(["zh", "en"]).optional(),
+        locale: z.enum(APP_LOCALES).optional(),
       },
     },
     async (args) => {

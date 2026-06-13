@@ -1,10 +1,10 @@
 import { z } from "zod";
-import type { Story } from "@/lib/types";
+import { APP_LOCALES, type Story } from "@/lib/types";
 
 type EventMember = NonNullable<Story["members"]>[number];
 
 const eventMemberClusterIdSchema = z.coerce.number().int().positive();
-const eventMemberLocaleSchema = z.enum(["zh", "en"]);
+const eventMemberLocaleSchema = z.enum(APP_LOCALES);
 
 type EventMemberLocale = z.infer<typeof eventMemberLocaleSchema>;
 

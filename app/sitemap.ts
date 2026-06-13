@@ -7,10 +7,9 @@
  * dynamic enumerator here when SEO traction justifies the cost.
  */
 import type { MetadataRoute } from "next";
+import { APP_LOCALES } from "@/lib/types";
 
 const SITE_URL = "https://news.ax0x.ai";
-
-const LOCALES = ["zh", "en"] as const;
 
 const PRIMARY_ROUTES = [
   "",          // /[locale]
@@ -26,7 +25,7 @@ const PRIMARY_ROUTES = [
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
-  const localePages: MetadataRoute.Sitemap = LOCALES.flatMap((locale) =>
+  const localePages: MetadataRoute.Sitemap = APP_LOCALES.flatMap((locale) =>
     PRIMARY_ROUTES.map((route) => ({
       url: `${SITE_URL}/${locale}${route}`,
       lastModified: now,

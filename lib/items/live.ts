@@ -1,9 +1,14 @@
 import { and, eq, sql, isNotNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items, sources, clusters } from "@/db/schema";
-import type { FeedView, Story, VisibleItemTier } from "@/lib/types";
+import type {
+  AppLocale,
+  FeedView,
+  Story,
+  VisibleItemTier,
+} from "@/lib/types";
 
-type Locale = "zh" | "en";
+type Locale = AppLocale;
 
 export type FeedQuery = {
   tier?: VisibleItemTier;

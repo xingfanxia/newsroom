@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { FeedQuery } from "@/lib/items/live";
-import { FEED_VIEWS, VISIBLE_ITEM_TIERS } from "@/lib/types";
+import { APP_LOCALES, FEED_VIEWS, VISIBLE_ITEM_TIERS } from "@/lib/types";
 
 const ymdSchema = z
   .string()
@@ -41,7 +41,7 @@ function makeFeedQueryParamSchema(options: {
     include_source_tags: z.string().min(1).optional(),
     limit: limitParamSchema(options.maxLimit, options.defaultLimit),
     offset: z.coerce.number().int().min(0).optional().default(0),
-    locale: z.enum(["zh", "en"]).optional().default("en"),
+    locale: z.enum(APP_LOCALES).optional().default("en"),
   });
 }
 
@@ -61,7 +61,7 @@ function makeSearchQueryParamSchema(options: {
     source_kind: z.string().min(1).optional(),
     limit: limitParamSchema(options.maxLimit, options.defaultLimit),
     offset: z.coerce.number().int().min(0).optional().default(0),
-    locale: z.enum(["zh", "en"]).optional().default("en"),
+    locale: z.enum(APP_LOCALES).optional().default("en"),
   });
 }
 
