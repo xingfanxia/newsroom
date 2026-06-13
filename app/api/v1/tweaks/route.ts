@@ -9,13 +9,7 @@
  * (no partial deltas) to match the existing UI and make the agent's mental
  * model simple ("I sent [a,b,c] → server state is exactly [a,b,c]").
  */
-import { eq } from "drizzle-orm";
-import { db } from "@/db/client";
-import { users } from "@/db/schema";
-import {
-  buildTweaksDbPatch,
-  tweaksPatchBodySchema,
-} from "@/lib/api/tweak-requests";
+import { tweaksPatchBodySchema } from "@/lib/api/tweak-requests";
 import { parseJsonRequestBody } from "@/lib/api/json-body";
 import {
   runV1Route,
@@ -23,21 +17,15 @@ import {
   v1Json,
   v1ServerError,
 } from "@/lib/api/v1-route";
-import { upsertAppUser } from "@/lib/auth/session";
+import {
+  getTweaksRoutePayload,
+  saveTweaksRoutePayload,
+} from "@/lib/api/tweak-routes";
 
 export async function GET(req: Request) {
   return runV1Route(req, async (user) => {
     try {
-      await upsertAppUser(user);
-      const [row] = await db()
-        .select({ tweaks: users.tweaks, watchlist: users.watchlist })
-        .from(users)
-        .where(eq(users.id, user.id))
-        .limit(1);
-      return v1Json({
-        tweaks: row?.tweaks ?? null,
-        watchlist: (row?.watchlist as string[] | null) ?? null,
-      });
+      return v1Json(await getTweaksRoutePayload(user));
     } catch (err) {
       return v1ServerError("api/v1/tweaks GET", err);
     }
@@ -51,14 +39,9 @@ export async function PATCH(req: Request) {
     });
     if (!parsed.ok) return parsed.response;
 
-    const patch = buildTweaksDbPatch(parsed.data);
-    if (!patch) {
-      return v1Error("empty_body", 400);
-    }
-
     try {
-      await upsertAppUser(user);
-      await db().update(users).set(patch).where(eq(users.id, user.id));
+      const result = await saveTweaksRoutePayload(user, parsed.data);
+      if (!result.ok) return v1Error(result.error, result.status);
       return v1Json({ ok: true });
     } catch (err) {
       return v1ServerError("api/v1/tweaks PATCH", err);

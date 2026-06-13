@@ -35,7 +35,7 @@ export const tweaksPatchBodySchema = z.object({
   watchlist: z.array(z.string().min(1).max(64)).max(24).optional(),
 });
 
-type TweaksPatchBody = z.infer<typeof tweaksPatchBodySchema>;
+export type TweaksPatchBody = z.infer<typeof tweaksPatchBodySchema>;
 
 export function buildTweaksDbPatch(
   body: TweaksPatchBody,

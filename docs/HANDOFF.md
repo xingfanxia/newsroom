@@ -55,6 +55,10 @@ Shipped cleanup:
   `lib/api/collection-routes.ts`, so both surfaces reuse the same
   `duplicate_name` and `not_found` decisions while keeping their own auth,
   request schemas, and response envelopes.
+- Shared cookie/v1 tweaks persistence through `lib/api/tweak-routes.ts`, so
+  user upsert, preferences/watchlist loading, DB patch construction, and
+  `empty_body` decisions stay aligned while each route keeps its own auth and
+  response envelope.
 - Shared user roles and iteration statuses through `USER_ROLES`,
   `ITERATION_STATUSES`, and named status constants in `lib/types.ts`, so DB
   enums, auth upserts, iteration routes, agent runtime writes, and the admin
@@ -227,7 +231,7 @@ Verification (2026-06-13):
 - `bun run code:dead:exports` — passed.
 - `bun run code:dead:types` — passed.
 - `bun run lint` — passed with no warnings.
-- `bun test --env-file=.env.local` — 779 pass, 1 skip, 0 fail.
+- `bun test --env-file=.env.local` — 780 pass, 1 skip, 0 fail.
 - `bun run build` — passed.
 - `git diff --check` — passed.
 
