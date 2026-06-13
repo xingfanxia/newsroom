@@ -49,6 +49,16 @@ function boundedText(max: number, min = 1) {
   );
 }
 
+function boundedRationaleText(max: number) {
+  return z.preprocess(
+    (value) =>
+      typeof value === "string" && value.trim().length === 0
+        ? "正文没有给出明确理由。"
+        : value,
+    boundedText(max),
+  );
+}
+
 export const zhEnrichSchema = z.object({
   titleZh: boundedText(80),
   summaryZh: boundedText(180, 20),
@@ -98,9 +108,9 @@ export async function generateChineseEnrichment(input: Parameters<typeof zhEnric
 
 export const zhScoreRationaleSchema = z.object({
   hkrReasonsZh: z.object({
-    h: boundedText(80),
-    k: boundedText(80),
-    r: boundedText(80),
+    h: boundedRationaleText(80),
+    k: boundedRationaleText(80),
+    r: boundedRationaleText(80),
   }),
   reasoningZh: boundedText(280),
 });

@@ -112,6 +112,18 @@ describe("Chinese-only schemas", () => {
     expect(parsed.hkrReasonsZh.h).toContain("模型");
   });
 
+  it("normalizes empty score rationale axes instead of failing the item", () => {
+    const parsed = zhScoreRationaleSchema.parse({
+      hkrReasonsZh: {
+        h: "模型发布有明确钩子。",
+        k: "",
+        r: "会触发从业者对路线图的讨论。",
+      },
+      reasoningZh: "保留现有分层，只重写中文推荐理由。",
+    });
+    expect(parsed.hkrReasonsZh.k).toBe("正文没有给出明确理由。");
+  });
+
   it("truncates overlong Chinese notes for UI safety", () => {
     const parsed = zhCommentaryNoteSchema.parse({
       editorNoteZh: "很".repeat(220),
