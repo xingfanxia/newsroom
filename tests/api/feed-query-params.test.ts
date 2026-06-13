@@ -8,6 +8,7 @@ import {
   v1FeedQueryParamSchema,
   v1SearchQueryParamSchema,
 } from "@/lib/api/feed-query-params";
+import { SOURCE_GROUPS, SOURCE_KINDS } from "@/lib/types";
 
 describe("feed query param schemas", () => {
   test("share feed defaults while preserving v1/public limit ceilings", () => {
@@ -72,6 +73,23 @@ describe("feed query param schemas", () => {
       includeSourceTags: ["vendor", "deep-report"],
     });
   });
+
+  test("validates source group and kind against runtime tuples", () => {
+    expect(
+      v1FeedQueryParamSchema.safeParse({
+        source_group: SOURCE_GROUPS[0],
+        source_kind: SOURCE_KINDS[0],
+      }).success,
+    ).toBe(true);
+    expect(
+      publicFeedQueryParamSchema.safeParse({ source_group: "not-a-group" })
+        .success,
+    ).toBe(false);
+    expect(
+      publicFeedQueryParamSchema.safeParse({ source_kind: "not-a-kind" })
+        .success,
+    ).toBe(false);
+  });
 });
 
 describe("search query param schemas", () => {
@@ -119,6 +137,28 @@ describe("search query param schemas", () => {
       includeSourceGroup: true,
       searchText: "agentic ide",
     });
+  });
+
+  test("validates search source group and kind against runtime tuples", () => {
+    expect(
+      v1SearchQueryParamSchema.safeParse({
+        q: "agent",
+        source_group: SOURCE_GROUPS[0],
+        source_kind: SOURCE_KINDS[0],
+      }).success,
+    ).toBe(true);
+    expect(
+      publicSearchQueryParamSchema.safeParse({
+        q: "agent",
+        source_group: "not-a-group",
+      }).success,
+    ).toBe(false);
+    expect(
+      publicSearchQueryParamSchema.safeParse({
+        q: "agent",
+        source_kind: "not-a-kind",
+      }).success,
+    ).toBe(false);
   });
 
   test("keeps comma-list parsing centralized", () => {

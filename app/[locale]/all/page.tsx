@@ -4,7 +4,12 @@ import { PageHead } from "@/components/shell/page-head";
 import { Item } from "@/components/feed/item";
 import { CalendarGrid } from "@/components/feed/calendar-grid";
 import { DayBreak } from "../_day-break";
-import { HomeFilters, type SourcePreset } from "../_home-filters";
+import { HomeFilters } from "../_home-filters";
+import {
+  coerceSourcePreset,
+  sourcePresetToFeedFilter,
+  type SourcePreset,
+} from "../_source-presets";
 import { groupByDay } from "@/lib/feed/group-by-day";
 import { getFeaturedStories } from "@/lib/items/live";
 import {
@@ -17,34 +22,6 @@ import type { Story } from "@/lib/types";
 export const revalidate = 60;
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-
-const SOURCE_PRESETS = new Set<SourcePreset>([
-  "all",
-  "official",
-  "newsletter",
-  "media",
-  "x",
-  "research",
-]);
-
-function coerceSource(v: string | undefined): SourcePreset {
-  return v && SOURCE_PRESETS.has(v as SourcePreset)
-    ? (v as SourcePreset)
-    : "all";
-}
-
-function presetToFilter(
-  preset: SourcePreset,
-): { sourceGroup?: string; sourceKind?: string } {
-  switch (preset) {
-    case "official":   return { sourceGroup: "vendor-official" };
-    case "newsletter": return { sourceGroup: "newsletter" };
-    case "media":      return { sourceGroup: "media" };
-    case "research":   return { sourceGroup: "research" };
-    case "x":          return { sourceKind: "x-api" };
-    default:           return {};
-  }
-}
 
 const PAGE_SIZE = 200;
 
@@ -63,8 +40,10 @@ export default async function AllPostsPage({
   const [{ locale }, sp] = await Promise.all([params, searchParams]);
   setRequestLocale(locale);
   const sourceId = sp.source_id?.trim() || undefined;
-  const sourcePreset = coerceSource(sp.source);
-  const sourceFilter = sourceId ? { sourceId } : presetToFilter(sourcePreset);
+  const sourcePreset = coerceSourcePreset(sp.source);
+  const sourceFilter = sourceId
+    ? { sourceId }
+    : sourcePresetToFeedFilter(sourcePreset);
   const activeDate = sp.date && DATE_RE.test(sp.date) ? sp.date : undefined;
   // When a day is picked, show everything from that day uncapped (500 is
   // the safety ceiling). Otherwise paginate in PAGE_SIZE chunks via `offset`.
@@ -238,4 +217,3 @@ function Pagination({
     </nav>
   );
 }
-

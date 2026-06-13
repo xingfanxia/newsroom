@@ -82,8 +82,8 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 
 - `tests/api/public-helpers.test.ts` — ETag determinism, family isolation, headers, CORS
 - `tests/api/public-ratelimit.test.ts` — threshold, IP isolation, family isolation, IPv4/IPv6 header fallback
-- `tests/api/feed-query-params.test.ts` — shared feed/search parameter defaults, max-limit ceilings, tag parsing, and `FeedQuery` mapping
-- `tests/api/feed-tier-source.test.ts` — REST/MCP feed schemas, score parsing, and commentary workers stay wired to shared item-tier/feed-view tuples
+- `tests/api/feed-query-params.test.ts` — shared feed/search parameter defaults, source filter validation, max-limit ceilings, tag parsing, and `FeedQuery` mapping
+- `tests/api/feed-tier-source.test.ts` — REST/MCP feed schemas, score parsing, and commentary workers stay wired to shared item-tier/feed-view/source-filter tuples
 - `tests/api/runtime-contracts-source.test.ts` — app/source locales and fetcher-supported source kinds stay wired to shared runtime tuples
 - `tests/api/feed-query-source.test.ts` — feed/search routes stay wired to shared query schemas and shared execution helpers
 - `tests/api/public-feed.test.ts` — public feed reports a stable full-match `total` across page sizes
@@ -114,7 +114,7 @@ Run these with `bun test tests/api/public-*.test.ts tests/api/feed-query-*.test.
 
 - **Rate limiter is Vercel-instance-local** — buckets don't survive cold starts. Treated as "discourage hammering" not "airtight cap." Real abuse defense lives at the CDN/WAF layer.
 - **Field stripping is centralized for feed/search and item-detail surfaces** — `toPublicApiItem` strips HKR reasons for feed/search, while `toPublicItemDetail` strips detail-only LLM internals (`reasoning`, `body_rss`, HKR reasons). If adding a new domain field, update the relevant serializer and OpenAPI schema together.
-- **Feed/search query parsing is centralized** — `/api/public/feed`, `/api/public/search`, `/api/v1/feed`, and `/api/v1/search` share `lib/api/feed-query-params.ts`; only public/v1 max limits differ. Feed-facing tier values come from `VISIBLE_ITEM_TIERS`, and `today|archive` comes from `FEED_VIEWS`, both in `lib/types.ts`; `/skill.md` and `/openapi.yaml` render those same runtime tuples instead of repeating enum lists.
+- **Feed/search query parsing is centralized** — `/api/public/feed`, `/api/public/search`, `/api/v1/feed`, and `/api/v1/search` share `lib/api/feed-query-params.ts`; only public/v1 max limits differ. Feed-facing tier values come from `VISIBLE_ITEM_TIERS`, `today|archive` comes from `FEED_VIEWS`, and `source_group` / `source_kind` come from `SOURCE_GROUPS` / `SOURCE_KINDS`, all in `lib/types.ts`; MCP, `/skill.md`, and `/openapi.yaml` render or validate those same runtime tuples instead of repeating enum lists.
 - **Feed execution is centralized for REST + MCP** — `/api/public/feed`, `/api/v1/feed`, and MCP `ax_radar_feed` all call `runFeedQuery`; adapters keep only auth/rate-limit/ETag and item serialization while the helper keeps item rows and `total` counts paired.
 - **Search execution is centralized for REST + MCP** — `/api/public/search`, `/api/v1/search`, and MCP `ax_radar_search` all call `runSearchQuery`; lexical mode counts the full filtered match set for pagination, while semantic mode shares the same source/date/tier filter mapping.
 - **Source catalog serialization is centralized** — `/api/public/sources`, `/api/v1/sources`, and MCP `ax_radar_sources` share `lib/api/source-catalog.ts`; public strips operational diagnostics, v1 keeps them, MCP keeps a compact flat shape.

@@ -4,6 +4,8 @@ import { items, sources, clusters } from "@/db/schema";
 import type {
   AppLocale,
   FeedView,
+  SourceGroup,
+  SourceKind,
   Story,
   VisibleItemTier,
 } from "@/lib/types";
@@ -21,9 +23,9 @@ export type FeedQuery = {
    *  over sourceGroup/sourceKind when set. */
   sourceId?: string;
   /** Filter by source.group — e.g. "podcast" for the /podcasts page. */
-  sourceGroup?: string;
+  sourceGroup?: SourceGroup;
   /** Filter by source.kind — e.g. "x-api" for the /x-monitor page. */
-  sourceKind?: string;
+  sourceKind?: SourceKind;
   /** Restrict to items whose published_at falls on this calendar day
    *  (UTC, YYYY-MM-DD). Used by the /all day-picker. */
   date?: string;

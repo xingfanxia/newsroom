@@ -1,6 +1,12 @@
 import { z } from "zod";
 import type { FeedQuery } from "@/lib/items/live";
-import { APP_LOCALES, FEED_VIEWS, VISIBLE_ITEM_TIERS } from "@/lib/types";
+import {
+  APP_LOCALES,
+  FEED_VIEWS,
+  SOURCE_GROUPS,
+  SOURCE_KINDS,
+  VISIBLE_ITEM_TIERS,
+} from "@/lib/types";
 
 const ymdSchema = z
   .string()
@@ -34,8 +40,8 @@ function makeFeedQueryParamSchema(options: {
     date_from: z.string().datetime().optional(),
     date_to: z.string().datetime().optional(),
     source_id: z.string().min(1).optional(),
-    source_group: z.string().min(1).optional(),
-    source_kind: z.string().min(1).optional(),
+    source_group: z.enum(SOURCE_GROUPS).optional(),
+    source_kind: z.enum(SOURCE_KINDS).optional(),
     curated_only: boolParamSchema,
     exclude_source_tags: z.string().min(1).optional(),
     include_source_tags: z.string().min(1).optional(),
@@ -57,8 +63,8 @@ function makeSearchQueryParamSchema(options: {
     date_from: z.string().datetime().optional(),
     date_to: z.string().datetime().optional(),
     source_id: z.string().min(1).optional(),
-    source_group: z.string().min(1).optional(),
-    source_kind: z.string().min(1).optional(),
+    source_group: z.enum(SOURCE_GROUPS).optional(),
+    source_kind: z.enum(SOURCE_KINDS).optional(),
     limit: limitParamSchema(options.maxLimit, options.defaultLimit),
     offset: z.coerce.number().int().min(0).optional().default(0),
     locale: z.enum(APP_LOCALES).optional().default("en"),

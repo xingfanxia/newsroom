@@ -42,10 +42,11 @@ Shipped cleanup:
 - Shared app/source locale tuples and the fetcher-supported source-kind subset
   through `lib/types.ts`, so DB locale enums, REST/MCP locale schemas, sitemap
   locales, and fetcher support checks cannot drift.
-- Shared item tier and feed view runtime tuples through `lib/types.ts`, so
-  REST feed/search schemas, MCP feed input schema, item/event commentary
-  workers, and score prompt parsing cannot drift on `featured|p1|all|excluded`
-  or `today|archive`.
+- Shared item tier, feed view, and source filter runtime tuples through
+  `lib/types.ts`, so REST feed/search schemas, MCP feed/search input schemas,
+  item/event commentary workers, score prompt parsing, and source filtering
+  cannot drift on `featured|p1|all|excluded`, `today|archive`,
+  `source_group`, or `source_kind`.
 - Shared `/skill.md` and `/openapi.yaml` public contract enums through the same
   `lib/types.ts` runtime tuples, including app/source locales, source
   group/kind/cadence, item tiers, and feed views; the source catalog
@@ -327,12 +328,9 @@ Commentary: 106/106 enriched items have deep notes.
    `bun run db:push`. **Still relevant for s9 semantic search work.**
 3. **`--font-mono` needs `Noto Sans SC`** in the fallback stack so CJK
    glyphs don't fall back to OS-specific faces.
-4. **`getFeaturedStories` has no per-source filter** — only
-   `sourceGroup` / `sourceKind`. `/x-monitor?handle=X` and
-   `/podcasts?source=X` emulate filtering via client-side
-   `s.source.publisher` matching (string equality on publisher name).
-   Fragile if two sources share a publisher name. **Fix this in s9
-   before exposing `/api/v1/feed` with per-source params.**
+4. **Resolved 2026-06-12: `getFeaturedStories` has server-side source filters** —
+   current callers use `sourceId`, `sourceGroup`, and `sourceKind`; the old
+   client-side publisher-name workaround is not current guidance.
 5. **M4 agent still must use `reasoningEffort: "medium"`** on Azure
    Pro — xhigh/high hit 5-min ceiling on 12KB prompts.
 6. **Tweaks localStorage migration** — legacy `"both"` language auto-
@@ -369,8 +367,9 @@ Full design in [`docs/AGENT-MCP-PLAN.md`](./AGENT-MCP-PLAN.md). Phases:
 5. Claude Code skill at `~/.claude/skills/ax-radar/SKILL.md` with
    domain glossary (tier/HKR/importance semantics).
 
-Before starting: **fix `getFeaturedStories` per-source filter** so
-`/api/v1/feed?source=<id>` doesn't rely on publisher-string matching.
+Historical pre-flight now resolved: `getFeaturedStories` supports per-source
+filters, and `/api/v1/feed?source_id=<id>` does not rely on publisher-string
+matching.
 
 ### 2. M4 agent end-to-end UAT
 Still never exercised through prod UI. First iteration remains

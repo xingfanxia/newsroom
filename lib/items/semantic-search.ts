@@ -22,14 +22,14 @@ import { and, eq, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items, sources, clusters, halfvecToDriver } from "@/db/schema";
 import { embed } from "@/lib/llm";
-import type { Story } from "@/lib/types";
+import type { AppLocale, SourceGroup, SourceKind, Story } from "@/lib/types";
 
 export type SemanticFilters = {
-  locale?: "zh" | "en";
+  locale?: AppLocale;
   limit?: number;
   sourceId?: string;
-  sourceGroup?: string;
-  sourceKind?: string;
+  sourceGroup?: SourceGroup;
+  sourceKind?: SourceKind;
   dateFrom?: string;
   dateTo?: string;
   /** Include excluded-tier hits? Default false — matches /feed behavior. */

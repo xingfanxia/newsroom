@@ -74,7 +74,13 @@ import {
   getUsageSummary,
   USAGE_WINDOWS,
 } from "@/lib/api/usage-summary";
-import { APP_LOCALES, FEED_VIEWS, VISIBLE_ITEM_TIERS } from "@/lib/types";
+import {
+  APP_LOCALES,
+  FEED_VIEWS,
+  SOURCE_GROUPS,
+  SOURCE_KINDS,
+  VISIBLE_ITEM_TIERS,
+} from "@/lib/types";
 import type { SessionUser } from "@/lib/auth/session";
 
 type ToolOutput = {
@@ -120,8 +126,8 @@ function buildServer(user: SessionUser): McpServer {
         view: z.enum(FEED_VIEWS).optional(),
         hot_window_hours: z.number().int().min(1).max(168).optional(),
         source_id: z.string().optional(),
-        source_group: z.string().optional(),
-        source_kind: z.string().optional(),
+        source_group: z.enum(SOURCE_GROUPS).optional(),
+        source_kind: z.enum(SOURCE_KINDS).optional(),
         curated_only: z.boolean().optional(),
         exclude_source_tags: z.array(z.string()).optional(),
         include_source_tags: z.array(z.string()).optional(),
@@ -213,8 +219,8 @@ function buildServer(user: SessionUser): McpServer {
         q: z.string().min(1),
         mode: z.enum(["lexical", "semantic"]).optional(),
         source_id: z.string().optional(),
-        source_group: z.string().optional(),
-        source_kind: z.string().optional(),
+        source_group: z.enum(SOURCE_GROUPS).optional(),
+        source_kind: z.enum(SOURCE_KINDS).optional(),
         date_from: z.string().optional(),
         date_to: z.string().optional(),
         limit: z.number().int().min(1).max(100).optional(),

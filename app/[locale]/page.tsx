@@ -7,7 +7,11 @@ import { Item } from "@/components/feed/item";
 import { RightRail } from "@/components/feed/right-rail";
 import { CalendarGrid } from "@/components/feed/calendar-grid";
 import { DayBreak } from "./_day-break";
-import { HomeFilters, type HomeTier, type HomeView, type SourcePreset } from "./_home-filters";
+import { HomeFilters, type HomeTier, type HomeView } from "./_home-filters";
+import {
+  coerceSourcePreset,
+  sourcePresetToFeedFilter,
+} from "./_source-presets";
 import { groupByDay } from "@/lib/feed/group-by-day";
 import { getFeaturedStories } from "@/lib/items/live";
 import {
@@ -25,40 +29,13 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export const revalidate = 60;
 
-const SOURCE_PRESETS = new Set<SourcePreset>([
-  "all",
-  "official",
-  "newsletter",
-  "media",
-  "x",
-  "research",
-]);
-
 function coerceTier(v: string | undefined): HomeTier {
   return v === "p1" ? "p1" : "featured";
-}
-function coerceSource(v: string | undefined): SourcePreset {
-  return v && SOURCE_PRESETS.has(v as SourcePreset)
-    ? (v as SourcePreset)
-    : "all";
 }
 function coerceView(v: string | undefined): HomeView {
   // Default flipped 2026-05-08: today's hot events, not the multi-day digest.
   // Old behavior is reachable via ?view=daily — preserved for power users.
   return v === "daily" ? "daily" : "today";
-}
-
-function presetToFilter(
-  preset: SourcePreset,
-): { sourceGroup?: string; sourceKind?: string } {
-  switch (preset) {
-    case "official":   return { sourceGroup: "vendor-official" };
-    case "newsletter": return { sourceGroup: "newsletter" };
-    case "media":      return { sourceGroup: "media" };
-    case "research":   return { sourceGroup: "research" };
-    case "x":          return { sourceKind: "x-api" };
-    default:           return {};
-  }
 }
 
 const FALLBACK_TICKER = [
@@ -98,8 +75,10 @@ export default async function HotNewsPage({
   const tier = coerceTier(sp.tier);
   // source_id pins a specific publisher and overrides any preset bucket.
   const sourceId = sp.source_id?.trim() || undefined;
-  const sourcePreset = coerceSource(sp.source);
-  const sourceFilter = sourceId ? { sourceId } : presetToFilter(sourcePreset);
+  const sourcePreset = coerceSourcePreset(sp.source);
+  const sourceFilter = sourceId
+    ? { sourceId }
+    : sourcePresetToFeedFilter(sourcePreset);
   const activeDate = sp.date && DATE_RE.test(sp.date) ? sp.date : undefined;
   // Default `today` (importance-sorted hot events). `daily` opts back into
   // the multi-day 3-per-day digest. Calendar drill-in (activeDate) overrides

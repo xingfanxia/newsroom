@@ -2,16 +2,10 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
 import { useTweaks } from "@/hooks/use-tweaks";
+import type { SourcePreset } from "./_source-presets";
 
 export type HomeTier = "featured" | "p1";
 export type HomeView = "today" | "daily";
-export type SourcePreset =
-  | "all"
-  | "official"
-  | "newsletter"
-  | "media"
-  | "x"
-  | "research";
 
 const VIEW_OPTS: Array<{ v: HomeView; en: string; zh: string }> = [
   { v: "today", en: "today",  zh: "今日热点" },
