@@ -11,7 +11,7 @@ function read(path: string): string {
 const publicSurfaceFiles = [
   "app/sitemap.ts",
   "app/robots.ts",
-  "app/api/rss/[slug]/route.ts",
+  "lib/rss/legacy-feeds.ts",
   "app/api/feed/[locale]/rss.xml/route.ts",
   "app/api/feed/newsletter/[locale]/rss.xml/route.ts",
   "app/openapi.yaml/route.ts",

@@ -127,6 +127,9 @@ Shipped cleanup:
   `/api/rss/*`, the featured-locale feeds, and the legacy newsletter feeds now
   use the same renderer/response helper while keeping feed-specific metadata
   such as radar extension fields.
+- Shared legacy `/api/rss/{daily,today,curated}.xml` feed construction through
+  `lib/rss/legacy-feeds.ts`; the slug route now owns only rate-limit, slug
+  validation, 404 handling, and the RSS HTTP response envelope.
 - Shared bearer-gated `/api/v1/*` auth and plain JSON/error envelopes through
   `lib/api/v1-route.ts`; v1 route files now call `runV1Route` and return
   `v1Json` / `v1Error` / `v1InvalidQuery`, so token verification and response
@@ -172,7 +175,7 @@ Verification (2026-06-13):
 - `bun run code:dead:exports` — passed.
 - `bun run code:dead:types` — passed.
 - `bun run lint` — passed with no warnings.
-- `bun test --env-file=.env.local` — 727 pass, 1 skip, 0 fail.
+- `bun test --env-file=.env.local` — 731 pass, 1 skip, 0 fail.
 - `bun run build` — passed.
 - `git diff --check` — passed.
 
