@@ -113,7 +113,12 @@ LLM tokens on normal web articles: non-X/Twitter rows require
 X adapter writes full tweet text into `items.body` and the article-body worker
 intentionally skips auth-walled X pages.
 
-Per item, parallel LLM calls run with a bounded per-call timeout (default 90s; `LLM_CALL_TIMEOUT_MS` override). The pipeline now chooses a treatment tier before calling the model:
+Per item, parallel LLM calls run with a bounded per-call timeout (default 90s;
+`LLM_CALL_TIMEOUT_MS` override). LLM provider ids, usage task labels, and
+reasoning-effort labels are runtime tuples in `lib/llm/types.ts`
+(`LLM_PROVIDERS`, `LLM_TASKS`, `REASONING_EFFORTS`) so provider env parsing,
+task profiles, and the `llm_usage` ledger cannot drift on free-form strings.
+The pipeline now chooses a treatment tier before calling the model:
 
 1. **Treatment** — `workers/enrich/treatment.ts` classifies items as `high` or `fast`.
    - `high`: featured/P1 or importance >= 72, routed to DeepSeek V4 Pro.

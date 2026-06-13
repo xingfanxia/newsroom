@@ -8,12 +8,46 @@ import {
   zhEnrichSchema,
   zhScoreRationaleSchema,
 } from "@/workers/enrich/chinese";
+import {
+  isLLMProvider,
+  isLLMTask,
+  isReasoningEffort,
+} from "@/lib/llm/types";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const llmSrc = readFileSync(resolve(__dirname, "../../lib/llm/index.ts"), "utf8");
 const typesSrc = readFileSync(resolve(__dirname, "../../lib/llm/types.ts"), "utf8");
+const usageSrc = readFileSync(resolve(__dirname, "../../lib/llm/usage.ts"), "utf8");
 
 describe("Azure DeepSeek routing", () => {
+  it("keeps LLM provider/task/reasoning contracts in runtime tuples", () => {
+    expect(typesSrc).toContain("export const LLM_PROVIDERS");
+    expect(typesSrc).toContain("export type LLMProvider = (typeof LLM_PROVIDERS)[number]");
+    expect(typesSrc).toContain("export const LLM_TASKS");
+    expect(typesSrc).toContain("export type LLMTask = (typeof LLM_TASKS)[number]");
+    expect(typesSrc).toContain("export const REASONING_EFFORTS");
+    expect(typesSrc).toContain(
+      "export type ReasoningEffort = (typeof REASONING_EFFORTS)[number]",
+    );
+    expect(typesSrc).toContain("export function isLLMProvider");
+    expect(typesSrc).toContain("export function isLLMTask");
+    expect(typesSrc).toContain("export function isReasoningEffort");
+    expect(llmSrc).toContain("isLLMProvider");
+    expect(llmSrc).toContain("isReasoningEffort");
+    expect(usageSrc).toContain("isLLMTask");
+    expect(usageSrc).toContain("LLM_TASKS");
+    expect(llmSrc).not.toContain("as LLMProvider | undefined");
+  });
+
+  it("validates LLM provider, task, and reasoning labels at runtime", () => {
+    expect(isLLMProvider("azure-deepseek")).toBe(true);
+    expect(isLLMProvider("openai")).toBe(false);
+    expect(isLLMTask("event-commentary")).toBe(true);
+    expect(isLLMTask("event_commentary")).toBe(false);
+    expect(isReasoningEffort("xhigh")).toBe(true);
+    expect(isReasoningEffort("maximum")).toBe(false);
+  });
+
   it("registers azure-deepseek as an LLM provider", () => {
     expect(typesSrc).toContain('"azure-deepseek"');
     expect(llmSrc).toContain("AZURE_DEEPSEEK_DEPLOYMENT");

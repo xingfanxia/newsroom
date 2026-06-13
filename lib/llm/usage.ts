@@ -8,6 +8,7 @@
 import { db } from "@/db/client";
 import { llmUsage } from "@/db/schema";
 import type { LLMProvider, LLMTask } from "./types";
+import { LLM_TASKS, isLLMTask } from "./types";
 import { resolvePricing, computeCost, type UsageTokens } from "./pricing";
 
 export type RecordUsageArgs = {
@@ -28,6 +29,11 @@ export function recordUsage(args: RecordUsageArgs): Promise<void> {
 }
 
 async function persist(args: RecordUsageArgs): Promise<void> {
+  if (args.task && !isLLMTask(args.task)) {
+    throw new Error(
+      `llm_usage task must be one of: ${LLM_TASKS.join(", ")}; received ${args.task}`,
+    );
+  }
   const pricing = await resolvePricing(args.model, args.provider);
   const cost = computeCost(args.tokens, pricing);
   const client = db();

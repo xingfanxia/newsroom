@@ -30,6 +30,10 @@ Shipped cleanup:
   `ITERATION_STATUSES`, and named status constants in `lib/types.ts`, so DB
   enums, auth upserts, iteration routes, agent runtime writes, and the admin
   iteration UI cannot drift.
+- Shared LLM providers, usage task labels, and reasoning effort labels through
+  `LLM_PROVIDERS`, `LLM_TASKS`, and `REASONING_EFFORTS` in
+  `lib/llm/types.ts`; provider env parsing and usage ledger writes now validate
+  against those runtime tuples before spending or recording cost.
 - Shared REST/MCP search execution through `lib/api/search-results.ts`;
   adapters now own only auth/rate-limit/ETag/serialization, while the helper
   owns lexical full-match totals and semantic source/date/tier filters.

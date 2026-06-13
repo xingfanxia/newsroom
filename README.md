@@ -84,7 +84,7 @@ See [`.env.example`](./.env.example) for the complete template. On Vercel, most 
 - **Azure OpenAI embeddings** (`AZURE_OPENAI_API_KEY` / `_ENDPOINT` / `_EMBEDDING_DEPLOYMENT`) — handles `text-embedding-3-large` only.
 - **Azure OpenAI chat compatibility** (`AZURE_OPENAI_CHAT_*`) — points at the Responses API deployment `gpt-5.5-standard`; retained for compatibility/probes.
 - **Azure DeepSeek** (`AZURE_DEEPSEEK_*`) — primary prose/scoring provider, with `DeepSeek-V4-Pro` and `DeepSeek-V4-Flash` deployments.
-- **Task routing** (`AIHOT_ENRICH_PROVIDER` / `_SCORE_PROVIDER` / `_EMBED_PROVIDER`) — enrich/score default to `azure-deepseek`; embeddings default to `azure-openai`.
+- **Task routing** (`AIHOT_ENRICH_PROVIDER` / `_SCORE_PROVIDER` / `_EMBED_PROVIDER`) — enrich/score default to `azure-deepseek`; embeddings default to `azure-openai`. Allowed provider ids are the runtime `LLM_PROVIDERS` tuple in `lib/llm/types.ts`; invalid env values fail fast before any model call.
 - **LLM safety knobs** (`LLM_CALL_TIMEOUT_MS`) — optional per-call timeout override; default is 90s.
 - **Fallback providers** (`ANTHROPIC_API_KEY`, `GEMINI_API_KEY`) — wired but not on the default production route.
 

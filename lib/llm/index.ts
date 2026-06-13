@@ -22,7 +22,13 @@ import type {
   EmbedResult,
   EmbedManyResult,
 } from "./types";
-import { LLMError } from "./types";
+import {
+  LLMError,
+  LLM_PROVIDERS,
+  REASONING_EFFORTS,
+  isLLMProvider,
+  isReasoningEffort,
+} from "./types";
 import {
   recordUsage,
   extractCachedTokens,
@@ -237,12 +243,23 @@ function resolveProvider(
     | "AIHOT_EMBED_PROVIDER" = "AIHOT_ENRICH_PROVIDER",
 ): LLMProvider {
   if (explicit) return explicit;
-  const env = process.env[envKey] as LLMProvider | undefined;
-  return env ?? "anthropic";
+  const env = process.env[envKey];
+  if (!env) return "anthropic";
+  if (!isLLMProvider(env)) {
+    throw new Error(
+      `${envKey} must be one of: ${LLM_PROVIDERS.join(", ")}; received ${env}`,
+    );
+  }
+  return env;
 }
 
 function reasoningProviderOptions(provider: LLMProvider, effort?: ReasoningEffort) {
   if (!effort) return undefined;
+  if (!isReasoningEffort(effort)) {
+    throw new Error(
+      `reasoningEffort must be one of: ${REASONING_EFFORTS.join(", ")}; received ${effort}`,
+    );
+  }
   if (provider === "azure-deepseek") return undefined;
   return {
     openai: { reasoningEffort: effort },

@@ -1,29 +1,52 @@
 import type { ModelMessage } from "ai";
 import type { z } from "zod";
 
-export type LLMProvider =
-  | "anthropic"
-  | "gemini"
-  | "azure-openai"
-  | "azure-openai-pro"
-  | "azure-deepseek";
+export const LLM_PROVIDERS = [
+  "anthropic",
+  "gemini",
+  "azure-openai",
+  "azure-openai-pro",
+  "azure-deepseek",
+] as const;
+export type LLMProvider = (typeof LLM_PROVIDERS)[number];
 
-export type ReasoningEffort = "minimal" | "low" | "medium" | "high" | "xhigh";
+export const REASONING_EFFORTS = [
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+] as const;
+export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
 
 /** Business task label — used for cost accounting in the llm_usage table. */
-export type LLMTask =
-  | "enrich"
-  | "score"
-  | "embed"
-  | "commentary"
-  | "event-commentary"
-  | "newsletter"
-  | "daily-column"
-  | "agent"
-  | "search"
-  | "arbitrate"
-  | "canonical-title"
-  | "other";
+export const LLM_TASKS = [
+  "enrich",
+  "score",
+  "embed",
+  "commentary",
+  "event-commentary",
+  "newsletter",
+  "daily-column",
+  "agent",
+  "search",
+  "arbitrate",
+  "canonical-title",
+  "other",
+] as const;
+export type LLMTask = (typeof LLM_TASKS)[number];
+
+export function isLLMProvider(value: string): value is LLMProvider {
+  return (LLM_PROVIDERS as readonly string[]).includes(value);
+}
+
+export function isReasoningEffort(value: string): value is ReasoningEffort {
+  return (REASONING_EFFORTS as readonly string[]).includes(value);
+}
+
+export function isLLMTask(value: string): value is LLMTask {
+  return (LLM_TASKS as readonly string[]).includes(value);
+}
 
 type LLMUsageContext = {
   /** Categorizes the call for cost dashboards. */
