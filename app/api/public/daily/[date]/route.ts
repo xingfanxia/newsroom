@@ -8,6 +8,7 @@ import {
   publicCachedJson,
   publicEndpointRateLimit,
   publicError,
+  publicServerError,
 } from "@/lib/api/public-helpers";
 import { getPublicDailyColumnByDate } from "@/lib/api/daily-columns";
 
@@ -39,7 +40,6 @@ export async function GET(
       body: result.payload.body,
     });
   } catch (err) {
-    console.error("[api/public/daily/:date] failed", err);
-    return publicError("server_error", 500);
+    return publicServerError("api/public/daily/:date", err);
   }
 }

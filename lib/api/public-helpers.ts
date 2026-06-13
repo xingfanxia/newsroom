@@ -5,7 +5,7 @@
  * Three things every public route should call:
  *   1. publicEndpointRateLimit(req, "<endpoint-key>") — IP token bucket
  *   2. publicCachedJson(req, { endpoint, etagFamily, signal, body }) for 200/304
- *   3. publicError(...) for explicit 4xx/5xx envelopes
+ *   3. publicError(...) / publicServerError(...) for error envelopes
  *
  * Public-safe field stripping lives next to each route handler (since each
  * route's domain model is different) — but the helpers here pin CORS, cache,
@@ -113,6 +113,11 @@ export function publicError(message: string, status: number): Response {
       },
     },
   );
+}
+
+export function publicServerError(label: string, err: unknown): Response {
+  console.error(`[${label}] failed`, err);
+  return publicError("server_error", 500);
 }
 
 export function publicInvalidQuery(issues: readonly unknown[]): Response {

@@ -116,6 +116,8 @@ describe("public API endpoint contract", () => {
       expect(source).not.toContain("ifNoneMatch(");
       expect(source).not.toContain("notModified(");
       expect(source).not.toContain("publicJson(");
+      expect(source).not.toContain('console.error("[api/public');
+      expect(source).not.toContain('publicError("server_error"');
       expect(source).not.toContain("windowMs: 60_000");
       expect(source).not.toMatch(/max: (600|300|120)/);
       expect(source).not.toContain('family: "public-');

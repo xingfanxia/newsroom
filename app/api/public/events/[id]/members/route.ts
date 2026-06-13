@@ -14,6 +14,7 @@ import {
   publicCachedJson,
   publicEndpointRateLimit,
   publicError,
+  publicServerError,
 } from "@/lib/api/public-helpers";
 
 export const dynamic = "force-dynamic";
@@ -49,7 +50,6 @@ export async function GET(
       body,
     });
   } catch (err) {
-    console.error("[api/public/events/:id/members] failed", err);
-    return publicError("server_error", 500);
+    return publicServerError("api/public/events/:id/members", err);
   }
 }

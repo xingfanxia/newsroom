@@ -11,8 +11,8 @@ import {
   etagSignal,
   publicCachedJson,
   publicEndpointRateLimit,
-  publicError,
   publicInvalidQuery,
+  publicServerError,
 } from "@/lib/api/public-helpers";
 import { parseQueryParams } from "@/lib/api/query-params";
 import { toPublicApiItem } from "@/lib/api/public-items";
@@ -76,7 +76,6 @@ export async function GET(req: Request) {
       },
     });
   } catch (err) {
-    console.error("[api/public/search] failed", err);
-    return publicError("server_error", 500);
+    return publicServerError("api/public/search", err);
   }
 }

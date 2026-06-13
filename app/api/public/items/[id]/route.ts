@@ -11,6 +11,7 @@ import {
   publicCachedJson,
   publicEndpointRateLimit,
   publicError,
+  publicServerError,
 } from "@/lib/api/public-helpers";
 import {
   getItemDetailRouteRow,
@@ -41,7 +42,6 @@ export async function GET(
       body: toPublicItemDetail(found.row),
     });
   } catch (err) {
-    console.error("[api/public/items/:id] failed", err);
-    return publicError("server_error", 500);
+    return publicServerError("api/public/items/:id", err);
   }
 }

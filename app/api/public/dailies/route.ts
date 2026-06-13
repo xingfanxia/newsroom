@@ -11,6 +11,7 @@ import {
   publicCachedJson,
   publicEndpointRateLimit,
   publicError,
+  publicServerError,
 } from "@/lib/api/public-helpers";
 import { queryParamsRecord } from "@/lib/api/query-params";
 import { getPublicDailyColumnIndex } from "@/lib/api/daily-columns";
@@ -33,7 +34,6 @@ export async function GET(req: Request) {
       body: result.payload.body,
     });
   } catch (err) {
-    console.error("[api/public/dailies] failed", err);
-    return publicError("server_error", 500);
+    return publicServerError("api/public/dailies", err);
   }
 }

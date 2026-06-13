@@ -122,6 +122,10 @@ Shipped cleanup:
   `/skill.md`, `/openapi.yaml`, `/agents`, and
   `docs/agent-access/README.md` render or verify the same endpoint count,
   limit labels, and cache policy instead of repeating budgets or 304 wiring.
+- Shared public 5xx logging/envelopes through `publicServerError` in
+  `lib/api/public-helpers.ts`; anonymous public route files keep explicit 4xx
+  branches local but no longer hand-copy `console.error` plus
+  `publicError("server_error", 500)`.
 - Shared REST query-param extraction and validation plumbing through
   `lib/api/query-params.ts`; public and v1 query routes now reuse one
   Request/URLSearchParams parser while keeping their separate
@@ -211,7 +215,7 @@ Verification (2026-06-13):
 - `bun run code:dead:exports` — passed.
 - `bun run code:dead:types` — passed.
 - `bun run lint` — passed with no warnings.
-- `bun test --env-file=.env.local` — 766 pass, 1 skip, 0 fail.
+- `bun test --env-file=.env.local` — 767 pass, 1 skip, 0 fail.
 - `bun run build` — passed.
 - `git diff --check` — passed.
 

@@ -17,8 +17,8 @@ import {
   etagSignal,
   publicCachedJson,
   publicEndpointRateLimit,
-  publicError,
   publicInvalidQuery,
+  publicServerError,
 } from "@/lib/api/public-helpers";
 import { parseQueryParams } from "@/lib/api/query-params";
 import { runFeedQuery } from "@/lib/api/feed-results";
@@ -63,7 +63,6 @@ export async function GET(req: Request) {
       },
     });
   } catch (err) {
-    console.error("[api/public/feed] failed", err);
-    return publicError("server_error", 500);
+    return publicServerError("api/public/feed", err);
   }
 }

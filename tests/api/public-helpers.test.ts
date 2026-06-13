@@ -9,6 +9,7 @@ import {
   publicHeaders,
   publicInvalidQuery,
   publicJson,
+  publicServerError,
 } from "@/lib/api/public-helpers";
 
 describe("public-helpers — etag + CORS + cache", () => {
@@ -168,6 +169,26 @@ describe("public-helpers — etag + CORS + cache", () => {
       expect(res.headers.get("access-control-allow-origin")).toBe("*");
       const body = await res.json();
       expect(body).toEqual({ error: "invalid_query" });
+    });
+
+    it("publicServerError logs the route label and returns the shared 500 envelope", async () => {
+      const originalError = console.error;
+      const calls: unknown[][] = [];
+      console.error = (...args: unknown[]) => {
+        calls.push(args);
+      };
+
+      try {
+        const err = new Error("boom");
+        const res = publicServerError("api/public/example", err);
+
+        expect(res.status).toBe(500);
+        expect(res.headers.get("access-control-allow-origin")).toBe("*");
+        expect(await res.json()).toEqual({ error: "server_error" });
+        expect(calls).toEqual([["[api/public/example] failed", err]]);
+      } finally {
+        console.error = originalError;
+      }
     });
 
     it("formats validation issues for public invalid query responses", async () => {

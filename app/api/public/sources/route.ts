@@ -9,7 +9,7 @@ import {
   etagSignal,
   publicCachedJson,
   publicEndpointRateLimit,
-  publicError,
+  publicServerError,
 } from "@/lib/api/public-helpers";
 import {
   listSourceCatalogRows,
@@ -44,7 +44,6 @@ export async function GET(req: Request) {
       body,
     });
   } catch (err) {
-    console.error("[api/public/sources] failed", err);
-    return publicError("server_error", 500);
+    return publicServerError("api/public/sources", err);
   }
 }

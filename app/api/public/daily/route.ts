@@ -6,12 +6,13 @@
  * theme tag + numbered exec summary (1-5 items, each w/ [#item-id] backlinks)
  * + 2000-4000 字 long-form narrative.
  *
- * locale=zh default. Only zh is generated today.
+ * locale=zh default. The daily-column worker currently writes zh rows.
  */
 import {
   publicCachedJson,
   publicEndpointRateLimit,
   publicError,
+  publicServerError,
 } from "@/lib/api/public-helpers";
 import { getLatestPublicDailyColumn } from "@/lib/api/daily-columns";
 
@@ -38,7 +39,6 @@ export async function GET(req: Request) {
       body: result.payload.body,
     });
   } catch (err) {
-    console.error("[api/public/daily] failed", err);
-    return publicError("server_error", 500);
+    return publicServerError("api/public/daily", err);
   }
 }
