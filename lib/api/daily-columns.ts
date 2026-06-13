@@ -3,7 +3,10 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import { newsletters } from "@/db/schema";
 import { etagSignal } from "@/lib/api/public-helpers";
-import { invalidQueryError } from "@/lib/api/query-params";
+import {
+  invalidQueryError,
+  queryParamsRecord,
+} from "@/lib/api/query-params";
 import { DAILY_NEWSLETTER_KIND, NEWSLETTER_LOCALES } from "@/lib/types";
 
 const dailyColumnLocaleSchema = z.enum(NEWSLETTER_LOCALES).default("zh");
@@ -278,6 +281,13 @@ export async function getLatestPublicDailyColumn(
   return { ok: true, payload: toPublicDailyColumnPayload(row) };
 }
 
+export async function getLatestPublicDailyColumnRequestPayload(
+  req: Request,
+): Promise<PublicDailyColumnResult> {
+  const url = new URL(req.url);
+  return getLatestPublicDailyColumn(url.searchParams.get("locale"));
+}
+
 export async function getPublicDailyColumnByDate({
   rawDate,
   rawLocale,
@@ -310,6 +320,17 @@ export async function getPublicDailyColumnByDate({
   return { ok: true, payload: toPublicDailyColumnPayload(row) };
 }
 
+export async function getPublicDailyColumnByDateRequestPayload(
+  req: Request,
+  { rawDate }: { rawDate: string },
+): Promise<PublicDailyColumnResult> {
+  const url = new URL(req.url);
+  return getPublicDailyColumnByDate({
+    rawDate,
+    rawLocale: url.searchParams.get("locale"),
+  });
+}
+
 export async function getPublicDailyColumnIndex(
   rawQuery: Record<string, string>,
 ): Promise<PublicDailyColumnIndexResult> {
@@ -327,6 +348,12 @@ export async function getPublicDailyColumnIndex(
     ok: true,
     payload: toPublicDailyColumnIndexPayload(rows, parsed.data),
   };
+}
+
+export async function getPublicDailyColumnIndexRequestPayload(
+  req: Request,
+): Promise<PublicDailyColumnIndexResult> {
+  return getPublicDailyColumnIndex(queryParamsRecord(req));
 }
 
 export function renderDailyColumnMarkdown(row: {

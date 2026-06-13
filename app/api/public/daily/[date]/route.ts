@@ -10,7 +10,7 @@ import {
   publicError,
   publicServerError,
 } from "@/lib/api/public-helpers";
-import { getPublicDailyColumnByDate } from "@/lib/api/daily-columns";
+import { getPublicDailyColumnByDateRequestPayload } from "@/lib/api/daily-columns";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -23,12 +23,10 @@ export async function GET(
   if (limited) return limited;
 
   const { date: rawDate } = await ctx.params;
-  const url = new URL(req.url);
 
   try {
-    const result = await getPublicDailyColumnByDate({
+    const result = await getPublicDailyColumnByDateRequestPayload(req, {
       rawDate,
-      rawLocale: url.searchParams.get("locale"),
     });
     if (!result.ok) return publicError(result.error, result.status);
 

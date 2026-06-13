@@ -13,8 +13,7 @@ import {
   publicError,
   publicServerError,
 } from "@/lib/api/public-helpers";
-import { queryParamsRecord } from "@/lib/api/query-params";
-import { getPublicDailyColumnIndex } from "@/lib/api/daily-columns";
+import { getPublicDailyColumnIndexRequestPayload } from "@/lib/api/daily-columns";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -24,7 +23,7 @@ export async function GET(req: Request) {
   if (limited) return limited;
 
   try {
-    const result = await getPublicDailyColumnIndex(queryParamsRecord(req));
+    const result = await getPublicDailyColumnIndexRequestPayload(req);
     if (!result.ok) return publicError(result.error, result.status);
 
     return publicCachedJson(req, {

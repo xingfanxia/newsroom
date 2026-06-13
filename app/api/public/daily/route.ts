@@ -14,7 +14,7 @@ import {
   publicError,
   publicServerError,
 } from "@/lib/api/public-helpers";
-import { getLatestPublicDailyColumn } from "@/lib/api/daily-columns";
+import { getLatestPublicDailyColumnRequestPayload } from "@/lib/api/daily-columns";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -23,12 +23,8 @@ export async function GET(req: Request) {
   const limited = publicEndpointRateLimit(req, "daily");
   if (limited) return limited;
 
-  const url = new URL(req.url);
-
   try {
-    const result = await getLatestPublicDailyColumn(
-      url.searchParams.get("locale"),
-    );
+    const result = await getLatestPublicDailyColumnRequestPayload(req);
     if (!result.ok) return publicError(result.error, result.status);
 
     // Daily column lands once per day; long stale-while-revalidate.

@@ -49,15 +49,18 @@ describe("daily-column API source wiring", () => {
       expect(source).not.toContain("toPublicDailyColumnIndex(");
       expect(source).not.toContain("publicDailyColumnEtagSignal(");
       expect(source).not.toContain("publicDailyColumnIndexEtagSignal(");
+      expect(source).not.toContain("new URL(req.url)");
+      expect(source).not.toContain("queryParamsRecord(req)");
+      expect(source).not.toContain('searchParams.get("locale")');
     }
     expect(read("app/api/public/daily/route.ts")).toContain(
-      "getLatestPublicDailyColumn",
+      "getLatestPublicDailyColumnRequestPayload",
     );
     expect(read("app/api/public/daily/[date]/route.ts")).toContain(
-      "getPublicDailyColumnByDate",
+      "getPublicDailyColumnByDateRequestPayload",
     );
     expect(read("app/api/public/dailies/route.ts")).toContain(
-      "getPublicDailyColumnIndex",
+      "getPublicDailyColumnIndexRequestPayload",
     );
   });
 

@@ -5,8 +5,11 @@ import {
   dailyColumnDayWindow,
   getDailyColumnMarkdownByDate,
   getLatestPublicDailyColumn,
+  getLatestPublicDailyColumnRequestPayload,
   getPublicDailyColumnByDate,
+  getPublicDailyColumnByDateRequestPayload,
   getPublicDailyColumnIndex,
+  getPublicDailyColumnIndexRequestPayload,
   publicDailyColumnEtagSignal,
   publicDailyColumnIndexEtagSignal,
   renderDailyColumnMarkdown,
@@ -204,6 +207,42 @@ describe("daily column shared date helpers", () => {
     ).resolves.toEqual({ ok: false, error: "invalid_locale", status: 400 });
 
     await expect(getPublicDailyColumnIndex({ take: "0" })).resolves.toEqual({
+      ok: false,
+      error:
+        "invalid_query: Too small: expected number to be >=1",
+      status: 400,
+    });
+  });
+
+  test("public request helpers return validation errors before lookup", async () => {
+    await expect(
+      getLatestPublicDailyColumnRequestPayload(
+        new Request("https://example.test/api/public/daily?locale=ja"),
+      ),
+    ).resolves.toEqual({
+      ok: false,
+      error: "invalid_locale",
+      status: 400,
+    });
+
+    await expect(
+      getPublicDailyColumnByDateRequestPayload(
+        new Request(
+          "https://example.test/api/public/daily/2026-06-11?locale=ja",
+        ),
+        { rawDate: "2026-06-11" },
+      ),
+    ).resolves.toEqual({
+      ok: false,
+      error: "invalid_locale",
+      status: 400,
+    });
+
+    await expect(
+      getPublicDailyColumnIndexRequestPayload(
+        new Request("https://example.test/api/public/dailies?take=0"),
+      ),
+    ).resolves.toEqual({
       ok: false,
       error:
         "invalid_query: Too small: expected number to be >=1",

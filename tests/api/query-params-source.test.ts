@@ -5,7 +5,6 @@ import { resolve } from "node:path";
 const root = process.cwd();
 
 const queryRoutePaths = [
-  "app/api/public/dailies/route.ts",
   "app/api/public/feed/route.ts",
   "app/api/public/search/route.ts",
   "app/api/v1/feed/route.ts",
@@ -26,6 +25,13 @@ describe("query param source wiring", () => {
       expect(source).not.toContain("Object.fromEntries(url.searchParams.entries())");
       expect(source).not.toContain("Object.fromEntries(req.searchParams.entries())");
     }
+
+    const dailies = read("app/api/public/dailies/route.ts");
+    const dailyColumns = read("lib/api/daily-columns.ts");
+    expect(dailies).toContain("getPublicDailyColumnIndexRequestPayload");
+    expect(dailies).not.toContain("@/lib/api/query-params");
+    expect(dailyColumns).toContain("@/lib/api/query-params");
+    expect(dailyColumns).toContain("queryParamsRecord(req)");
   });
 
   test("public invalid-query messages use the shared formatter", () => {
