@@ -17,15 +17,14 @@ import {
   v1ServerError,
 } from "@/lib/api/v1-route";
 import {
-  createCollection,
-  deleteCollection,
-  listCollections,
-  updateCollection,
-} from "@/lib/items/collections";
+  createCollectionRoutePayload,
+  deleteCollectionRoutePayload,
+  listCollectionRoutePayload,
+  updateCollectionRoutePayload,
+} from "@/lib/api/collection-routes";
 import { upsertAppUser } from "@/lib/auth/session";
 import {
   collectionDeleteBodySchema,
-  isDuplicateCollectionNameError,
   v1CollectionCreateBodySchema,
   v1CollectionUpdateBodySchema,
 } from "@/lib/api/collection-requests";
@@ -35,8 +34,7 @@ export async function GET(req: Request) {
   return runV1Route(req, async (user) => {
     try {
       await upsertAppUser(user);
-      const collections = await listCollections(user.id);
-      return v1Json({ collections, total: collections.length });
+      return v1Json(await listCollectionRoutePayload(user.id));
     } catch (err) {
       return v1ServerError("api/v1/collections GET", err);
     }
@@ -56,15 +54,13 @@ export async function POST(req: Request) {
 
     try {
       await upsertAppUser(user);
-      const collection = await createCollection({
+      const result = await createCollectionRoutePayload({
         userId: user.id,
         ...parsed.data,
       });
-      return v1Json({ collection });
+      if (!result.ok) return v1Error(result.error, result.status);
+      return v1Json(result.payload);
     } catch (err) {
-      if (isDuplicateCollectionNameError(err)) {
-        return v1Error("duplicate_name", 409);
-      }
       return v1ServerError("api/v1/collections POST", err);
     }
   });
@@ -82,11 +78,11 @@ export async function PATCH(req: Request) {
     if (!parsed.ok) return parsed.response;
 
     try {
-      const ok = await updateCollection({
+      const result = await updateCollectionRoutePayload({
         userId: user.id,
         ...parsed.data,
       });
-      if (!ok) return v1Error("not_found", 404);
+      if (!result.ok) return v1Error(result.error, result.status);
       return v1Json({ ok: true });
     } catch (err) {
       return v1ServerError("api/v1/collections PATCH", err);
@@ -103,8 +99,8 @@ export async function DELETE(req: Request) {
     if (!parsed.ok) return parsed.response;
 
     try {
-      const ok = await deleteCollection(user.id, parsed.data.id);
-      if (!ok) return v1Error("not_found", 404);
+      const result = await deleteCollectionRoutePayload(user.id, parsed.data.id);
+      if (!result.ok) return v1Error(result.error, result.status);
       return v1Json({ ok: true });
     } catch (err) {
       return v1ServerError("api/v1/collections DELETE", err);

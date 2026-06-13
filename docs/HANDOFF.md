@@ -51,6 +51,10 @@ Shipped cleanup:
   `freshAdminSessionCookie` and `expiredAdminSessionCookie` in
   `lib/auth/password.ts`, so login/logout cannot drift on cookie name,
   `httpOnly`, `secure`, `sameSite`, path, or max-age attributes.
+- Shared admin/v1 saved-collection CRUD result mapping through
+  `lib/api/collection-routes.ts`, so both surfaces reuse the same
+  `duplicate_name` and `not_found` decisions while keeping their own auth,
+  request schemas, and response envelopes.
 - Shared user roles and iteration statuses through `USER_ROLES`,
   `ITERATION_STATUSES`, and named status constants in `lib/types.ts`, so DB
   enums, auth upserts, iteration routes, agent runtime writes, and the admin
@@ -223,7 +227,7 @@ Verification (2026-06-13):
 - `bun run code:dead:exports` — passed.
 - `bun run code:dead:types` — passed.
 - `bun run lint` — passed with no warnings.
-- `bun test --env-file=.env.local` — 778 pass, 1 skip, 0 fail.
+- `bun test --env-file=.env.local` — 779 pass, 1 skip, 0 fail.
 - `bun run build` — passed.
 - `git diff --check` — passed.
 

@@ -8,23 +8,22 @@ import {
 } from "@/lib/api/admin-route";
 import { parseJsonRequestBody } from "@/lib/api/json-body";
 import {
-  createCollection,
-  listCollections,
-  updateCollection,
-  deleteCollection,
-} from "@/lib/items/collections";
+  createCollectionRoutePayload,
+  deleteCollectionRoutePayload,
+  listCollectionRoutePayload,
+  updateCollectionRoutePayload,
+} from "@/lib/api/collection-routes";
 import {
   adminCollectionCreateBodySchema,
   adminCollectionUpdateBodySchema,
   collectionDeleteBodySchema,
-  isDuplicateCollectionNameError,
 } from "@/lib/api/collection-requests";
 
 /** GET — list user's collections (used on the saved page + move dialog). */
 export async function GET() {
   return runAdminRoute(async (user) => {
     await upsertAppUser(user);
-    const collections = await listCollections(user.id);
+    const { collections } = await listCollectionRoutePayload(user.id);
     return adminJson({ collections });
   });
 }
@@ -40,15 +39,13 @@ export async function POST(req: Request) {
     if (!parsed.ok) return parsed.response;
 
     try {
-      const collection = await createCollection({
+      const result = await createCollectionRoutePayload({
         userId: user.id,
         ...parsed.data,
       });
-      return adminJson({ collection });
+      if (!result.ok) return adminError(result.error, result.status);
+      return adminJson(result.payload);
     } catch (err) {
-      if (isDuplicateCollectionNameError(err)) {
-        return adminError("duplicate_name", 409);
-      }
       return adminServerError("api/admin/collections POST", err);
     }
   });
@@ -63,11 +60,11 @@ export async function PATCH(req: Request) {
     if (!parsed.ok) return parsed.response;
 
     try {
-      const ok = await updateCollection({
+      const result = await updateCollectionRoutePayload({
         userId: user.id,
         ...parsed.data,
       });
-      if (!ok) return adminError("not_found", 404);
+      if (!result.ok) return adminError(result.error, result.status);
       return adminOk();
     } catch (err) {
       return adminServerError("api/admin/collections PATCH", err);
@@ -84,8 +81,12 @@ export async function DELETE(req: Request) {
     });
     if (!parsed.ok) return parsed.response;
 
-    const ok = await deleteCollection(user.id, parsed.data.id);
-    if (!ok) return adminError("not_found", 404);
-    return adminOk();
+    try {
+      const result = await deleteCollectionRoutePayload(user.id, parsed.data.id);
+      if (!result.ok) return adminError(result.error, result.status);
+      return adminOk();
+    } catch (err) {
+      return adminServerError("api/admin/collections DELETE", err);
+    }
   });
 }
