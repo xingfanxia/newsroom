@@ -15,7 +15,10 @@
  * Returns empty members array (not 404) for unknown cluster ids so the UI's
  * drawer can degrade gracefully without a separate error path.
  */
-import { getEventMembersRoutePayload } from "@/lib/api/event-members";
+import {
+  getEventMembersRequestPayload,
+  toEventMembersListEnvelope,
+} from "@/lib/api/event-members";
 import {
   plainError,
   plainJson,
@@ -27,22 +30,17 @@ export async function GET(
   ctx: { params: Promise<{ id: string }> },
 ) {
   const { id: idRaw } = await ctx.params;
-  const url = new URL(req.url);
 
   try {
-    const result = await getEventMembersRoutePayload({
+    const result = await getEventMembersRequestPayload(req, {
       rawId: idRaw,
-      rawLocale: url.searchParams.get("locale"),
       defaultLocale: "zh",
     });
     if (!result.ok) {
       return plainError(result.error, result.status);
     }
 
-    return plainJson({
-      members: result.payload.members,
-      total: result.payload.total,
-    });
+    return plainJson(toEventMembersListEnvelope(result.payload));
   } catch (err) {
     return plainServerError("api/events/:id/members", err);
   }

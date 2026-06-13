@@ -1,9 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import {
+  eventMembersCacheSignalParts,
+  getEventMembersRequestPayload,
   getEventMembersRoutePayload,
   parseEventMemberRouteParams,
   toEventMemberApiItem,
   toEventMemberApiItems,
+  toEventMembersListEnvelope,
   toEventMembersPayload,
 } from "@/lib/api/event-members";
 import type { Story } from "@/lib/types";
@@ -102,12 +105,12 @@ describe("event member API serialization", () => {
   });
 
   test("builds the shared event members payload envelope", () => {
-    expect(
-      toEventMembersPayload(42, [
-        member,
-        { ...member, sourceId: "anthropic-news", sourceName: "Anthropic" },
-      ]),
-    ).toEqual({
+    const payload = toEventMembersPayload(42, [
+      member,
+      { ...member, sourceId: "anthropic-news", sourceName: "Anthropic" },
+    ]);
+
+    expect(payload).toEqual({
       cluster_id: 42,
       members: [
         toEventMemberApiItem(member),
@@ -118,6 +121,15 @@ describe("event member API serialization", () => {
         }),
       ],
       total: 2,
+    });
+    expect(toEventMembersListEnvelope(payload)).toEqual({
+      members: payload.members,
+      total: 2,
+    });
+    expect(eventMembersCacheSignalParts(payload)).toEqual({
+      cluster_id: 42,
+      n: 2,
+      last_at: "2026-06-11T00:00:00.000Z",
     });
   });
 
@@ -136,6 +148,16 @@ describe("event member API serialization", () => {
         rawLocale: "ja",
         defaultLocale: "zh",
       }),
+    ).resolves.toEqual({ ok: false, error: "invalid_locale", status: 400 });
+
+    await expect(
+      getEventMembersRequestPayload(
+        new Request("https://example.test/api/events/42/members?locale=ja"),
+        {
+          rawId: "42",
+          defaultLocale: "zh",
+        },
+      ),
     ).resolves.toEqual({ ok: false, error: "invalid_locale", status: 400 });
   });
 });

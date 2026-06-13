@@ -22,7 +22,10 @@ import {
   v1Json,
   v1ServerError,
 } from "@/lib/api/v1-route";
-import { getEventMembersRoutePayload } from "@/lib/api/event-members";
+import {
+  getEventMembersRequestPayload,
+  toEventMembersListEnvelope,
+} from "@/lib/api/event-members";
 
 export async function GET(
   req: Request,
@@ -30,22 +33,17 @@ export async function GET(
 ) {
   return runV1Route(req, async () => {
     const { id: idRaw } = await ctx.params;
-    const url = new URL(req.url);
 
     try {
-      const result = await getEventMembersRoutePayload({
+      const result = await getEventMembersRequestPayload(req, {
         rawId: idRaw,
-        rawLocale: url.searchParams.get("locale"),
         defaultLocale: "zh",
       });
       if (!result.ok) {
         return v1Error(result.error, result.status);
       }
 
-      return v1Json({
-        members: result.payload.members,
-        total: result.payload.total,
-      });
+      return v1Json(toEventMembersListEnvelope(result.payload));
     } catch (err) {
       return v1ServerError("api/v1/events/:id/members", err);
     }

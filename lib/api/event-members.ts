@@ -31,6 +31,11 @@ export type EventMembersPayload = {
   total: number;
 };
 
+export type EventMembersListEnvelope = Pick<
+  EventMembersPayload,
+  "members" | "total"
+>;
+
 type EventMembersRoutePayloadResult =
   | { ok: true; payload: EventMembersPayload }
   | { ok: false; error: "invalid_id" | "invalid_locale"; status: 400 };
@@ -118,5 +123,42 @@ export async function getEventMembersRoutePayload({
   return {
     ok: true,
     payload: await getEventMembersPayload(parsed.clusterId, parsed.locale),
+  };
+}
+
+export async function getEventMembersRequestPayload(
+  req: Request,
+  {
+    rawId,
+    defaultLocale,
+  }: {
+    rawId: string;
+    defaultLocale: EventMemberLocale;
+  },
+): Promise<EventMembersRoutePayloadResult> {
+  const url = new URL(req.url);
+  return getEventMembersRoutePayload({
+    rawId,
+    rawLocale: url.searchParams.get("locale"),
+    defaultLocale,
+  });
+}
+
+export function toEventMembersListEnvelope(
+  payload: EventMembersPayload,
+): EventMembersListEnvelope {
+  return {
+    members: payload.members,
+    total: payload.total,
+  };
+}
+
+export function eventMembersCacheSignalParts(
+  payload: EventMembersPayload,
+): Record<string, string | number | null> {
+  return {
+    cluster_id: payload.cluster_id,
+    n: payload.total,
+    last_at: payload.members[payload.members.length - 1]?.published_at ?? "",
   };
 }

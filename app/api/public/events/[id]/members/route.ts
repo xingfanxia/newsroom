@@ -8,7 +8,10 @@
  * Unknown cluster_id returns 200 with empty members[] so consumer agents can
  * degrade without a special error path — same convention as v1.
  */
-import { getEventMembersRoutePayload } from "@/lib/api/event-members";
+import {
+  eventMembersCacheSignalParts,
+  getEventMembersRequestPayload,
+} from "@/lib/api/event-members";
 import {
   etagSignal,
   publicCachedJson,
@@ -28,12 +31,10 @@ export async function GET(
   if (limited) return limited;
 
   const { id: idRaw } = await ctx.params;
-  const url = new URL(req.url);
 
   try {
-    const result = await getEventMembersRoutePayload({
+    const result = await getEventMembersRequestPayload(req, {
       rawId: idRaw,
-      rawLocale: url.searchParams.get("locale"),
       defaultLocale: "en",
     });
     if (!result.ok) return publicError(result.error, result.status);
@@ -42,11 +43,7 @@ export async function GET(
     return publicCachedJson(req, {
       endpoint: "eventMembers",
       etagFamily: "public-event",
-      signal: etagSignal({
-        cluster_id: body.cluster_id,
-        n: body.total,
-        last_at: body.members[body.members.length - 1]?.published_at ?? "",
-      }),
+      signal: etagSignal(eventMembersCacheSignalParts(body)),
       body,
     });
   } catch (err) {
