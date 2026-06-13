@@ -1,6 +1,7 @@
 import { and, eq, isNotNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items, sources } from "@/db/schema";
+import { flattenItemTags } from "@/lib/items/tags";
 import { isHighlightItemTier, type AppLocale, type Story } from "@/lib/types";
 
 type Locale = AppLocale;
@@ -65,16 +66,7 @@ export async function getItemDetail(
   if (!r) return null;
   if (r.tier === "excluded") return null;
 
-  const tagBag = (r.tags ?? {}) as {
-    capabilities?: string[];
-    entities?: string[];
-    topics?: string[];
-  };
-  const flatTags = [
-    ...(tagBag.capabilities ?? []),
-    ...(tagBag.entities ?? []),
-    ...(tagBag.topics ?? []),
-  ].slice(0, 6);
+  const flatTags = flattenItemTags(r.tags, 6);
 
   const title =
     locale === "en"

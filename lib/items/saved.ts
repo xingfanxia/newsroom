@@ -1,6 +1,7 @@
 import { desc, eq, and, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items, sources, feedback, clusters } from "@/db/schema";
+import { flattenItemTags } from "@/lib/items/tags";
 import {
   FEEDBACK_SAVE_VOTE,
   isHighlightItemTier,
@@ -86,16 +87,7 @@ export async function getSavedStories(
     .limit(limit);
 
   return rows.map((r) => {
-    const tagBag = (r.tags ?? {}) as {
-      capabilities?: string[];
-      entities?: string[];
-      topics?: string[];
-    };
-    const flatTags = [
-      ...(tagBag.capabilities ?? []),
-      ...(tagBag.entities ?? []),
-      ...(tagBag.topics ?? []),
-    ].slice(0, 6);
+    const flatTags = flattenItemTags(r.tags, 6);
 
     const publisher =
       locale === "en" ? r.sourceNameEn : r.sourceNameZh;

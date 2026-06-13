@@ -1,6 +1,7 @@
 import { and, eq, sql, isNotNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items, sources, clusters } from "@/db/schema";
+import { flattenItemTags } from "@/lib/items/tags";
 import {
   isHighlightItemTier,
   type AppLocale,
@@ -351,17 +352,7 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
   })();
 
   return dedupedRows.map((r): Story => {
-    const tagBag = (r.tags ?? {}) as {
-      capabilities?: string[];
-      entities?: string[];
-      topics?: string[];
-    };
-    // Flatten for UI. Canonical English IDs stored in DB; UI localizes at render.
-    const flatTags = [
-      ...(tagBag.capabilities ?? []),
-      ...(tagBag.entities ?? []),
-      ...(tagBag.topics ?? []),
-    ].slice(0, 4);
+    const flatTags = flattenItemTags(r.tags, 4);
 
     const publisher =
       q.locale === "en" ? r.sourceNameEn : r.sourceNameZh;

@@ -141,6 +141,9 @@ Shipped cleanup:
   system cron rows, system source-health notes, daily index rows, and policy
   summary labels now reuse the same date coercion / latest-date / compact-age
   helpers instead of carrying local `ago` variants.
+- Shared item tag flattening through `lib/items/tags.ts`; live feed, saved
+  stories, item detail, and semantic-search mappers now reuse the same
+  capability/entity/topic ordering while keeping their own display caps.
 - Shared bearer-gated `/api/v1/*` auth and plain JSON/error envelopes through
   `lib/api/v1-route.ts`; v1 route files now call `runV1Route` and return
   `v1Json` / `v1Error` / `v1InvalidQuery`, so token verification and response
@@ -186,7 +189,7 @@ Verification (2026-06-13):
 - `bun run code:dead:exports` — passed.
 - `bun run code:dead:types` — passed.
 - `bun run lint` — passed with no warnings.
-- `bun test --env-file=.env.local` — 743 pass, 1 skip, 0 fail.
+- `bun test --env-file=.env.local` — 748 pass, 1 skip, 0 fail.
 - `bun run build` — passed.
 - `git diff --check` — passed.
 

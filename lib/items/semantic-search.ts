@@ -21,6 +21,7 @@
 import { and, eq, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items, sources, clusters, halfvecToDriver } from "@/db/schema";
+import { flattenItemTags } from "@/lib/items/tags";
 import { embed } from "@/lib/llm";
 import {
   isHighlightItemTier,
@@ -139,16 +140,7 @@ export async function semanticSearch(
   const locale = opts.locale ?? "en";
 
   const mapped = rows.map((r) => {
-    const tagBag = (r.tags ?? {}) as {
-      capabilities?: string[];
-      entities?: string[];
-      topics?: string[];
-    };
-    const flatTags = [
-      ...(tagBag.capabilities ?? []),
-      ...(tagBag.entities ?? []),
-      ...(tagBag.topics ?? []),
-    ].slice(0, 4);
+    const flatTags = flattenItemTags(r.tags, 4);
 
     const publisher = locale === "en" ? r.sourceNameEn : r.sourceNameZh;
     const title =
