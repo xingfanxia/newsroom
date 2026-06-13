@@ -1,9 +1,8 @@
 import { and, eq, isNotNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items, sources } from "@/db/schema";
-import { pickLocalizedText, pickSameLocaleText } from "@/lib/items/localized";
-import { flattenItemTags } from "@/lib/items/tags";
-import { isHighlightItemTier, type AppLocale, type Story } from "@/lib/types";
+import { toStory } from "@/lib/items/story-mapper";
+import type { AppLocale, Story } from "@/lib/types";
 
 type Locale = AppLocale;
 
@@ -67,54 +66,11 @@ export async function getItemDetail(
   if (!r) return null;
   if (r.tier === "excluded") return null;
 
-  const flatTags = flattenItemTags(r.tags, 6);
-  const title = pickLocalizedText(locale, {
-    en: r.titleEn,
-    zh: r.titleZh,
-    fallback: r.title,
-  })!;
-  const editorNote = pickLocalizedText(locale, {
-    en: r.editorNoteEn,
-    zh: r.editorNoteZh,
+  const story: Story = toStory(r, {
+    locale,
+    tagLimit: 6,
+    includeSourceGroup: true,
   });
-  const editorAnalysis = pickLocalizedText(locale, {
-    en: r.editorAnalysisEn,
-    zh: r.editorAnalysisZh,
-  });
-
-  const story: Story = {
-    id: String(r.id),
-    sourceId: r.sourceId,
-    source: {
-      publisher: pickSameLocaleText(locale, {
-        en: r.sourceNameEn,
-        zh: r.sourceNameZh,
-      }) ?? r.sourceId,
-      kindCode: r.sourceKind as Story["source"]["kindCode"],
-      localeCode: (r.sourceLocale ?? "multi") as Story["source"]["localeCode"],
-      groupCode: r.sourceGroup as Story["source"]["groupCode"],
-    },
-    featured: isHighlightItemTier(r.tier),
-    title,
-    summary: pickLocalizedText(locale, {
-      en: r.summaryEn,
-      zh: r.summaryZh,
-    }) ?? "",
-    tags: flatTags,
-    importance: r.importance ?? 0,
-    tier: (r.tier ?? "all") as Story["tier"],
-    publishedAt: r.publishedAt.toISOString(),
-    url: r.url,
-    locale: (r.sourceLocale ?? "multi") as Story["locale"],
-    editorNote: editorNote ?? undefined,
-    editorAnalysis: editorAnalysis ?? undefined,
-    reasoning: pickLocalizedText(locale, {
-      en: r.reasoningEn,
-      zh: r.reasoningZh,
-      fallback: r.reasoning,
-    }) ?? undefined,
-    hkr: (r.hkr as Story["hkr"]) ?? undefined,
-  };
 
   return {
     story,

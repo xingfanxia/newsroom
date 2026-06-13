@@ -1,13 +1,8 @@
 import { desc, eq, and, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items, sources, feedback, clusters } from "@/db/schema";
-import { pickLocalizedText, pickSameLocaleText } from "@/lib/items/localized";
-import { flattenItemTags } from "@/lib/items/tags";
-import {
-  FEEDBACK_SAVE_VOTE,
-  isHighlightItemTier,
-  type Story,
-} from "@/lib/types";
+import { toStory } from "@/lib/items/story-mapper";
+import { FEEDBACK_SAVE_VOTE, type Story } from "@/lib/types";
 
 /**
  * Fetch the current user's saved items (feedback.vote='save') joined with
@@ -58,7 +53,6 @@ export async function getSavedStories(
       sourceGroup: sources.group,
       clusterId: items.clusterId,
       clusterMemberCount: clusters.memberCount,
-      clusterCoverage: clusters.coverage,
       clusterFirstSeenAt: clusters.firstSeenAt,
       clusterLatestMemberAt: clusters.latestMemberAt,
       clusterCanonicalTitleZh: clusters.canonicalTitleZh,
@@ -88,89 +82,12 @@ export async function getSavedStories(
     .limit(limit);
 
   return rows.map((r) => {
-    const flatTags = flattenItemTags(r.tags, 6);
-
-    const publisher =
-      pickSameLocaleText(locale, {
-        en: r.sourceNameEn,
-        zh: r.sourceNameZh,
-      }) ?? r.sourceId;
-    const title =
-      pickSameLocaleText(locale, {
-        en: r.clusterCanonicalTitleEn,
-        zh: r.clusterCanonicalTitleZh,
-      }) ??
-      pickLocalizedText(locale, {
-        en: r.titleEn,
-        zh: r.titleZh,
-        fallback: r.title,
-      })!;
-    const editorNote =
-      pickLocalizedText(locale, {
-        en: r.clusterEditorNoteEn,
-        zh: r.clusterEditorNoteZh,
-      }) ??
-      pickLocalizedText(locale, {
-        en: r.editorNoteEn,
-        zh: r.editorNoteZh,
-      });
-    const editorAnalysis =
-      pickLocalizedText(locale, {
-        en: r.clusterEditorAnalysisEn,
-        zh: r.clusterEditorAnalysisZh,
-      }) ??
-      pickLocalizedText(locale, {
-        en: r.editorAnalysisEn,
-        zh: r.editorAnalysisZh,
-      });
-    const effectiveImportance = r.clusterImportance ?? r.importance ?? 0;
-    const effectiveTier = (r.clusterEventTier ?? r.tier ?? "all") as Story["tier"];
-    const effectiveHkr =
-      (r.clusterHkr as Story["hkr"] | null) ?? (r.hkr as Story["hkr"] | null);
-    const coverage =
-      r.clusterMemberCount && r.clusterMemberCount > 1
-        ? r.clusterMemberCount
-        : undefined;
-
     return {
-      id: String(r.id),
-      sourceId: r.sourceId,
-      source: {
-        publisher,
-        kindCode: r.sourceKind as Story["source"]["kindCode"],
-        localeCode: (r.sourceLocale ?? "multi") as Story["source"]["localeCode"],
-        groupCode: r.sourceGroup as Story["source"]["groupCode"],
-      },
-      featured: isHighlightItemTier(effectiveTier),
-      title,
-      summary: pickLocalizedText(locale, {
-        en: r.summaryEn,
-        zh: r.summaryZh,
-      }) ?? "",
-      tags: flatTags,
-      importance: effectiveImportance,
-      tier: effectiveTier,
-      publishedAt: r.publishedAt.toISOString(),
-      url: r.url,
-      crossSourceCount:
-        r.clusterMemberCount && r.clusterMemberCount > 1
-          ? r.clusterMemberCount - 1
-          : undefined,
-      locale: (r.sourceLocale ?? "multi") as Story["locale"],
-      editorNote: editorNote ?? undefined,
-      editorAnalysis: editorAnalysis ?? undefined,
-      reasoning: pickLocalizedText(locale, {
-        en: r.reasoningEn,
-        zh: r.reasoningZh,
-        fallback: r.reasoning,
-      }) ?? undefined,
-      hkr: effectiveHkr ?? undefined,
-      clusterId: r.clusterId ?? undefined,
-      coverage,
-      firstSeenAt: r.clusterFirstSeenAt?.toISOString(),
-      latestMemberAt: r.clusterLatestMemberAt?.toISOString(),
-      canonicalTitleZh: r.clusterCanonicalTitleZh ?? undefined,
-      canonicalTitleEn: r.clusterCanonicalTitleEn ?? undefined,
+      ...toStory(r, {
+        locale,
+        tagLimit: 6,
+        includeSourceGroup: true,
+      }),
       savedAt: r.savedAt.toISOString(),
       collectionId: r.collectionId,
     };

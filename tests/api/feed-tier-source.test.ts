@@ -43,6 +43,10 @@ const semanticSearch = readFileSync(
   resolve(root, "lib/items/semantic-search.ts"),
   "utf8",
 );
+const storyMapper = readFileSync(
+  resolve(root, "lib/items/story-mapper.ts"),
+  "utf8",
+);
 const enrichTreatment = readFileSync(
   resolve(root, "workers/enrich/treatment.ts"),
   "utf8",
@@ -148,10 +152,7 @@ describe("feed tier/view source wiring", () => {
 
   test("highlight tier decisions use the shared helper", () => {
     for (const source of [
-      liveItems,
-      itemDetail,
-      savedItems,
-      semanticSearch,
+      storyMapper,
       enrichTreatment,
       itemCommentary,
       eventCommentary,
@@ -162,6 +163,16 @@ describe("feed tier/view source wiring", () => {
       expect(source).not.toMatch(
         /(?:tier|eventTier|effectiveTier|r\.tier|item\.tier|c\.eventTier) === "featured" \|\| (?:tier|eventTier|effectiveTier|r\.tier|item\.tier|c\.eventTier) === "p1"/,
       );
+    }
+
+    for (const source of [
+      liveItems,
+      itemDetail,
+      savedItems,
+      semanticSearch,
+    ]) {
+      expect(source).toContain("@/lib/items/story-mapper");
+      expect(source).not.toContain("isHighlightItemTier");
     }
   });
 

@@ -148,6 +148,10 @@ Shipped cleanup:
   mappers now reuse the same zh/en/legacy fallback rules for titles,
   summaries, editorial text, source labels, and score reasoning instead of
   hand-writing locale ternaries in each surface.
+- Shared Story row mapping through `lib/items/story-mapper.ts`; live feed,
+  saved stories, item detail, and semantic-search now keep SQL/query ownership
+  local while reusing one tested mapper for source labels, tags, locale
+  fallbacks, effective event fields, HKR, coverage, and still-developing state.
 - Shared bearer-gated `/api/v1/*` auth and plain JSON/error envelopes through
   `lib/api/v1-route.ts`; v1 route files now call `runV1Route` and return
   `v1Json` / `v1Error` / `v1InvalidQuery`, so token verification and response
@@ -193,7 +197,7 @@ Verification (2026-06-13):
 - `bun run code:dead:exports` — passed.
 - `bun run code:dead:types` — passed.
 - `bun run lint` — passed with no warnings.
-- `bun test --env-file=.env.local` — 752 pass, 1 skip, 0 fail.
+- `bun test --env-file=.env.local` — 756 pass, 1 skip, 0 fail.
 - `bun run build` — passed.
 - `git diff --check` — passed.
 

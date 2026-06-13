@@ -1,10 +1,8 @@
 import { and, eq, sql, isNotNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items, sources, clusters } from "@/db/schema";
-import { pickLocalizedText, pickSameLocaleText } from "@/lib/items/localized";
-import { flattenItemTags } from "@/lib/items/tags";
+import { toStory } from "@/lib/items/story-mapper";
 import {
-  isHighlightItemTier,
   type AppLocale,
   type FeedView,
   type SourceGroup,
@@ -303,7 +301,6 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
       // ── Event-aggregation: cluster-level fields for multi-member events ──
       clusterId: items.clusterId,
       clusterMemberCount: clusters.memberCount,
-      clusterCoverage: clusters.coverage,
       clusterFirstSeenAt: clusters.firstSeenAt,
       clusterLatestMemberAt: clusters.latestMemberAt,
       clusterCanonicalTitleZh: clusters.canonicalTitleZh,
@@ -353,121 +350,16 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
   })();
   const locale = q.locale ?? "zh";
 
-  return dedupedRows.map((r): Story => {
-    const flatTags = flattenItemTags(r.tags, 4);
-
-    const publisher =
-      pickSameLocaleText(locale, {
-        en: r.sourceNameEn,
-        zh: r.sourceNameZh,
-      }) ?? r.sourceId;
-
-    // Event-aware title fallback ladder:
-    //   cluster.canonical_title_<locale>   (LLM-generated neutral event name)
-    //   → item.title_<locale>              (item's locale-specific title)
-    //   → item.title_<other-locale>        (whichever locale we have)
-    //   → item.title                       (raw source title)
-    const title =
-      pickSameLocaleText(locale, {
-        en: r.clusterCanonicalTitleEn,
-        zh: r.clusterCanonicalTitleZh,
-      }) ??
-      pickLocalizedText(locale, {
-        en: r.titleEn,
-        zh: r.titleZh,
-        fallback: r.title,
-      })!;
-
-    // Event-aware editor note/analysis: cluster-level wins when present
-    // (multi-member events have commentary at cluster, singletons keep it at item).
-    const editorNote =
-      pickLocalizedText(locale, {
-        en: r.clusterEditorNoteEn,
-        zh: r.clusterEditorNoteZh,
-      }) ??
-      pickLocalizedText(locale, {
-        en: r.editorNoteEn,
-        zh: r.editorNoteZh,
-      });
-    const editorAnalysis =
-      pickLocalizedText(locale, {
-        en: r.clusterEditorAnalysisEn,
-        zh: r.clusterEditorAnalysisZh,
-      }) ??
-      pickLocalizedText(locale, {
-        en: r.editorAnalysisEn,
-        zh: r.editorAnalysisZh,
-      });
-
-    // Event-aware importance + tier.
-    const effectiveImportance = r.clusterImportance ?? r.importance ?? 0;
-    const effectiveTier = (r.clusterEventTier ?? r.tier ?? "all") as Story["tier"];
-
-    // Coverage: memberCount when in a multi-member cluster; undefined for singletons.
-    const coverage =
-      r.clusterMemberCount && r.clusterMemberCount > 1
-        ? r.clusterMemberCount
-        : undefined;
-
-    // Still-developing: event broke before today AND last new coverage within hot window.
-    const firstSeenMs = r.clusterFirstSeenAt?.getTime();
-    const latestMemberMs = r.clusterLatestMemberAt?.getTime();
-    const stillDeveloping =
-      firstSeenMs !== undefined &&
-      latestMemberMs !== undefined &&
-      firstSeenMs < startOfTodayMs &&
-      latestMemberMs > now - hotWindowMs;
-
-    // HKR fallback: cluster-level for multi-member events, item-level otherwise.
-    const effectiveHkr =
-      (r.clusterHkr as Story["hkr"] | null) ?? (r.hkr as Story["hkr"] | null);
-
-    return {
-      id: String(r.id),
-      sourceId: r.sourceId,
-      source: {
-        publisher,
-        kindCode: r.sourceKind as Story["source"]["kindCode"],
-        localeCode: (r.sourceLocale ?? "multi") as Story["source"]["localeCode"],
-        groupCode: q.includeSourceGroup
-          ? (r.sourceGroup as Story["source"]["groupCode"])
-          : undefined,
-      },
-      featured: isHighlightItemTier(effectiveTier),
-      title,
-      summary: pickLocalizedText(locale, {
-        en: r.summaryEn,
-        zh: r.summaryZh,
-      }) ?? "",
-      tags: flatTags,
-      importance: effectiveImportance,
-      tier: effectiveTier,
-      publishedAt: r.publishedAt.toISOString(),
-      url: r.url,
-      // crossSourceCount kept for backwards compat; UI migrates to `coverage`.
-      crossSourceCount:
-        r.clusterMemberCount && r.clusterMemberCount > 1
-          ? r.clusterMemberCount - 1
-          : undefined,
-      locale: (r.sourceLocale ?? "multi") as Story["locale"],
-      editorNote: editorNote ?? undefined,
-      editorAnalysis: editorAnalysis ?? undefined,
-      reasoning: pickLocalizedText(locale, {
-        en: r.reasoningEn,
-        zh: r.reasoningZh,
-        fallback: r.reasoning,
-      }) ?? undefined,
-      hkr: effectiveHkr ?? undefined,
-      // ── Event-aggregation fields ──
-      clusterId: r.clusterId ?? undefined,
-      coverage,
-      firstSeenAt: r.clusterFirstSeenAt?.toISOString(),
-      latestMemberAt: r.clusterLatestMemberAt?.toISOString(),
-      canonicalTitleZh: r.clusterCanonicalTitleZh ?? undefined,
-      canonicalTitleEn: r.clusterCanonicalTitleEn ?? undefined,
-      stillDeveloping: stillDeveloping || undefined,
-    };
-  });
+  return dedupedRows.map((r): Story =>
+    toStory(r, {
+      locale,
+      tagLimit: 4,
+      includeSourceGroup: q.includeSourceGroup,
+      nowMs: now,
+      startOfTodayMs,
+      hotWindowMs,
+    }),
+  );
 }
 
 /**
