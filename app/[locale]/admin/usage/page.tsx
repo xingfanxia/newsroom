@@ -15,6 +15,7 @@ import {
   formatUsageShortDate,
   formatUsageTaskModels,
   formatUsageTokens,
+  usageRangeLabel,
   usageTaskTone,
 } from "@/lib/llm/usage-display";
 
@@ -40,6 +41,7 @@ export default async function UsagePage({
   const [{ locale }, sp] = await Promise.all([params, searchParams]);
   setRequestLocale(locale);
   const zh = locale === "zh";
+  const usageLocale = zh ? "zh" : "en";
   const range: WindowKey = (USAGE_WINDOWS as readonly string[]).includes(
     sp.range ?? "",
   )
@@ -326,10 +328,22 @@ export default async function UsagePage({
               gap: 10,
             }}
           >
-            <MiniSpend label={zh ? "今日" : "today"} totals={today} />
-            <MiniSpend label={zh ? "近 7 天" : "7d"} totals={week} />
-            <MiniSpend label={zh ? "近 30 天" : "30d"} totals={month} />
-            <MiniSpend label={zh ? "全量" : "all-time"} totals={all} />
+            <MiniSpend
+              label={usageRangeLabel("today", usageLocale)}
+              totals={today}
+            />
+            <MiniSpend
+              label={usageRangeLabel("week", usageLocale)}
+              totals={week}
+            />
+            <MiniSpend
+              label={usageRangeLabel("month", usageLocale)}
+              totals={month}
+            />
+            <MiniSpend
+              label={usageRangeLabel("all", usageLocale)}
+              totals={all}
+            />
           </div>
         )}
 

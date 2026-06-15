@@ -13,8 +13,12 @@ describe("usage stats surfaces", () => {
     expect(stats).toContain('"all"');
     expect(page).toContain("USAGE_WINDOWS");
     expect(page).toContain("USAGE_RANGE_LABELS");
+    expect(page).toContain("usageRangeLabel(\"today\", usageLocale)");
+    expect(page).toContain("usageRangeLabel(\"all\", usageLocale)");
     expect(page).not.toContain('const RANGES = ["today", "week", "month", "all"]');
     expect(page).not.toContain("const RANGE_LABEL");
+    expect(page).not.toContain('label={zh ? "近 7 天" : "7d"}');
+    expect(page).not.toContain('label={zh ? "全量" : "all-time"}');
     expect(summary).toContain("USAGE_WINDOWS");
     expect(summary).toContain("usageSummaryWindowSchema");
     expect(summary).toContain("DEFAULT_USAGE_WINDOW");
@@ -38,6 +42,7 @@ describe("usage stats surfaces", () => {
 
   it("keeps usage presentation helpers out of the admin page component", () => {
     expect(page).toContain("@/lib/llm/usage-display");
+    expect(page).toContain("usageRangeLabel");
     expect(page).toContain("usageTaskTone(c.task)");
     expect(page).toContain("formatUsageTaskModels(t.models)");
     expect(page).not.toContain("function taskPillColor");
