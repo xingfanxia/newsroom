@@ -1,12 +1,13 @@
 #!/usr/bin/env bun
 /**
  * Diagnostic — prints the current data state: item counts, enrich progress,
- * month distribution, top sources, and the normalize queue depth.
+ * month distribution, top sources, shared queue depths, and cron activity.
  *
  * Used to verify backfill runs landed as expected. Safe to run anytime.
  */
 import { sql } from "drizzle-orm";
 import { db, closeDb } from "@/db/client";
+import { getSystemSnapshot } from "@/lib/shell/system-stats";
 
 async function main() {
   const client = db();
@@ -23,8 +24,7 @@ async function main() {
 
   const rawState = await client.execute(sql`
     SELECT
-      count(*)::int AS raw_total,
-      count(*) FILTER (WHERE normalized_at IS NULL)::int AS pending_normalize
+      count(*)::int AS raw_total
     FROM raw_items
   `);
 
@@ -50,6 +50,8 @@ async function main() {
     LIMIT 20
   `);
 
+  const system = await getSystemSnapshot();
+
   console.log("=== totals ===");
   console.log(totals[0]);
   console.log("\n=== raw_items ===");
@@ -61,6 +63,18 @@ async function main() {
   console.log("\n=== top 2026 sources ===");
   for (const r of bySource)
     console.log(`  ${String(r.source_id).padEnd(28)} ${String(r.n).padStart(4)}`);
+  console.log("\n=== worker queues ===");
+  for (const q of system.queues) {
+    console.log(
+      `  ${q.name.padEnd(18)} ${String(q.depth).padStart(5)} pending  ${q.rate}`,
+    );
+  }
+  console.log("\n=== cron activity ===");
+  for (const c of system.cron) {
+    console.log(
+      `  ${c.name.padEnd(18)} ${c.schedule.padEnd(17)} last ${c.last.padEnd(10)} next ${c.next}`,
+    );
+  }
 
   await closeDb();
 }

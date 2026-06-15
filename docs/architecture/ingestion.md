@@ -88,6 +88,9 @@ Grouping for the `信源` UI: same enum as `group` above, with labels/order from
   commentary timestamps, cluster updates, and newsletter publishes). Jobs with
   no dedicated durable timestamp, such as `score-backfill`, are shown as
   `no signal` instead of inventing a last-run time.
+- `scripts/ops/check-data-state.ts` reuses the same system snapshot for
+  queue depths and cron activity, so operator pre-flight checks and the admin
+  dashboard cannot drift on pending/pickup status.
 - RSS/Atom parsing via `fast-xml-parser`.
 - RSSHub routes hit `https://rsshub.app/{route}` (public instance) or self-hosted fallback.
 - Supported fetch kinds are `rss`, `atom`, `rsshub`, `x-api`, and
