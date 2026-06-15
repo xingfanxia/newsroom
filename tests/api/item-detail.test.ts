@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  getAgentItemDetailRoutePayload,
   getItemDetailRouteRow,
   parseItemDetailRouteId,
   publicItemDetailEtagSignal,
@@ -95,6 +96,16 @@ describe("parseItemDetailRouteId", () => {
 describe("getItemDetailRouteRow", () => {
   test("rejects invalid ids before the DB lookup path", async () => {
     await expect(getItemDetailRouteRow("0")).resolves.toEqual({
+      ok: false,
+      error: "invalid_id",
+      status: 400,
+    });
+  });
+});
+
+describe("getAgentItemDetailRoutePayload", () => {
+  test("rejects invalid ids before the DB lookup path", async () => {
+    await expect(getAgentItemDetailRoutePayload("0")).resolves.toEqual({
       ok: false,
       error: "invalid_id",
       status: 400,

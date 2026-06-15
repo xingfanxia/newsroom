@@ -123,6 +123,9 @@ type ItemDetailRouteLookupError = typeof INVALID_ROUTE_ID_ERROR | "not_found";
 type ItemDetailRouteLookup =
   | { ok: true; id: number; row: ItemDetailRow }
   | { ok: false; error: ItemDetailRouteLookupError; status: 400 | 404 };
+type AgentItemDetailRouteLookup =
+  | { ok: true; id: number; payload: V1ItemDetail }
+  | { ok: false; error: ItemDetailRouteLookupError; status: 400 | 404 };
 
 export type V1ItemDetail = {
   id: string;
@@ -177,6 +180,14 @@ export async function getItemDetailRouteRow(
   }
 
   return { ok: true, id: parsed.id, row };
+}
+
+export async function getAgentItemDetailRoutePayload(
+  rawId: string,
+): Promise<AgentItemDetailRouteLookup> {
+  const found = await getItemDetailRouteRow(rawId);
+  if (!found.ok) return found;
+  return { ok: true, id: found.id, payload: toV1ItemDetail(found.row) };
 }
 
 function iso(d: Date | null | undefined): string | null {

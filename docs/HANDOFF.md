@@ -146,9 +146,10 @@ Shipped cleanup:
   `lib/api/feed-query-params.ts`; MCP `ax_radar_feed` and
   `ax_radar_search` now use the same source-filter/runtime tuple contracts as
   REST while route handlers stay thin execution/payload adapters.
-- Shared v1/public item-detail route lookup through
-  `getItemDetailRouteRow` in `lib/api/item-detail.ts`; route files now own
-  only auth/cache/error-envelope mapping and surface-specific serialization.
+- Shared item-detail lookup and bearer-agent payload construction through
+  `lib/api/item-detail.ts`; public routes keep public cache/error mapping,
+  while `/api/v1/items/:id` and MCP `ax_radar_get_item` share
+  `getAgentItemDetailRoutePayload` and the full `toV1ItemDetail` serializer.
 - Shared event-member route payload execution through
   `getEventMembersRoutePayload` / `getEventMembersPayload` in
   `lib/api/event-members.ts`; UI-internal, public, v1, and MCP adapters now

@@ -11,6 +11,7 @@ const publicItemRoute = readFileSync(
   resolve(root, "app/api/public/items/[id]/route.ts"),
   "utf8",
 );
+const mcpRoute = readFileSync(resolve(root, "app/api/mcp/route.ts"), "utf8");
 const itemDetailModule = readFileSync(
   resolve(root, "lib/api/item-detail.ts"),
   "utf8",
@@ -25,20 +26,33 @@ const storyItemFieldsModule = readFileSync(
 );
 
 describe("item detail route source wiring", () => {
-  test("public and v1 detail routes delegate route id parsing, DB lookup, and serialization", () => {
-    for (const source of [v1ItemRoute, publicItemRoute]) {
+  test("public detail route delegates route id parsing, DB lookup, and serialization", () => {
+    expect(publicItemRoute).toContain("@/lib/api/item-detail");
+    expect(publicItemRoute).toContain("getItemDetailRouteRow");
+    expect(publicItemRoute).not.toContain("parseItemDetailRouteId");
+    expect(publicItemRoute).not.toContain("getItemDetailRow");
+    expect(publicItemRoute).not.toContain(".select({");
+    expect(publicItemRoute).not.toContain("leftJoin(clusters");
+    expect(publicItemRoute).not.toContain("innerJoin(sources");
+    expect(publicItemRoute).not.toContain("const idSchema = z.coerce");
+    expect(publicItemRoute).toContain("toPublicItemDetail(found.row)");
+    expect(publicItemRoute).toContain("publicItemDetailEtagSignal(found.row)");
+  });
+
+  test("bearer agent item detail surfaces share the v1 payload helper", () => {
+    for (const source of [v1ItemRoute, mcpRoute]) {
       expect(source).toContain("@/lib/api/item-detail");
-      expect(source).toContain("getItemDetailRouteRow");
+      expect(source).toContain("getAgentItemDetailRoutePayload");
       expect(source).not.toContain("parseItemDetailRouteId");
       expect(source).not.toContain("getItemDetailRow");
       expect(source).not.toContain(".select({");
       expect(source).not.toContain("leftJoin(clusters");
       expect(source).not.toContain("innerJoin(sources");
-      expect(source).not.toContain("const idSchema = z.coerce");
+      expect(source).not.toContain("toV1ItemDetail(found.row)");
     }
-    expect(v1ItemRoute).toContain("toV1ItemDetail(found.row)");
-    expect(publicItemRoute).toContain("toPublicItemDetail(found.row)");
-    expect(publicItemRoute).toContain("publicItemDetailEtagSignal(found.row)");
+    expect(mcpRoute).not.toContain("@/lib/items/detail");
+    expect(mcpRoute).not.toContain("getItemDetail(id");
+    expect(mcpRoute).not.toContain("body_md: detail.bodyMd");
   });
 
   test("public HKR stripping is shared by list and detail serializers", () => {

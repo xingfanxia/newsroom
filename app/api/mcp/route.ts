@@ -23,8 +23,10 @@
  * so the two surfaces can never drift.
  *
  * Resources registered:
- *   ax-radar://today           — today's curated feed as markdown
- *   ax-radar://item/{id}       — one item's full detail as markdown
+ *   ax-radar://today           — today's hot feed as markdown
+ *   ax-radar://curated         — operator-curated stream as markdown
+ *   ax-radar://daily/latest    — latest daily AI column as markdown
+ *   ax-radar://daily/{date}    — daily AI column by date
  *
  * Configure in claude_desktop_config.json:
  *   {
@@ -50,6 +52,7 @@ import {
   mcpSearchToolInputShape,
   searchQueryFromMcpToolArgs,
 } from "@/lib/api/feed-query-params";
+import { getAgentItemDetailRoutePayload } from "@/lib/api/item-detail";
 import {
   runFeedQuery,
   toAgentFeedPayload,
@@ -58,7 +61,6 @@ import {
   runSearchQuery,
   toAgentSearchPayload,
 } from "@/lib/api/search-results";
-import { getItemDetail } from "@/lib/items/detail";
 import { getEventMembersPayload } from "@/lib/api/event-members";
 import { saveItemRoutePayload } from "@/lib/api/saved-routes";
 import { listCollections } from "@/lib/items/collections";
@@ -153,10 +155,14 @@ function buildServer(user: SessionUser): McpServer {
         locale: z.enum(APP_LOCALES).optional(),
       },
     },
-    async ({ id, locale }) => {
-      const detail = await getItemDetail(id, locale ?? "en");
-      if (!detail) return error(`item ${id} not found or excluded`);
-      return text({ story: detail.story, body_md: detail.bodyMd });
+    async ({ id }) => {
+      const found = await getAgentItemDetailRoutePayload(String(id));
+      if (!found.ok) {
+        return found.error === "not_found"
+          ? error(`item ${id} not found`)
+          : error(found.error);
+      }
+      return text(found.payload);
     },
   );
 
