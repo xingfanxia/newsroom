@@ -1,17 +1,14 @@
-import { NextResponse } from "next/server";
+import { okError } from "@/lib/api/ok-response";
 import { getSessionUser, type SessionUser } from "@/lib/auth/session";
 
 type SessionAuthError = "auth_required";
 
 export type SessionRouteAuthResult =
   | { ok: true; user: SessionUser }
-  | { ok: false; response: NextResponse };
+  | { ok: false; response: Response };
 
-export function sessionAuthRequiredResponse(): NextResponse {
-  return NextResponse.json(
-    { ok: false, error: "auth_required" satisfies SessionAuthError },
-    { status: 401 },
-  );
+export function sessionAuthRequiredResponse(): Response {
+  return okError("auth_required" satisfies SessionAuthError, 401);
 }
 
 export async function requireSessionForRoute(): Promise<SessionRouteAuthResult> {

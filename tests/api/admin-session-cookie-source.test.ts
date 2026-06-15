@@ -19,8 +19,15 @@ describe("admin session cookie source wiring", () => {
     expect(login).toContain("adminLoginSuccessResponse");
     expect(login).toContain("adminLoginInvalidResponse");
     expect(logout).toContain("adminLogoutResponse");
+    expect(helper).toContain("@/lib/api/ok-response");
+    expect(helper).toContain("okJson");
+    expect(helper).toContain("okError");
+    expect(helper).toContain("okEmpty");
     expect(helper).toContain("freshAdminSessionCookie");
     expect(helper).toContain("expiredAdminSessionCookie");
+    expect(helper).not.toContain("NextResponse");
+    expect(helper).not.toContain("ok: true");
+    expect(helper).not.toContain("ok: false");
 
     for (const source of [login, logout]) {
       expect(source).not.toContain("NextResponse");

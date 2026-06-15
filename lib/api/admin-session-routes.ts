@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
 import { z } from "zod";
+import { okEmpty, okError, okJson } from "@/lib/api/ok-response";
 import {
   expiredAdminSessionCookie,
   freshAdminSessionCookie,
@@ -11,15 +11,11 @@ export const adminLoginBodySchema = z.object({
 });
 
 export function adminLoginInvalidResponse(): Response {
-  return NextResponse.json(
-    { ok: false, error: "invalid" },
-    { status: 401 },
-  );
+  return okError("invalid", 401);
 }
 
 export function adminLoginSuccessResponse(rawNext: string | undefined): Response {
-  const res = NextResponse.json({
-    ok: true,
+  const res = okJson({
     next: sanitizeAdminNext(rawNext),
   });
   res.cookies.set(freshAdminSessionCookie());
@@ -27,7 +23,7 @@ export function adminLoginSuccessResponse(rawNext: string | undefined): Response
 }
 
 export function adminLogoutResponse(): Response {
-  const res = NextResponse.json({ ok: true });
+  const res = okEmpty();
   res.cookies.set(expiredAdminSessionCookie());
   return res;
 }

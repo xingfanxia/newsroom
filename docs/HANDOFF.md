@@ -38,7 +38,8 @@ Shipped cleanup:
   the lower-level `lib/api/session-auth.ts` auth-required response.
 - Shared the underlying `{ ok: true }` / `{ ok: false, error }` response
   envelope construction through `lib/api/ok-response.ts`; admin/session route
-  helpers now alias that implementation while keeping domain-specific names.
+  helpers, auth-denial helpers, and admin login/logout cookie responses now
+  reuse that implementation while keeping domain-specific names.
 - Shared plain JSON success/error envelopes for small legacy/internal routes
   through `lib/api/plain-response.ts`; `/api/events/:id/members` and
   `/api/sources/active` no longer hand-copy `Response.json` or catch-all
@@ -59,7 +60,7 @@ Shipped cleanup:
 - Shared admin login/logout HTTP response construction through
   `lib/api/admin-session-routes.ts`, so next-target sanitization, invalid
   password envelopes, ok envelopes, and Set-Cookie attachment stay out of
-  route leaf files.
+  route leaf files while still using the common ok-response helpers.
 - Shared admin/v1 saved-collection CRUD result mapping through
   `lib/api/collection-routes.ts`, so both surfaces reuse the same
   `duplicate_name` and `not_found` decisions while keeping their own auth,

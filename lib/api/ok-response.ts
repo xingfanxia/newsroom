@@ -1,18 +1,20 @@
+import { NextResponse } from "next/server";
+
 export function okJson(
   body: Record<string, unknown>,
   init?: ResponseInit,
-): Response {
-  return Response.json({ ok: true, ...body }, init);
+): NextResponse {
+  return NextResponse.json({ ok: true, ...body }, init);
 }
 
-export function okEmpty(init?: ResponseInit): Response {
-  return Response.json({ ok: true }, init);
+export function okEmpty(init?: ResponseInit): NextResponse {
+  return NextResponse.json({ ok: true }, init);
 }
 
 export function okError(
   error: string,
   status: number,
   extra: Record<string, unknown> = {},
-): Response {
-  return Response.json({ ok: false, ...extra, error }, { status });
+): NextResponse {
+  return NextResponse.json({ ok: false, ...extra, error }, { status });
 }

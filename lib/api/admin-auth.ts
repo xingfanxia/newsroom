@@ -1,27 +1,24 @@
-import { NextResponse } from "next/server";
 import {
   ForbiddenError,
   UnauthorizedError,
   requireAdmin,
   type SessionUser,
 } from "@/lib/auth/session";
+import { okError } from "@/lib/api/ok-response";
 import { sessionAuthRequiredResponse } from "./session-auth";
 
 type AdminAuthError = "admin_required";
 
 export type AdminRouteAuthResult =
   | { ok: true; admin: SessionUser }
-  | { ok: false; response: NextResponse };
+  | { ok: false; response: Response };
 
-export function adminAuthErrorResponse(err: unknown): NextResponse | null {
+export function adminAuthErrorResponse(err: unknown): Response | null {
   if (err instanceof UnauthorizedError) {
     return sessionAuthRequiredResponse();
   }
   if (err instanceof ForbiddenError) {
-    return NextResponse.json(
-      { ok: false, error: "admin_required" satisfies AdminAuthError },
-      { status: 403 },
-    );
+    return okError("admin_required" satisfies AdminAuthError, 403);
   }
   return null;
 }

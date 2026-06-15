@@ -44,6 +44,20 @@ describe("required session route source wiring", () => {
     }
   });
 
+  test("cookie auth denial helpers reuse shared ok/error envelopes", () => {
+    const sessionAuth = read("lib/api/session-auth.ts");
+    const adminAuth = read("lib/api/admin-auth.ts");
+
+    for (const source of [sessionAuth, adminAuth]) {
+      expect(source).toContain("@/lib/api/ok-response");
+      expect(source).toContain("okError");
+      expect(source).not.toContain("NextResponse");
+      expect(source).not.toContain("NextResponse.json(");
+      expect(source).not.toContain("error: \"auth_required\"");
+      expect(source).not.toContain("error: \"admin_required\"");
+    }
+  });
+
   test("saved move route shares request validation with saved API schemas", () => {
     const source = read("app/api/feedback/move/route.ts");
 
