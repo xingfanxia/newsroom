@@ -255,7 +255,7 @@ body[data-cjk="lxgw"]      { --font-sans-cjk: 'LXGW WenKai', 'LXGW WenKai Screen
   .radar-sweep, .ticker, .cursor, .pulse-bar { animation: none !important; }
 }
 
-/* Legacy surface helpers retained for any unported components */
+/* Shared surface helpers used by app-shell and admin components. */
 .surface-card {
   background: var(--bg-1);
   border: 1px solid var(--border-1);
@@ -264,5 +264,12 @@ body[data-cjk="lxgw"]      { --font-sans-cjk: 'LXGW WenKai', 'LXGW WenKai Screen
 .surface-elevated {
   background: var(--bg-2);
   border: 1px solid var(--border-1);
+  border-radius: 4px;
+}
+.surface-featured {
+  background:
+    linear-gradient(135deg, rgba(63, 185, 80, 0.08), rgba(88, 166, 255, 0.04)),
+    var(--bg-1);
+  border: 1px solid rgba(63, 185, 80, 0.24);
   border-radius: 4px;
 }
