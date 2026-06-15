@@ -209,7 +209,7 @@ Shipped cleanup:
 - Shared REST query-param extraction and validation plumbing through
   `lib/api/query-params.ts`; public and v1 query routes now reuse one
   Request/URLSearchParams parser while keeping their separate
-  `publicInvalidQueryResult` and `v1InvalidQuery` envelopes.
+  `publicInvalidQueryResult` and `v1InvalidQueryResult` envelope adapters.
 - Shared v1 server-error logging/envelope through `v1ServerError` in
   `lib/api/v1-route.ts`; v1 route files keep their business 4xx branches but
   no longer hand-copy `console.error` plus `v1Error("server_error", 500)`.
@@ -256,8 +256,8 @@ Shipped cleanup:
   page importing low-level LLM stat queries directly.
 - Shared bearer-gated `/api/v1/*` auth and plain JSON/error envelopes through
   `lib/api/v1-route.ts`; v1 route files now call `runV1Route` and return
-  `v1Json` / `v1Error` / `v1InvalidQuery`, so token verification and response
-  shape cannot drift between agent endpoints.
+  `v1Json` / `v1Error` / `v1InvalidQueryResult`, so token verification, query
+  validation envelopes, and response shape cannot drift between agent endpoints.
 - Shared agent bearer auth through `lib/auth/api-token.ts` for both
   `/api/v1/*` and `/api/mcp`; v1 routes enter via `runV1Route`, while MCP
   calls `requireApiToken` directly before handing control to the Streamable

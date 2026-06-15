@@ -24,7 +24,7 @@
  */
 import {
   runV1Route,
-  v1InvalidQuery,
+  v1InvalidQueryResult,
   v1Json,
   v1ServerError,
 } from "@/lib/api/v1-route";
@@ -36,8 +36,8 @@ import {
 
 export async function GET(req: Request) {
   return runV1Route(req, async () => {
-    const parsed = parseV1SearchQueryRequest(req);
-    if (!parsed.ok) return v1InvalidQuery(parsed.issues);
+    const parsed = v1InvalidQueryResult(parseV1SearchQueryRequest(req));
+    if (!parsed.ok) return parsed.response;
 
     const p = parsed.data;
 

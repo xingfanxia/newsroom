@@ -3,6 +3,7 @@ import {
   runV1Route,
   v1Error,
   v1InvalidQuery,
+  v1InvalidQueryResult,
   v1Json,
   v1ServerError,
 } from "@/lib/api/v1-route";
@@ -32,6 +33,35 @@ describe("v1 route helpers", () => {
       error: "invalid_query",
       issues,
     });
+  });
+
+  test("v1InvalidQueryResult maps query parser failures to the shared response", async () => {
+    const issues = [{ path: ["tier"], message: "invalid option" }];
+    const result = v1InvalidQueryResult({ ok: false, issues });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.response.status).toBe(400);
+      expect(await result.response.json()).toEqual({
+        error: "invalid_query",
+        issues,
+      });
+    }
+  });
+
+  test("v1InvalidQueryResult can preserve issue-less legacy envelopes", async () => {
+    const result = v1InvalidQueryResult(
+      { ok: false, issues: [{ message: "bad window" }] },
+      { includeIssues: false },
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.response.status).toBe(400);
+      expect(await result.response.json()).toEqual({
+        error: "invalid_query",
+      });
+    }
   });
 
   test("v1ServerError logs the route label and returns the shared 500 envelope", async () => {

@@ -1,7 +1,11 @@
 import { requireApiToken } from "@/lib/auth/api-token";
 import type { SessionUser } from "@/lib/auth/session";
+import type { QueryParseResult } from "@/lib/api/query-params";
 
 type V1RouteHandler = (user: SessionUser) => Response | Promise<Response>;
+type V1InvalidQueryResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; response: Response };
 
 export async function runV1Route(
   req: Request,
@@ -28,6 +32,19 @@ export function v1InvalidQuery(issues?: unknown): Response {
   return issues === undefined
     ? v1Error("invalid_query", 400)
     : v1Error("invalid_query", 400, { issues });
+}
+
+export function v1InvalidQueryResult<T>(
+  parsed: QueryParseResult<T>,
+  opts: { includeIssues?: boolean } = {},
+): V1InvalidQueryResult<T> {
+  if (parsed.ok) return parsed;
+  return {
+    ok: false,
+    response: v1InvalidQuery(
+      opts.includeIssues === false ? undefined : parsed.issues,
+    ),
+  };
 }
 
 export function v1ServerError(label: string, err: unknown): Response {
