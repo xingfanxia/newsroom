@@ -65,9 +65,11 @@ describe("event member route source wiring", () => {
     const source = read("app/api/public/events/[id]/members/route.ts");
 
     expect(source).toContain("publicCachedRoute");
+    expect(source).toContain("publicRouteResult(");
     expect(source).toContain('endpoint: "eventMembers"');
     expect(source).not.toContain("publicEndpointRateLimit(");
     expect(source).not.toContain("publicCachedJson(req,");
+    expect(source).not.toContain("if (!result.ok) return result");
     expect(source).toContain("eventMembersCacheSignalParts");
     expect(source).toContain("etagSignal(eventMembersCacheSignalParts(body))");
     expect(source).not.toContain("body.members[body.members.length");

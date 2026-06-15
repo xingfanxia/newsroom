@@ -15,6 +15,7 @@ import {
 import {
   etagSignal,
   publicCachedRoute,
+  publicRouteResult,
 } from "@/lib/api/public-helpers";
 
 export const dynamic = "force-dynamic";
@@ -34,14 +35,10 @@ export async function GET(
         rawId: idRaw,
         defaultLocale: "en",
       });
-      if (!result.ok) return result;
-
-      const body = result.payload;
-      return {
-        ok: true,
+      return publicRouteResult(result, (body) => ({
         signal: etagSignal(eventMembersCacheSignalParts(body)),
         body,
-      };
+      }));
     },
   });
 }

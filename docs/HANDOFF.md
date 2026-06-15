@@ -212,6 +212,10 @@ Shipped cleanup:
   `lib/api/query-params.ts`; public and v1 query routes now reuse one
   Request/URLSearchParams parser while keeping their separate
   `publicInvalidQueryResult` and `v1InvalidQueryResult` envelope adapters.
+- Shared public domain-result to cached-route-result mapping through
+  `publicRouteResult`; public daily and event-member routes now keep only
+  success body/ETag-signal shaping while the public helper maps
+  `{ ok: false, error, status }` branches.
 - Shared v1 server-error logging/envelope through `v1ServerError` in
   `lib/api/v1-route.ts`; v1 route files keep their business 4xx branches but
   no longer hand-copy `console.error` plus `v1Error("server_error", 500)`.

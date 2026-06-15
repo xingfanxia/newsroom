@@ -11,6 +11,7 @@ import {
   publicInvalidQuery,
   publicInvalidQueryResult,
   publicJson,
+  publicRouteResult,
   publicServerError,
 } from "@/lib/api/public-helpers";
 
@@ -165,6 +166,32 @@ describe("public-helpers — etag + CORS + cache", () => {
   });
 
   describe("publicCachedRoute", () => {
+    it("maps route payload results into cached route results", () => {
+      expect(
+        publicRouteResult(
+          { ok: true, payload: { value: 1 } },
+          (payload) => ({
+            signal: `value=${payload.value}`,
+            body: payload,
+          }),
+        ),
+      ).toEqual({
+        ok: true,
+        signal: "value=1",
+        body: { value: 1 },
+      });
+
+      expect(
+        publicRouteResult(
+          { ok: false, error: "not_found", status: 404 },
+          (payload: { value: number }) => ({
+            signal: `value=${payload.value}`,
+            body: payload,
+          }),
+        ),
+      ).toEqual({ ok: false, error: "not_found", status: 404 });
+    });
+
     it("wraps a route payload with rate-limit, endpoint cache, and JSON", async () => {
       const req = new Request("https://x.test/");
       const res = await publicCachedRoute(req, {

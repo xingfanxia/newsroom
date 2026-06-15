@@ -33,6 +33,10 @@ export type PublicCachedRouteResult =
   | { ok: true; signal: string; body: unknown }
   | { ok: false; error: string; status: number };
 
+export type PublicRouteResult<T> =
+  | { ok: true; payload: T }
+  | { ok: false; error: string; status: number };
+
 type PublicCachedRouteArgs = {
   endpoint: PublicEndpointKey;
   etagFamily: string;
@@ -131,6 +135,14 @@ export async function publicCachedRoute(
   } catch (err) {
     return publicServerError(label, err);
   }
+}
+
+export function publicRouteResult<T>(
+  result: PublicRouteResult<T>,
+  toCached: (payload: T) => { signal: string; body: unknown },
+): PublicCachedRouteResult {
+  if (!result.ok) return result;
+  return { ok: true, ...toCached(result.payload) };
 }
 
 /** 4xx error — CORS-open so the browser can read the body. */

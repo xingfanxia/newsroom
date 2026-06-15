@@ -6,6 +6,7 @@
  */
 import {
   publicCachedRoute,
+  publicRouteResult,
 } from "@/lib/api/public-helpers";
 import { getPublicDailyColumnByDateRequestPayload } from "@/lib/api/daily-columns";
 
@@ -25,13 +26,10 @@ export async function GET(
       const result = await getPublicDailyColumnByDateRequestPayload(req, {
         rawDate,
       });
-      if (!result.ok) return result;
-
-      return {
-        ok: true,
-        signal: result.payload.etagSignal,
-        body: result.payload.body,
-      };
+      return publicRouteResult(result, (payload) => ({
+        signal: payload.etagSignal,
+        body: payload.body,
+      }));
     },
   });
 }

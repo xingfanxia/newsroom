@@ -37,6 +37,8 @@ describe("daily-column API source wiring", () => {
       expect(source).not.toContain("new URL(req.url)");
       expect(source).not.toContain("queryParamsRecord(req)");
       expect(source).not.toContain('searchParams.get("locale")');
+      expect(source).toContain("publicRouteResult(");
+      expect(source).not.toContain("if (!result.ok) return result");
     }
     expect(readSource("app/api/public/daily/route.ts")).toContain(
       "getLatestPublicDailyColumnRequestPayload",
