@@ -1,5 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
+  NO_DURABLE_CRON_ACTIVITY_LABEL,
+  NO_DURABLE_CRON_ACTIVITY_SIGNAL,
   cadenceMinutesFromCron,
   systemCronSnapshots,
 } from "@/lib/shell/system-cron";
@@ -48,7 +50,7 @@ describe("cadenceMinutesFromCron", () => {
     const snapshots = systemCronSnapshots(
       {
         "fetch-hourly": new Date("2026-06-13T10:30:00.000Z"),
-        "score-backfill": null,
+        "score-backfill": NO_DURABLE_CRON_ACTIVITY_SIGNAL,
       },
       new Date("2026-06-13T11:36:00.000Z"),
     );
@@ -57,7 +59,7 @@ describe("cadenceMinutesFromCron", () => {
       "1h ago",
     );
     expect(snapshots.find((c) => c.name === "score-backfill")?.last).toBe(
-      "no signal",
+      NO_DURABLE_CRON_ACTIVITY_LABEL,
     );
     expect(snapshots.find((c) => c.name === "newsletter-daily")?.last).toBe(
       "—",

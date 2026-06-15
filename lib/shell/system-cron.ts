@@ -8,9 +8,14 @@ export type SystemCron = {
   last: string;
 };
 
+export const NO_DURABLE_CRON_ACTIVITY_SIGNAL = null;
+export const NO_DURABLE_CRON_ACTIVITY_LABEL = "no signal";
+
+type NoDurableCronActivitySignal = typeof NO_DURABLE_CRON_ACTIVITY_SIGNAL;
+
 export type SystemCronActivityByName = Record<
   string,
-  Date | string | null | undefined
+  Date | string | NoDurableCronActivitySignal | undefined
 >;
 
 type VercelCronConfig = {
@@ -39,7 +44,7 @@ export function systemCronSnapshots(
       last: hasActivitySignal
         ? formatCompactRelativeTime(activityByName[name], {
             now,
-            nullLabel: "no signal",
+            nullLabel: NO_DURABLE_CRON_ACTIVITY_LABEL,
           })
         : "—",
     };

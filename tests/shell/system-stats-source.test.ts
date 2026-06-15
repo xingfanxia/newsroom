@@ -31,7 +31,12 @@ describe("admin system stats source wiring", () => {
     expect(source).toContain("lastClusterActivityAt");
     expect(source).toContain("lastDailyNewsletterAt");
     expect(source).toContain("lastMonthlyNewsletterAt");
-    expect(source).toContain("\"score-backfill\": null");
+    expect(source).toContain("NO_DURABLE_CRON_ACTIVITY_SIGNAL");
+    expect(source).toContain(
+      "\"score-backfill\": NO_DURABLE_CRON_ACTIVITY_SIGNAL",
+    );
+    expect(source).not.toContain("\"score-backfill\": null");
+    expect(source).not.toContain("FROM llm_usage");
     expect(source).not.toContain("function ago");
     expect(source).not.toContain("function uptimeFromFirstSuccess");
   });

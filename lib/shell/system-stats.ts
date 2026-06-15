@@ -26,7 +26,11 @@ import {
   sourceHealth,
 } from "@/db/schema";
 import { EVENT_COMMENTARY_CRON_RECENCY_HOURS } from "@/lib/events/commentary-window";
-import { systemCronSnapshots, type SystemCron } from "@/lib/shell/system-cron";
+import {
+  NO_DURABLE_CRON_ACTIVITY_SIGNAL,
+  systemCronSnapshots,
+  type SystemCron,
+} from "@/lib/shell/system-cron";
 import { systemQueueSnapshot, type SystemQueue } from "@/lib/shell/system-queues";
 import {
   formatCompactRelativeTime,
@@ -202,7 +206,10 @@ export async function getSystemSnapshot(): Promise<SystemSnapshot> {
       "article-body": itemsRow?.lastBodyFetchedAt ?? null,
       enrich: itemsRow?.lastEnrichedAt ?? null,
       commentary: itemsRow?.lastItemCommentaryAt ?? null,
-      "score-backfill": null,
+      // Score-backfill has no dedicated run-log or `score_updated_at`.
+      // Live enrich also emits score LLM usage, so deriving this from
+      // `llm_usage.task = score` would create a false activity signal.
+      "score-backfill": NO_DURABLE_CRON_ACTIVITY_SIGNAL,
       cluster: clustersRow?.lastClusterActivityAt ?? null,
       "newsletter-daily": newsletterRow?.lastDailyNewsletterAt ?? null,
       "newsletter-monthly": newsletterRow?.lastMonthlyNewsletterAt ?? null,
