@@ -1,10 +1,7 @@
 import {
-  adminError,
-  adminOk,
-  runAdminRoute,
-} from "@/lib/api/admin-route";
-import { rejectIterationRunRoutePayload } from "@/lib/api/iteration-routes";
-import { parseIterationRunRouteId } from "@/lib/policy/iterations";
+  rejectIterationRunRoutePayload,
+  runAdminIterationIdRoute,
+} from "@/lib/api/iteration-routes";
 
 export const dynamic = "force-dynamic";
 
@@ -19,13 +16,7 @@ export async function POST(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  return runAdminRoute(async () => {
-    const { id: rawId } = await params;
-    const parsedId = parseIterationRunRouteId(rawId);
-    if (!parsedId.ok) return adminError(parsedId.error, 400);
-
-    const result = await rejectIterationRunRoutePayload(parsedId.id);
-    if (!result.ok) return adminError(result.error, result.status);
-    return adminOk();
-  });
+  return runAdminIterationIdRoute(params, (id) =>
+    rejectIterationRunRoutePayload(id),
+  );
 }

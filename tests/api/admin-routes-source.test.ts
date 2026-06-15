@@ -28,8 +28,15 @@ describe("protected admin route source wiring", () => {
     for (const path of protectedAdminRoutePaths) {
       const source = read(path);
 
-      expect(source).toContain("@/lib/api/admin-route");
-      expect(source).toContain("runAdminRoute");
+      if (path.includes("/iterations/[id]/")) {
+        expect(source).toContain("@/lib/api/iteration-routes");
+        expect(source).toContain("runAdminIterationIdRoute");
+        expect(source).not.toContain("@/lib/api/admin-route");
+        expect(source).not.toContain("runAdminRoute");
+      } else {
+        expect(source).toContain("@/lib/api/admin-route");
+        expect(source).toContain("runAdminRoute");
+      }
       expect(source).not.toContain("@/lib/api/admin-auth");
       expect(source).not.toContain("requireAdminForRoute");
       expect(source).not.toContain("NextResponse.json(");

@@ -213,6 +213,10 @@ Shipped cleanup:
 - Shared v1 server-error logging/envelope through `v1ServerError` in
   `lib/api/v1-route.ts`; v1 route files keep their business 4xx branches but
   no longer hand-copy `console.error` plus `v1Error("server_error", 500)`.
+- Shared admin iteration id route adapters through `runAdminIterationIdRoute`
+  in `lib/api/iteration-routes.ts`; `/api/admin/iterations/[id]`, `/apply`,
+  and `/reject` now keep only the action binding while the shared helper owns
+  admin auth, route-id parsing, and result-to-admin-envelope mapping.
 - Shared RSS XML/HTTP response envelope, XML escaping, CDATA splitting, and
   lightweight markdown-to-HTML rendering through `lib/rss/render.ts`;
   `/api/rss/*`, the featured-locale feeds, and the legacy newsletter feeds now

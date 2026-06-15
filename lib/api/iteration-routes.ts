@@ -1,7 +1,13 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { iterationRuns, type IterationRun } from "@/db/schema";
+import {
+  adminError,
+  adminJson,
+  runAdminRoute,
+} from "@/lib/api/admin-route";
 import type { SessionUser } from "@/lib/auth/session";
+import { parseIterationRunRouteId } from "@/lib/policy/iterations";
 import { commitSkillVersion } from "@/lib/policy/skill";
 import {
   ITERATION_APPLIED_STATUS,
@@ -23,6 +29,26 @@ type IterationRouteError =
 type IterationRouteResult<T = Record<string, never>> =
   | { ok: true; payload: T }
   | IterationRouteError;
+
+type AdminIterationIdRouteHandler<T extends Record<string, unknown>> = (
+  id: number,
+  admin: SessionUser,
+) => Promise<IterationRouteResult<T>>;
+
+export function runAdminIterationIdRoute<T extends Record<string, unknown>>(
+  params: Promise<{ id: string }>,
+  handler: AdminIterationIdRouteHandler<T>,
+): Promise<Response> {
+  return runAdminRoute(async (admin) => {
+    const { id: rawId } = await params;
+    const parsedId = parseIterationRunRouteId(rawId);
+    if (!parsedId.ok) return adminError(parsedId.error, 400);
+
+    const result = await handler(parsedId.id, admin);
+    if (!result.ok) return adminError(result.error, result.status, result.extra);
+    return adminJson(result.payload);
+  });
+}
 
 export async function getIterationRunRoutePayload(
   id: number,
