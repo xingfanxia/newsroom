@@ -1,7 +1,5 @@
-import { asc, eq } from "drizzle-orm";
-import { db } from "@/db/client";
-import { sources } from "@/db/schema";
 import { plainJson, plainServerError } from "@/lib/api/plain-response";
+import { getActiveSourcesRoutePayload } from "@/lib/api/source-catalog";
 
 export const revalidate = 300;
 
@@ -13,30 +11,7 @@ export const revalidate = 300;
  */
 export async function GET() {
   try {
-    const client = db();
-    const rows = await client
-      .select({
-        id: sources.id,
-        nameEn: sources.nameEn,
-        nameZh: sources.nameZh,
-        kind: sources.kind,
-        group: sources.group,
-        locale: sources.locale,
-      })
-      .from(sources)
-      .where(eq(sources.enabled, true))
-      .orderBy(asc(sources.group), asc(sources.nameEn));
-    return plainJson({
-      sources: rows.map((r) => ({
-        id: r.id,
-        name_en: r.nameEn,
-        name_zh: r.nameZh,
-        kind: r.kind,
-        group: r.group,
-        locale: r.locale,
-      })),
-      total: rows.length,
-    });
+    return plainJson(await getActiveSourcesRoutePayload());
   } catch (err) {
     return plainServerError("api/sources/active", err);
   }

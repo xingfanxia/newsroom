@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  toActiveSourcePickerItem,
   toMcpSourceApiItem,
   toPublicSourceApiItem,
   toV1SourceApiItem,
@@ -30,6 +31,22 @@ const row: SourceCatalogRow = {
 };
 
 describe("source catalog API serialization", () => {
+  test("serializes the active source picker contract without hidden diagnostics", () => {
+    const item = toActiveSourcePickerItem(row);
+
+    expect(item).toEqual({
+      id: "openai-news",
+      name_en: "OpenAI News",
+      name_zh: "OpenAI News ZH",
+      kind: "rss",
+      group: "vendor-official",
+      locale: "en",
+    });
+    expect(item).not.toHaveProperty("url");
+    expect(item).not.toHaveProperty("health");
+    expect(item).not.toHaveProperty("notes");
+  });
+
   test("serializes the full bearer-gated v1 source contract", () => {
     expect(toV1SourceApiItem(row)).toEqual({
       id: "openai-news",

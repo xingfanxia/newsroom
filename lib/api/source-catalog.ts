@@ -7,6 +7,16 @@ type SourceCatalogOrder = "priority" | "id";
 
 const DEFAULT_SOURCE_HEALTH_STATUS = "pending" satisfies SourceHealthStatus;
 
+type ActiveSourcePickerRow = Pick<
+  SourceCatalogRow,
+  "id" | "nameEn" | "nameZh" | "kind" | "group" | "locale"
+>;
+
+type ActiveSourcesRoutePayload = {
+  sources: ReturnType<typeof toActiveSourcePickerItem>[];
+  total: number;
+};
+
 export async function listSourceCatalogRows(
   order: SourceCatalogOrder = "priority",
 ) {
@@ -48,8 +58,46 @@ export type SourceCatalogRow = Awaited<
   ReturnType<typeof listSourceCatalogRows>
 >[number];
 
+async function listActiveSourcePickerRows(): Promise<
+  ActiveSourcePickerRow[]
+> {
+  return db()
+    .select({
+      id: sources.id,
+      nameEn: sources.nameEn,
+      nameZh: sources.nameZh,
+      kind: sources.kind,
+      group: sources.group,
+      locale: sources.locale,
+    })
+    .from(sources)
+    .where(eq(sources.enabled, true))
+    .orderBy(asc(sources.group), asc(sources.nameEn));
+}
+
+export async function getActiveSourcesRoutePayload(): Promise<
+  ActiveSourcesRoutePayload
+> {
+  const rows = await listActiveSourcePickerRows();
+  return {
+    sources: rows.map(toActiveSourcePickerItem),
+    total: rows.length,
+  };
+}
+
 function iso(d: Date | null | undefined): string | null {
   return d?.toISOString() ?? null;
+}
+
+export function toActiveSourcePickerItem(r: ActiveSourcePickerRow) {
+  return {
+    id: r.id,
+    name_en: r.nameEn,
+    name_zh: r.nameZh,
+    kind: r.kind,
+    group: r.group,
+    locale: r.locale,
+  };
 }
 
 export function toV1SourceApiItem(r: SourceCatalogRow) {

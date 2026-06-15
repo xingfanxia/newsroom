@@ -43,6 +43,11 @@ Shipped cleanup:
   through `lib/api/plain-response.ts`; `/api/events/:id/members` and
   `/api/sources/active` no longer hand-copy `Response.json` or catch-all
   `console.error` server-error branches.
+- Shared active source-picker payload lookup through
+  `lib/api/source-catalog.ts`; `/api/sources/active` now keeps only the
+  plain JSON/error envelope while the source-catalog helper owns the enabled
+  source query, ordering, and compact `{ id, name, kind, group, locale }`
+  serializer.
 - Shared mutating route JSON body parsing and Zod error-envelope handling through `lib/api/json-body.ts`.
 - Shared feedback vote values through `FEEDBACK_VOTES`, `FEEDBACK_SIGNAL_VOTES`,
   and `FEEDBACK_SAVE_VOTE` in `lib/types.ts`, so the DB enum, feedback request

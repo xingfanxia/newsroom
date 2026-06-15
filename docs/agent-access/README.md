@@ -53,7 +53,7 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 - **`lib/types.ts`** — shared item tier, highlight-tier subset, feed view, search mode, app/source locale, source group/kind, source-health status, feedback vote, user role, iteration status, and cadence runtime tuples used by REST/MCP schemas, public/agent item source fields, cluster lead-pick authority typing, `/skill.md`, `/openapi.yaml`, sitemap generation, DB enums, fetcher support checks, score parsing, feedback routes, iteration routes, and commentary workers.
 - **`lib/api/feed-results.ts`** — shared feed execution for `/api/public/feed`, `/api/v1/feed`, and MCP `ax_radar_feed`; surface adapters own auth/rate-limit/ETag and serializers, while this helper owns paired item + `total` queries and pagination defaults.
 - **`lib/api/search-results.ts`** — shared lexical/semantic search execution for `/api/public/search`, `/api/v1/search`, and MCP `ax_radar_search`; surface adapters own auth/rate-limit/ETag and serializers, while this helper owns lexical `total` counts and semantic filter mapping.
-- **`lib/api/source-catalog.ts`** — shared source catalog query + serializers used by `/api/public/sources`, `/api/v1/sources`, and MCP `ax_radar_sources`, with public/v1/MCP each owning only its exposure policy.
+- **`lib/api/source-catalog.ts`** — shared source catalog query + serializers used by `/api/public/sources`, `/api/v1/sources`, `/api/sources/active`, and MCP `ax_radar_sources`, with public/v1/MCP/source-picker each owning only its exposure policy.
 - **`lib/api/public-items.ts`** — shared anonymous feed/search item serializer. It keeps the public `FeedItem` shape aligned across `/api/public/feed` and `/api/public/search`.
 - **`lib/api/v1-items.ts`** — shared bearer-gated agent item serializer used by `/api/v1/feed`, `/api/v1/search`, `/api/v1/saved`, and MCP feed/search tools.
 - **`lib/api/story-item-fields.ts`** — shared flat Story field helpers used by both anonymous public serializers and bearer-gated `/api/v1/*` serializers, with each surface still owning its HKR exposure policy.
@@ -103,8 +103,8 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 - `tests/api/feed-query-source.test.ts` — feed/search routes stay wired to shared query schemas and shared execution helpers
 - `tests/api/public-feed.test.ts` — public feed reports a stable full-match `total` across page sizes
 - `tests/api/public-search.test.ts` — public lexical search reports a stable full-match `total` across page sizes
-- `tests/api/source-catalog.test.ts` — public, v1, and MCP source catalog serialization contracts
-- `tests/api/source-catalog-source.test.ts` — source routes and OpenAPI stay wired to shared source catalog/runtime tuple contracts
+- `tests/api/source-catalog.test.ts` — public, v1, MCP, and active source-picker source catalog serialization contracts
+- `tests/api/source-catalog-source.test.ts` + `tests/api/sources-active-source.test.ts` — source routes and OpenAPI stay wired to shared source catalog/runtime tuple contracts
 - `tests/api/skill-source.test.ts` — hosted `/skill.md` stays wired to shared runtime tuple contracts for installing agents
 - `tests/api/public-items.test.ts` — anonymous feed/search item shape, HKR reason stripping, locale-specific event title fields
 - `tests/api/item-detail.test.ts` — public/v1 full-detail item route id parsing, item shape, public HKR stripping, and event-aware ETag signal
@@ -130,7 +130,7 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 - `tests/llm/usage-stats-source.test.ts` — admin/v1/MCP usage surfaces stay wired to all-time windows, model labels, and the shared agent summary contract
 - `tests/items/collections.test.ts` — saved collection assignment rejects cross-owner collection ids
 
-Run these with `bun test --env-file=.env.local tests/api/public-*.test.ts tests/api/feed-query-*.test.ts tests/api/query-params*.test.ts tests/api/source-catalog*.test.ts tests/api/skill-source.test.ts tests/api/item-detail*.test.ts tests/api/event-members*.test.ts tests/api/daily-columns*.test.ts tests/api/collection*.test.ts tests/api/saved-*.test.ts tests/api/tweak*.test.ts tests/api/mcp-contract-source.test.ts tests/api/usage-summary.test.ts tests/api/v1-route-*.test.ts tests/api/v1-saved-source.test.ts tests/llm/usage-display.test.ts tests/llm/usage-stats-source.test.ts tests/items/collections.test.ts`.
+Run these with `bun test --env-file=.env.local tests/api/public-*.test.ts tests/api/feed-query-*.test.ts tests/api/query-params*.test.ts tests/api/source-catalog*.test.ts tests/api/sources-active-source.test.ts tests/api/skill-source.test.ts tests/api/item-detail*.test.ts tests/api/event-members*.test.ts tests/api/daily-columns*.test.ts tests/api/collection*.test.ts tests/api/saved-*.test.ts tests/api/tweak*.test.ts tests/api/mcp-contract-source.test.ts tests/api/usage-summary.test.ts tests/api/v1-route-*.test.ts tests/api/v1-saved-source.test.ts tests/llm/usage-display.test.ts tests/llm/usage-stats-source.test.ts tests/items/collections.test.ts`.
 
 ## Operational notes
 
@@ -142,7 +142,7 @@ Run these with `bun test --env-file=.env.local tests/api/public-*.test.ts tests/
 - **Query extraction is centralized separately from envelopes** — reusable REST query helpers use `parseQueryParams` / `queryParamsRecord` from `lib/api/query-params.ts`, then surface adapters choose `publicInvalidQuery` or `v1InvalidQuery` so validation parsing cannot drift while response contracts remain surface-specific.
 - **Feed execution is centralized for REST + MCP** — `/api/public/feed`, `/api/v1/feed`, and MCP `ax_radar_feed` all call `runFeedQuery`; adapters keep only auth/rate-limit/ETag and item serialization while the helper keeps item rows and `total` counts paired.
 - **Search execution is centralized for REST + MCP** — `/api/public/search`, `/api/v1/search`, and MCP `ax_radar_search` all call `runSearchQuery`; lexical mode counts the full filtered match set for pagination, while semantic mode shares the same source/date/tier filter mapping.
-- **Source catalog serialization is centralized** — `/api/public/sources`, `/api/v1/sources`, and MCP `ax_radar_sources` share `lib/api/source-catalog.ts`; public strips operational diagnostics, v1 keeps them, MCP keeps a compact flat shape.
+- **Source catalog serialization is centralized** — `/api/public/sources`, `/api/v1/sources`, `/api/sources/active`, and MCP `ax_radar_sources` share `lib/api/source-catalog.ts`; public strips operational diagnostics, v1 keeps them, the active source picker keeps only compact identity fields, and MCP keeps a compact flat shape.
 - **Bearer agent item serialization is shared across REST + MCP** — `/api/v1/feed`, `/api/v1/search`, MCP `ax_radar_feed`, and MCP `ax_radar_search` all use `toAgentApiItem`; `/api/v1/saved` extends it via `toSavedAgentApiItem`.
 - **Saved collection assignment is owner-aware** — `/api/v1/saved` and MCP `ax_radar_save` enter through `saveItemRoutePayload`, while browser move actions enter through `assignSavedItemCollection`; both paths reject another user's collection id before mutating assignment.
 - **Saved collection request validation is shared across auth surfaces** — `/api/admin/collections` accepts browser camelCase bodies while `/api/v1/collections` accepts agent snake_case bodies, but both normalize through `lib/api/collection-requests.ts` before calling `lib/items/collections.ts`.
