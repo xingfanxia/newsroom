@@ -77,7 +77,8 @@ Written at the end of s7 (2026-04-19). User flagged "a lot of issues needs to be
 - [x] No test for `/api/admin/policy/commit` writes correct `version+1` —
   covered by `tests/api/policy-commit.test.ts`.
 - [x] No test for `/api/saved/export` markdown shape — covered by `tests/api/saved-export.test.ts`.
-- [ ] No test for `/api/tweaks` GET+PATCH round-trip
+- [x] No test for `/api/tweaks` GET+PATCH round-trip — shared helper
+  contract and real DB persistence covered by `tests/api/tweak-routes.test.ts`.
 - [ ] `getFeaturedStories` per-source-filter workaround (client-side `s.source.publisher` match) has zero test coverage
 - [ ] `useTweaks` TweaksProvider not tested for context propagation
 

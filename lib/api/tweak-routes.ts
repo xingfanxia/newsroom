@@ -6,9 +6,10 @@ import {
   type TweaksPatchBody,
 } from "@/lib/api/tweak-requests";
 import { upsertAppUser, type SessionUser } from "@/lib/auth/session";
+import { type Tweaks } from "@/lib/tweaks";
 
 export type TweaksRoutePayload = {
-  tweaks: unknown | null;
+  tweaks: Partial<Tweaks> | null;
   watchlist: string[] | null;
 };
 
@@ -28,7 +29,7 @@ export async function getTweaksRoutePayload(
     .limit(1);
 
   return {
-    tweaks: row?.tweaks ?? null,
+    tweaks: (row?.tweaks as Partial<Tweaks> | null) ?? null,
     watchlist: (row?.watchlist as string[] | null) ?? null,
   };
 }

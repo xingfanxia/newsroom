@@ -72,7 +72,7 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 - **`lib/api/saved-routes.ts`** — shared saved-item route payload helpers used by bearer-gated `/api/v1/saved`, browser `/api/feedback/move`, and MCP `ax_radar_save`; it owns saved lookup, agent saved-item serialization, save toggling, owner-aware collection assignment and move semantics, assigned-collection payloads, and missing-item FK-to-`item_not_found` mapping while adapters keep their auth and response envelopes.
 - **`lib/api/saved-export.ts`** — shared browser saved-export helper for Markdown dumps; `/api/saved/export` keeps only optional cookie-session fallback semantics, while this helper owns query parsing, saved item/collection lookup, Markdown rendering, attachment filenames, and response headers.
 - **`lib/api/usage-summary.ts`** — shared bearer-gated LLM usage summary contract used by `/api/v1/usage/summary` and MCP `ax_radar_usage`, with request/window parsing, the default usage window, totals, task/model breakdowns, and recent call provider/model labels.
-- **`lib/tweaks.ts` + `lib/api/tweak-requests.ts`** — shared tweak option contracts, defaults, PATCH validation, and DB patch construction used by the client site-config provider, cookie-gated `/api/tweaks`, and bearer-gated `/api/v1/tweaks`.
+- **`lib/tweaks.ts` + `lib/api/tweak-requests.ts` + `lib/api/tweak-routes.ts`** — shared tweak option contracts, defaults, PATCH validation, DB patch construction, and GET/PATCH route payload persistence used by the client site-config provider, cookie-gated `/api/tweaks`, and bearer-gated `/api/v1/tweaks`.
 
 ## Adding a new public endpoint
 
@@ -125,6 +125,7 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 - `tests/api/saved-routes.test.ts` + `tests/api/saved-routes-source.test.ts` — saved list/write/move helper behavior and source wiring keep `/api/v1/saved` on shared list payload construction, `/api/feedback/move` on the shared move helper, and `/api/v1/saved` plus MCP `ax_radar_save` on the same save mutation path
 - `tests/api/saved-export.test.ts` — browser saved-export query parsing, Markdown shape, deterministic filenames, and attachment headers
 - `tests/api/tweak-requests.test.ts` — shared tweak PATCH validation and DB patch construction for browser + bearer surfaces
+- `tests/api/tweak-routes.test.ts` — shared tweak route payload contract and real DB GET/PATCH round-trip semantics
 - `tests/api/tweaks-source.test.ts` — cookie/v1 tweak routes and the client provider stay wired to shared tweak contracts
 - `tests/api/mcp-contract-source.test.ts` — MCP feed/search stay wired to shared execution helpers and the shared v1 item serializer
 - `tests/api/usage-summary.test.ts` — bearer-gated usage summary parses request windows and serializes totals, task/model breakdowns, and recent calls for agents
