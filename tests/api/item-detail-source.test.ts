@@ -47,4 +47,11 @@ describe("item detail route source wiring", () => {
     expect(itemDetailModule).not.toContain("function publicHkr");
     expect(publicItemsModule).not.toContain("function toPublicHkr");
   });
+
+  test("detail serializers reuse the shared nullable ISO helper", () => {
+    expect(itemDetailModule).toContain("@/lib/time/relative");
+    expect(itemDetailModule).toContain("toIsoStringOrNull");
+    expect(itemDetailModule).not.toContain("function iso(");
+    expect(itemDetailModule).not.toContain("?.toISOString() ?? null");
+  });
 });

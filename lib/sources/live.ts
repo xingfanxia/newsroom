@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { sources, sourceHealth } from "@/db/schema";
 import { sourceCatalog } from "@/lib/sources/catalog";
+import { toIsoStringOrNull } from "@/lib/time/relative";
 import type { Source } from "@/lib/types";
 
 export type LiveSource = Source & {
@@ -69,8 +70,8 @@ export async function getLiveSources(): Promise<LiveSource[]> {
         notes: r.notes ?? undefined,
         health: {
           status: r.hStatus ?? "pending",
-          lastFetchedAt: r.hLastFetched?.toISOString() ?? null,
-          lastSuccessAt: r.hLastSuccess?.toISOString() ?? null,
+          lastFetchedAt: toIsoStringOrNull(r.hLastFetched),
+          lastSuccessAt: toIsoStringOrNull(r.hLastSuccess),
           lastError: r.hError,
           lastItemsCount: r.hLastCount ?? 0,
           totalItemsCount: r.hTotalCount ?? 0,

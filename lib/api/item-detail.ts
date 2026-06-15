@@ -8,6 +8,7 @@ import {
   type PositiveRouteIdResult,
 } from "@/lib/api/route-params";
 import { toPublicHkr, type PublicHkr } from "@/lib/api/story-item-fields";
+import { toIsoStringOrNull } from "@/lib/time/relative";
 import type { Story } from "@/lib/types";
 
 type Hkr = Story["hkr"];
@@ -190,10 +191,6 @@ export async function getAgentItemDetailRoutePayload(
   return { ok: true, id: found.id, payload: toV1ItemDetail(found.row) };
 }
 
-function iso(d: Date | null | undefined): string | null {
-  return d?.toISOString() ?? null;
-}
-
 function detailSource(row: ItemDetailRow): DetailSource {
   return {
     id: row.sourceId,
@@ -233,8 +230,8 @@ function detailEvent(
     coverage: row.clusterMemberCount,
     tier: row.clusterEventTier,
     importance: row.clusterImportance,
-    first_seen_at: iso(row.clusterFirstSeenAt),
-    latest_member_at: iso(row.clusterLatestMemberAt),
+    first_seen_at: toIsoStringOrNull(row.clusterFirstSeenAt),
+    latest_member_at: toIsoStringOrNull(row.clusterLatestMemberAt),
     canonical_title: {
       zh: row.clusterCanonicalTitleZh,
       en: row.clusterCanonicalTitleEn,
@@ -279,8 +276,8 @@ function baseDetail(row: ItemDetailRow) {
     canonical_url: row.canonicalUrl,
     author: row.author,
     published_at: row.publishedAt.toISOString(),
-    enriched_at: iso(row.enrichedAt),
-    commentary_at: iso(row.commentaryAt),
+    enriched_at: toIsoStringOrNull(row.enrichedAt),
+    commentary_at: toIsoStringOrNull(row.commentaryAt),
     body_md: row.bodyMd,
   };
 }
@@ -299,8 +296,8 @@ export function toV1ItemDetail(row: ItemDetailRow): V1ItemDetail {
     event: event
       ? {
           ...event,
-          verified_at: iso(row.clusterVerifiedAt),
-          commentary_at: iso(row.clusterCommentaryAt),
+          verified_at: toIsoStringOrNull(row.clusterVerifiedAt),
+          commentary_at: toIsoStringOrNull(row.clusterCommentaryAt),
         }
       : null,
   };
@@ -317,11 +314,11 @@ export function toPublicItemDetail(row: ItemDetailRow): PublicItemDetail {
 export function publicItemDetailEtagSignal(row: ItemDetailRow): string {
   return etagSignal({
     id: row.id,
-    enriched_at: iso(row.enrichedAt),
-    commentary_at: iso(row.commentaryAt),
+    enriched_at: toIsoStringOrNull(row.enrichedAt),
+    commentary_at: toIsoStringOrNull(row.commentaryAt),
     cluster_id: row.clusterId,
     cluster_coverage: row.clusterMemberCount,
-    cluster_latest_member_at: iso(row.clusterLatestMemberAt),
-    cluster_commentary_at: iso(row.clusterCommentaryAt),
+    cluster_latest_member_at: toIsoStringOrNull(row.clusterLatestMemberAt),
+    cluster_commentary_at: toIsoStringOrNull(row.clusterCommentaryAt),
   });
 }

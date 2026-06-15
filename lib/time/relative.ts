@@ -33,6 +33,10 @@ export function latestDate(...values: DateLike[]): Date | null {
   return latest;
 }
 
+export function toIsoStringOrNull(value: DateLike): string | null {
+  return coerceDate(value)?.toISOString() ?? null;
+}
+
 export function formatCompactRelativeTime(
   value: DateLike,
   options: TimeOptions = {},

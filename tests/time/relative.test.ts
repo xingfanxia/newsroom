@@ -5,6 +5,7 @@ import {
   formatCompactRelativeTime,
   formatElapsedSince,
   latestDate,
+  toIsoStringOrNull,
 } from "@/lib/time/relative";
 
 const NOW = new Date("2026-06-13T11:36:00.000Z");
@@ -30,6 +31,17 @@ describe("relative time display helpers", () => {
         new Date("2026-06-13T10:00:00.000Z"),
       ),
     ).toEqual(new Date("2026-06-13T10:00:00.000Z"));
+  });
+
+  test("serializes valid date-like values to nullable ISO strings", () => {
+    expect(toIsoStringOrNull("2026-06-13T11:00:00.000Z")).toBe(
+      "2026-06-13T11:00:00.000Z",
+    );
+    expect(toIsoStringOrNull(new Date("2026-06-13T11:00:00.000Z"))).toBe(
+      "2026-06-13T11:00:00.000Z",
+    );
+    expect(toIsoStringOrNull("not-a-date")).toBeNull();
+    expect(toIsoStringOrNull(null)).toBeNull();
   });
 
   test("formats compact relative labels for operational tables", () => {

@@ -15,6 +15,7 @@ import {
   listSourceCatalogRows,
   toPublicSourceApiItem,
 } from "@/lib/api/source-catalog";
+import { toIsoStringOrNull } from "@/lib/time/relative";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -37,7 +38,7 @@ export async function GET(req: Request) {
       signal: etagSignal({
         count: rows.length,
         latest_success: rows
-          .map((r) => r.lastSuccessAt?.toISOString() ?? "")
+          .map((r) => toIsoStringOrNull(r.lastSuccessAt) ?? "")
           .sort()
           .pop() ?? "",
       }),

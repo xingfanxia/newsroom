@@ -1,6 +1,7 @@
 import { asc, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { sources, sourceHealth } from "@/db/schema";
+import { toIsoStringOrNull } from "@/lib/time/relative";
 import type { SourceHealthStatus } from "@/lib/types";
 
 type SourceCatalogOrder = "priority" | "id";
@@ -85,10 +86,6 @@ export async function getActiveSourcesRoutePayload(): Promise<
   };
 }
 
-function iso(d: Date | null | undefined): string | null {
-  return d?.toISOString() ?? null;
-}
-
 export function toActiveSourcePickerItem(r: ActiveSourcePickerRow) {
   return {
     id: r.id,
@@ -116,8 +113,8 @@ export function toV1SourceApiItem(r: SourceCatalogRow) {
     notes: r.notes,
     health: {
       status: r.status ?? DEFAULT_SOURCE_HEALTH_STATUS,
-      last_fetched_at: iso(r.lastFetchedAt),
-      last_success_at: iso(r.lastSuccessAt),
+      last_fetched_at: toIsoStringOrNull(r.lastFetchedAt),
+      last_success_at: toIsoStringOrNull(r.lastSuccessAt),
       consecutive_failures: r.consecutiveFailures ?? 0,
       last_items_count: r.lastItemsCount ?? 0,
       total_items_count: r.totalItemsCount ?? 0,
@@ -142,7 +139,7 @@ export function toPublicSourceApiItem(r: SourceCatalogRow) {
     curated: r.curated ?? false,
     health: {
       status: r.status ?? DEFAULT_SOURCE_HEALTH_STATUS,
-      last_success_at: iso(r.lastSuccessAt),
+      last_success_at: toIsoStringOrNull(r.lastSuccessAt),
       consecutive_failures: r.consecutiveFailures ?? 0,
       total_items_count: r.totalItemsCount ?? 0,
     },
@@ -159,7 +156,7 @@ export function toMcpSourceApiItem(r: SourceCatalogRow) {
     cadence: r.cadence,
     enabled: r.enabled,
     status: r.status ?? DEFAULT_SOURCE_HEALTH_STATUS,
-    last_success_at: iso(r.lastSuccessAt),
+    last_success_at: toIsoStringOrNull(r.lastSuccessAt),
     consecutive_failures: r.consecutiveFailures ?? 0,
     total_items: r.totalItemsCount ?? 0,
   };
