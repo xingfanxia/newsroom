@@ -54,8 +54,9 @@ describe("event member route source wiring", () => {
     expect(source).toContain("@/lib/api/plain-response");
     expect(source).toContain("toEventMembersListEnvelope");
     expect(source).toContain("plainJson");
-    expect(source).toContain("plainError");
+    expect(source).toContain("plainRouteResult");
     expect(source).toContain("plainServerError");
+    expect(source).not.toContain("plainError(result.error");
     expect(source).not.toContain("Response.json(");
     expect(source).not.toContain('console.error("[api/events');
   });

@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   plainError,
   plainJson,
+  plainRouteResult,
   plainServerError,
 } from "@/lib/api/plain-response";
 
@@ -19,6 +20,22 @@ describe("plain response helpers", () => {
 
     expect(res.status).toBe(404);
     expect(await res.json()).toEqual({ error: "not_found" });
+  });
+
+  test("plainRouteResult maps domain results to the shared plain envelope", async () => {
+    const ok = plainRouteResult(
+      { ok: true, payload: { value: 1 } },
+      plainJson,
+    );
+    expect(ok.status).toBe(200);
+    expect(await ok.json()).toEqual({ value: 1 });
+
+    const err = plainRouteResult(
+      { ok: false, error: "invalid_id", status: 400 },
+      plainJson,
+    );
+    expect(err.status).toBe(400);
+    expect(await err.json()).toEqual({ error: "invalid_id" });
   });
 
   test("plainServerError logs the route label and returns the shared 500 envelope", async () => {

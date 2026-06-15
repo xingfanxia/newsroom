@@ -44,7 +44,8 @@ Shipped cleanup:
 - Shared plain JSON success/error envelopes for small legacy/internal routes
   through `lib/api/plain-response.ts`; `/api/events/:id/members` and
   `/api/sources/active` no longer hand-copy `Response.json` or catch-all
-  `console.error` server-error branches.
+  `console.error` server-error branches, and event-member domain failures map
+  through `plainRouteResult`.
 - Shared active source-picker payload lookup through
   `lib/api/source-catalog.ts`; `/api/sources/active` now keeps only the
   plain JSON/error envelope while the source-catalog helper owns the enabled
@@ -222,6 +223,9 @@ Shipped cleanup:
   `sessionRouteResult`; `/api/tweaks` and `/api/feedback/move` now keep only
   success payload shaping while the session helper maps `{ ok: false, error,
   status }` branches.
+- Shared plain domain-result envelope mapping through `plainRouteResult`;
+  `/api/events/:id/members` now keeps only success payload shaping while the
+  plain-response helper maps `{ ok: false, error, status }` branches.
 - Shared admin iteration id route adapters through `runAdminIterationIdRoute`
   in `lib/api/iteration-routes.ts`; `/api/admin/iterations/[id]`, `/apply`,
   and `/reject` now keep only the action binding while the shared helper owns

@@ -20,8 +20,8 @@ import {
   toEventMembersListEnvelope,
 } from "@/lib/api/event-members";
 import {
-  plainError,
   plainJson,
+  plainRouteResult,
   plainServerError,
 } from "@/lib/api/plain-response";
 
@@ -36,11 +36,9 @@ export async function GET(
       rawId: idRaw,
       defaultLocale: "zh",
     });
-    if (!result.ok) {
-      return plainError(result.error, result.status);
-    }
-
-    return plainJson(toEventMembersListEnvelope(result.payload));
+    return plainRouteResult(result, (payload) =>
+      plainJson(toEventMembersListEnvelope(payload)),
+    );
   } catch (err) {
     return plainServerError("api/events/:id/members", err);
   }

@@ -13,6 +13,20 @@ export function plainError(error: string, status: number): Response {
   return plainJson({ error }, { status });
 }
 
+export type PlainRouteResult<T> =
+  | { ok: true; payload: T }
+  | { ok: false; error: string; status: number };
+
+export function plainRouteResult<T>(
+  result: PlainRouteResult<T>,
+  onOk: (payload: T) => Response,
+): Response {
+  if (!result.ok) {
+    return plainError(result.error, result.status);
+  }
+  return onOk(result.payload);
+}
+
 export function plainServerError(label: string, err: unknown): Response {
   console.error(`[${label}] failed`, err);
   return plainError("server_error", 500);
