@@ -81,6 +81,38 @@ export const v1CollectionUpdateBodySchema = z
 export const collectionDeleteBodySchema = z.object({ id: collectionIdSchema });
 
 export function isDuplicateCollectionNameError(err: unknown): boolean {
-  const message = err instanceof Error ? err.message : String(err);
-  return /duplicate|unique/i.test(message);
+  let current: unknown = err;
+  for (let depth = 0; depth < 4 && current; depth++) {
+    if (/23505|duplicate|unique/i.test(collectionErrorSearchText(current))) {
+      return true;
+    }
+    if (typeof current !== "object") break;
+
+    const cause = (current as { cause?: unknown }).cause;
+    if (!cause || cause === current) break;
+    current = cause;
+  }
+  return false;
+}
+
+function collectionErrorSearchText(err: unknown): string {
+  if (typeof err !== "object" || err === null) return String(err);
+
+  const fields = err as {
+    message?: unknown;
+    detail?: unknown;
+    code?: unknown;
+    constraint_name?: unknown;
+    constraint?: unknown;
+  };
+  return [
+    err instanceof Error ? err.message : undefined,
+    fields.message,
+    fields.detail,
+    fields.code,
+    fields.constraint_name,
+    fields.constraint,
+  ]
+    .filter((value): value is string => typeof value === "string")
+    .join("\n");
 }

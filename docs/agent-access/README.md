@@ -120,6 +120,7 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 - `tests/api/daily-columns-source.test.ts` — public daily routes and MCP daily resources stay wired to shared daily-column request/lookup/payload helpers
 - `tests/api/collection-requests.test.ts` — shared saved-collection request schemas for admin camelCase bodies and v1 snake_case bodies
 - `tests/api/collections-source.test.ts` — admin/v1 collection routes stay wired to shared collection request schemas
+- `tests/api/collections.test.ts` — shared saved-collection route helpers cover owner-scoped create/list/update/delete, duplicate-name mapping, save counts, and delete-to-inbox reparenting
 - `tests/api/saved-requests.test.ts` — shared saved-item query request parsing plus mutation and move request schemas
 - `tests/api/saved-routes.test.ts` + `tests/api/saved-routes-source.test.ts` — saved list/write/move helper behavior and source wiring keep `/api/v1/saved` on shared list payload construction, `/api/feedback/move` on the shared move helper, and `/api/v1/saved` plus MCP `ax_radar_save` on the same save mutation path
 - `tests/api/saved-export.test.ts` — browser saved-export query parsing, Markdown shape, deterministic filenames, and attachment headers

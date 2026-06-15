@@ -31,15 +31,26 @@ export async function listCollections(userId: string): Promise<SavedCollection[]
       pinned: savedCollections.pinned,
       sortOrder: savedCollections.sortOrder,
       createdAt: savedCollections.createdAt,
-      count: sql<number>`
-        (SELECT count(*) FROM ${feedback}
-         WHERE ${feedback.userId} = ${savedCollections.userId}
-           AND ${feedback.vote} = ${FEEDBACK_SAVE_VOTE}
-           AND ${feedback.collectionId} = ${savedCollections.id})::int
-      `,
+      count: sql<number>`count(${feedback.id})::int`,
     })
     .from(savedCollections)
+    .leftJoin(
+      feedback,
+      and(
+        eq(feedback.userId, savedCollections.userId),
+        eq(feedback.collectionId, savedCollections.id),
+        eq(feedback.vote, FEEDBACK_SAVE_VOTE),
+      ),
+    )
     .where(eq(savedCollections.userId, userId))
+    .groupBy(
+      savedCollections.id,
+      savedCollections.name,
+      savedCollections.nameCjk,
+      savedCollections.pinned,
+      savedCollections.sortOrder,
+      savedCollections.createdAt,
+    )
     .orderBy(
       desc(savedCollections.pinned),
       asc(savedCollections.sortOrder),

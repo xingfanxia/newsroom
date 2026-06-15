@@ -67,4 +67,15 @@ describe("collection request schemas", () => {
       false,
     );
   });
+
+  test("detects duplicate collection errors nested under Drizzle causes", () => {
+    const wrapped = new Error("Failed query");
+    wrapped.cause = {
+      code: "23505",
+      constraint_name: "saved_collections_user_name_idx",
+      detail: "Key (user_id, name) already exists.",
+    };
+
+    expect(isDuplicateCollectionNameError(wrapped)).toBe(true);
+  });
 });
