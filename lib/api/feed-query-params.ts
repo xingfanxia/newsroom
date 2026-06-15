@@ -9,6 +9,7 @@ import {
   SOURCE_KINDS,
   VISIBLE_ITEM_TIERS,
 } from "@/lib/types";
+import type { SearchMode } from "@/lib/types";
 
 const ymdSchema = z
   .string()
@@ -93,6 +94,39 @@ export const publicSearchQueryParamSchema = makeSearchQueryParamSchema({
   defaultLimit: 20,
 });
 
+export const mcpFeedToolInputShape = {
+  tier: z.enum(VISIBLE_ITEM_TIERS).optional(),
+  view: z.enum(FEED_VIEWS).optional(),
+  hot_window_hours: z.number().int().min(1).max(168).optional(),
+  source_id: z.string().optional(),
+  source_group: z.enum(SOURCE_GROUPS).optional(),
+  source_kind: z.enum(SOURCE_KINDS).optional(),
+  curated_only: z.boolean().optional(),
+  exclude_source_tags: z.array(z.string()).optional(),
+  include_source_tags: z.array(z.string()).optional(),
+  date: z.string().optional(),
+  date_from: z.string().optional(),
+  date_to: z.string().optional(),
+  limit: z.number().int().min(1).max(200).optional(),
+  offset: z.number().int().min(0).optional(),
+  locale: z.enum(APP_LOCALES).optional(),
+} as const;
+
+export const mcpSearchToolInputShape = {
+  q: z.string().min(1),
+  mode: z.enum(SEARCH_MODES).optional(),
+  source_id: z.string().optional(),
+  source_group: z.enum(SOURCE_GROUPS).optional(),
+  source_kind: z.enum(SOURCE_KINDS).optional(),
+  date_from: z.string().optional(),
+  date_to: z.string().optional(),
+  limit: z.number().int().min(1).max(100).optional(),
+  locale: z.enum(APP_LOCALES).optional(),
+} as const;
+
+export const mcpFeedToolInputSchema = z.object(mcpFeedToolInputShape);
+export const mcpSearchToolInputSchema = z.object(mcpSearchToolInputShape);
+
 export type FeedQueryParams =
   | z.infer<typeof v1FeedQueryParamSchema>
   | z.infer<typeof publicFeedQueryParamSchema>;
@@ -100,6 +134,13 @@ export type FeedQueryParams =
 export type SearchQueryParams =
   | z.infer<typeof v1SearchQueryParamSchema>
   | z.infer<typeof publicSearchQueryParamSchema>;
+
+export type McpFeedToolInput = z.infer<typeof mcpFeedToolInputSchema>;
+export type McpSearchToolInput = z.infer<typeof mcpSearchToolInputSchema>;
+export type McpSearchExecutionParams = SearchQueryParams & {
+  mode: SearchMode;
+  semanticIncludeExcluded: boolean;
+};
 
 type V1FeedQueryParams = z.infer<typeof v1FeedQueryParamSchema>;
 type PublicFeedQueryParams = z.infer<typeof publicFeedQueryParamSchema>;
@@ -182,6 +223,27 @@ export function feedQueryFromParams(q: FeedQueryParams): FeedQuery {
   };
 }
 
+export function feedQueryFromMcpToolArgs(args: McpFeedToolInput): FeedQuery {
+  return {
+    tier: args.tier ?? "featured",
+    locale: args.locale ?? "en",
+    limit: args.limit ?? 40,
+    offset: args.offset ?? 0,
+    sourceId: args.source_id,
+    sourceGroup: args.source_group,
+    sourceKind: args.source_kind,
+    date: args.date,
+    dateFrom: args.date_from,
+    dateTo: args.date_to,
+    includeSourceGroup: true,
+    view: args.view ?? "archive",
+    hotWindowHours: args.hot_window_hours ?? 24,
+    curatedOnly: args.curated_only || undefined,
+    excludeSourceTags: args.exclude_source_tags,
+    includeSourceTags: args.include_source_tags,
+  };
+}
+
 export function searchFeedQueryFromParams(q: SearchQueryParams): FeedQuery {
   return {
     tier: q.tier,
@@ -196,5 +258,24 @@ export function searchFeedQueryFromParams(q: SearchQueryParams): FeedQuery {
     dateTo: q.date_to,
     includeSourceGroup: true,
     searchText: q.q,
+  };
+}
+
+export function searchQueryFromMcpToolArgs(
+  args: McpSearchToolInput,
+): McpSearchExecutionParams {
+  return {
+    q: args.q,
+    mode: args.mode ?? "lexical",
+    tier: "all",
+    locale: args.locale ?? "en",
+    limit: args.limit ?? 20,
+    offset: 0,
+    source_id: args.source_id,
+    source_group: args.source_group,
+    source_kind: args.source_kind,
+    date_from: args.date_from,
+    date_to: args.date_to,
+    semanticIncludeExcluded: false,
   };
 }

@@ -142,6 +142,10 @@ Shipped cleanup:
   auth/rate-limit/ETag/envelopes, while the helper owns paired item +
   full-match total queries, pagination defaults, and public vs agent item
   exposure.
+- Shared MCP feed/search tool input schemas and default-to-query mapping through
+  `lib/api/feed-query-params.ts`; MCP `ax_radar_feed` and
+  `ax_radar_search` now use the same source-filter/runtime tuple contracts as
+  REST while route handlers stay thin execution/payload adapters.
 - Shared v1/public item-detail route lookup through
   `getItemDetailRouteRow` in `lib/api/item-detail.ts`; route files now own
   only auth/cache/error-envelope mapping and surface-specific serialization.

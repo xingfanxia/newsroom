@@ -101,30 +101,37 @@ describe("feed tier/view source wiring", () => {
   });
 
   test("feed-facing schemas use shared visible tiers, views, and source filters", () => {
-    for (const source of [feedParams, mcpRoute]) {
-      expect(source).toContain("VISIBLE_ITEM_TIERS");
-      expect(source).toContain("FEED_VIEWS");
-      expect(source).toContain("SOURCE_GROUPS");
-      expect(source).toContain("SOURCE_KINDS");
-      expect(source).toContain("z.enum(VISIBLE_ITEM_TIERS)");
-      expect(source).toContain("z.enum(FEED_VIEWS)");
-      expect(source).toContain("z.enum(SOURCE_GROUPS)");
-      expect(source).toContain("z.enum(SOURCE_KINDS)");
-      expect(source).not.toContain('z.enum(["featured", "p1", "all"])');
-      expect(source).not.toContain('z.enum(["today", "archive"])');
-      expect(source).not.toContain("source_group: z.string().min(1)");
-      expect(source).not.toContain("source_kind: z.string().min(1)");
-      expect(source).not.toContain("source_group: z.string().optional()");
-      expect(source).not.toContain("source_kind: z.string().optional()");
-    }
+    expect(feedParams).toContain("VISIBLE_ITEM_TIERS");
+    expect(feedParams).toContain("FEED_VIEWS");
+    expect(feedParams).toContain("SOURCE_GROUPS");
+    expect(feedParams).toContain("SOURCE_KINDS");
+    expect(feedParams).toContain("mcpFeedToolInputShape");
+    expect(feedParams).toContain("z.enum(VISIBLE_ITEM_TIERS)");
+    expect(feedParams).toContain("z.enum(FEED_VIEWS)");
+    expect(feedParams).toContain("z.enum(SOURCE_GROUPS)");
+    expect(feedParams).toContain("z.enum(SOURCE_KINDS)");
+    expect(feedParams).not.toContain('z.enum(["featured", "p1", "all"])');
+    expect(feedParams).not.toContain('z.enum(["today", "archive"])');
+    expect(feedParams).not.toContain("source_group: z.string().min(1)");
+    expect(feedParams).not.toContain("source_kind: z.string().min(1)");
+    expect(feedParams).not.toContain("source_group: z.string().optional()");
+    expect(feedParams).not.toContain("source_kind: z.string().optional()");
+
+    expect(mcpRoute).toContain("mcpFeedToolInputShape");
+    expect(mcpRoute).not.toContain("z.enum(VISIBLE_ITEM_TIERS)");
+    expect(mcpRoute).not.toContain("z.enum(FEED_VIEWS)");
+    expect(mcpRoute).not.toContain("z.enum(SOURCE_GROUPS)");
+    expect(mcpRoute).not.toContain("z.enum(SOURCE_KINDS)");
   });
 
   test("search-facing schemas use the shared mode tuple", () => {
-    for (const source of [feedParams, mcpRoute]) {
-      expect(source).toContain("SEARCH_MODES");
-      expect(source).toContain("z.enum(SEARCH_MODES)");
-      expect(source).not.toContain('z.enum(["lexical", "semantic"])');
-    }
+    expect(feedParams).toContain("SEARCH_MODES");
+    expect(feedParams).toContain("mcpSearchToolInputShape");
+    expect(feedParams).toContain("z.enum(SEARCH_MODES)");
+    expect(feedParams).not.toContain('z.enum(["lexical", "semantic"])');
+
+    expect(mcpRoute).toContain("mcpSearchToolInputShape");
+    expect(mcpRoute).not.toContain("z.enum(SEARCH_MODES)");
   });
 
   test("UI source preset filters map through one typed helper", () => {

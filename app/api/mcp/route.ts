@@ -43,7 +43,13 @@ import {
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { z } from "zod";
 import { requireApiToken } from "@/lib/auth/api-token";
-import { getFeaturedStories, type FeedQuery } from "@/lib/items/live";
+import { getFeaturedStories } from "@/lib/items/live";
+import {
+  feedQueryFromMcpToolArgs,
+  mcpFeedToolInputShape,
+  mcpSearchToolInputShape,
+  searchQueryFromMcpToolArgs,
+} from "@/lib/api/feed-query-params";
 import {
   runFeedQuery,
   toAgentFeedPayload,
@@ -69,14 +75,7 @@ import {
   usageSummaryWindowSchema,
   usageWindowOrDefault,
 } from "@/lib/api/usage-summary";
-import {
-  APP_LOCALES,
-  FEED_VIEWS,
-  SEARCH_MODES,
-  SOURCE_GROUPS,
-  SOURCE_KINDS,
-  VISIBLE_ITEM_TIERS,
-} from "@/lib/types";
+import { APP_LOCALES } from "@/lib/types";
 import type { SessionUser } from "@/lib/auth/session";
 
 type ToolOutput = {
@@ -117,44 +116,11 @@ function buildServer(user: SessionUser): McpServer {
       title: "Browse the AX Radar feed",
       description:
         "Return curated items from the AX Radar timeline. Each row is a single editorial card: a singleton article OR a multi-source EVENT (multiple publishers covering the same real-world story merged into one card). When `coverage > 1` the row is an event — use ax_radar_event_members to see all the sources covering it. `view=today` is the importance-sorted hot feed (热点聚合) — what matters today, including events still developing. `view=archive` (default) is the chronological calendar timeline keyed on the lead's published_at. `tier=featured` is today's signal, `tier=all` spans everything non-excluded. Set `curated_only=true` for the operator-curated AX严选 stream (hand-picked publishers like 鸭哥/grapeot, 群聊日报). Use source_id/source_group/source_kind or source tag filters when you need a narrower slice.",
-      inputSchema: {
-        tier: z.enum(VISIBLE_ITEM_TIERS).optional(),
-        view: z.enum(FEED_VIEWS).optional(),
-        hot_window_hours: z.number().int().min(1).max(168).optional(),
-        source_id: z.string().optional(),
-        source_group: z.enum(SOURCE_GROUPS).optional(),
-        source_kind: z.enum(SOURCE_KINDS).optional(),
-        curated_only: z.boolean().optional(),
-        exclude_source_tags: z.array(z.string()).optional(),
-        include_source_tags: z.array(z.string()).optional(),
-        date: z.string().optional(),
-        date_from: z.string().optional(),
-        date_to: z.string().optional(),
-        limit: z.number().int().min(1).max(200).optional(),
-        offset: z.number().int().min(0).optional(),
-        locale: z.enum(APP_LOCALES).optional(),
-      },
+      inputSchema: mcpFeedToolInputShape,
     },
     async (args) => {
-      const locale = args.locale ?? "en";
-      const q: FeedQuery = {
-        tier: args.tier ?? "featured",
-        locale,
-        limit: args.limit ?? 40,
-        offset: args.offset ?? 0,
-        sourceId: args.source_id,
-        sourceGroup: args.source_group,
-        sourceKind: args.source_kind,
-        date: args.date,
-        dateFrom: args.date_from,
-        dateTo: args.date_to,
-        includeSourceGroup: true,
-        view: args.view ?? "archive",
-        hotWindowHours: args.hot_window_hours,
-        curatedOnly: args.curated_only,
-        excludeSourceTags: args.exclude_source_tags,
-        includeSourceTags: args.include_source_tags,
-      };
+      const q = feedQueryFromMcpToolArgs(args);
+      const locale = q.locale ?? "en";
       const result = await runFeedQuery(q);
       return text(toAgentFeedPayload(result, locale));
     },
@@ -200,36 +166,12 @@ function buildServer(user: SessionUser): McpServer {
       title: "Search the radar by keyword or concept",
       description:
         "Lexical mode (default) does case-insensitive substring match against title + summary. Semantic mode embeds your query and ranks items by pgvector cosine distance — better for conceptual queries where the exact phrase isn't in the text (e.g. 'autonomous coding agent' surfaces pieces about IDE automation). Semantic returns a `distance` field per hit (smaller = closer; ~-1 for near-identical vectors).",
-      inputSchema: {
-        q: z.string().min(1),
-        mode: z.enum(SEARCH_MODES).optional(),
-        source_id: z.string().optional(),
-        source_group: z.enum(SOURCE_GROUPS).optional(),
-        source_kind: z.enum(SOURCE_KINDS).optional(),
-        date_from: z.string().optional(),
-        date_to: z.string().optional(),
-        limit: z.number().int().min(1).max(100).optional(),
-        locale: z.enum(APP_LOCALES).optional(),
-      },
+      inputSchema: mcpSearchToolInputShape,
     },
     async (args) => {
-      const mode = args.mode ?? "lexical";
-      const limit = args.limit ?? 20;
-      const locale = args.locale ?? "en";
-      const result = await runSearchQuery({
-        q: args.q,
-        mode,
-        tier: "all",
-        locale,
-        limit,
-        offset: 0,
-        source_id: args.source_id,
-        source_group: args.source_group,
-        source_kind: args.source_kind,
-        date_from: args.date_from,
-        date_to: args.date_to,
-        semanticIncludeExcluded: false,
-      });
+      const q = searchQueryFromMcpToolArgs(args);
+      const locale = q.locale;
+      const result = await runSearchQuery(q);
 
       return text(toAgentSearchPayload(result, locale));
     },

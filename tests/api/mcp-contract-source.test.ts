@@ -64,6 +64,21 @@ describe("MCP contract source wiring", () => {
     expect(mcpRoute).not.toContain('import { semanticSearch }');
   });
 
+  test("feed/search tools share MCP query schemas and default mapping", () => {
+    expect(mcpRoute).toContain('from "@/lib/api/feed-query-params"');
+    expect(feedTool).toContain("inputSchema: mcpFeedToolInputShape");
+    expect(searchTool).toContain("inputSchema: mcpSearchToolInputShape");
+    expect(feedTool).toContain("feedQueryFromMcpToolArgs(args)");
+    expect(searchTool).toContain("searchQueryFromMcpToolArgs(args)");
+    expect(feedTool).not.toContain("const q: FeedQuery");
+    expect(feedTool).not.toContain("tier: args.tier ??");
+    expect(feedTool).not.toContain("includeSourceGroup: true");
+    expect(searchTool).not.toContain("const mode = args.mode ??");
+    expect(searchTool).not.toContain('tier: "all"');
+    expect(searchTool).not.toContain("semanticIncludeExcluded: false");
+    expect(searchTool).not.toContain("q: args.q,\n        q: args.q");
+  });
+
   test("does not hand-roll event-aware feed/search item fields", () => {
     const feedSearchTools = `${feedTool}\n${searchTool}`;
     expect(feedSearchTools).not.toContain("has_commentary: Boolean");

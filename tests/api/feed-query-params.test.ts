@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import {
   feedQueryFromParams,
+  feedQueryFromMcpToolArgs,
+  mcpFeedToolInputSchema,
+  mcpSearchToolInputSchema,
   parseCommaList,
   parsePublicFeedQueryRequest,
   parsePublicSearchQueryRequest,
@@ -9,6 +12,7 @@ import {
   publicFeedQueryParamSchema,
   publicSearchQueryParamSchema,
   searchFeedQueryFromParams,
+  searchQueryFromMcpToolArgs,
   v1FeedQueryParamSchema,
   v1SearchQueryParamSchema,
 } from "@/lib/api/feed-query-params";
@@ -93,6 +97,67 @@ describe("feed query param schemas", () => {
       publicFeedQueryParamSchema.safeParse({ source_kind: "not-a-kind" })
         .success,
     ).toBe(false);
+  });
+});
+
+describe("MCP feed query input helpers", () => {
+  test("validate MCP feed limits and map defaults to FeedQuery", () => {
+    expect(mcpFeedToolInputSchema.safeParse({ limit: 200 }).success).toBe(true);
+    expect(mcpFeedToolInputSchema.safeParse({ limit: 201 }).success).toBe(false);
+
+    const query = feedQueryFromMcpToolArgs({});
+
+    expect(query).toMatchObject({
+      tier: "featured",
+      locale: "en",
+      limit: 40,
+      offset: 0,
+      includeSourceGroup: true,
+      view: "archive",
+      hotWindowHours: 24,
+    });
+    expect(query.curatedOnly).toBeUndefined();
+    expect(query.excludeSourceTags).toBeUndefined();
+    expect(query.includeSourceTags).toBeUndefined();
+  });
+
+  test("maps MCP feed args without re-parsing array tag filters", () => {
+    const args = mcpFeedToolInputSchema.parse({
+      tier: "p1",
+      view: "today",
+      hot_window_hours: 6,
+      source_id: "ai-chatgroup-daily",
+      source_group: "newsletter",
+      source_kind: "rss",
+      date: "2026-06-12",
+      date_from: "2026-06-11T00:00:00.000Z",
+      date_to: "2026-06-12T00:00:00.000Z",
+      curated_only: true,
+      include_source_tags: ["operator", "community"],
+      exclude_source_tags: ["paper"],
+      limit: 12,
+      offset: 8,
+      locale: "zh",
+    });
+
+    expect(feedQueryFromMcpToolArgs(args)).toEqual({
+      tier: "p1",
+      locale: "zh",
+      limit: 12,
+      offset: 8,
+      sourceId: "ai-chatgroup-daily",
+      sourceGroup: "newsletter",
+      sourceKind: "rss",
+      date: "2026-06-12",
+      dateFrom: "2026-06-11T00:00:00.000Z",
+      dateTo: "2026-06-12T00:00:00.000Z",
+      includeSourceGroup: true,
+      view: "today",
+      hotWindowHours: 6,
+      curatedOnly: true,
+      excludeSourceTags: ["paper"],
+      includeSourceTags: ["operator", "community"],
+    });
   });
 });
 
@@ -185,6 +250,54 @@ describe("search query param schemas", () => {
     ]);
     expect(parseCommaList(" , , ")).toBeUndefined();
     expect(parseCommaList(undefined)).toBeUndefined();
+  });
+});
+
+describe("MCP search query input helpers", () => {
+  test("validate MCP search limits and map defaults to search execution params", () => {
+    expect(mcpSearchToolInputSchema.safeParse({ q: "agent", limit: 100 }).success)
+      .toBe(true);
+    expect(mcpSearchToolInputSchema.safeParse({ q: "agent", limit: 101 }).success)
+      .toBe(false);
+
+    expect(searchQueryFromMcpToolArgs({ q: "agent" })).toMatchObject({
+      q: "agent",
+      mode: "lexical",
+      tier: "all",
+      locale: "en",
+      limit: 20,
+      offset: 0,
+      semanticIncludeExcluded: false,
+    });
+  });
+
+  test("maps MCP semantic search args to the REST search execution shape", () => {
+    const args = mcpSearchToolInputSchema.parse({
+      q: "autonomous coding agent",
+      mode: "semantic",
+      source_id: "openai-news",
+      source_group: "vendor-official",
+      source_kind: "rss",
+      date_from: "2026-06-01T00:00:00.000Z",
+      date_to: "2026-06-12T00:00:00.000Z",
+      limit: 7,
+      locale: "zh",
+    });
+
+    expect(searchQueryFromMcpToolArgs(args)).toEqual({
+      q: "autonomous coding agent",
+      mode: "semantic",
+      tier: "all",
+      locale: "zh",
+      limit: 7,
+      offset: 0,
+      source_id: "openai-news",
+      source_group: "vendor-official",
+      source_kind: "rss",
+      date_from: "2026-06-01T00:00:00.000Z",
+      date_to: "2026-06-12T00:00:00.000Z",
+      semanticIncludeExcluded: false,
+    });
   });
 });
 
