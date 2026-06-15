@@ -35,13 +35,20 @@ const saveTool = sectionBetween(
 );
 
 describe("MCP contract source wiring", () => {
-  test("feed/search item payloads use the shared v1 agent serializer", () => {
+  test("feed item payloads use the shared v1 agent serializer", () => {
     expect(mcpRoute).toContain(
       'import { toAgentApiItem } from "@/lib/api/v1-items";',
     );
     expect(feedTool).toContain("toAgentApiItem(s, locale)");
-    expect(searchTool).toContain("toAgentApiItem(s, locale)");
-    expect(searchTool).toContain("...toAgentApiItem(s, locale)");
+  });
+
+  test("search payloads use the shared search helper serializer", () => {
+    expect(mcpRoute).toContain("toAgentSearchPayload");
+    expect(searchTool).toContain("toAgentSearchPayload(result, locale)");
+    expect(searchTool).not.toContain("toAgentApiItem");
+    expect(searchTool).not.toContain("distance: s.distance");
+    expect(searchTool).not.toContain("embedding_dims:");
+    expect(searchTool).not.toContain("latency_ms:");
   });
 
   test("feed/search tools share execution with the REST surfaces", () => {

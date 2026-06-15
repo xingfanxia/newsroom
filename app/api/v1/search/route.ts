@@ -28,9 +28,11 @@ import {
   v1Json,
   v1ServerError,
 } from "@/lib/api/v1-route";
-import { toAgentApiItem } from "@/lib/api/v1-items";
 import { parseV1SearchQueryRequest } from "@/lib/api/feed-query-params";
-import { runSearchQuery } from "@/lib/api/search-results";
+import {
+  runSearchQuery,
+  toAgentSearchPayload,
+} from "@/lib/api/search-results";
 
 export async function GET(req: Request) {
   return runV1Route(req, async () => {
@@ -41,30 +43,7 @@ export async function GET(req: Request) {
 
     try {
       const result = await runSearchQuery(p);
-      if (result.mode === "semantic") {
-        return v1Json({
-          mode: "semantic",
-          q: result.q,
-          items: result.items.map((s) => ({
-            ...toAgentApiItem(s, p.locale),
-            distance: s.distance,
-          })),
-          total: result.total,
-          limit: result.limit,
-          offset: result.offset,
-          embedding_dims: result.embeddingDims,
-          latency_ms: result.latencyMs,
-        });
-      }
-
-      return v1Json({
-        mode: result.mode,
-        q: result.q,
-        items: result.items.map((s) => toAgentApiItem(s, p.locale)),
-        total: result.total,
-        limit: result.limit,
-        offset: result.offset,
-      });
+      return v1Json(toAgentSearchPayload(result, p.locale));
     } catch (err) {
       return v1ServerError("api/v1/search", err);
     }

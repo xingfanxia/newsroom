@@ -14,9 +14,11 @@ import {
   publicInvalidQuery,
   publicServerError,
 } from "@/lib/api/public-helpers";
-import { toPublicApiItem } from "@/lib/api/public-items";
 import { parsePublicSearchQueryRequest } from "@/lib/api/feed-query-params";
-import { runSearchQuery } from "@/lib/api/search-results";
+import {
+  runSearchQuery,
+  toPublicSearchPayload,
+} from "@/lib/api/search-results";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -40,38 +42,11 @@ export async function GET(req: Request) {
   try {
     const result = await runSearchQuery(p);
     const signal = `${baseSignal}|total=${result.total}|first=${result.items[0]?.id ?? ""}`;
-    if (result.mode === "semantic") {
-      return publicCachedJson(req, {
-        endpoint: "search",
-        etagFamily: "public-search",
-        signal,
-        body: {
-          mode: "semantic",
-          q: result.q,
-          items: result.items.map((s) => ({
-            ...toPublicApiItem(s, p.locale),
-            distance: s.distance,
-          })),
-          total: result.total,
-          limit: result.limit,
-          offset: result.offset,
-          latency_ms: result.latencyMs,
-        },
-      });
-    }
-
     return publicCachedJson(req, {
       endpoint: "search",
       etagFamily: "public-search",
       signal,
-      body: {
-        mode: result.mode,
-        q: result.q,
-        items: result.items.map((s) => toPublicApiItem(s, p.locale)),
-        total: result.total,
-        limit: result.limit,
-        offset: result.offset,
-      },
+      body: toPublicSearchPayload(result, p.locale),
     });
   } catch (err) {
     return publicServerError("api/public/search", err);

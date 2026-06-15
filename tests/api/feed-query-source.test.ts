@@ -73,6 +73,29 @@ describe("feed/search route query parsing source wiring", () => {
     }
   });
 
+  test("search routes delegate payload serialization to the shared search helper", () => {
+    expect(read("app/api/v1/search/route.ts")).toContain(
+      "toAgentSearchPayload(result, p.locale)",
+    );
+    expect(read("app/api/public/search/route.ts")).toContain(
+      "toPublicSearchPayload(result, p.locale)",
+    );
+
+    for (const path of [
+      "app/api/v1/search/route.ts",
+      "app/api/public/search/route.ts",
+    ] as const) {
+      const source = read(path);
+      expect(source).not.toContain("@/lib/api/v1-items");
+      expect(source).not.toContain("@/lib/api/public-items");
+      expect(source).not.toContain("toAgentApiItem");
+      expect(source).not.toContain("toPublicApiItem");
+      expect(source).not.toContain("distance: s.distance");
+      expect(source).not.toContain("embedding_dims:");
+      expect(source).not.toContain("latency_ms:");
+    }
+  });
+
   test("feed routes share execution so totals and defaults cannot drift", () => {
     for (const path of [
       "app/api/v1/feed/route.ts",

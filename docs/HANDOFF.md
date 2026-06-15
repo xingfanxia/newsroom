@@ -132,9 +132,11 @@ Shipped cleanup:
 - Shared positive route-id parsing through `lib/api/route-params.ts`; item
   detail, event-member, and admin iteration routes now reuse the same coercion
   and `invalid_id` error label.
-- Shared REST/MCP search execution through `lib/api/search-results.ts`;
-  adapters now own only auth/rate-limit/ETag/serialization, while the helper
-  owns lexical full-match totals and semantic source/date/tier filters.
+- Shared REST/MCP search execution and payload serialization through
+  `lib/api/search-results.ts`; adapters now own only
+  auth/rate-limit/ETag/envelopes, while the helper owns lexical full-match
+  totals, semantic source/date/tier filters, and public vs agent
+  distance/latency/embedding metadata.
 - Shared REST/MCP feed execution through `lib/api/feed-results.ts`;
   adapters now own only auth/rate-limit/ETag/serialization, while the helper
   owns paired item + full-match total queries and pagination defaults.

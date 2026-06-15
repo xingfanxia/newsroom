@@ -45,7 +45,10 @@ import { z } from "zod";
 import { requireApiToken } from "@/lib/auth/api-token";
 import { getFeaturedStories, type FeedQuery } from "@/lib/items/live";
 import { runFeedQuery } from "@/lib/api/feed-results";
-import { runSearchQuery } from "@/lib/api/search-results";
+import {
+  runSearchQuery,
+  toAgentSearchPayload,
+} from "@/lib/api/search-results";
 import { getItemDetail } from "@/lib/items/detail";
 import { toAgentApiItem } from "@/lib/api/v1-items";
 import { getEventMembersPayload } from "@/lib/api/event-members";
@@ -232,26 +235,7 @@ function buildServer(user: SessionUser): McpServer {
         semanticIncludeExcluded: false,
       });
 
-      if (result.mode === "semantic") {
-        return text({
-          mode: "semantic",
-          q: args.q,
-          items: result.items.map((s) => {
-            return {
-              ...toAgentApiItem(s, locale),
-              distance: s.distance,
-            };
-          }),
-          total: result.total,
-        });
-      }
-
-      return text({
-        mode: "lexical",
-        q: args.q,
-        items: result.items.map((s) => toAgentApiItem(s, locale)),
-        total: result.total,
-      });
+      return text(toAgentSearchPayload(result, locale));
     },
   );
 
