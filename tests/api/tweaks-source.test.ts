@@ -39,6 +39,8 @@ describe("tweaks route source wiring", () => {
 
   test("cookie route wraps persistence failures in the shared session error envelope", () => {
     expect(cookieRoute).toContain("sessionServerError");
+    expect(cookieRoute).toContain("sessionRouteResult(");
+    expect(cookieRoute).not.toContain("sessionError(result.error");
     expect(cookieRoute).toContain('sessionServerError("api/tweaks GET", err)');
     expect(cookieRoute).toContain('sessionServerError("api/tweaks PATCH", err)');
   });

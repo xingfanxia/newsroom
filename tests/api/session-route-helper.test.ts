@@ -4,6 +4,7 @@ import {
   sessionError,
   sessionJson,
   sessionOk,
+  sessionRouteResult,
   sessionServerError,
 } from "@/lib/api/session-route";
 
@@ -28,6 +29,35 @@ describe("session route helpers", () => {
 
     expect(res.status).toBe(404);
     expect(await res.json()).toEqual({ ok: false, error: "not_found" });
+  });
+
+  test("sessionRouteResult maps domain results to the shared session envelope", async () => {
+    const ok = sessionRouteResult(
+      { ok: true, payload: { value: 1 } },
+      sessionJson,
+    );
+    expect(ok.status).toBe(200);
+    expect(await ok.json()).toEqual({ ok: true, value: 1 });
+
+    const empty = sessionRouteResult({ ok: true }, () => sessionOk());
+    expect(empty.status).toBe(200);
+    expect(await empty.json()).toEqual({ ok: true });
+
+    const err = sessionRouteResult(
+      {
+        ok: false,
+        error: "not_found",
+        status: 404,
+        extra: { id: 123 },
+      },
+      sessionJson,
+    );
+    expect(err.status).toBe(404);
+    expect(await err.json()).toEqual({
+      ok: false,
+      id: 123,
+      error: "not_found",
+    });
   });
 
   test("sessionServerError logs the route label and returns the shared 500 envelope", async () => {

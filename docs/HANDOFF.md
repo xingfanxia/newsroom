@@ -34,8 +34,9 @@ Shipped cleanup:
   lower-level `lib/api/admin-auth.ts` auth/admin-required response mapping.
 - Shared cookie-session route auth and ok/error JSON envelopes for
   required-session user routes (`/api/feedback*`, `/api/tweaks`), plus their
-  catch-all server-error logging, through `lib/api/session-route.ts`, wrapping
-  the lower-level `lib/api/session-auth.ts` auth-required response.
+  domain-result mapping and catch-all server-error logging, through
+  `lib/api/session-route.ts`, wrapping the lower-level
+  `lib/api/session-auth.ts` auth-required response.
 - Shared the underlying `{ ok: true }` / `{ ok: false, error }` response
   envelope construction through `lib/api/ok-response.ts`; admin/session route
   helpers, auth-denial helpers, and admin login/logout cookie responses now
@@ -217,6 +218,10 @@ Shipped cleanup:
   and `v1RouteResult`; collection, saved, event-member, and tweak leaf routes
   now keep only success payload shaping while the surface helpers map
   `{ ok: false, error, status }` branches.
+- Shared required-session domain-result envelope mapping through
+  `sessionRouteResult`; `/api/tweaks` and `/api/feedback/move` now keep only
+  success payload shaping while the session helper maps `{ ok: false, error,
+  status }` branches.
 - Shared admin iteration id route adapters through `runAdminIterationIdRoute`
   in `lib/api/iteration-routes.ts`; `/api/admin/iterations/[id]`, `/apply`,
   and `/reject` now keep only the action binding while the shared helper owns

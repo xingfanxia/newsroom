@@ -17,6 +17,7 @@ describe("required session route source wiring", () => {
     expect(source).toContain("sessionJson");
     expect(source).toContain("sessionOk");
     expect(source).toContain("sessionError");
+    expect(source).toContain("sessionRouteResult");
     expect(source).toContain("sessionServerError");
     expect(source).not.toContain("Response.json({ ok:");
   });
@@ -58,6 +59,8 @@ describe("required session route source wiring", () => {
     expect(source).toContain("feedbackMoveBodySchema");
     expect(source).toContain("@/lib/api/saved-routes");
     expect(source).toContain("moveSavedItemRoutePayload");
+    expect(source).toContain("sessionRouteResult(");
+    expect(source).not.toContain("sessionError(result.error");
     expect(source).not.toContain('from "zod"');
     expect(source).not.toContain("const bodySchema = z.object");
     expect(source).not.toContain("@/lib/items/collections");

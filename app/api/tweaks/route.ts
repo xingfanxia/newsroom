@@ -1,9 +1,9 @@
 import { parseJsonRequestBody } from "@/lib/api/json-body";
 import {
   runSessionRoute,
-  sessionError,
   sessionJson,
   sessionOk,
+  sessionRouteResult,
   sessionServerError,
 } from "@/lib/api/session-route";
 import { tweaksPatchBodySchema } from "@/lib/api/tweak-requests";
@@ -33,8 +33,7 @@ export async function PATCH(req: Request) {
 
     try {
       const result = await saveTweaksRoutePayload(user, parsed.data);
-      if (!result.ok) return sessionError(result.error, result.status);
-      return sessionOk();
+      return sessionRouteResult(result, () => sessionOk());
     } catch (err) {
       return sessionServerError("api/tweaks PATCH", err);
     }

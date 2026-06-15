@@ -3,8 +3,8 @@ import { feedbackMoveBodySchema } from "@/lib/api/saved-requests";
 import { moveSavedItemRoutePayload } from "@/lib/api/saved-routes";
 import {
   runSessionRoute,
-  sessionError,
   sessionOk,
+  sessionRouteResult,
   sessionServerError,
 } from "@/lib/api/session-route";
 
@@ -24,8 +24,7 @@ export async function POST(req: Request) {
 
     try {
       const result = await moveSavedItemRoutePayload(user, parsed.data);
-      if (!result.ok) return sessionError(result.error, result.status);
-      return sessionOk();
+      return sessionRouteResult(result, () => sessionOk());
     } catch (err) {
       return sessionServerError("api/feedback/move", err);
     }
