@@ -48,4 +48,11 @@ describe("tweaks route source wiring", () => {
     expect(hook).not.toContain('density: "compact" | "comfy" | "reader"');
     expect(hook).not.toContain('accent: "green" | "blue"');
   });
+
+  test("client tweaks server sync is debounced off the hot mutation path", () => {
+    expect(hook).toContain("TWEAKS_SERVER_SYNC_DEBOUNCE_MS");
+    expect(hook).toContain("pendingServerTweaksRef");
+    expect(hook).toContain("window.setTimeout");
+    expect(hook).toContain("window.clearTimeout");
+  });
 });

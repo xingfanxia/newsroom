@@ -37,7 +37,10 @@ Written at the end of s7 (2026-04-19). User flagged "a lot of issues needs to be
   resolves the query against the user's collection list before loading saved
   items and redirects stale numeric ids to canonical `/saved`. Covered by
   `tests/items/saved-collection-selection.test.ts`.
-- [ ] **Tweaks server-sync floods** — every tweak mutation fires PATCH `/api/tweaks`. Scrubbing through theme/accent rapidly sends 6-10 requests in a second. Add 500ms debounce.
+- [x] **Tweaks server-sync floods** — fixed; client tweaks still update
+  local state/localStorage immediately, but `/api/tweaks` PATCH now runs
+  through a 500ms trailing debounce. Covered by
+  `tests/api/tweaks-source.test.ts`.
 - [ ] **Policy editor: close-tab loses drafts** — no confirmation on unload with unsaved changes. Window `beforeunload` handler needed.
 - [ ] **Policy editor: no diff preview before commit** — user commits blindly. Should show a `DiffViewer` of old vs new content + confirm step.
 - [ ] **Named collections UI uses native `confirm()` / `prompt()`** — ugly on mobile, no styling. Replace with a sonner-based inline confirm or a proper modal.

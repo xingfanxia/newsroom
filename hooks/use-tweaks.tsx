@@ -5,6 +5,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -13,6 +14,7 @@ import { TWEAK_DEFAULTS, type Tweaks } from "@/lib/tweaks";
 export type { Tweaks };
 
 const STORAGE_KEY = "ax-radar:tweaks";
+const TWEAKS_SERVER_SYNC_DEBOUNCE_MS = 500;
 
 type TweaksValue = {
   tweaks: Tweaks;
@@ -65,6 +67,8 @@ export function TweaksProvider({
   );
   const [tweaks, setTweaksState] = useState<Tweaks>(base);
   const [open, setOpen] = useState(false);
+  const pendingServerTweaksRef = useRef<Tweaks | null>(null);
+  const serverSyncTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     const local = loadFromStorage(base);
@@ -129,22 +133,51 @@ export function TweaksProvider({
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const setTweaks = useCallback((next: Tweaks) => {
-    setTweaksState(next);
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    } catch {
-      /* quota / disabled — still update in-memory + body attrs */
-    }
-    // Fire-and-forget server sync. 401 means anon user — localStorage is
-    // sufficient for them. Any error is silent; the local cookie still holds.
-    void fetch("/api/tweaks", {
-      method: "PATCH",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tweaks: next }),
-    }).catch(() => {});
+  useEffect(() => {
+    return () => {
+      if (serverSyncTimerRef.current !== null) {
+        window.clearTimeout(serverSyncTimerRef.current);
+        serverSyncTimerRef.current = null;
+      }
+      pendingServerTweaksRef.current = null;
+    };
   }, []);
+
+  const scheduleServerSync = useCallback((next: Tweaks) => {
+    pendingServerTweaksRef.current = next;
+    if (serverSyncTimerRef.current !== null) {
+      window.clearTimeout(serverSyncTimerRef.current);
+    }
+
+    serverSyncTimerRef.current = window.setTimeout(() => {
+      serverSyncTimerRef.current = null;
+      const pending = pendingServerTweaksRef.current;
+      pendingServerTweaksRef.current = null;
+      if (!pending) return;
+
+      // Fire-and-forget server sync. 401 means anon user — localStorage is
+      // sufficient for them. Any error is silent; the local cookie still holds.
+      void fetch("/api/tweaks", {
+        method: "PATCH",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tweaks: pending }),
+      }).catch(() => {});
+    }, TWEAKS_SERVER_SYNC_DEBOUNCE_MS);
+  }, []);
+
+  const setTweaks = useCallback(
+    (next: Tweaks) => {
+      setTweaksState(next);
+      try {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        /* quota / disabled — still update in-memory + body attrs */
+      }
+      scheduleServerSync(next);
+    },
+    [scheduleServerSync],
+  );
 
   const patch = useCallback(
     <K extends keyof Tweaks>(key: K, value: Tweaks[K]) => {
