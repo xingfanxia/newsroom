@@ -20,13 +20,12 @@ describe("/api/v1/saved source wiring", () => {
     expect(savedRoute).not.toContain("const postBodySchema = z.object");
   });
 
-  test("list endpoint uses the shared saved agent serializer", () => {
-    expect(savedRoute).toContain(
-      'import { toSavedAgentApiItem } from "@/lib/api/v1-items";',
-    );
-    expect(savedRoute).toContain(
-      "items: stories.map((s) => toSavedAgentApiItem(s, q.locale))",
-    );
+  test("list endpoint delegates saved lookup and agent serialization to the shared route helper", () => {
+    expect(savedRoute).toContain("listSavedItemsRoutePayload");
+    expect(savedRoute).not.toContain("@/lib/api/v1-items");
+    expect(savedRoute).not.toContain("@/lib/items/saved");
+    expect(savedRoute).not.toContain("toSavedAgentApiItem");
+    expect(savedRoute).not.toContain("getSavedStories");
     expect(savedRoute).not.toContain("source_id: s.sourceId");
     expect(savedRoute).not.toContain("published_at: s.publishedAt");
   });

@@ -1,11 +1,27 @@
+import {
+  toSavedAgentApiItem,
+  type SavedAgentApiItem,
+} from "@/lib/api/v1-items";
 import { applyFeedbackToggle } from "@/lib/feedback/toggle";
 import {
   assignSavedItemCollection,
   getSavedItemCollectionId,
   userOwnsSavedCollection,
 } from "@/lib/items/collections";
-import { FEEDBACK_SAVE_VOTE } from "@/lib/types";
+import { getSavedStories } from "@/lib/items/saved";
+import { FEEDBACK_SAVE_VOTE, type AppLocale } from "@/lib/types";
 import type { SessionUser } from "@/lib/auth/session";
+
+type ListSavedItemsRouteQuery = {
+  locale: AppLocale;
+  limit: number;
+  collection?: number | "inbox";
+};
+
+type ListSavedItemsRoutePayload = {
+  items: SavedAgentApiItem[];
+  total: number;
+};
 
 type SaveItemRouteBody = {
   itemId: number;
@@ -27,6 +43,21 @@ type SaveItemRouteResult =
       error: "collection_not_found" | "save_not_found" | "item_not_found";
       status: 404;
     };
+
+export async function listSavedItemsRoutePayload(
+  user: Pick<SessionUser, "id">,
+  query: ListSavedItemsRouteQuery,
+): Promise<ListSavedItemsRoutePayload> {
+  const stories = await getSavedStories(user.id, query.locale, {
+    limit: query.limit,
+    collection: query.collection ?? null,
+  });
+
+  return {
+    items: stories.map((story) => toSavedAgentApiItem(story, query.locale)),
+    total: stories.length,
+  };
+}
 
 export async function saveItemRoutePayload(
   user: SessionUser,

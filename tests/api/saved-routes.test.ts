@@ -1,7 +1,10 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 import { and, eq, sql } from "drizzle-orm";
 import { closeDb, db, schema } from "@/db/client";
-import { saveItemRoutePayload } from "@/lib/api/saved-routes";
+import {
+  listSavedItemsRoutePayload,
+  saveItemRoutePayload,
+} from "@/lib/api/saved-routes";
 import type { SessionUser } from "@/lib/auth/session";
 
 const hasDb = Boolean(
@@ -135,6 +138,19 @@ describeOrSkip("saveItemRoutePayload (real DB)", () => {
       collectionId: ownerCollectionId,
       note: "route helper note",
     });
+
+    const list = await listSavedItemsRoutePayload(ownerUser, {
+      locale: "en",
+      limit: 80,
+    });
+    expect(list.total).toBeGreaterThanOrEqual(1);
+    expect(
+      list.items.some(
+        (item) =>
+          item.id === String(itemId) &&
+          item.collection_id === ownerCollectionId,
+      ),
+    ).toBe(true);
 
     const repeated = await saveItemRoutePayload(ownerUser, {
       itemId,

@@ -2,9 +2,8 @@
  * GET  /api/v1/saved  — list the caller's saved items.
  * POST /api/v1/saved  — toggle the save slot for an item on/off.
  *
- * Both operations are thin wrappers around shared saved helpers
- * (getSavedStories, saveItemRoutePayload) so the agent-facing and
- * human-facing surfaces can never drift.
+ * Both operations are thin wrappers around shared saved helpers so the
+ * agent-facing and human-facing surfaces can never drift.
  *
  * Query params (GET):
  *   collection = <id> | inbox (omitted = all)
@@ -19,7 +18,10 @@ import {
   parseV1SavedQueryRequest,
   v1SavedPostBodySchema,
 } from "@/lib/api/saved-requests";
-import { saveItemRoutePayload } from "@/lib/api/saved-routes";
+import {
+  listSavedItemsRoutePayload,
+  saveItemRoutePayload,
+} from "@/lib/api/saved-routes";
 import {
   runV1Route,
   v1Error,
@@ -27,8 +29,6 @@ import {
   v1Json,
   v1ServerError,
 } from "@/lib/api/v1-route";
-import { toSavedAgentApiItem } from "@/lib/api/v1-items";
-import { getSavedStories } from "@/lib/items/saved";
 
 export async function GET(req: Request) {
   return runV1Route(req, async (user) => {
@@ -38,14 +38,7 @@ export async function GET(req: Request) {
     const q = parsed.data;
 
     try {
-      const stories = await getSavedStories(user.id, q.locale, {
-        limit: q.limit,
-        collection: q.collection ?? null,
-      });
-      return v1Json({
-        items: stories.map((s) => toSavedAgentApiItem(s, q.locale)),
-        total: stories.length,
-      });
+      return v1Json(await listSavedItemsRoutePayload(user, q));
     } catch (err) {
       return v1ServerError("api/v1/saved GET", err);
     }

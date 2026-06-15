@@ -80,10 +80,12 @@ Shipped cleanup:
   `/api/feedback/move` reuse the same positive item id, positive collection id,
   inbox-null, locale, and pagination validation instead of carrying
   route-local Zod/query-parser wiring.
-- Shared saved-item mutation semantics through `lib/api/saved-routes.ts`;
-  `/api/v1/saved` and MCP `ax_radar_save` now reuse the same save toggle,
-  owner-aware collection assignment, assigned-collection response payload,
-  and missing-item FK-to-`item_not_found` mapping.
+- Shared saved-item route payload semantics through `lib/api/saved-routes.ts`;
+  `/api/v1/saved` now delegates saved lookup and agent serialization through
+  `listSavedItemsRoutePayload`, while `/api/v1/saved` and MCP
+  `ax_radar_save` reuse the same save toggle, owner-aware collection
+  assignment, assigned-collection response payload, and missing-item
+  FK-to-`item_not_found` mapping.
 - Shared browser saved-export parsing/rendering through
   `lib/api/saved-export.ts`; `/api/saved/export` now keeps only optional
   cookie-session fallback semantics while the helper owns collection/locale

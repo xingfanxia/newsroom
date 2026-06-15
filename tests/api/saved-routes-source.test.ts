@@ -13,6 +13,17 @@ const v1SavedRoute = read("app/api/v1/saved/route.ts");
 const mcpRoute = read("app/api/mcp/route.ts");
 
 describe("saved route mutation helper source wiring", () => {
+  test("shared helper owns saved list lookup and agent serialization semantics", () => {
+    expect(savedRoutes).toContain("listSavedItemsRoutePayload");
+    expect(savedRoutes).toContain("getSavedStories");
+    expect(savedRoutes).toContain("toSavedAgentApiItem");
+    expect(v1SavedRoute).toContain("listSavedItemsRoutePayload");
+    expect(v1SavedRoute).not.toContain("@/lib/items/saved");
+    expect(v1SavedRoute).not.toContain("@/lib/api/v1-items");
+    expect(v1SavedRoute).not.toContain("getSavedStories");
+    expect(v1SavedRoute).not.toContain("toSavedAgentApiItem");
+  });
+
   test("shared helper owns save toggle, item-not-found, and collection assignment semantics", () => {
     expect(savedRoutes).toContain("applyFeedbackToggle");
     expect(savedRoutes).toContain("FEEDBACK_SAVE_VOTE");
