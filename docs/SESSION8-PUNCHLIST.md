@@ -33,7 +33,10 @@ Written at the end of s7 (2026-04-19). User flagged "a lot of issues needs to be
 
 ## C — functional bugs likely lurking
 
-- [ ] **Saved page with stale `?collection=<id>`** — URL points at a deleted collection id. Server falls through to inbox but URL still says the old id. Either rewrite URL to `?collection=inbox` on fallback or 404.
+- [x] **Saved page with stale `?collection=<id>`** — fixed; the page now
+  resolves the query against the user's collection list before loading saved
+  items and redirects stale numeric ids to canonical `/saved`. Covered by
+  `tests/items/saved-collection-selection.test.ts`.
 - [ ] **Tweaks server-sync floods** — every tweak mutation fires PATCH `/api/tweaks`. Scrubbing through theme/accent rapidly sends 6-10 requests in a second. Add 500ms debounce.
 - [ ] **Policy editor: close-tab loses drafts** — no confirmation on unload with unsaved changes. Window `beforeunload` handler needed.
 - [ ] **Policy editor: no diff preview before commit** — user commits blindly. Should show a `DiffViewer` of old vs new content + confirm step.

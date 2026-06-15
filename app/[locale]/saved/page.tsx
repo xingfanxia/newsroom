@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { setRequestLocale } from "next-intl/server";
 import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
@@ -9,17 +10,11 @@ import { SavedMetaStrip } from "@/components/saved/saved-meta-strip";
 import { SavedTags } from "@/components/saved/saved-tags";
 import { getSavedStories, getSavedTags, getSavedTotals } from "@/lib/items/saved";
 import { getInboxCount, listCollections } from "@/lib/items/collections";
+import { resolveSavedCollectionSelection } from "@/lib/items/saved-collection-selection";
 import { getPulseData, getRadarStats } from "@/lib/shell/dashboard-stats";
 import { ADMIN_USER_ID, getSessionUser, upsertAppUser } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
-
-function parseCollection(raw: string | undefined): number | "inbox" | undefined {
-  if (!raw || raw === "all") return undefined;
-  if (raw === "inbox") return "inbox";
-  const n = Number.parseInt(raw, 10);
-  return Number.isFinite(n) && n > 0 ? n : undefined;
-}
 
 export default async function SavedPage({
   params,
@@ -34,33 +29,18 @@ export default async function SavedPage({
   const user = await getSessionUser();
   const userId = user?.id ?? ADMIN_USER_ID;
   if (user) await upsertAppUser(user);
-
-  const collectionParam = parseCollection(sp.collection);
-  const activeId: number | "inbox" =
-    collectionParam === "inbox"
-      ? "inbox"
-      : typeof collectionParam === "number"
-        ? collectionParam
-        : "inbox";
-  const collectionFilter: number | "inbox" | null =
-    collectionParam ?? "inbox"; // default view = inbox
+  const appLocale = locale as "zh" | "en";
 
   const [
-    stories,
     collections,
     inboxCount,
     totals,
-    tags,
     stats,
     pulse,
   ] = await Promise.all([
-    getSavedStories(userId, locale as "zh" | "en", {
-      collection: collectionFilter,
-    }).catch(() => []),
     listCollections(userId).catch(() => []),
     getInboxCount(userId).catch(() => 0),
     getSavedTotals(userId).catch(() => ({ total: 0, thisWeek: 0, thisMonth: 0 })),
-    getSavedTags(userId, { collection: collectionFilter }).catch(() => []),
     getRadarStats().catch(() => ({
       items_today: 0,
       items_p1: 0,
@@ -68,6 +48,16 @@ export default async function SavedPage({
       tracked_sources: 0,
     })),
     getPulseData().catch(() => []),
+  ]);
+  const selection = resolveSavedCollectionSelection(sp.collection, collections);
+  if (selection.shouldRedirect) redirect(`/${locale}/saved`);
+
+  const { activeId, collectionFilter } = selection;
+  const [stories, tags] = await Promise.all([
+    getSavedStories(userId, appLocale, { collection: collectionFilter }).catch(
+      () => [],
+    ),
+    getSavedTags(userId, { collection: collectionFilter }).catch(() => []),
   ]);
 
   const sorted = [...stories].sort(
