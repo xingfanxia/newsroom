@@ -105,7 +105,7 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 - `tests/api/runtime-contracts-source.test.ts` — app/source locales, fetcher-supported source kinds, feedback vote values, user roles, and iteration statuses stay wired to shared runtime tuples
 - `tests/api/feed-query-source.test.ts` — feed/search routes stay wired to shared query schemas and shared execution helpers
 - `tests/api/admin-iterations-source.test.ts` — admin iteration routes stay wired to shared auth, route-id parsing, and iteration-run result helpers
-- `tests/api/policy-commit.test.ts` — admin policy commit request validation stays centralized
+- `tests/api/policy-commit.test.ts` — admin policy commit request validation plus real DB monotonic `policy_versions.version` writes stay covered
 - `tests/api/public-feed.test.ts` — public feed reports a stable full-match `total` across page sizes
 - `tests/api/public-search.test.ts` — public lexical search reports a stable full-match `total` across page sizes
 - `tests/api/source-catalog.test.ts` — public, v1, MCP, and active source-picker source catalog serialization contracts

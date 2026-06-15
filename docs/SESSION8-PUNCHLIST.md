@@ -70,7 +70,8 @@ Written at the end of s7 (2026-04-19). User flagged "a lot of issues needs to be
 - [x] No test for `/api/feedback/move` reparent behaviour — covered by
   `tests/api/saved-routes.test.ts` and
   `tests/api/saved-routes-source.test.ts`.
-- [ ] No test for `/api/admin/policy/commit` writes correct `version+1`
+- [x] No test for `/api/admin/policy/commit` writes correct `version+1` —
+  covered by `tests/api/policy-commit.test.ts`.
 - [x] No test for `/api/saved/export` markdown shape — covered by `tests/api/saved-export.test.ts`.
 - [ ] No test for `/api/tweaks` GET+PATCH round-trip
 - [ ] `getFeaturedStories` per-source-filter workaround (client-side `s.source.publisher` match) has zero test coverage
