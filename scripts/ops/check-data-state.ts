@@ -38,7 +38,7 @@ async function main() {
   const byMonth = await client.execute(sql`
     SELECT to_char(published_at, 'YYYY-MM') AS month, count(*)::int AS n
     FROM items
-    WHERE published_at >= '2025-01-01'::date
+    WHERE published_at >= date_trunc('month', now()) - interval '17 months'
     GROUP BY month ORDER BY month DESC
   `);
 
@@ -60,7 +60,7 @@ async function main() {
   console.log(rawState[0]);
   console.log("\n=== sources ===");
   console.log(srcs[0]);
-  console.log("\n=== month distribution (2025-01..now) ===");
+  console.log("\n=== month distribution (last 18 months) ===");
   for (const r of byMonth) console.log(`  ${r.month}  ${String(r.n).padStart(5)}`);
   console.log("\n=== top current-year sources ===");
   for (const r of bySource)

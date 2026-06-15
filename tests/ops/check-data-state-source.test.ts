@@ -21,6 +21,14 @@ describe("check-data-state operator diagnostic", () => {
     expect(source).not.toContain("=== top 2026 sources ===");
   });
 
+  test("uses a rolling month-distribution window instead of a fixed start date", () => {
+    expect(source).toContain("date_trunc('month', now())");
+    expect(source).toContain("interval '17 months'");
+    expect(source).toContain("=== month distribution (last 18 months) ===");
+    expect(source).not.toContain("2025-01-01");
+    expect(source).not.toContain("=== month distribution (2025-01..now) ===");
+  });
+
   test("names commentary counters after the current tier-gated fields", () => {
     expect(source).toContain("AS with_editor_note");
     expect(source).toContain("AS with_editor_analysis");
