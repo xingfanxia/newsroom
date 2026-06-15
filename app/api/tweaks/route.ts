@@ -4,6 +4,7 @@ import {
   sessionError,
   sessionJson,
   sessionOk,
+  sessionServerError,
 } from "@/lib/api/session-route";
 import { tweaksPatchBodySchema } from "@/lib/api/tweak-requests";
 import {
@@ -14,7 +15,11 @@ import {
 /** GET — return the user's saved tweaks + watchlist (null when not set). */
 export async function GET() {
   return runSessionRoute(async (user) => {
-    return sessionJson(await getTweaksRoutePayload(user));
+    try {
+      return sessionJson(await getTweaksRoutePayload(user));
+    } catch (err) {
+      return sessionServerError("api/tweaks GET", err);
+    }
   });
 }
 
@@ -26,8 +31,12 @@ export async function PATCH(req: Request) {
     });
     if (!parsed.ok) return parsed.response;
 
-    const result = await saveTweaksRoutePayload(user, parsed.data);
-    if (!result.ok) return sessionError(result.error, result.status);
-    return sessionOk();
+    try {
+      const result = await saveTweaksRoutePayload(user, parsed.data);
+      if (!result.ok) return sessionError(result.error, result.status);
+      return sessionOk();
+    } catch (err) {
+      return sessionServerError("api/tweaks PATCH", err);
+    }
   });
 }

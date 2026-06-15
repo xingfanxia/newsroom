@@ -44,6 +44,12 @@ describe("tweaks route source wiring", () => {
     }
   });
 
+  test("cookie route wraps persistence failures in the shared session error envelope", () => {
+    expect(cookieRoute).toContain("sessionServerError");
+    expect(cookieRoute).toContain('sessionServerError("api/tweaks GET", err)');
+    expect(cookieRoute).toContain('sessionServerError("api/tweaks PATCH", err)');
+  });
+
   test("client tweaks state uses the same source-of-truth defaults as API schemas", () => {
     expect(hook).toContain("@/lib/tweaks");
     expect(hook).not.toContain('density: "compact" | "comfy" | "reader"');

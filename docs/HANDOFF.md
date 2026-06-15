@@ -107,6 +107,10 @@ Shipped cleanup:
   user upsert, preferences/watchlist loading, DB patch construction, and
   `empty_body` decisions stay aligned while each route keeps its own auth and
   response envelope.
+- Cookie-gated `/api/tweaks` now wraps shared persistence failures with
+  `sessionServerError`, matching the other required-session routes instead of
+  falling through to the framework's default 500 response. Covered by
+  `tests/api/tweaks-source.test.ts`.
 - Shared watchlist normalization through `lib/watchlist.ts`; browser right-rail
   add/remove flows and cookie/v1 tweak PATCH validation now trim, lowercase,
   and case-insensitively dedupe terms before persistence.
