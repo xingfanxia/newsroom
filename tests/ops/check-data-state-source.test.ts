@@ -12,4 +12,12 @@ describe("check-data-state operator diagnostic", () => {
     expect(source).not.toContain("pending_normalize");
     expect(source).not.toContain("FROM llm_usage");
   });
+
+  test("uses a rolling current-year source window instead of stale fixed dates", () => {
+    expect(source).toContain("date_trunc('year', now())");
+    expect(source).toContain("interval '1 year'");
+    expect(source).toContain("=== top current-year sources ===");
+    expect(source).not.toContain("2026-04-30");
+    expect(source).not.toContain("=== top 2026 sources ===");
+  });
 });
