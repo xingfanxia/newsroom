@@ -7,6 +7,8 @@ import { VersionPill } from "@/components/admin/version-pill";
 import { useTweaks } from "@/hooks/use-tweaks";
 import { diffLines } from "@/lib/policy/diff";
 
+type PolicyConfirmAction = "commit" | "discard";
+
 /**
  * Editable policy view. Idle = rendered as preformatted markdown; "edit"
  * button swaps to a split textarea + diff preview. Saving calls
@@ -29,12 +31,25 @@ export function PolicyEditor({
   const [content, setContent] = useState(initialContent);
   const [reasoning, setReasoning] = useState("");
   const [saving, setSaving] = useState(false);
+  const [confirmAction, setConfirmAction] =
+    useState<PolicyConfirmAction | null>(null);
   const dirty = content !== initialContent;
+  const activeConfirmAction = dirty ? confirmAction : null;
   const charCount = useMemo(() => content.length, [content]);
   const diff = useMemo(
     () => (dirty ? diffLines(initialContent, content) : []),
     [content, dirty, initialContent],
   );
+
+  const editContent = (nextContent: string) => {
+    setContent(nextContent);
+    setConfirmAction(null);
+  };
+
+  const editReasoning = (nextReasoning: string) => {
+    setReasoning(nextReasoning);
+    setConfirmAction(null);
+  };
 
   useEffect(() => {
     if (!dirty) return;
@@ -48,12 +63,17 @@ export function PolicyEditor({
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [dirty]);
 
-  const save = async () => {
+  const requestSave = () => {
     if (!dirty) {
       toast.info(zh ? "没有改动" : "nothing to save");
       return;
     }
-    if (!confirm(zh ? `确定发布为 v${version + 1}？` : `commit as v${version + 1}?`)) {
+    setConfirmAction("commit");
+  };
+
+  const confirmPolicyCommit = async () => {
+    if (!dirty) {
+      setConfirmAction(null);
       return;
     }
     setSaving(true);
@@ -76,17 +96,26 @@ export function PolicyEditor({
       toast.success(zh ? `已发布 v${body.version}` : `committed v${body.version}`);
       setEditing(false);
       setReasoning("");
+      setConfirmAction(null);
       router.refresh();
     } finally {
       setSaving(false);
     }
   };
 
-  const cancel = () => {
-    if (dirty && !confirm(zh ? "放弃改动？" : "discard changes?")) return;
+  const confirmPolicyDiscard = () => {
     setContent(initialContent);
     setReasoning("");
+    setConfirmAction(null);
     setEditing(false);
+  };
+
+  const cancel = () => {
+    if (dirty) {
+      setConfirmAction("discard");
+      return;
+    }
+    confirmPolicyDiscard();
   };
 
   return (
@@ -112,7 +141,7 @@ export function PolicyEditor({
             <button
               type="button"
               className="act-btn primary"
-              onClick={save}
+              onClick={requestSave}
               disabled={saving || !dirty}
               style={{ cursor: saving || !dirty ? "not-allowed" : "pointer" }}
             >
@@ -138,6 +167,73 @@ export function PolicyEditor({
         )}
       </div>
 
+      {editing && activeConfirmAction && (
+        <div
+          role="alert"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            justifyContent: "space-between",
+            border: "1px solid var(--border-1)",
+            borderLeft: "2px solid var(--accent-orange)",
+            background: "color-mix(in srgb, var(--bg-1) 88%, var(--accent-orange) 12%)",
+            padding: "10px 12px",
+            fontFamily: "var(--font-mono)",
+            borderRadius: 2,
+          }}
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <span
+              style={{
+                color: "var(--fg-1)",
+                fontSize: 12,
+                fontWeight: 700,
+              }}
+            >
+              {activeConfirmAction === "commit"
+                ? zh
+                  ? `发布为 v${version + 1}`
+                  : `commit v${version + 1}`
+                : zh
+                  ? "放弃改动"
+                  : "discard changes"}
+            </span>
+            <span style={{ color: "var(--fg-3)", fontSize: 11 }}>
+              {activeConfirmAction === "commit"
+                ? zh
+                  ? "确认后会写入新的策略版本。"
+                  : "Confirm to write a new policy version."
+                : zh
+                  ? "确认后会丢弃当前草稿。"
+                  : "Confirm to discard the current draft."}
+            </span>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              type="button"
+              className="act-btn primary"
+              onClick={
+                activeConfirmAction === "commit"
+                  ? confirmPolicyCommit
+                  : confirmPolicyDiscard
+              }
+              disabled={saving}
+            >
+              <span>✓</span> {zh ? "确认" : "confirm"}
+            </button>
+            <button
+              type="button"
+              className="act-btn"
+              onClick={() => setConfirmAction(null)}
+              disabled={saving}
+            >
+              <span>✕</span> {zh ? "返回" : "back"}
+            </button>
+          </div>
+        </div>
+      )}
+
       {editing ? (
         <div
           style={{
@@ -149,7 +245,7 @@ export function PolicyEditor({
         >
           <textarea
             value={content}
-            onChange={(e) => setContent(e.target.value)}
+            onChange={(e) => editContent(e.target.value)}
             spellCheck={false}
             style={{
               background: "var(--bg-1)",
@@ -234,7 +330,7 @@ export function PolicyEditor({
           </div>
           <input
             value={reasoning}
-            onChange={(e) => setReasoning(e.target.value)}
+            onChange={(e) => editReasoning(e.target.value)}
             maxLength={2000}
             placeholder={zh ? "例如：收紧 P1 门槛" : "e.g. tighten P1 threshold"}
             style={{

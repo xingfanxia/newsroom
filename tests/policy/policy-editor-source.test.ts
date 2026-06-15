@@ -23,4 +23,19 @@ describe("policy editor source wiring", () => {
     expect(source).toContain("event.returnValue = \"\"");
     expect(source).toContain("[dirty]");
   });
+
+  test("uses inline confirmation panels instead of native confirm dialogs", () => {
+    expect(source).not.toContain("confirm(");
+    expect(source).toContain("confirmAction");
+    expect(source).toContain("confirmPolicyCommit");
+    expect(source).toContain("confirmPolicyDiscard");
+    expect(source).toContain('role="alert"');
+  });
+
+  test("clears pending inline confirmations when the draft changes again", () => {
+    expect(source).toContain("const editContent = (nextContent: string) => {");
+    expect(source).toContain("const editReasoning = (nextReasoning: string) => {");
+    expect(source).toContain("onChange={(e) => editContent(e.target.value)}");
+    expect(source).toContain("onChange={(e) => editReasoning(e.target.value)}");
+  });
 });

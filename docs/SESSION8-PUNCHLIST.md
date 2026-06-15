@@ -47,6 +47,9 @@ Written at the end of s7 (2026-04-19). User flagged "a lot of issues needs to be
 - [x] **Policy editor: no diff preview before commit** — fixed; edit mode now
   reuses `diffLines` + `DiffViewer` against the committed baseline. Covered by
   `tests/policy/policy-editor-source.test.ts`.
+- [x] **Policy editor uses native `confirm()` for commit/discard** — fixed;
+  publish and discard now use inline admin-surface confirmations. Covered by
+  `tests/policy/policy-editor-source.test.ts`.
 - [x] **Named collections UI uses native `confirm()` / `prompt()`** —
   fixed; collection create/rename/delete and saved-item removal now use
   styled inline panels instead of browser-native dialogs. Covered by

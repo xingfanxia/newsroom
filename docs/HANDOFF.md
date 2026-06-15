@@ -78,6 +78,9 @@ Shipped cleanup:
   `DiffViewer` contract and register a dirty-draft `beforeunload` guard, so
   policy edits are reviewed against the committed baseline before publishing
   and tab-close protection is covered by a source contract test.
+- Policy editor publish/discard confirmations now render inline in the admin
+  surface instead of using browser-native `confirm()` dialogs. Covered by
+  `tests/policy/policy-editor-source.test.ts`.
 - Saved collection create/rename/delete and saved-item removal no longer use
   browser-native `prompt()` / `confirm()` flows. Collection mutations now stay
   in styled inline panels, and collection row action menus render in document
