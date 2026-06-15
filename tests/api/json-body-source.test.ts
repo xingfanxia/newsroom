@@ -1,8 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-
-const root = process.cwd();
+import { readSource as read } from "@/tests/helpers/source";
 
 const sharedJsonBodyRoutePaths = [
   "app/api/admin/auth/route.ts",
@@ -15,10 +12,6 @@ const sharedJsonBodyRoutePaths = [
   "app/api/v1/saved/route.ts",
   "app/api/v1/tweaks/route.ts",
 ] as const;
-
-function read(path: string): string {
-  return readFileSync(resolve(root, path), "utf8");
-}
 
 describe("JSON body parsing source wiring", () => {
   test("mutating API routes share JSON parse and Zod error handling", () => {

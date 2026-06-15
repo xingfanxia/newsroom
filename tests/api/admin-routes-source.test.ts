@@ -1,8 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-
-const root = process.cwd();
+import { readSource as read } from "@/tests/helpers/source";
 
 const protectedAdminRoutePaths = [
   "app/api/admin/collections/route.ts",
@@ -12,10 +9,6 @@ const protectedAdminRoutePaths = [
   "app/api/admin/iterations/[id]/reject/route.ts",
   "app/api/admin/iterations/run/route.ts",
 ] as const;
-
-function read(path: string): string {
-  return readFileSync(resolve(root, path), "utf8");
-}
 
 describe("protected admin route source wiring", () => {
   test("admin route helper centralizes auth and aliases shared ok/error envelopes", () => {

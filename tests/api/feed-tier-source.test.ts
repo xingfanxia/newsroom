@@ -1,80 +1,39 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import {
   HIGHLIGHT_ITEM_TIERS,
   isHighlightItemTier,
   isVisibleItemTier,
   VISIBLE_ITEM_TIERS,
 } from "@/lib/types";
+import { readSource } from "@/tests/helpers/source";
 
-const root = process.cwd();
-const types = readFileSync(resolve(root, "lib/types.ts"), "utf8");
-const feedParams = readFileSync(
-  resolve(root, "lib/api/feed-query-params.ts"),
-  "utf8",
+const types = readSource("lib/types.ts");
+const feedParams = readSource("lib/api/feed-query-params.ts");
+const mcpRoute = readSource("app/api/mcp/route.ts");
+const sourcePresets = readSource("app/[locale]/_source-presets.ts");
+const storyItemFields = readSource("lib/api/story-item-fields.ts");
+const leadPick = readSource("workers/cluster/lead-pick.ts");
+const recomputeClusterLeads = readSource(
+  "scripts/migrations/recompute-cluster-leads.ts",
 );
-const mcpRoute = readFileSync(resolve(root, "app/api/mcp/route.ts"), "utf8");
-const sourcePresets = readFileSync(
-  resolve(root, "app/[locale]/_source-presets.ts"),
-  "utf8",
+const homePage = readSource("app/[locale]/page.tsx");
+const allPage = readSource("app/[locale]/all/page.tsx");
+const liveItems = readSource("lib/items/live.ts");
+const itemDetail = readSource("lib/items/detail.ts");
+const savedItems = readSource("lib/items/saved.ts");
+const semanticSearch = readSource("lib/items/semantic-search.ts");
+const storyMapper = readSource("lib/items/story-mapper.ts");
+const enrichTreatment = readSource("workers/enrich/treatment.ts");
+const enrichPrompt = readSource("workers/enrich/prompt.ts");
+const itemCommentary = readSource("workers/enrich/commentary.ts");
+const eventCommentary = readSource("workers/cluster/commentary.ts");
+const backfillStyle = readSource("scripts/ops/backfill-style.ts");
+const backfillChinese = readSource("scripts/ops/backfill-chinese.ts");
+const resetCuratedForBackfill = readSource(
+  "scripts/ops/reset-curated-for-backfill.ts",
 );
-const storyItemFields = readFileSync(
-  resolve(root, "lib/api/story-item-fields.ts"),
-  "utf8",
-);
-const leadPick = readFileSync(
-  resolve(root, "workers/cluster/lead-pick.ts"),
-  "utf8",
-);
-const recomputeClusterLeads = readFileSync(
-  resolve(root, "scripts/migrations/recompute-cluster-leads.ts"),
-  "utf8",
-);
-const homePage = readFileSync(resolve(root, "app/[locale]/page.tsx"), "utf8");
-const allPage = readFileSync(
-  resolve(root, "app/[locale]/all/page.tsx"),
-  "utf8",
-);
-const liveItems = readFileSync(resolve(root, "lib/items/live.ts"), "utf8");
-const itemDetail = readFileSync(resolve(root, "lib/items/detail.ts"), "utf8");
-const savedItems = readFileSync(resolve(root, "lib/items/saved.ts"), "utf8");
-const semanticSearch = readFileSync(
-  resolve(root, "lib/items/semantic-search.ts"),
-  "utf8",
-);
-const storyMapper = readFileSync(
-  resolve(root, "lib/items/story-mapper.ts"),
-  "utf8",
-);
-const enrichTreatment = readFileSync(
-  resolve(root, "workers/enrich/treatment.ts"),
-  "utf8",
-);
-const enrichPrompt = readFileSync(resolve(root, "workers/enrich/prompt.ts"), "utf8");
-const itemCommentary = readFileSync(
-  resolve(root, "workers/enrich/commentary.ts"),
-  "utf8",
-);
-const eventCommentary = readFileSync(
-  resolve(root, "workers/cluster/commentary.ts"),
-  "utf8",
-);
-const backfillStyle = readFileSync(
-  resolve(root, "scripts/ops/backfill-style.ts"),
-  "utf8",
-);
-const backfillChinese = readFileSync(
-  resolve(root, "scripts/ops/backfill-chinese.ts"),
-  "utf8",
-);
-const resetCuratedForBackfill = readFileSync(
-  resolve(root, "scripts/ops/reset-curated-for-backfill.ts"),
-  "utf8",
-);
-const regenCommentaryPreview = readFileSync(
-  resolve(root, "scripts/ops/regen-commentary-preview.ts"),
-  "utf8",
+const regenCommentaryPreview = readSource(
+  "scripts/ops/regen-commentary-preview.ts",
 );
 
 describe("feed tier/view source wiring", () => {

@@ -3,8 +3,12 @@ import { join, resolve } from "node:path";
 
 const projectRoot = process.cwd();
 
+function sourcePath(path: string): string {
+  return resolve(projectRoot, path);
+}
+
 export function readSource(path: string): string {
-  return readFileSync(resolve(projectRoot, path), "utf8");
+  return readFileSync(sourcePath(path), "utf8");
 }
 
 export function routeFilesUnder(dir: string): string[] {

@@ -1,16 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import {
   INVALID_ROUTE_ID_ERROR,
   parsePositiveRouteId,
 } from "@/lib/api/route-params";
-
-const root = process.cwd();
-
-function read(path: string): string {
-  return readFileSync(resolve(root, path), "utf8");
-}
+import { readSource as read } from "@/tests/helpers/source";
 
 const routeParamsSrc = read("lib/api/route-params.ts");
 const itemDetailSrc = read("lib/api/item-detail.ts");

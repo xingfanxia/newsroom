@@ -1,29 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { readSource } from "@/tests/helpers/source";
 
-const root = process.cwd();
-const v1ItemRoute = readFileSync(
-  resolve(root, "app/api/v1/items/[id]/route.ts"),
-  "utf8",
-);
-const publicItemRoute = readFileSync(
-  resolve(root, "app/api/public/items/[id]/route.ts"),
-  "utf8",
-);
-const mcpRoute = readFileSync(resolve(root, "app/api/mcp/route.ts"), "utf8");
-const itemDetailModule = readFileSync(
-  resolve(root, "lib/api/item-detail.ts"),
-  "utf8",
-);
-const publicItemsModule = readFileSync(
-  resolve(root, "lib/api/public-items.ts"),
-  "utf8",
-);
-const storyItemFieldsModule = readFileSync(
-  resolve(root, "lib/api/story-item-fields.ts"),
-  "utf8",
-);
+const v1ItemRoute = readSource("app/api/v1/items/[id]/route.ts");
+const publicItemRoute = readSource("app/api/public/items/[id]/route.ts");
+const mcpRoute = readSource("app/api/mcp/route.ts");
+const itemDetailModule = readSource("lib/api/item-detail.ts");
+const publicItemsModule = readSource("lib/api/public-items.ts");
+const storyItemFieldsModule = readSource("lib/api/story-item-fields.ts");
 
 describe("item detail route source wiring", () => {
   test("public detail route delegates route id parsing, DB lookup, and serialization", () => {

@@ -1,18 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { readSource as read } from "@/tests/helpers/source";
 
-const root = process.cwd();
 const routePaths = [
   "app/api/events/[id]/members/route.ts",
   "app/api/public/events/[id]/members/route.ts",
   "app/api/v1/events/[id]/members/route.ts",
 ] as const;
 const mcpRoutePath = "app/api/mcp/route.ts";
-
-function read(path: string): string {
-  return readFileSync(resolve(root, path), "utf8");
-}
 
 describe("event member route source wiring", () => {
   test("all HTTP event-member routes share route payload lookup", () => {

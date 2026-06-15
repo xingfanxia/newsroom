@@ -1,12 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { readSource } from "@/tests/helpers/source";
 
-const root = process.cwd();
-const savedRoute = readFileSync(
-  resolve(root, "app/api/v1/saved/route.ts"),
-  "utf8",
-);
+const savedRoute = readSource("app/api/v1/saved/route.ts");
 
 describe("/api/v1/saved source wiring", () => {
   test("route shares saved request schemas instead of declaring local zod objects", () => {

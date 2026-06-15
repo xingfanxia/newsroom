@@ -1,18 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-
-const root = process.cwd();
+import { readSource as read } from "@/tests/helpers/source";
 
 const requiredSessionRoutePaths = [
   "app/api/feedback/route.ts",
   "app/api/feedback/move/route.ts",
   "app/api/tweaks/route.ts",
 ] as const;
-
-function read(path: string): string {
-  return readFileSync(resolve(root, path), "utf8");
-}
 
 describe("required session route source wiring", () => {
   test("session route helper centralizes auth and aliases shared ok/error envelopes", () => {

@@ -1,8 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { readSource as read } from "@/tests/helpers/source";
 
-const root = process.cwd();
 const routePaths = [
   "app/api/admin/iterations/[id]/route.ts",
   "app/api/admin/iterations/[id]/apply/route.ts",
@@ -12,10 +10,6 @@ const allIterationRoutePaths = [
   ...routePaths,
   "app/api/admin/iterations/run/route.ts",
 ] as const;
-
-function read(path: string): string {
-  return readFileSync(resolve(root, path), "utf8");
-}
 
 describe("admin iteration route source wiring", () => {
   test("all routes share admin auth response handling", () => {

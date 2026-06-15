@@ -1,18 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { readSource as read } from "@/tests/helpers/source";
 
-const root = process.cwd();
 const routePaths = [
   "app/api/v1/feed/route.ts",
   "app/api/public/feed/route.ts",
   "app/api/v1/search/route.ts",
   "app/api/public/search/route.ts",
 ] as const;
-
-function read(path: string): string {
-  return readFileSync(resolve(root, path), "utf8");
-}
 
 const feedQueryParams = read("lib/api/feed-query-params.ts");
 

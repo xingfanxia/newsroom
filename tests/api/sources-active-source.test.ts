@@ -1,11 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { readSource } from "@/tests/helpers/source";
 
-const source = readFileSync(
-  resolve(process.cwd(), "app/api/sources/active/route.ts"),
-  "utf8",
-);
+const source = readSource("app/api/sources/active/route.ts");
 
 describe("active sources route source wiring", () => {
   test("delegates payload lookup and plain JSON envelopes", () => {

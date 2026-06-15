@@ -1,6 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { GET as getOpenApiYaml } from "@/app/openapi.yaml/route";
 import { GET as getSkillMarkdown } from "@/app/skill.md/route";
 import {
@@ -17,8 +15,7 @@ import {
   publicRateLimitPerIpLabel,
   publicRateLimitReqLabel,
 } from "@/lib/api/public-endpoint-config";
-
-const root = process.cwd();
+import { readSource as readProjectFile } from "@/tests/helpers/source";
 
 const routeContracts = [
   ["feed", "app/api/public/feed/route.ts"],
@@ -30,10 +27,6 @@ const routeContracts = [
   ["dailyByDate", "app/api/public/daily/[date]/route.ts"],
   ["dailies", "app/api/public/dailies/route.ts"],
 ] as const;
-
-function readProjectFile(path: string): string {
-  return readFileSync(resolve(root, path), "utf8");
-}
 
 describe("public API endpoint contract", () => {
   test("public endpoint limits have one runtime source of truth", () => {

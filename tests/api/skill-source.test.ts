@@ -1,6 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { GET as getSkillMarkdown } from "@/app/skill.md/route";
 import {
   APP_LOCALES,
@@ -11,9 +9,9 @@ import {
   SOURCE_KINDS,
   VISIBLE_ITEM_TIERS,
 } from "@/lib/types";
+import { readSource } from "@/tests/helpers/source";
 
-const root = process.cwd();
-const skillRoute = readFileSync(resolve(root, "app/skill.md/route.ts"), "utf8");
+const skillRoute = readSource("app/skill.md/route.ts");
 
 function markdownCodeUnion(values: readonly string[]): string {
   return values.map((value) => `\`${value}\``).join(" | ");

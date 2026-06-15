@@ -1,12 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-
-const root = process.cwd();
-
-function read(path: string): string {
-  return readFileSync(resolve(root, path), "utf8");
-}
+import { readSource as read } from "@/tests/helpers/source";
 
 describe("query param source wiring", () => {
   test("query routes use the shared search-param parser", () => {

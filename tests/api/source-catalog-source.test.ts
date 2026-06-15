@@ -1,6 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { GET as getOpenApiYaml } from "@/app/openapi.yaml/route";
 import {
   APP_LOCALES,
@@ -14,53 +12,25 @@ import {
   SOURCE_LOCALES,
   VISIBLE_ITEM_TIERS,
 } from "@/lib/types";
+import { readSource } from "@/tests/helpers/source";
 
-const root = process.cwd();
-const v1SourcesRoute = readFileSync(
-  resolve(root, "app/api/v1/sources/route.ts"),
-  "utf8",
+const v1SourcesRoute = readSource("app/api/v1/sources/route.ts");
+const publicSourcesRoute = readSource("app/api/public/sources/route.ts");
+const agentsTabs = readSource("app/[locale]/agents/_tabs.tsx");
+const mainFeedRssRoute = readSource("app/api/feed/[locale]/rss.xml/route.ts");
+const sourcesPage = readSource("app/[locale]/sources/page.tsx");
+const readme = readSource("README.md");
+const docsReadme = readSource("docs/README.md");
+const agentMcpPlan = readSource("docs/AGENT-MCP-PLAN.md");
+const architectureDoc = readSource("docs/architecture/ingestion.md");
+const handoffDoc = readSource("docs/HANDOFF.md");
+const schema = readSource("db/schema.ts");
+const sourceCatalog = readSource("lib/api/source-catalog.ts");
+const removeErroredSourcesScript = readSource(
+  "scripts/ops/remove-errored-sources.ts",
 );
-const publicSourcesRoute = readFileSync(
-  resolve(root, "app/api/public/sources/route.ts"),
-  "utf8",
-);
-const agentsTabs = readFileSync(
-  resolve(root, "app/[locale]/agents/_tabs.tsx"),
-  "utf8",
-);
-const mainFeedRssRoute = readFileSync(
-  resolve(root, "app/api/feed/[locale]/rss.xml/route.ts"),
-  "utf8",
-);
-const sourcesPage = readFileSync(
-  resolve(root, "app/[locale]/sources/page.tsx"),
-  "utf8",
-);
-const readme = readFileSync(resolve(root, "README.md"), "utf8");
-const docsReadme = readFileSync(resolve(root, "docs/README.md"), "utf8");
-const agentMcpPlan = readFileSync(
-  resolve(root, "docs/AGENT-MCP-PLAN.md"),
-  "utf8",
-);
-const architectureDoc = readFileSync(
-  resolve(root, "docs/architecture/ingestion.md"),
-  "utf8",
-);
-const handoffDoc = readFileSync(resolve(root, "docs/HANDOFF.md"), "utf8");
-const schema = readFileSync(resolve(root, "db/schema.ts"), "utf8");
-const sourceCatalog = readFileSync(
-  resolve(root, "lib/api/source-catalog.ts"),
-  "utf8",
-);
-const removeErroredSourcesScript = readFileSync(
-  resolve(root, "scripts/ops/remove-errored-sources.ts"),
-  "utf8",
-);
-const types = readFileSync(resolve(root, "lib/types.ts"), "utf8");
-const openapiRoute = readFileSync(
-  resolve(root, "app/openapi.yaml/route.ts"),
-  "utf8",
-);
+const types = readSource("lib/types.ts");
+const openapiRoute = readSource("app/openapi.yaml/route.ts");
 
 function inlineEnum(values: readonly (string | null)[]): string {
   return `[${values.map((value) => (value === null ? "null" : value)).join(", ")}]`;

@@ -1,6 +1,4 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { eq } from "drizzle-orm";
 import { closeDb, db, schema } from "@/db/client";
 import {
@@ -8,18 +6,14 @@ import {
   saveTweaksRoutePayload,
 } from "@/lib/api/tweak-routes";
 import type { SessionUser } from "@/lib/auth/session";
+import { readSource as read } from "@/tests/helpers/source";
 
-const root = process.cwd();
 const hasDb = Boolean(
   process.env.POSTGRES_URL ||
     process.env.DATABASE_URL ||
     process.env.POSTGRES_PRISMA_URL,
 );
 const describeOrSkip = hasDb ? describe : describe.skip;
-
-function read(path: string): string {
-  return readFileSync(resolve(root, path), "utf8");
-}
 
 describe("tweaks route payload source contract", () => {
   test("types the shared payload as a partial Tweaks contract", () => {
