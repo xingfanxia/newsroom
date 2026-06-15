@@ -5,9 +5,10 @@
  * GET    → { tweaks, watchlist }
  * PATCH  → body { tweaks?, watchlist? } — either field optional
  *
- * Watchlist: array of ≤24 strings, each 1..64 chars. Full replace semantic
- * (no partial deltas) to match the existing UI and make the agent's mental
- * model simple ("I sent [a,b,c] → server state is exactly [a,b,c]").
+ * Watchlist: full-replace array of ≤24 normalized strings, each 1..64 chars
+ * after trim/lowercase/case-insensitive dedupe. This keeps the UI and agent
+ * mental model simple: each PATCH sends the complete desired list, and the
+ * server stores that normalized full list.
  */
 import { tweaksPatchBodySchema } from "@/lib/api/tweak-requests";
 import { parseJsonRequestBody } from "@/lib/api/json-body";

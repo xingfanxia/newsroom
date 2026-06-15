@@ -12,6 +12,7 @@ const cookieRoute = read("app/api/tweaks/route.ts");
 const v1Route = read("app/api/v1/tweaks/route.ts");
 const sharedRouteHelper = read("lib/api/tweak-routes.ts");
 const hook = read("hooks/use-tweaks.tsx");
+const rightRail = read("components/feed/right-rail.tsx");
 
 describe("tweaks route source wiring", () => {
   test("cookie and v1 routes share request validation", () => {
@@ -54,5 +55,14 @@ describe("tweaks route source wiring", () => {
     expect(hook).toContain("pendingServerTweaksRef");
     expect(hook).toContain("window.setTimeout");
     expect(hook).toContain("window.clearTimeout");
+  });
+
+  test("right rail watchlist shares API normalization helpers", () => {
+    expect(rightRail).toContain("@/lib/watchlist");
+    expect(rightRail).toContain("addWatchlistTerm");
+    expect(rightRail).toContain("removeWatchlistTerm");
+    expect(rightRail).toContain("limitWatchlist");
+    expect(rightRail).not.toContain("terms.includes");
+    expect(rightRail).not.toContain(".slice(0, 24)");
   });
 });

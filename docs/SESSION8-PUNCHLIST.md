@@ -51,7 +51,10 @@ Written at the end of s7 (2026-04-19). User flagged "a lot of issues needs to be
   fixed; collection create/rename/delete and saved-item removal now use
   styled inline panels instead of browser-native dialogs. Covered by
   `tests/items/saved-ui-source.test.ts`.
-- [ ] **Watchlist: case-insensitive dedup missing** — adding `"GPT-6"` after `"gpt-6"` creates two entries. Normalize to lowercase before compare.
+- [x] **Watchlist: case-insensitive dedup missing** — fixed; browser
+  right-rail add/remove flows and cookie/v1 tweak PATCH validation now share
+  `lib/watchlist.ts` trim/lowercase/dedupe helpers. Covered by
+  `tests/api/tweak-requests.test.ts` and `tests/api/tweaks-source.test.ts`.
 - [x] **X Monitor filter by handle uses `s.source.publisher` string match** —
   fixed; exact `FeedQuery.sourceId` filtering and page wiring covered by
   `tests/items/feed-source-filter-source.test.ts`.

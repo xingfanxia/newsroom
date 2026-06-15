@@ -104,6 +104,9 @@ Shipped cleanup:
   user upsert, preferences/watchlist loading, DB patch construction, and
   `empty_body` decisions stay aligned while each route keeps its own auth and
   response envelope.
+- Shared watchlist normalization through `lib/watchlist.ts`; browser right-rail
+  add/remove flows and cookie/v1 tweak PATCH validation now trim, lowercase,
+  and case-insensitively dedupe terms before persistence.
 - Shared user roles and iteration statuses through `USER_ROLES`,
   `ITERATION_STATUSES`, and named status constants in `lib/types.ts`, so DB
   enums, auth upserts, iteration routes, agent runtime writes, and the admin

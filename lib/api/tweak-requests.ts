@@ -11,6 +11,11 @@ import {
   TWEAK_THEMES,
   type Tweaks,
 } from "@/lib/tweaks";
+import {
+  MAX_WATCHLIST_TERM_CHARS,
+  MAX_WATCHLIST_TERMS,
+  normalizeWatchlist,
+} from "@/lib/watchlist";
 
 const tweakSettingsSchema = z.object({
   density: z.enum(TWEAK_DENSITIES),
@@ -32,7 +37,15 @@ const tweakSettingsSchema = z.object({
 
 export const tweaksPatchBodySchema = z.object({
   tweaks: tweakSettingsSchema.partial().optional(),
-  watchlist: z.array(z.string().min(1).max(64)).max(24).optional(),
+  watchlist: z
+    .array(z.string())
+    .transform(normalizeWatchlist)
+    .pipe(
+      z
+        .array(z.string().min(1).max(MAX_WATCHLIST_TERM_CHARS))
+        .max(MAX_WATCHLIST_TERMS),
+    )
+    .optional(),
 });
 
 export type TweaksPatchBody = z.infer<typeof tweaksPatchBodySchema>;
@@ -42,6 +55,8 @@ export function buildTweaksDbPatch(
 ): Record<string, unknown> | null {
   const patch: Record<string, unknown> = { updatedAt: new Date() };
   if (body.tweaks !== undefined) patch.tweaks = body.tweaks;
-  if (body.watchlist !== undefined) patch.watchlist = body.watchlist;
+  if (body.watchlist !== undefined) {
+    patch.watchlist = normalizeWatchlist(body.watchlist);
+  }
   return Object.keys(patch).length === 1 ? null : patch;
 }

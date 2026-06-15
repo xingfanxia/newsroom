@@ -3,6 +3,12 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { RadarWidget, type RadarStats } from "./radar-widget";
 import { useTweaks } from "@/hooks/use-tweaks";
+import {
+  addWatchlistTerm,
+  limitWatchlist,
+  removeWatchlistTerm,
+  watchlistsEqual,
+} from "@/lib/watchlist";
 
 export type WatchlistEntry = { q: string; hits: number; delta: number };
 export type TopicEntry = { tag: string; count: number; hot?: boolean };
@@ -34,8 +40,6 @@ export function RightRail({
       {tweaks.showRadar && <RadarWidget stats={stats} />}
 
       <WatchlistPanel fallback={watchlist} zh={zh} />
-
-
 
       <div className="panel">
         <div className="hd">
@@ -122,11 +126,14 @@ function WatchlistPanel({
   zh: boolean;
 }) {
   const [terms, setTerms] = useState<string[]>(() =>
-    fallback.map((w) => w.q),
+    limitWatchlist(fallback.map((w) => w.q)),
   );
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  const nextWithDraft = addWatchlistTerm(terms, draft);
+  const canAddDraft =
+    draft.trim().length > 0 && !watchlistsEqual(nextWithDraft, terms);
 
   useEffect(() => {
     let cancelled = false;
@@ -134,7 +141,9 @@ function WatchlistPanel({
       .then((r) => (r.ok ? r.json() : null))
       .then((body) => {
         if (cancelled) return;
-        if (Array.isArray(body?.watchlist)) setTerms(body.watchlist);
+        if (Array.isArray(body?.watchlist)) {
+          setTerms(limitWatchlist(body.watchlist));
+        }
       })
       .catch(() => {});
     return () => {
@@ -143,13 +152,14 @@ function WatchlistPanel({
   }, []);
 
   const save = async (next: string[]) => {
+    const watchlist = limitWatchlist(next);
     setBusy(true);
     try {
       await fetch("/api/tweaks", {
         method: "PATCH",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ watchlist: next }),
+        body: JSON.stringify({ watchlist }),
       });
     } finally {
       setBusy(false);
@@ -157,20 +167,16 @@ function WatchlistPanel({
   };
 
   const addTerm = () => {
-    const v = draft.trim();
-    if (!v) return;
-    if (terms.includes(v)) {
-      setDraft("");
-      return;
-    }
-    const next = [...terms, v].slice(0, 24);
-    setTerms(next);
+    const next = addWatchlistTerm(terms, draft);
     setDraft("");
+    if (watchlistsEqual(next, terms)) return;
+    setTerms(next);
     void save(next);
   };
 
   const remove = (q: string) => {
-    const next = terms.filter((t) => t !== q);
+    const next = removeWatchlistTerm(terms, q);
+    if (watchlistsEqual(next, terms)) return;
     setTerms(next);
     void save(next);
   };
@@ -252,7 +258,7 @@ function WatchlistPanel({
             <button
               type="button"
               onClick={addTerm}
-              disabled={!draft.trim() || busy}
+              disabled={!canAddDraft || busy}
               style={{
                 background: "transparent",
                 color: "var(--accent-green)",
@@ -260,7 +266,7 @@ function WatchlistPanel({
                 fontFamily: "var(--font-mono)",
                 fontSize: 11,
                 padding: "4px 10px",
-                cursor: draft.trim() ? "pointer" : "not-allowed",
+                cursor: canAddDraft ? "pointer" : "not-allowed",
                 borderRadius: 2,
               }}
             >
