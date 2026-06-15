@@ -65,6 +65,11 @@ Shipped cleanup:
   mapping through `lib/api/policy-commit.ts`, so
   `/api/admin/policy/commit` keeps only admin auth, JSON parsing, and response
   mapping.
+- Shared admin iteration-run lookup/apply/reject result semantics through
+  `lib/api/iteration-routes.ts`, so `/api/admin/iterations/[id]` leaf routes
+  keep only admin auth, route-id parsing, and response mapping instead of
+  directly importing Drizzle, `iterationRuns`, status tuples, policy commits,
+  or cache invalidation.
 - Shared admin/v1 saved-collection CRUD result mapping through
   `lib/api/collection-routes.ts`, so both surfaces reuse the same
   `duplicate_name` and `not_found` decisions while keeping their own auth,

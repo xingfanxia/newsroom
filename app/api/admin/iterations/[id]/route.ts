@@ -1,11 +1,9 @@
-import { eq } from "drizzle-orm";
-import { db } from "@/db/client";
-import { iterationRuns } from "@/db/schema";
 import {
   adminError,
   adminJson,
   runAdminRoute,
 } from "@/lib/api/admin-route";
+import { getIterationRunRoutePayload } from "@/lib/api/iteration-routes";
 import { parseIterationRunRouteId } from "@/lib/policy/iterations";
 
 export const dynamic = "force-dynamic";
@@ -24,14 +22,9 @@ export async function GET(
     const { id: rawId } = await params;
     const parsedId = parseIterationRunRouteId(rawId);
     if (!parsedId.ok) return adminError(parsedId.error, 400);
-    const { id } = parsedId;
 
-    const [row] = await db()
-      .select()
-      .from(iterationRuns)
-      .where(eq(iterationRuns.id, id))
-      .limit(1);
-    if (!row) return adminError("not_found", 404);
-    return adminJson({ run: row });
+    const result = await getIterationRunRoutePayload(parsedId.id);
+    if (!result.ok) return adminError(result.error, result.status);
+    return adminJson(result.payload);
   });
 }

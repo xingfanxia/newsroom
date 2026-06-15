@@ -25,6 +25,7 @@ const agentIterate = read("workers/agent/iterate.ts");
 const iterationRunRoute = read("app/api/admin/iterations/run/route.ts");
 const iterationApplyRoute = read("app/api/admin/iterations/[id]/apply/route.ts");
 const iterationRejectRoute = read("app/api/admin/iterations/[id]/reject/route.ts");
+const iterationRouteHelpers = read("lib/api/iteration-routes.ts");
 const mcpRoute = read("app/api/mcp/route.ts");
 const v1SavedRoute = read("app/api/v1/saved/route.ts");
 const sitemap = read("app/sitemap.ts");
@@ -105,10 +106,9 @@ describe("runtime contract source wiring", () => {
     expect(agentIterate).toContain("ITERATION_FAILED_STATUS");
     expect(iterationRunRoute).toContain("ITERATION_PROPOSED_STATUS");
     expect(iterationRunRoute).toContain("ITERATION_FAILED_STATUS");
-    expect(iterationApplyRoute).toContain("ITERATION_PROPOSED_STATUS");
-    expect(iterationApplyRoute).toContain("ITERATION_APPLIED_STATUS");
-    expect(iterationRejectRoute).toContain("ITERATION_PROPOSED_STATUS");
-    expect(iterationRejectRoute).toContain("ITERATION_REJECTED_STATUS");
+    expect(iterationRouteHelpers).toContain("ITERATION_PROPOSED_STATUS");
+    expect(iterationRouteHelpers).toContain("ITERATION_APPLIED_STATUS");
+    expect(iterationRouteHelpers).toContain("ITERATION_REJECTED_STATUS");
 
     for (const source of [
       schema,
@@ -119,6 +119,7 @@ describe("runtime contract source wiring", () => {
       iterationRunRoute,
       iterationApplyRoute,
       iterationRejectRoute,
+      iterationRouteHelpers,
     ]) {
       expect(source).not.toContain('["admin", "editor", "reader"]');
       expect(source).not.toContain('"admin" : "reader"');

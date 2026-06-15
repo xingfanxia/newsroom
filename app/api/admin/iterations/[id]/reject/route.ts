@@ -1,16 +1,10 @@
-import { and, eq } from "drizzle-orm";
-import { db } from "@/db/client";
-import { iterationRuns } from "@/db/schema";
 import {
   adminError,
   adminOk,
   runAdminRoute,
 } from "@/lib/api/admin-route";
+import { rejectIterationRunRoutePayload } from "@/lib/api/iteration-routes";
 import { parseIterationRunRouteId } from "@/lib/policy/iterations";
-import {
-  ITERATION_PROPOSED_STATUS,
-  ITERATION_REJECTED_STATUS,
-} from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -29,20 +23,9 @@ export async function POST(
     const { id: rawId } = await params;
     const parsedId = parseIterationRunRouteId(rawId);
     if (!parsedId.ok) return adminError(parsedId.error, 400);
-    const { id } = parsedId;
 
-    const [updated] = await db()
-      .update(iterationRuns)
-      .set({ status: ITERATION_REJECTED_STATUS, completedAt: new Date() })
-      .where(
-        and(
-          eq(iterationRuns.id, id),
-          eq(iterationRuns.status, ITERATION_PROPOSED_STATUS),
-        ),
-      )
-      .returning();
-
-    if (!updated) return adminError("not_proposable", 400);
+    const result = await rejectIterationRunRoutePayload(parsedId.id);
+    if (!result.ok) return adminError(result.error, result.status);
     return adminOk();
   });
 }

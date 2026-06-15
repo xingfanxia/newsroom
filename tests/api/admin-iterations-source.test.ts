@@ -43,4 +43,28 @@ describe("admin iteration route source wiring", () => {
       expect(source).not.toContain("Number.isInteger(id)");
     }
   });
+
+  test("id routes delegate DB/status/commit semantics to a shared API helper", () => {
+    const helper = read("lib/api/iteration-routes.ts");
+
+    expect(helper).toContain("@/db/client");
+    expect(helper).toContain("@/db/schema");
+    expect(helper).toContain("getIterationRunRoutePayload");
+    expect(helper).toContain("applyIterationRunRoutePayload");
+    expect(helper).toContain("rejectIterationRunRoutePayload");
+    expect(helper).toContain("commitSkillVersion");
+    expect(helper).toContain("invalidatePolicyCache");
+
+    for (const path of routePaths) {
+      const source = read(path);
+
+      expect(source).toContain("@/lib/api/iteration-routes");
+      expect(source).not.toContain("@/db/client");
+      expect(source).not.toContain("@/db/schema");
+      expect(source).not.toContain("from \"drizzle-orm\"");
+      expect(source).not.toContain("commitSkillVersion");
+      expect(source).not.toContain("invalidatePolicyCache");
+      expect(source).not.toContain("ITERATION_PROPOSED_STATUS");
+    }
+  });
 });
