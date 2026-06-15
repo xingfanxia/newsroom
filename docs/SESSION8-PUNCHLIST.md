@@ -39,8 +39,12 @@ Written at the end of s7 (2026-04-19). User flagged "a lot of issues needs to be
 - [ ] **Policy editor: no diff preview before commit** — user commits blindly. Should show a `DiffViewer` of old vs new content + confirm step.
 - [ ] **Named collections UI uses native `confirm()` / `prompt()`** — ugly on mobile, no styling. Replace with a sonner-based inline confirm or a proper modal.
 - [ ] **Watchlist: case-insensitive dedup missing** — adding `"GPT-6"` after `"gpt-6"` creates two entries. Normalize to lowercase before compare.
-- [ ] **X Monitor filter by handle uses `s.source.publisher` string match** — fragile. If two handles share a nameEn/nameZh string the filter leaks. Requires adding `sourceId` to `FeedQuery` (see Gotcha 11 in HANDOFF).
-- [ ] **Podcasts filter by source uses the same publisher match** — same bug class.
+- [x] **X Monitor filter by handle uses `s.source.publisher` string match** —
+  fixed; exact `FeedQuery.sourceId` filtering and page wiring covered by
+  `tests/items/feed-source-filter-source.test.ts`.
+- [x] **Podcasts filter by source uses the same publisher match** — fixed by
+  the same `sourceId` path and covered by
+  `tests/items/feed-source-filter-source.test.ts`.
 - [x] **Export MD omits `editor_analysis` long-form** — resolved; saved export now includes `editor_analysis` when distinct from `editor_note`, and rendering lives in `lib/api/saved-export.ts`.
 - [ ] **CollectionSidebar "more" context menu** — positioned `right: 6; top: 100%` absolute. On the last row near the bottom of a short viewport, it renders below the fold / off-screen.
 - [ ] **Feedback move** endpoint returns 404 if the save doesn't exist. But the UI doesn't disambiguate "you don't own this save" vs "it's already been removed". Probably fine, document.
@@ -79,7 +83,9 @@ Written at the end of s7 (2026-04-19). User flagged "a lot of issues needs to be
 - [x] No test for `/api/saved/export` markdown shape — covered by `tests/api/saved-export.test.ts`.
 - [x] No test for `/api/tweaks` GET+PATCH round-trip — shared helper
   contract and real DB persistence covered by `tests/api/tweak-routes.test.ts`.
-- [ ] `getFeaturedStories` per-source-filter workaround (client-side `s.source.publisher` match) has zero test coverage
+- [x] `getFeaturedStories` per-source-filter workaround (client-side `s.source.publisher` match) has zero test coverage —
+  exact source-id precedence and page source wiring covered by
+  `tests/items/feed-source-filter-source.test.ts`.
 - [ ] `useTweaks` TweaksProvider not tested for context propagation
 
 ## G — design-mock divergences still open

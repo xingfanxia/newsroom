@@ -122,10 +122,10 @@ function buildFeedWhere(q: FeedQuery) {
   const sourceIdFilter = q.sourceId
     ? sql`${items.sourceId} = ${q.sourceId}`
     : sql`TRUE`;
-  const groupFilter = q.sourceGroup
+  const groupFilter = !q.sourceId && q.sourceGroup
     ? sql`${sources.group} = ${q.sourceGroup}`
     : sql`TRUE`;
-  const kindFilter = q.sourceKind
+  const kindFilter = !q.sourceId && q.sourceKind
     ? sql`${sources.kind} = ${q.sourceKind}`
     : sql`TRUE`;
   // View-aware day filter. Bucket anchor for date filtering = items.published_at.
