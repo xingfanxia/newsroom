@@ -35,6 +35,8 @@ describe("admin iteration route source wiring", () => {
     expect(helper).toContain("parseIterationRunRouteId");
     expect(helper).toContain("runAdminIterationIdRoute");
     expect(helper).toContain("adminError(parsedId.error, 400)");
+    expect(helper).toContain("adminRouteResult(result, adminJson)");
+    expect(helper).not.toContain("adminError(result.error");
 
     for (const path of routePaths) {
       const source = read(path);

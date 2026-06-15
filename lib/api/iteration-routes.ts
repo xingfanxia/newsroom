@@ -4,6 +4,7 @@ import { iterationRuns, type IterationRun } from "@/db/schema";
 import {
   adminError,
   adminJson,
+  adminRouteResult,
   runAdminRoute,
 } from "@/lib/api/admin-route";
 import type { SessionUser } from "@/lib/auth/session";
@@ -45,8 +46,7 @@ export function runAdminIterationIdRoute<T extends Record<string, unknown>>(
     if (!parsedId.ok) return adminError(parsedId.error, 400);
 
     const result = await handler(parsedId.id, admin);
-    if (!result.ok) return adminError(result.error, result.status, result.extra);
-    return adminJson(result.payload);
+    return adminRouteResult(result, adminJson);
   });
 }
 

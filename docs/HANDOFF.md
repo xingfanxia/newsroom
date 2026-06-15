@@ -233,7 +233,7 @@ Shipped cleanup:
 - Shared admin iteration id route adapters through `runAdminIterationIdRoute`
   in `lib/api/iteration-routes.ts`; `/api/admin/iterations/[id]`, `/apply`,
   and `/reject` now keep only the action binding while the shared helper owns
-  admin auth, route-id parsing, and result-to-admin-envelope mapping.
+  admin auth, route-id parsing, and `adminRouteResult` envelope mapping.
 - Shared RSS XML/HTTP response envelope, XML escaping, CDATA splitting, and
   lightweight markdown-to-HTML rendering through `lib/rss/render.ts`;
   `/api/rss/*`, the featured-locale feeds, and the legacy newsletter feeds now
