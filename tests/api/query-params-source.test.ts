@@ -4,22 +4,18 @@ import { resolve } from "node:path";
 
 const root = process.cwd();
 
-const queryRoutePaths = [
-  "app/api/v1/saved/route.ts",
-] as const;
-
 function read(path: string): string {
   return readFileSync(resolve(root, path), "utf8");
 }
 
 describe("query param source wiring", () => {
   test("query routes use the shared search-param parser", () => {
-    for (const path of queryRoutePaths) {
-      const source = read(path);
-      expect(source).toContain("@/lib/api/query-params");
-      expect(source).not.toContain("Object.fromEntries(url.searchParams.entries())");
-      expect(source).not.toContain("Object.fromEntries(req.searchParams.entries())");
-    }
+    const savedRoute = read("app/api/v1/saved/route.ts");
+    const savedRequests = read("lib/api/saved-requests.ts");
+    expect(savedRoute).toContain("parseV1SavedQueryRequest");
+    expect(savedRoute).not.toContain("@/lib/api/query-params");
+    expect(savedRequests).toContain("@/lib/api/query-params");
+    expect(savedRequests).toContain("parseV1SavedQueryRequest");
 
     const dailies = read("app/api/public/dailies/route.ts");
     const dailyColumns = read("lib/api/daily-columns.ts");
@@ -41,6 +37,17 @@ describe("query param source wiring", () => {
     expect(usageRoute).not.toContain("@/lib/api/query-params");
     expect(usageSummary).toContain("@/lib/api/query-params");
     expect(usageSummary).toContain("parseUsageSummaryQueryRequest");
+
+    for (const source of [
+      savedRoute,
+      savedRequests,
+      dailyColumns,
+      feedQueryParams,
+      usageSummary,
+    ]) {
+      expect(source).not.toContain("Object.fromEntries(url.searchParams.entries())");
+      expect(source).not.toContain("Object.fromEntries(req.searchParams.entries())");
+    }
   });
 
   test("public invalid-query messages use the shared formatter", () => {

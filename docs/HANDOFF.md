@@ -74,10 +74,12 @@ Shipped cleanup:
   `lib/api/collection-routes.ts`, so both surfaces reuse the same
   `duplicate_name` and `not_found` decisions while keeping their own auth,
   request schemas, and response envelopes.
-- Shared saved-item request schemas through `lib/api/saved-requests.ts`;
-  `/api/v1/saved` and `/api/feedback/move` now reuse the same positive item
-  id, positive collection id, inbox-null, locale, and pagination validation
-  instead of carrying route-local Zod objects.
+- Shared saved-item request parsing through `lib/api/saved-requests.ts`;
+  `/api/v1/saved` now delegates GET query extraction to
+  `parseV1SavedQueryRequest`, while `/api/v1/saved` and
+  `/api/feedback/move` reuse the same positive item id, positive collection id,
+  inbox-null, locale, and pagination validation instead of carrying
+  route-local Zod/query-parser wiring.
 - Shared saved-item mutation semantics through `lib/api/saved-routes.ts`;
   `/api/v1/saved` and MCP `ax_radar_save` now reuse the same save toggle,
   owner-aware collection assignment, assigned-collection response payload,

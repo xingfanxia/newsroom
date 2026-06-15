@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  parseQueryParams,
+  type QueryParseResult,
+} from "@/lib/api/query-params";
 import { APP_LOCALES } from "@/lib/types";
 
 const savedItemIdSchema = z.number().int().positive();
@@ -11,6 +15,14 @@ export const v1SavedQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).optional().default(80),
   locale: z.enum(APP_LOCALES).optional().default("en"),
 });
+
+export type V1SavedQueryParams = z.infer<typeof v1SavedQuerySchema>;
+
+export function parseV1SavedQueryRequest(
+  req: Request,
+): QueryParseResult<V1SavedQueryParams> {
+  return parseQueryParams(req, v1SavedQuerySchema);
+}
 
 export const v1SavedPostBodySchema = z.object({
   item_id: savedItemIdSchema,

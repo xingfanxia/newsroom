@@ -15,10 +15,9 @@
  *   { item_id: number, on: boolean, collection_id?: number, note?: string }
  */
 import { parseJsonRequestBody } from "@/lib/api/json-body";
-import { parseQueryParams } from "@/lib/api/query-params";
 import {
+  parseV1SavedQueryRequest,
   v1SavedPostBodySchema,
-  v1SavedQuerySchema,
 } from "@/lib/api/saved-requests";
 import { saveItemRoutePayload } from "@/lib/api/saved-routes";
 import {
@@ -33,7 +32,7 @@ import { getSavedStories } from "@/lib/items/saved";
 
 export async function GET(req: Request) {
   return runV1Route(req, async (user) => {
-    const parsed = parseQueryParams(req, v1SavedQuerySchema);
+    const parsed = parseV1SavedQueryRequest(req);
     if (!parsed.ok) return v1InvalidQuery(parsed.issues);
 
     const q = parsed.data;

@@ -11,9 +11,11 @@ const savedRoute = readFileSync(
 describe("/api/v1/saved source wiring", () => {
   test("route shares saved request schemas instead of declaring local zod objects", () => {
     expect(savedRoute).toContain("@/lib/api/saved-requests");
-    expect(savedRoute).toContain("v1SavedQuerySchema");
+    expect(savedRoute).toContain("parseV1SavedQueryRequest");
     expect(savedRoute).toContain("v1SavedPostBodySchema");
     expect(savedRoute).not.toContain('from "zod"');
+    expect(savedRoute).not.toContain("@/lib/api/query-params");
+    expect(savedRoute).not.toContain("parseQueryParams(");
     expect(savedRoute).not.toContain("const getQuerySchema = z.object");
     expect(savedRoute).not.toContain("const postBodySchema = z.object");
   });

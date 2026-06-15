@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   feedbackMoveBodySchema,
+  parseV1SavedQueryRequest,
   v1SavedPostBodySchema,
   v1SavedQuerySchema,
 } from "@/lib/api/saved-requests";
@@ -31,6 +32,29 @@ describe("saved request schemas", () => {
     );
     expect(v1SavedQuerySchema.safeParse({ limit: "201" }).success).toBe(false);
     expect(v1SavedQuerySchema.safeParse({ locale: "fr" }).success).toBe(false);
+  });
+
+  test("parses v1 saved query requests through the shared request helper", () => {
+    const parsed = parseV1SavedQueryRequest(
+      new Request(
+        "https://example.test/api/v1/saved?collection=inbox&limit=25&locale=zh",
+      ),
+    );
+
+    expect(parsed).toEqual({
+      ok: true,
+      data: {
+        collection: "inbox",
+        limit: 25,
+        locale: "zh",
+      },
+    });
+
+    const invalid = parseV1SavedQueryRequest(
+      new Request("https://example.test/api/v1/saved?limit=201"),
+    );
+
+    expect(invalid.ok).toBe(false);
   });
 
   test("validates v1 saved mutation bodies", () => {
