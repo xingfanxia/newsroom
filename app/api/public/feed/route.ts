@@ -20,8 +20,10 @@ import {
   publicInvalidQuery,
   publicServerError,
 } from "@/lib/api/public-helpers";
-import { runFeedQuery } from "@/lib/api/feed-results";
-import { toPublicApiItem } from "@/lib/api/public-items";
+import {
+  runFeedQuery,
+  toPublicFeedPayload,
+} from "@/lib/api/feed-results";
 import {
   feedQueryFromParams,
   parsePublicFeedQueryRequest,
@@ -52,13 +54,7 @@ export async function GET(req: Request) {
         latest_at: result.items[0]?.publishedAt ?? "",
         qs: parsed.search,
       }),
-      body: {
-        items: result.items.map((s) => toPublicApiItem(s, q.locale)),
-        total: result.total,
-        limit: result.limit,
-        offset: result.offset,
-        view: result.view,
-      },
+      body: toPublicFeedPayload(result, q.locale),
     });
   } catch (err) {
     return publicServerError("api/public/feed", err);

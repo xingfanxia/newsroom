@@ -44,13 +44,15 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import { z } from "zod";
 import { requireApiToken } from "@/lib/auth/api-token";
 import { getFeaturedStories, type FeedQuery } from "@/lib/items/live";
-import { runFeedQuery } from "@/lib/api/feed-results";
+import {
+  runFeedQuery,
+  toAgentFeedPayload,
+} from "@/lib/api/feed-results";
 import {
   runSearchQuery,
   toAgentSearchPayload,
 } from "@/lib/api/search-results";
 import { getItemDetail } from "@/lib/items/detail";
-import { toAgentApiItem } from "@/lib/api/v1-items";
 import { getEventMembersPayload } from "@/lib/api/event-members";
 import { saveItemRoutePayload } from "@/lib/api/saved-routes";
 import { listCollections } from "@/lib/items/collections";
@@ -154,13 +156,7 @@ function buildServer(user: SessionUser): McpServer {
         includeSourceTags: args.include_source_tags,
       };
       const result = await runFeedQuery(q);
-      return text({
-        items: result.items.map((s) => toAgentApiItem(s, locale)),
-        total: result.total,
-        limit: result.limit,
-        offset: result.offset,
-        view: result.view,
-      });
+      return text(toAgentFeedPayload(result, locale));
     },
   );
 

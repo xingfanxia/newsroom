@@ -137,9 +137,11 @@ Shipped cleanup:
   auth/rate-limit/ETag/envelopes, while the helper owns lexical full-match
   totals, semantic source/date/tier filters, and public vs agent
   distance/latency/embedding metadata.
-- Shared REST/MCP feed execution through `lib/api/feed-results.ts`;
-  adapters now own only auth/rate-limit/ETag/serialization, while the helper
-  owns paired item + full-match total queries and pagination defaults.
+- Shared REST/MCP feed execution and payload serialization through
+  `lib/api/feed-results.ts`; adapters now own only
+  auth/rate-limit/ETag/envelopes, while the helper owns paired item +
+  full-match total queries, pagination defaults, and public vs agent item
+  exposure.
 - Shared v1/public item-detail route lookup through
   `getItemDetailRouteRow` in `lib/api/item-detail.ts`; route files now own
   only auth/cache/error-envelope mapping and surface-specific serialization.

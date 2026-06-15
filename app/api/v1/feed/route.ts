@@ -37,8 +37,10 @@ import {
   v1Json,
   v1ServerError,
 } from "@/lib/api/v1-route";
-import { runFeedQuery } from "@/lib/api/feed-results";
-import { toAgentApiItem } from "@/lib/api/v1-items";
+import {
+  runFeedQuery,
+  toAgentFeedPayload,
+} from "@/lib/api/feed-results";
 import {
   feedQueryFromParams,
   parseV1FeedQueryRequest,
@@ -54,13 +56,7 @@ export async function GET(req: Request) {
 
     try {
       const result = await runFeedQuery(feedQuery);
-      return v1Json({
-        items: result.items.map((s) => toAgentApiItem(s, q.locale)),
-        total: result.total,
-        limit: result.limit,
-        offset: result.offset,
-        view: result.view,
-      });
+      return v1Json(toAgentFeedPayload(result, q.locale));
     } catch (err) {
       return v1ServerError("api/v1/feed", err);
     }

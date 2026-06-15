@@ -108,4 +108,25 @@ describe("feed/search route query parsing source wiring", () => {
       expect(source).not.toContain("countFeaturedStories");
     }
   });
+
+  test("feed routes delegate payload serialization to the shared feed helper", () => {
+    expect(read("app/api/v1/feed/route.ts")).toContain(
+      "toAgentFeedPayload(result, q.locale)",
+    );
+    expect(read("app/api/public/feed/route.ts")).toContain(
+      "toPublicFeedPayload(result, q.locale)",
+    );
+
+    for (const path of [
+      "app/api/v1/feed/route.ts",
+      "app/api/public/feed/route.ts",
+    ] as const) {
+      const source = read(path);
+      expect(source).not.toContain("@/lib/api/v1-items");
+      expect(source).not.toContain("@/lib/api/public-items");
+      expect(source).not.toContain("toAgentApiItem");
+      expect(source).not.toContain("toPublicApiItem");
+      expect(source).not.toContain("result.items.map");
+    }
+  });
 });
