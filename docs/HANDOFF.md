@@ -78,6 +78,10 @@ Shipped cleanup:
   `DiffViewer` contract and register a dirty-draft `beforeunload` guard, so
   policy edits are reviewed against the committed baseline before publishing
   and tab-close protection is covered by a source contract test.
+- Saved collection create/rename/delete and saved-item removal no longer use
+  browser-native `prompt()` / `confirm()` flows. Collection mutations now stay
+  in styled inline panels, and collection row action menus render in document
+  flow instead of absolute dropdowns that can fall off short viewports.
 - Shared saved-item request parsing through `lib/api/saved-requests.ts`;
   `/api/v1/saved` now delegates GET query extraction to
   `parseV1SavedQueryRequest`, while `/api/v1/saved` and
@@ -575,7 +579,6 @@ browser-verified. Open DevTools responsive mode + walk through `/`,
   affordable and the product decision is revisited.
 - **Tweaks PATCH floods** — rapid theme/accent scrubbing fires 10+
   PATCH requests in a second. Add 500ms debounce.
-- **Native `confirm()`/`prompt()` in collection CRUD** — ugly on mobile.
 - **`/admin/users`** still `ComingSoonPanel` — single-user mode so low
   priority until multi-user.
 

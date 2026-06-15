@@ -47,7 +47,10 @@ Written at the end of s7 (2026-04-19). User flagged "a lot of issues needs to be
 - [x] **Policy editor: no diff preview before commit** — fixed; edit mode now
   reuses `diffLines` + `DiffViewer` against the committed baseline. Covered by
   `tests/policy/policy-editor-source.test.ts`.
-- [ ] **Named collections UI uses native `confirm()` / `prompt()`** — ugly on mobile, no styling. Replace with a sonner-based inline confirm or a proper modal.
+- [x] **Named collections UI uses native `confirm()` / `prompt()`** —
+  fixed; collection create/rename/delete and saved-item removal now use
+  styled inline panels instead of browser-native dialogs. Covered by
+  `tests/items/saved-ui-source.test.ts`.
 - [ ] **Watchlist: case-insensitive dedup missing** — adding `"GPT-6"` after `"gpt-6"` creates two entries. Normalize to lowercase before compare.
 - [x] **X Monitor filter by handle uses `s.source.publisher` string match** —
   fixed; exact `FeedQuery.sourceId` filtering and page wiring covered by
@@ -56,7 +59,9 @@ Written at the end of s7 (2026-04-19). User flagged "a lot of issues needs to be
   the same `sourceId` path and covered by
   `tests/items/feed-source-filter-source.test.ts`.
 - [x] **Export MD omits `editor_analysis` long-form** — resolved; saved export now includes `editor_analysis` when distinct from `editor_note`, and rendering lives in `lib/api/saved-export.ts`.
-- [ ] **CollectionSidebar "more" context menu** — positioned `right: 6; top: 100%` absolute. On the last row near the bottom of a short viewport, it renders below the fold / off-screen.
+- [x] **CollectionSidebar "more" context menu** — fixed; row actions now
+  render as an inline panel in document flow instead of an absolute
+  `top: 100%` dropdown. Covered by `tests/items/saved-ui-source.test.ts`.
 - [ ] **Feedback move** endpoint returns 404 if the save doesn't exist. But the UI doesn't disambiguate "you don't own this save" vs "it's already been removed". Probably fine, document.
 - [ ] **Delete collection cascade** — saves get reparented to inbox (SET NULL). The UI optimistically routes to inbox via `go("inbox")` — but `router.refresh()` fetches the new inbox count, which might race with the DELETE. Verify the revalidation order.
 

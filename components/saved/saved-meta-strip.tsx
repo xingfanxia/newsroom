@@ -1,6 +1,6 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { useTweaks } from "@/hooks/use-tweaks";
 import { FEEDBACK_SAVE_VOTE } from "@/lib/types";
@@ -42,6 +42,7 @@ export function SavedMetaStrip({
   const { tweaks } = useTweaks();
   const zh = tweaks.language === "zh";
   const [moveOpen, setMoveOpen] = useState(false);
+  const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const currentCollection =
@@ -72,8 +73,7 @@ export function SavedMetaStrip({
     }
   };
 
-  const remove = async () => {
-    if (!confirm(zh ? "取消收藏？" : "remove from saved?")) return;
+  const removeSaved = async () => {
     setBusy(true);
     try {
       const res = await fetch("/api/feedback", {
@@ -88,6 +88,7 @@ export function SavedMetaStrip({
       router.refresh();
     } finally {
       setBusy(false);
+      setRemoveConfirmOpen(false);
     }
   };
 
@@ -164,7 +165,8 @@ export function SavedMetaStrip({
         disabled={busy}
         onClick={(e) => {
           e.stopPropagation();
-          remove();
+          setMoveOpen(false);
+          setRemoveConfirmOpen(true);
         }}
         style={{
           background: "transparent",
@@ -177,6 +179,15 @@ export function SavedMetaStrip({
       >
         ✕ {zh ? "取消收藏" : "remove"}
       </button>
+
+      {removeConfirmOpen && (
+        <RemoveSavedConfirmPanel
+          zh={zh}
+          disabled={busy}
+          onCancel={() => setRemoveConfirmOpen(false)}
+          onConfirm={removeSaved}
+        />
+      )}
 
       {moveOpen && (
         <div
@@ -225,11 +236,80 @@ export function SavedMetaStrip({
   );
 }
 
+function RemoveSavedConfirmPanel({
+  zh,
+  disabled,
+  onCancel,
+  onConfirm,
+}: {
+  zh: boolean;
+  disabled: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        flexBasis: "100%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "flex-end",
+        gap: 6,
+        padding: "6px 0 0",
+        color: "var(--fg-2)",
+      }}
+    >
+      <span style={{ marginRight: 4 }}>
+        {zh ? "确认取消收藏？" : "remove from saved?"}
+      </span>
+      <ConfirmBtn danger disabled={disabled} onClick={onConfirm}>
+        {zh ? "取消收藏" : "remove"}
+      </ConfirmBtn>
+      <ConfirmBtn disabled={disabled} onClick={onCancel}>
+        {zh ? "保留" : "keep"}
+      </ConfirmBtn>
+    </div>
+  );
+}
+
+function ConfirmBtn({
+  children,
+  disabled,
+  danger,
+  onClick,
+}: {
+  children: ReactNode;
+  disabled: boolean;
+  danger?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      style={{
+        background: danger ? "rgba(248,81,73,0.14)" : "var(--bg-2)",
+        border: `1px solid ${danger ? "rgba(248,81,73,0.35)" : "var(--border-1)"}`,
+        color: danger ? "var(--accent-red)" : "var(--fg-2)",
+        fontFamily: "var(--font-mono)",
+        fontSize: 10.5,
+        padding: "4px 7px",
+        borderRadius: 2,
+        cursor: disabled ? "not-allowed" : "pointer",
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
 function MoveBtn({
   children,
   onClick,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   onClick: () => void;
 }) {
   return (
