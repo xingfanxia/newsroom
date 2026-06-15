@@ -213,6 +213,10 @@ Shipped cleanup:
 - Shared v1 server-error logging/envelope through `v1ServerError` in
   `lib/api/v1-route.ts`; v1 route files keep their business 4xx branches but
   no longer hand-copy `console.error` plus `v1Error("server_error", 500)`.
+- Shared admin/v1 domain-result envelope mapping through `adminRouteResult`
+  and `v1RouteResult`; collection, saved, event-member, and tweak leaf routes
+  now keep only success payload shaping while the surface helpers map
+  `{ ok: false, error, status }` branches.
 - Shared admin iteration id route adapters through `runAdminIterationIdRoute`
   in `lib/api/iteration-routes.ts`; `/api/admin/iterations/[id]`, `/apply`,
   and `/reject` now keep only the action binding while the shared helper owns
@@ -256,8 +260,9 @@ Shipped cleanup:
   page importing low-level LLM stat queries directly.
 - Shared bearer-gated `/api/v1/*` auth and plain JSON/error envelopes through
   `lib/api/v1-route.ts`; v1 route files now call `runV1Route` and return
-  `v1Json` / `v1Error` / `v1InvalidQueryResult`, so token verification, query
-  validation envelopes, and response shape cannot drift between agent endpoints.
+  `v1Json` / `v1RouteResult` / `v1InvalidQueryResult`, so token verification,
+  query validation envelopes, domain-result failures, and response shape cannot
+  drift between agent endpoints.
 - Shared agent bearer auth through `lib/auth/api-token.ts` for both
   `/api/v1/*` and `/api/mcp`; v1 routes enter via `runV1Route`, while MCP
   calls `requireApiToken` directly before handing control to the Streamable

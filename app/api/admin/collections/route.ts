@@ -1,8 +1,8 @@
 import { upsertAppUser } from "@/lib/auth/session";
 import {
-  adminError,
   adminJson,
   adminOk,
+  adminRouteResult,
   adminServerError,
   runAdminRoute,
 } from "@/lib/api/admin-route";
@@ -43,8 +43,7 @@ export async function POST(req: Request) {
         userId: user.id,
         ...parsed.data,
       });
-      if (!result.ok) return adminError(result.error, result.status);
-      return adminJson(result.payload);
+      return adminRouteResult(result, adminJson);
     } catch (err) {
       return adminServerError("api/admin/collections POST", err);
     }
@@ -64,8 +63,7 @@ export async function PATCH(req: Request) {
         userId: user.id,
         ...parsed.data,
       });
-      if (!result.ok) return adminError(result.error, result.status);
-      return adminOk();
+      return adminRouteResult(result, () => adminOk());
     } catch (err) {
       return adminServerError("api/admin/collections PATCH", err);
     }
@@ -83,8 +81,7 @@ export async function DELETE(req: Request) {
 
     try {
       const result = await deleteCollectionRoutePayload(user.id, parsed.data.id);
-      if (!result.ok) return adminError(result.error, result.status);
-      return adminOk();
+      return adminRouteResult(result, () => adminOk());
     } catch (err) {
       return adminServerError("api/admin/collections DELETE", err);
     }

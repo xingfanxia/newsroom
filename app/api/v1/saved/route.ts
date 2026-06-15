@@ -24,9 +24,9 @@ import {
 } from "@/lib/api/saved-routes";
 import {
   runV1Route,
-  v1Error,
   v1InvalidQueryResult,
   v1Json,
+  v1RouteResult,
   v1ServerError,
 } from "@/lib/api/v1-route";
 
@@ -61,8 +61,7 @@ export async function POST(req: Request) {
         collectionId: b.collection_id,
         note: b.note,
       });
-      if (!result.ok) return v1Error(result.error, result.status);
-      return v1Json(result.payload);
+      return v1RouteResult(result, v1Json);
     } catch (err) {
       return v1ServerError("api/v1/saved POST", err);
     }

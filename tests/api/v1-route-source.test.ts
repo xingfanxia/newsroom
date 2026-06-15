@@ -32,6 +32,7 @@ describe("v1 route source contracts", () => {
     expect(helper).toContain("export async function runV1Route");
     expect(helper).toContain("export function v1Json");
     expect(helper).toContain("export function v1Error");
+    expect(helper).toContain("export function v1RouteResult");
     expect(helper).toContain("export function v1InvalidQuery");
     expect(helper).toContain("export function v1InvalidQueryResult");
     expect(helper).toContain("export function v1ServerError");
@@ -49,6 +50,20 @@ describe("v1 route source contracts", () => {
 
       expect(source, path).toContain("v1InvalidQueryResult(");
       expect(source, path).not.toContain("return v1InvalidQuery(");
+    }
+  });
+
+  test("v1 domain result failures map through the shared route helper", () => {
+    for (const path of [
+      "app/api/v1/collections/route.ts",
+      "app/api/v1/events/[id]/members/route.ts",
+      "app/api/v1/saved/route.ts",
+      "app/api/v1/tweaks/route.ts",
+    ] as const) {
+      const source = readSource(path);
+
+      expect(source, path).toContain("v1RouteResult(");
+      expect(source, path).not.toContain("v1Error(result.error");
     }
   });
 });

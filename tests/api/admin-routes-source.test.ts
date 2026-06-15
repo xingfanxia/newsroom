@@ -20,6 +20,7 @@ describe("protected admin route source wiring", () => {
     expect(source).toContain("adminJson");
     expect(source).toContain("adminOk");
     expect(source).toContain("adminError");
+    expect(source).toContain("adminRouteResult");
     expect(source).toContain("adminServerError");
     expect(source).not.toContain("Response.json({ ok:");
   });

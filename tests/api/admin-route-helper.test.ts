@@ -3,6 +3,7 @@ import {
   adminError,
   adminJson,
   adminOk,
+  adminRouteResult,
   adminServerError,
   runAdminRoute,
 } from "@/lib/api/admin-route";
@@ -28,6 +29,35 @@ describe("admin route helpers", () => {
 
     expect(res.status).toBe(404);
     expect(await res.json()).toEqual({
+      ok: false,
+      id: 123,
+      error: "not_found",
+    });
+  });
+
+  test("adminRouteResult maps domain results to the shared admin envelope", async () => {
+    const ok = adminRouteResult(
+      { ok: true, payload: { value: 1 } },
+      adminJson,
+    );
+    expect(ok.status).toBe(200);
+    expect(await ok.json()).toEqual({ ok: true, value: 1 });
+
+    const empty = adminRouteResult({ ok: true }, () => adminOk());
+    expect(empty.status).toBe(200);
+    expect(await empty.json()).toEqual({ ok: true });
+
+    const err = adminRouteResult(
+      {
+        ok: false,
+        error: "not_found",
+        status: 404,
+        extra: { id: 123 },
+      },
+      adminJson,
+    );
+    expect(err.status).toBe(404);
+    expect(await err.json()).toEqual({
       ok: false,
       id: 123,
       error: "not_found",

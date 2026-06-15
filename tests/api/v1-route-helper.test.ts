@@ -5,6 +5,7 @@ import {
   v1InvalidQuery,
   v1InvalidQueryResult,
   v1Json,
+  v1RouteResult,
   v1ServerError,
 } from "@/lib/api/v1-route";
 
@@ -22,6 +23,28 @@ describe("v1 route helpers", () => {
 
     expect(res.status).toBe(404);
     expect(await res.json()).toEqual({ error: "not_found" });
+  });
+
+  test("v1RouteResult maps domain results to the shared plain envelope", async () => {
+    const ok = v1RouteResult({ ok: true, payload: { value: 1 } }, v1Json);
+    expect(ok.status).toBe(200);
+    expect(await ok.json()).toEqual({ value: 1 });
+
+    const empty = v1RouteResult({ ok: true }, () => v1Json({ ok: true }));
+    expect(empty.status).toBe(200);
+    expect(await empty.json()).toEqual({ ok: true });
+
+    const err = v1RouteResult(
+      {
+        ok: false,
+        error: "not_found",
+        status: 404,
+        extra: { id: 123 },
+      },
+      v1Json,
+    );
+    expect(err.status).toBe(404);
+    expect(await err.json()).toEqual({ id: 123, error: "not_found" });
   });
 
   test("v1InvalidQuery keeps validation issues when provided", async () => {

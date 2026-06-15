@@ -37,10 +37,14 @@ describe("collection route source wiring", () => {
     for (const source of [adminRoute, v1Route]) {
       expect(source).toContain("@/lib/api/collection-routes");
       expect(source).not.toContain("@/lib/items/collections");
+      expect(source).not.toContain("result.error, result.status");
       expect(source).not.toContain("createCollection(");
       expect(source).not.toContain("listCollections(");
       expect(source).not.toContain("updateCollection(");
       expect(source).not.toContain("deleteCollection(");
     }
+
+    expect(adminRoute).toContain("adminRouteResult(");
+    expect(v1Route).toContain("v1RouteResult(");
   });
 });

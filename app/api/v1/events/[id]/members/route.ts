@@ -18,8 +18,8 @@
  */
 import {
   runV1Route,
-  v1Error,
   v1Json,
+  v1RouteResult,
   v1ServerError,
 } from "@/lib/api/v1-route";
 import {
@@ -39,11 +39,9 @@ export async function GET(
         rawId: idRaw,
         defaultLocale: "zh",
       });
-      if (!result.ok) {
-        return v1Error(result.error, result.status);
-      }
-
-      return v1Json(toEventMembersListEnvelope(result.payload));
+      return v1RouteResult(result, (payload) =>
+        v1Json(toEventMembersListEnvelope(payload)),
+      );
     } catch (err) {
       return v1ServerError("api/v1/events/:id/members", err);
     }

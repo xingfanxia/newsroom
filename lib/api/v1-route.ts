@@ -6,6 +6,15 @@ type V1RouteHandler = (user: SessionUser) => Response | Promise<Response>;
 type V1InvalidQueryResult<T> =
   | { ok: true; data: T }
   | { ok: false; response: Response };
+export type V1RouteResult<T = undefined> =
+  | { ok: true; payload: T }
+  | { ok: true; payload?: undefined }
+  | {
+      ok: false;
+      error: string;
+      status: number;
+      extra?: Record<string, unknown>;
+    };
 
 export async function runV1Route(
   req: Request,
@@ -26,6 +35,16 @@ export function v1Error(
   extra: Record<string, unknown> = {},
 ): Response {
   return Response.json({ ...extra, error }, { status });
+}
+
+export function v1RouteResult<T>(
+  result: V1RouteResult<T>,
+  onOk: (payload: T) => Response,
+): Response {
+  if (!result.ok) {
+    return v1Error(result.error, result.status, result.extra);
+  }
+  return onOk(("payload" in result ? result.payload : undefined) as T);
 }
 
 export function v1InvalidQuery(issues?: unknown): Response {

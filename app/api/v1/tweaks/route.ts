@@ -14,8 +14,8 @@ import { tweaksPatchBodySchema } from "@/lib/api/tweak-requests";
 import { parseJsonRequestBody } from "@/lib/api/json-body";
 import {
   runV1Route,
-  v1Error,
   v1Json,
+  v1RouteResult,
   v1ServerError,
 } from "@/lib/api/v1-route";
 import {
@@ -42,8 +42,7 @@ export async function PATCH(req: Request) {
 
     try {
       const result = await saveTweaksRoutePayload(user, parsed.data);
-      if (!result.ok) return v1Error(result.error, result.status);
-      return v1Json({ ok: true });
+      return v1RouteResult(result, () => v1Json({ ok: true }));
     } catch (err) {
       return v1ServerError("api/v1/tweaks PATCH", err);
     }
