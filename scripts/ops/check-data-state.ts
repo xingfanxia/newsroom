@@ -17,7 +17,8 @@ async function main() {
       count(*)::int AS total,
       count(*) FILTER (WHERE enriched_at IS NOT NULL)::int AS enriched,
       count(*) FILTER (WHERE body_md IS NOT NULL AND body_md != '')::int AS with_body_md,
-      count(*) FILTER (WHERE editor_analysis_zh IS NOT NULL AND editor_analysis_zh != '')::int AS with_commentary,
+      count(*) FILTER (WHERE editor_note_zh IS NOT NULL AND editor_note_zh != '')::int AS with_editor_note,
+      count(*) FILTER (WHERE editor_analysis_zh IS NOT NULL AND editor_analysis_zh != '')::int AS with_editor_analysis,
       count(*) FILTER (WHERE tier = 'featured' OR tier = 'p1')::int AS curated
     FROM items
   `);

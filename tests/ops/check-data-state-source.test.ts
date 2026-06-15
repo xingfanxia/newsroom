@@ -20,4 +20,12 @@ describe("check-data-state operator diagnostic", () => {
     expect(source).not.toContain("2026-04-30");
     expect(source).not.toContain("=== top 2026 sources ===");
   });
+
+  test("names commentary counters after the current tier-gated fields", () => {
+    expect(source).toContain("AS with_editor_note");
+    expect(source).toContain("AS with_editor_analysis");
+    expect(source).toContain("editor_note_zh IS NOT NULL");
+    expect(source).toContain("editor_analysis_zh IS NOT NULL");
+    expect(source).not.toContain("AS with_commentary");
+  });
 });
