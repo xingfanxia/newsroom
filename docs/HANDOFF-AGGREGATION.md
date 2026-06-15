@@ -1,5 +1,10 @@
 # AX's AI RADAR — Handoff to aggregation session (2026-04-24)
 
+> Historical archive. This file preserves the April 2026 aggregation planning
+> handoff and is not current implementation guidance. Current clustering,
+> cron, and feed behavior lives in [`docs/architecture/ingestion.md`](./architecture/ingestion.md)
+> and runtime source.
+
 > **Read this first.** Prior handoffs: [`HANDOFF.md`](./HANDOFF.md) (s8, 2026-04-19/20) + s9 shipped the AGENT-MCP plan in commits `d968a29` → `c7394bc`. This handoff covers a short polish session on 2026-04-24 and **preserves the design for the next session's goal: cross-source event aggregation**.
 
 ---
