@@ -196,20 +196,20 @@ Shipped cleanup:
   source-tool copy avoids fixed counts for the same reason.
 - Shared public API endpoint metadata through
   `lib/api/public-endpoint-config.ts`, with public route HTTP envelopes
-  centralized in `lib/api/public-helpers.ts`; public route handlers now call
-  `publicEndpointRateLimit(req, "<endpoint-key>")` and
-  `publicCachedJson(req, { endpoint, etagFamily, signal, body })`, while
+  centralized in `lib/api/public-helpers.ts`; public route handlers now enter
+  through `publicCachedRoute(req, { endpoint, etagFamily, label, load })`, while
   `/skill.md`, `/openapi.yaml`, `/agents`, and
   `docs/agent-access/README.md` render or verify the same endpoint count,
   limit labels, and cache policy instead of repeating budgets or 304 wiring.
-- Shared public 5xx logging/envelopes through `publicServerError` in
-  `lib/api/public-helpers.ts`; anonymous public route files keep explicit 4xx
-  branches local but no longer hand-copy `console.error` plus
-  `publicError("server_error", 500)`.
+- Shared public 4xx/5xx envelope mapping through `publicCachedRoute` in
+  `lib/api/public-helpers.ts`; anonymous public route files keep domain
+  validation/404 decisions local as `{ ok: false, error, status }` results but
+  no longer hand-copy rate limits, cache/ETag responses, `publicError`, or
+  `console.error` plus `server_error` catch blocks.
 - Shared REST query-param extraction and validation plumbing through
   `lib/api/query-params.ts`; public and v1 query routes now reuse one
   Request/URLSearchParams parser while keeping their separate
-  `publicInvalidQuery` and `v1InvalidQuery` envelopes.
+  `publicInvalidQueryResult` and `v1InvalidQuery` envelopes.
 - Shared v1 server-error logging/envelope through `v1ServerError` in
   `lib/api/v1-route.ts`; v1 route files keep their business 4xx branches but
   no longer hand-copy `console.error` plus `v1Error("server_error", 500)`.

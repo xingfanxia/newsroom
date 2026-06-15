@@ -2,10 +2,10 @@
  * Shared helpers for /api/public/* — anonymous, ETag-aware, CORS-open
  * read-only JSON surfaces.
  *
- * Three things every public route should call:
- *   1. publicEndpointRateLimit(req, "<endpoint-key>") — IP token bucket
- *   2. publicCachedJson(req, { endpoint, etagFamily, signal, body }) for 200/304
- *   3. publicError(...) / publicServerError(...) for error envelopes
+ * Public route files should enter through `publicCachedRoute(...)` so the
+ * anonymous HTTP surface keeps one rate-limit, ETag/cache, and error envelope.
+ * Lower-level helpers remain exported for focused tests and the rare route
+ * that needs to assemble the envelope manually.
  *
  * Public-safe field stripping lives next to each route handler (since each
  * route's domain model is different) — but the helpers here pin CORS, cache,
@@ -27,6 +27,17 @@ type PublicCachedJsonArgs = {
   etagFamily: string;
   signal: string;
   body: unknown;
+};
+
+export type PublicCachedRouteResult =
+  | { ok: true; signal: string; body: unknown }
+  | { ok: false; error: string; status: number };
+
+type PublicCachedRouteArgs = {
+  endpoint: PublicEndpointKey;
+  etagFamily: string;
+  label: string;
+  load: () => PublicCachedRouteResult | Promise<PublicCachedRouteResult>;
 };
 
 /** Generate `W/"<family>-<sha1[:16]>"` — weak so reverse proxies can vary. */
@@ -84,7 +95,7 @@ export function publicJson(
   });
 }
 
-export function publicEndpointRateLimit(
+function publicEndpointRateLimit(
   req: Request,
   endpoint: PublicEndpointKey,
 ): Response | null {
@@ -99,6 +110,27 @@ export function publicCachedJson(
   const cache = publicCacheConfig(endpoint);
   if (ifNoneMatch(req, etag)) return notModified(etag, cache);
   return publicJson(body, etag, cache);
+}
+
+export async function publicCachedRoute(
+  req: Request,
+  { endpoint, etagFamily, label, load }: PublicCachedRouteArgs,
+): Promise<Response> {
+  const limited = publicEndpointRateLimit(req, endpoint);
+  if (limited) return limited;
+
+  try {
+    const result = await load();
+    if (!result.ok) return publicError(result.error, result.status);
+    return publicCachedJson(req, {
+      endpoint,
+      etagFamily,
+      signal: result.signal,
+      body: result.body,
+    });
+  } catch (err) {
+    return publicServerError(label, err);
+  }
 }
 
 /** 4xx error — CORS-open so the browser can read the body. */
@@ -122,6 +154,12 @@ export function publicServerError(label: string, err: unknown): Response {
 
 export function publicInvalidQuery(issues: readonly unknown[]): Response {
   return publicError(invalidQueryError(issues), 400);
+}
+
+export function publicInvalidQueryResult(
+  issues: readonly unknown[],
+): PublicCachedRouteResult {
+  return { ok: false, error: invalidQueryError(issues), status: 400 };
 }
 
 /**

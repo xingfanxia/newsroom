@@ -8,10 +8,7 @@
  *   - body_md kept (transcript / article text); body_rss (raw HTML) dropped
  */
 import {
-  publicCachedJson,
-  publicEndpointRateLimit,
-  publicError,
-  publicServerError,
+  publicCachedRoute,
 } from "@/lib/api/public-helpers";
 import {
   getItemDetailRouteRow,
@@ -26,22 +23,20 @@ export async function GET(
   req: Request,
   ctx: { params: Promise<{ id: string }> },
 ) {
-  const limited = publicEndpointRateLimit(req, "item");
-  if (limited) return limited;
+  return publicCachedRoute(req, {
+    endpoint: "item",
+    etagFamily: "public-item",
+    label: "api/public/items/:id",
+    load: async () => {
+      const { id: idRaw } = await ctx.params;
+      const found = await getItemDetailRouteRow(idRaw);
+      if (!found.ok) return found;
 
-  const { id: idRaw } = await ctx.params;
-
-  try {
-    const found = await getItemDetailRouteRow(idRaw);
-    if (!found.ok) return publicError(found.error, found.status);
-
-    return publicCachedJson(req, {
-      endpoint: "item",
-      etagFamily: "public-item",
-      signal: publicItemDetailEtagSignal(found.row),
-      body: toPublicItemDetail(found.row),
-    });
-  } catch (err) {
-    return publicServerError("api/public/items/:id", err);
-  }
+      return {
+        ok: true,
+        signal: publicItemDetailEtagSignal(found.row),
+        body: toPublicItemDetail(found.row),
+      };
+    },
+  });
 }

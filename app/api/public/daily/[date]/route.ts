@@ -5,10 +5,7 @@
  * the requested UTC date. 404 if no column for that date.
  */
 import {
-  publicCachedJson,
-  publicEndpointRateLimit,
-  publicError,
-  publicServerError,
+  publicCachedRoute,
 } from "@/lib/api/public-helpers";
 import { getPublicDailyColumnByDateRequestPayload } from "@/lib/api/daily-columns";
 
@@ -19,25 +16,22 @@ export async function GET(
   req: Request,
   ctx: { params: Promise<{ date: string }> },
 ) {
-  const limited = publicEndpointRateLimit(req, "dailyByDate");
-  if (limited) return limited;
+  return publicCachedRoute(req, {
+    endpoint: "dailyByDate",
+    etagFamily: "public-daily-date",
+    label: "api/public/daily/:date",
+    load: async () => {
+      const { date: rawDate } = await ctx.params;
+      const result = await getPublicDailyColumnByDateRequestPayload(req, {
+        rawDate,
+      });
+      if (!result.ok) return result;
 
-  const { date: rawDate } = await ctx.params;
-
-  try {
-    const result = await getPublicDailyColumnByDateRequestPayload(req, {
-      rawDate,
-    });
-    if (!result.ok) return publicError(result.error, result.status);
-
-    // Historical dailies are immutable — aggressive cache.
-    return publicCachedJson(req, {
-      endpoint: "dailyByDate",
-      etagFamily: "public-daily-date",
-      signal: result.payload.etagSignal,
-      body: result.payload.body,
-    });
-  } catch (err) {
-    return publicServerError("api/public/daily/:date", err);
-  }
+      return {
+        ok: true,
+        signal: result.payload.etagSignal,
+        body: result.payload.body,
+      };
+    },
+  });
 }

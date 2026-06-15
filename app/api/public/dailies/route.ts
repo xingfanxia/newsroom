@@ -8,10 +8,7 @@
  * take: 1..180, default 30. Strict 400 on out-of-range.
  */
 import {
-  publicCachedJson,
-  publicEndpointRateLimit,
-  publicError,
-  publicServerError,
+  publicCachedRoute,
 } from "@/lib/api/public-helpers";
 import { getPublicDailyColumnIndexRequestPayload } from "@/lib/api/daily-columns";
 
@@ -19,20 +16,19 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
-  const limited = publicEndpointRateLimit(req, "dailies");
-  if (limited) return limited;
+  return publicCachedRoute(req, {
+    endpoint: "dailies",
+    etagFamily: "public-dailies",
+    label: "api/public/dailies",
+    load: async () => {
+      const result = await getPublicDailyColumnIndexRequestPayload(req);
+      if (!result.ok) return result;
 
-  try {
-    const result = await getPublicDailyColumnIndexRequestPayload(req);
-    if (!result.ok) return publicError(result.error, result.status);
-
-    return publicCachedJson(req, {
-      endpoint: "dailies",
-      etagFamily: "public-dailies",
-      signal: result.payload.etagSignal,
-      body: result.payload.body,
-    });
-  } catch (err) {
-    return publicServerError("api/public/dailies", err);
-  }
+      return {
+        ok: true,
+        signal: result.payload.etagSignal,
+        body: result.payload.body,
+      };
+    },
+  });
 }

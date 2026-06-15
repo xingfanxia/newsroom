@@ -14,10 +14,7 @@ import {
 } from "@/lib/api/event-members";
 import {
   etagSignal,
-  publicCachedJson,
-  publicEndpointRateLimit,
-  publicError,
-  publicServerError,
+  publicCachedRoute,
 } from "@/lib/api/public-helpers";
 
 export const dynamic = "force-dynamic";
@@ -27,26 +24,24 @@ export async function GET(
   req: Request,
   ctx: { params: Promise<{ id: string }> },
 ) {
-  const limited = publicEndpointRateLimit(req, "eventMembers");
-  if (limited) return limited;
+  return publicCachedRoute(req, {
+    endpoint: "eventMembers",
+    etagFamily: "public-event",
+    label: "api/public/events/:id/members",
+    load: async () => {
+      const { id: idRaw } = await ctx.params;
+      const result = await getEventMembersRequestPayload(req, {
+        rawId: idRaw,
+        defaultLocale: "en",
+      });
+      if (!result.ok) return result;
 
-  const { id: idRaw } = await ctx.params;
-
-  try {
-    const result = await getEventMembersRequestPayload(req, {
-      rawId: idRaw,
-      defaultLocale: "en",
-    });
-    if (!result.ok) return publicError(result.error, result.status);
-
-    const body = result.payload;
-    return publicCachedJson(req, {
-      endpoint: "eventMembers",
-      etagFamily: "public-event",
-      signal: etagSignal(eventMembersCacheSignalParts(body)),
-      body,
-    });
-  } catch (err) {
-    return publicServerError("api/public/events/:id/members", err);
-  }
+      const body = result.payload;
+      return {
+        ok: true,
+        signal: etagSignal(eventMembersCacheSignalParts(body)),
+        body,
+      };
+    },
+  });
 }

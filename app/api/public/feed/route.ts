@@ -15,10 +15,8 @@
  */
 import {
   etagSignal,
-  publicCachedJson,
-  publicEndpointRateLimit,
-  publicInvalidQuery,
-  publicServerError,
+  publicCachedRoute,
+  publicInvalidQueryResult,
 } from "@/lib/api/public-helpers";
 import {
   runFeedQuery,
@@ -33,30 +31,28 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
-  const limited = publicEndpointRateLimit(req, "feed");
-  if (limited) return limited;
+  return publicCachedRoute(req, {
+    endpoint: "feed",
+    etagFamily: "public-feed",
+    label: "api/public/feed",
+    load: async () => {
+      const parsed = parsePublicFeedQueryRequest(req);
+      if (!parsed.ok) return publicInvalidQueryResult(parsed.issues);
+      const q = parsed.data;
+      const feedQuery = feedQueryFromParams(q);
+      const result = await runFeedQuery(feedQuery);
 
-  const parsed = parsePublicFeedQueryRequest(req);
-  if (!parsed.ok) return publicInvalidQuery(parsed.issues);
-  const q = parsed.data;
-  const feedQuery = feedQueryFromParams(q);
-
-  try {
-    const result = await runFeedQuery(feedQuery);
-
-    return publicCachedJson(req, {
-      endpoint: "feed",
-      etagFamily: "public-feed",
-      signal: etagSignal({
-        count: result.items.length,
-        total: result.total,
-        first_id: result.items[0]?.id ?? "",
-        latest_at: result.items[0]?.publishedAt ?? "",
-        qs: parsed.search,
-      }),
-      body: toPublicFeedPayload(result, q.locale),
-    });
-  } catch (err) {
-    return publicServerError("api/public/feed", err);
-  }
+      return {
+        ok: true,
+        signal: etagSignal({
+          count: result.items.length,
+          total: result.total,
+          first_id: result.items[0]?.id ?? "",
+          latest_at: result.items[0]?.publishedAt ?? "",
+          qs: parsed.search,
+        }),
+        body: toPublicFeedPayload(result, q.locale),
+      };
+    },
+  });
 }

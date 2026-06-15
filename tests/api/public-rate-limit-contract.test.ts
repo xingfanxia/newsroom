@@ -101,8 +101,10 @@ describe("public API endpoint contract", () => {
     for (const [key, path] of routeContracts) {
       const source = readProjectFile(path);
       expect(source).toContain("@/lib/api/public-helpers");
-      expect(source).toContain(`publicEndpointRateLimit(req, "${key}")`);
-      expect(source).toContain("publicCachedJson(req,");
+      expect(source).toContain("publicCachedRoute(req, {");
+      expect(source).toContain(`endpoint: "${key}"`);
+      expect(source).not.toContain("publicEndpointRateLimit(");
+      expect(source).not.toContain("publicCachedJson(req,");
       expect(source).not.toContain("publicRateLimitConfig");
       expect(source).not.toContain("publicCacheConfig");
       expect(source).not.toContain("publicRateLimit(req");
@@ -156,8 +158,7 @@ describe("public API endpoint contract", () => {
     const configSource = readProjectFile("lib/api/public-endpoint-config.ts");
 
     expect(doc).toContain("lib/api/public-endpoint-config.ts");
-    expect(doc).toContain('publicEndpointRateLimit(req, "<endpoint-key>")');
-    expect(doc).toContain('publicCachedJson(req, { endpoint: "<endpoint-key>"');
+    expect(doc).toContain('publicCachedRoute(req, { endpoint: "<endpoint-key>"');
     expect(doc).toContain("Cache headers are centralized");
     expect(configSource).toContain("PUBLIC_RATE_LIMIT_DOC_GROUPS");
 
@@ -172,5 +173,7 @@ describe("public API endpoint contract", () => {
     expect(doc).not.toContain(
       'publicRateLimit(req, publicRateLimitConfig("<endpoint-key>"))',
     );
+    expect(doc).not.toContain('publicEndpointRateLimit(req, "<endpoint-key>")');
+    expect(doc).not.toContain('publicCachedJson(req, { endpoint: "<endpoint-key>"');
   });
 });

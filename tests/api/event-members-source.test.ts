@@ -63,8 +63,10 @@ describe("event member route source wiring", () => {
   test("public route keeps only public cache/rate-limit behavior locally", () => {
     const source = read("app/api/public/events/[id]/members/route.ts");
 
-    expect(source).toContain("publicEndpointRateLimit");
-    expect(source).toContain("publicCachedJson");
+    expect(source).toContain("publicCachedRoute");
+    expect(source).toContain('endpoint: "eventMembers"');
+    expect(source).not.toContain("publicEndpointRateLimit(");
+    expect(source).not.toContain("publicCachedJson(req,");
     expect(source).toContain("eventMembersCacheSignalParts");
     expect(source).toContain("etagSignal(eventMembersCacheSignalParts(body))");
     expect(source).not.toContain("body.members[body.members.length");

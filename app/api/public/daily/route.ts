@@ -9,10 +9,7 @@
  * locale=zh default. The daily-column worker currently writes zh rows.
  */
 import {
-  publicCachedJson,
-  publicEndpointRateLimit,
-  publicError,
-  publicServerError,
+  publicCachedRoute,
 } from "@/lib/api/public-helpers";
 import { getLatestPublicDailyColumnRequestPayload } from "@/lib/api/daily-columns";
 
@@ -20,21 +17,19 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
-  const limited = publicEndpointRateLimit(req, "daily");
-  if (limited) return limited;
+  return publicCachedRoute(req, {
+    endpoint: "daily",
+    etagFamily: "public-daily",
+    label: "api/public/daily",
+    load: async () => {
+      const result = await getLatestPublicDailyColumnRequestPayload(req);
+      if (!result.ok) return result;
 
-  try {
-    const result = await getLatestPublicDailyColumnRequestPayload(req);
-    if (!result.ok) return publicError(result.error, result.status);
-
-    // Daily column lands once per day; long stale-while-revalidate.
-    return publicCachedJson(req, {
-      endpoint: "daily",
-      etagFamily: "public-daily",
-      signal: result.payload.etagSignal,
-      body: result.payload.body,
-    });
-  } catch (err) {
-    return publicServerError("api/public/daily", err);
-  }
+      return {
+        ok: true,
+        signal: result.payload.etagSignal,
+        body: result.payload.body,
+      };
+    },
+  });
 }

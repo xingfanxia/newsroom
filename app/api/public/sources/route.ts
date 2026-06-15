@@ -7,9 +7,7 @@
  */
 import {
   etagSignal,
-  publicCachedJson,
-  publicEndpointRateLimit,
-  publicServerError,
+  publicCachedRoute,
 } from "@/lib/api/public-helpers";
 import {
   listSourceCatalogRows,
@@ -21,30 +19,26 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
-  const limited = publicEndpointRateLimit(req, "sources");
-  if (limited) return limited;
-
-  try {
-    const rows = await listSourceCatalogRows("priority");
-    const body = {
-      sources: rows.map(toPublicSourceApiItem),
-      total: rows.length,
-    };
-
-    // Catalog rarely changes — long stale-while-revalidate.
-    return publicCachedJson(req, {
-      endpoint: "sources",
-      etagFamily: "public-sources",
-      signal: etagSignal({
-        count: rows.length,
-        latest_success: rows
-          .map((r) => toIsoStringOrNull(r.lastSuccessAt) ?? "")
-          .sort()
-          .pop() ?? "",
-      }),
-      body,
-    });
-  } catch (err) {
-    return publicServerError("api/public/sources", err);
-  }
+  return publicCachedRoute(req, {
+    endpoint: "sources",
+    etagFamily: "public-sources",
+    label: "api/public/sources",
+    load: async () => {
+      const rows = await listSourceCatalogRows("priority");
+      return {
+        ok: true,
+        signal: etagSignal({
+          count: rows.length,
+          latest_success: rows
+            .map((r) => toIsoStringOrNull(r.lastSuccessAt) ?? "")
+            .sort()
+            .pop() ?? "",
+        }),
+        body: {
+          sources: rows.map(toPublicSourceApiItem),
+          total: rows.length,
+        },
+      };
+    },
+  });
 }
