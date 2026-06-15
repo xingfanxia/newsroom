@@ -48,4 +48,23 @@ describe("protected admin route source wiring", () => {
       expect(source).not.toContain('adminError("server_error"');
     }
   });
+
+  test("policy commit route delegates request schema and commit mapping", () => {
+    const route = read("app/api/admin/policy/commit/route.ts");
+    const helper = read("lib/api/policy-commit.ts");
+
+    expect(route).toContain("@/lib/api/policy-commit");
+    expect(route).toContain("policyCommitBodySchema");
+    expect(route).toContain("commitPolicyRoutePayload");
+    expect(route).not.toContain('from "zod"');
+    expect(route).not.toContain("const bodySchema = z.object");
+    expect(route).not.toContain("@/lib/policy/skill");
+    expect(route).not.toContain("commitSkillVersion");
+    expect(route).not.toContain("feedbackSample");
+    expect(route).not.toContain("feedbackCount");
+
+    expect(helper).toContain("policyCommitBodySchema");
+    expect(helper).toContain("commitSkillVersion");
+    expect(helper).toContain("committedBy: user.email");
+  });
 });

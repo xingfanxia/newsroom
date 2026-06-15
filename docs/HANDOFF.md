@@ -61,6 +61,10 @@ Shipped cleanup:
   `lib/api/admin-session-routes.ts`, so next-target sanitization, invalid
   password envelopes, ok envelopes, and Set-Cookie attachment stay out of
   route leaf files while still using the common ok-response helpers.
+- Shared admin policy commit request validation and `commitSkillVersion`
+  mapping through `lib/api/policy-commit.ts`, so
+  `/api/admin/policy/commit` keeps only admin auth, JSON parsing, and response
+  mapping.
 - Shared admin/v1 saved-collection CRUD result mapping through
   `lib/api/collection-routes.ts`, so both surfaces reuse the same
   `duplicate_name` and `not_found` decisions while keeping their own auth,
