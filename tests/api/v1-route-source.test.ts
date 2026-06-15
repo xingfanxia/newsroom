@@ -1,28 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { readdirSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
-
-const root = process.cwd();
-
-function read(path: string): string {
-  return readFileSync(resolve(root, path), "utf8");
-}
-
-function routeFilesUnder(dir: string): string[] {
-  const abs = resolve(root, dir);
-  return readdirSync(abs, { withFileTypes: true }).flatMap((entry) => {
-    const child = join(dir, entry.name);
-    if (entry.isDirectory()) return routeFilesUnder(child);
-    return entry.name === "route.ts" ? [child] : [];
-  });
-}
+import { readSource, routeFilesUnder } from "@/tests/helpers/source";
 
 const v1RouteFiles = routeFilesUnder("app/api/v1").sort();
 
 describe("v1 route source contracts", () => {
   test("bearer auth and JSON envelopes are centralized for every v1 handler", () => {
     for (const path of v1RouteFiles) {
-      const source = read(path);
+      const source = readSource(path);
       const handlerCount =
         source.match(/export async function (GET|POST|PATCH|DELETE)\(/g)
           ?.length ?? 0;
@@ -40,7 +24,7 @@ describe("v1 route source contracts", () => {
   });
 
   test("the shared helper owns the bearer auth bridge and plain error envelopes", () => {
-    const helper = read("lib/api/v1-route.ts");
+    const helper = readSource("lib/api/v1-route.ts");
 
     expect(helper).toContain(
       'import { requireApiToken } from "@/lib/auth/api-token"',

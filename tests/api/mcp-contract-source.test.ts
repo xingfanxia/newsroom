@@ -1,17 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { readSource, sectionBetween } from "@/tests/helpers/source";
 
-const root = process.cwd();
-const mcpRoute = readFileSync(resolve(root, "app/api/mcp/route.ts"), "utf8");
-
-function sectionBetween(source: string, start: string, end: string): string {
-  const startIndex = source.indexOf(start);
-  const endIndex = source.indexOf(end, startIndex + start.length);
-  expect(startIndex).toBeGreaterThanOrEqual(0);
-  expect(endIndex).toBeGreaterThan(startIndex);
-  return source.slice(startIndex, endIndex);
-}
+const mcpRoute = readSource("app/api/mcp/route.ts");
 
 const feedTool = sectionBetween(
   mcpRoute,

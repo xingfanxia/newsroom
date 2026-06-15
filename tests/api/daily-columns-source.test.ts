@@ -1,20 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-
-const root = process.cwd();
-
-function read(path: string): string {
-  return readFileSync(resolve(root, path), "utf8");
-}
-
-function sectionBetween(source: string, start: string, end: string): string {
-  const startIndex = source.indexOf(start);
-  const endIndex = source.indexOf(end, startIndex + start.length);
-  expect(startIndex).toBeGreaterThanOrEqual(0);
-  expect(endIndex).toBeGreaterThan(startIndex);
-  return source.slice(startIndex, endIndex);
-}
+import { readSource, sectionBetween } from "@/tests/helpers/source";
 
 const routePaths = [
   "app/api/public/daily/route.ts",
@@ -25,9 +10,9 @@ const dailyUiPaths = [
   "app/[locale]/daily/page.tsx",
   "app/[locale]/daily/[date]/page.tsx",
 ] as const;
-const legacyRssFeeds = read("lib/rss/legacy-feeds.ts");
+const legacyRssFeeds = readSource("lib/rss/legacy-feeds.ts");
 
-const mcpRoute = read("app/api/mcp/route.ts");
+const mcpRoute = readSource("app/api/mcp/route.ts");
 const mcpDailyResources = sectionBetween(
   mcpRoute,
   "// ── Daily column resources",
@@ -37,7 +22,7 @@ const mcpDailyResources = sectionBetween(
 describe("daily-column API source wiring", () => {
   test("public daily routes delegate query parsing and serialization", () => {
     for (const path of routePaths) {
-      const source = read(path);
+      const source = readSource(path);
 
       expect(source).toContain("@/lib/api/daily-columns");
       expect(source).not.toContain(".select({");
@@ -53,42 +38,42 @@ describe("daily-column API source wiring", () => {
       expect(source).not.toContain("queryParamsRecord(req)");
       expect(source).not.toContain('searchParams.get("locale")');
     }
-    expect(read("app/api/public/daily/route.ts")).toContain(
+    expect(readSource("app/api/public/daily/route.ts")).toContain(
       "getLatestPublicDailyColumnRequestPayload",
     );
-    expect(read("app/api/public/daily/[date]/route.ts")).toContain(
+    expect(readSource("app/api/public/daily/[date]/route.ts")).toContain(
       "getPublicDailyColumnByDateRequestPayload",
     );
-    expect(read("app/api/public/dailies/route.ts")).toContain(
+    expect(readSource("app/api/public/dailies/route.ts")).toContain(
       "getPublicDailyColumnIndexRequestPayload",
     );
   });
 
   test("site daily pages and RSS helpers reuse the same daily-column query helpers", () => {
     for (const path of dailyUiPaths) {
-      const source = read(path);
+      const source = readSource(path);
 
       expect(source).toContain("@/lib/api/daily-columns");
       expect(source).not.toContain(".select({");
       expect(source).not.toContain("from(newsletters)");
       expect(source).not.toContain("newsletters.columnTitle");
     }
-    expect(read("app/[locale]/daily/page.tsx")).toContain(
+    expect(readSource("app/[locale]/daily/page.tsx")).toContain(
       "listDailyColumnRows",
     );
-    expect(read("app/[locale]/daily/page.tsx")).toContain(
+    expect(readSource("app/[locale]/daily/page.tsx")).toContain(
       "@/lib/time/relative",
     );
-    expect(read("app/[locale]/daily/page.tsx")).not.toContain(
+    expect(readSource("app/[locale]/daily/page.tsx")).not.toContain(
       "function relativeAgo",
     );
-    expect(read("app/[locale]/daily/[date]/page.tsx")).toContain(
+    expect(readSource("app/[locale]/daily/[date]/page.tsx")).toContain(
       "getDailyColumnRowByDate",
     );
     expect(legacyRssFeeds).toContain("@/lib/api/daily-columns");
     expect(legacyRssFeeds).toContain("listDailyColumnRows");
     expect(legacyRssFeeds).not.toContain("from(newsletters)");
-    expect(read("app/api/rss/[slug]/route.ts")).toContain(
+    expect(readSource("app/api/rss/[slug]/route.ts")).toContain(
       "@/lib/rss/legacy-feeds",
     );
   });
