@@ -254,6 +254,10 @@ Shipped cleanup:
   `lib/api/v1-route.ts`; v1 route files now call `runV1Route` and return
   `v1Json` / `v1Error` / `v1InvalidQuery`, so token verification and response
   shape cannot drift between agent endpoints.
+- Shared agent bearer auth through `lib/auth/api-token.ts` for both
+  `/api/v1/*` and `/api/mcp`; v1 routes enter via `runV1Route`, while MCP
+  calls `requireApiToken` directly before handing control to the Streamable
+  HTTP transport.
 - Shared hourly/daily/weekly fetch+normalize sequencing through `workers/fetcher/pipeline.ts`, with HTTP route wiring in `app/api/cron/_fetch-bucket-route.ts` and local cron scripts using the same helper.
 - Shared cron HTTP auth/timestamp/JSON envelopes through
   `app/api/cron/_route.ts`, so cron leaf route files only declare static Next
@@ -568,8 +572,8 @@ Full design in [`docs/AGENT-MCP-PLAN.md`](./AGENT-MCP-PLAN.md). Phases:
    `/api/v1/watchlist`.
 3. Semantic search: extend `/api/v1/search?mode=semantic` using
    existing pgvector HNSW on `items.embedding`.
-4. MCP server at `/api/mcp/sse` via `@modelcontextprotocol/sdk` —
-   thin wrapper, ~300 LOC.
+4. MCP server at `/api/mcp` via `@modelcontextprotocol/sdk` Streamable HTTP —
+   thin wrapper around shared agent helpers.
 5. Claude Code skill at `~/.claude/skills/ax-radar/SKILL.md` with
    domain glossary (tier/HKR/importance semantics).
 
@@ -607,9 +611,10 @@ browser-verified. Open DevTools responsive mode + walk through `/`,
 
 - `db/schema.ts` — add `api_tokens` table (id, user_id, token_hash,
   label, last_used_at, created_at, revoked_at)
-- `lib/auth/api-token.ts` — new middleware, `verifyApiToken(req)`
+- `lib/auth/api-token.ts` — shared bearer-token verifier for `/api/v1/*`
+  and `/api/mcp`; use `requireApiToken(req)`
 - `app/api/v1/` — new route namespace
-- `app/api/mcp/sse/route.ts` — MCP SSE endpoint
+- `app/api/mcp/route.ts` — MCP Streamable HTTP endpoint
 - `lib/items/live.ts` — add `sourceId` to `FeedQuery`, drop the
   client-side publisher-string workaround on podcasts + x-monitor
 - `scripts/ops/mint-api-token.ts` — CLI to issue tokens

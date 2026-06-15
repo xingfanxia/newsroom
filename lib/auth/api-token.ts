@@ -1,5 +1,6 @@
 /**
- * Bearer-token auth for /api/v1/* endpoints.
+ * Bearer-token auth for bearer-gated agent endpoints (`/api/v1/*` and
+ * `/api/mcp`).
  *
  * Tokens are 32 random bytes (256 bits of entropy, base64url-encoded at mint
  * time). We never persist the plaintext — only sha256(token) is stored in
