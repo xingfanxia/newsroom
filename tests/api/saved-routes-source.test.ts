@@ -24,6 +24,18 @@ describe("saved route mutation helper source wiring", () => {
     expect(v1SavedRoute).not.toContain("toSavedAgentApiItem");
   });
 
+  test("shared helper owns saved move semantics for the browser move route", () => {
+    const moveRoute = read("app/api/feedback/move/route.ts");
+
+    expect(savedRoutes).toContain("moveSavedItemRoutePayload");
+    expect(savedRoutes).toContain("upsertAppUser");
+    expect(savedRoutes).toContain("moveItemToCollection");
+    expect(moveRoute).toContain("moveSavedItemRoutePayload");
+    expect(moveRoute).not.toContain("upsertAppUser");
+    expect(moveRoute).not.toContain("moveItemToCollection");
+    expect(moveRoute).not.toContain("@/lib/items/collections");
+  });
+
   test("shared helper owns save toggle, item-not-found, and collection assignment semantics", () => {
     expect(savedRoutes).toContain("applyFeedbackToggle");
     expect(savedRoutes).toContain("FEEDBACK_SAVE_VOTE");

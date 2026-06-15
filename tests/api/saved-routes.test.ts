@@ -3,6 +3,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { closeDb, db, schema } from "@/db/client";
 import {
   listSavedItemsRoutePayload,
+  moveSavedItemRoutePayload,
   saveItemRoutePayload,
 } from "@/lib/api/saved-routes";
 import type { SessionUser } from "@/lib/auth/session";
@@ -117,7 +118,13 @@ describeOrSkip("saveItemRoutePayload (real DB)", () => {
   });
 
   it("saves into an owned collection, reports the assignment, and unsaves", async () => {
-    if (itemId === null || ownerCollectionId === null) return;
+    if (
+      itemId === null ||
+      ownerCollectionId === null ||
+      otherCollectionId === null
+    ) {
+      return;
+    }
 
     const saved = await saveItemRoutePayload(ownerUser, {
       itemId,
@@ -151,6 +158,42 @@ describeOrSkip("saveItemRoutePayload (real DB)", () => {
           item.collection_id === ownerCollectionId,
       ),
     ).toBe(true);
+
+    const foreignMove = await moveSavedItemRoutePayload(ownerUser, {
+      itemId,
+      targetCollectionId: otherCollectionId,
+    });
+    expect(foreignMove).toEqual({
+      ok: false,
+      error: "not_found",
+      status: 404,
+    });
+    expect(await currentOwnerSave()).toEqual({
+      collectionId: ownerCollectionId,
+      note: "route helper note",
+    });
+
+    await expect(
+      moveSavedItemRoutePayload(ownerUser, {
+        itemId,
+        targetCollectionId: null,
+      }),
+    ).resolves.toEqual({ ok: true });
+    expect(await currentOwnerSave()).toEqual({
+      collectionId: null,
+      note: "route helper note",
+    });
+
+    await expect(
+      moveSavedItemRoutePayload(ownerUser, {
+        itemId,
+        targetCollectionId: ownerCollectionId,
+      }),
+    ).resolves.toEqual({ ok: true });
+    expect(await currentOwnerSave()).toEqual({
+      collectionId: ownerCollectionId,
+      note: "route helper note",
+    });
 
     const repeated = await saveItemRoutePayload(ownerUser, {
       itemId,

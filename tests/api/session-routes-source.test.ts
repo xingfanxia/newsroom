@@ -63,8 +63,13 @@ describe("required session route source wiring", () => {
 
     expect(source).toContain("@/lib/api/saved-requests");
     expect(source).toContain("feedbackMoveBodySchema");
+    expect(source).toContain("@/lib/api/saved-routes");
+    expect(source).toContain("moveSavedItemRoutePayload");
     expect(source).not.toContain('from "zod"');
     expect(source).not.toContain("const bodySchema = z.object");
+    expect(source).not.toContain("@/lib/items/collections");
+    expect(source).not.toContain("moveItemToCollection");
+    expect(source).not.toContain("upsertAppUser");
   });
 
   test("optional saved export keeps its fallback-user semantics explicit", () => {

@@ -6,11 +6,12 @@ import { applyFeedbackToggle } from "@/lib/feedback/toggle";
 import {
   assignSavedItemCollection,
   getSavedItemCollectionId,
+  moveItemToCollection,
   userOwnsSavedCollection,
 } from "@/lib/items/collections";
 import { getSavedStories } from "@/lib/items/saved";
 import { FEEDBACK_SAVE_VOTE, type AppLocale } from "@/lib/types";
-import type { SessionUser } from "@/lib/auth/session";
+import { upsertAppUser, type SessionUser } from "@/lib/auth/session";
 
 type ListSavedItemsRouteQuery = {
   locale: AppLocale;
@@ -30,6 +31,11 @@ type SaveItemRouteBody = {
   note?: string;
 };
 
+type MoveSavedItemRouteBody = {
+  itemId: number;
+  targetCollectionId: number | null;
+};
+
 type SaveItemRoutePayload = {
   item_id: number;
   saved: boolean;
@@ -43,6 +49,10 @@ type SaveItemRouteResult =
       error: "collection_not_found" | "save_not_found" | "item_not_found";
       status: 404;
     };
+
+type MoveSavedItemRouteResult =
+  | { ok: true }
+  | { ok: false; error: "not_found"; status: 404 };
 
 export async function listSavedItemsRoutePayload(
   user: Pick<SessionUser, "id">,
@@ -109,6 +119,23 @@ export async function saveItemRoutePayload(
       collection_id: collectionId,
     },
   };
+}
+
+export async function moveSavedItemRoutePayload(
+  user: SessionUser,
+  body: MoveSavedItemRouteBody,
+): Promise<MoveSavedItemRouteResult> {
+  await upsertAppUser(user);
+
+  const ok = await moveItemToCollection({
+    userId: user.id,
+    itemId: body.itemId,
+    targetCollectionId: body.targetCollectionId,
+  });
+
+  return ok
+    ? { ok: true }
+    : { ok: false, error: "not_found", status: 404 };
 }
 
 function isMissingItemForeignKeyError(err: unknown): boolean {

@@ -82,8 +82,9 @@ Shipped cleanup:
   route-local Zod/query-parser wiring.
 - Shared saved-item route payload semantics through `lib/api/saved-routes.ts`;
   `/api/v1/saved` now delegates saved lookup and agent serialization through
-  `listSavedItemsRoutePayload`, while `/api/v1/saved` and MCP
-  `ax_radar_save` reuse the same save toggle, owner-aware collection
+  `listSavedItemsRoutePayload`, `/api/feedback/move` delegates browser saved
+  reparenting through `moveSavedItemRoutePayload`, and `/api/v1/saved` plus
+  MCP `ax_radar_save` reuse the same save toggle, owner-aware collection
   assignment, assigned-collection response payload, and missing-item
   FK-to-`item_not_found` mapping.
 - Shared browser saved-export parsing/rendering through

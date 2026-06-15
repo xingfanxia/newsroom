@@ -56,7 +56,9 @@ Written at the end of s7 (2026-04-19). User flagged "a lot of issues needs to be
 
 ## E — operational hygiene
 
-- [ ] **Enrich pipeline on backfilled items** — 6216 items total, 5146 enriched (83%). That means 1070 items are still unenriched. Cron should pick them up; verify the enrich drain rate (scoring ~280/hr per handoff estimate).
+- [x] **Enrich pipeline on backfilled items** — verified on 2026-06-15 via
+  read-only DB queue checks: `raw_items` pending normalize = 0,
+  `items.enriched_at IS NULL` = 0, and `items.importance IS NULL` = 0.
 - [ ] **`x-ai-watchlist` source row still in DB** — catalog no longer defines it but the seed script doesn't delete rows. Either add a catalog-deletion pass to `seed-sources.ts` or manually `DELETE FROM sources WHERE id = 'x-ai-watchlist'`.
 - [ ] **Supabase env vars on Vercel** — `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` unused since s6 password-gate swap. `vercel env rm` to clean up.
 - [ ] **Key rotation** — OpenAI/Anthropic/Gemini/Azure/Jina keys have been in chat history since s3-4. 5-min task per provider. Deferred 4+ sessions running.
@@ -65,7 +67,9 @@ Written at the end of s7 (2026-04-19). User flagged "a lot of issues needs to be
 ## F — testing gaps introduced in s7
 
 - [ ] No integration tests for `/api/admin/collections` CRUD (create/patch/delete/list)
-- [ ] No test for `/api/feedback/move` reparent behaviour
+- [x] No test for `/api/feedback/move` reparent behaviour — covered by
+  `tests/api/saved-routes.test.ts` and
+  `tests/api/saved-routes-source.test.ts`.
 - [ ] No test for `/api/admin/policy/commit` writes correct `version+1`
 - [x] No test for `/api/saved/export` markdown shape — covered by `tests/api/saved-export.test.ts`.
 - [ ] No test for `/api/tweaks` GET+PATCH round-trip

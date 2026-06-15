@@ -1,13 +1,12 @@
 import { parseJsonRequestBody } from "@/lib/api/json-body";
 import { feedbackMoveBodySchema } from "@/lib/api/saved-requests";
+import { moveSavedItemRoutePayload } from "@/lib/api/saved-routes";
 import {
   runSessionRoute,
   sessionError,
   sessionOk,
   sessionServerError,
 } from "@/lib/api/session-route";
-import { upsertAppUser } from "@/lib/auth/session";
-import { moveItemToCollection } from "@/lib/items/collections";
 
 /**
  * POST /api/feedback/move — reparent a saved item into a named collection
@@ -18,20 +17,14 @@ import { moveItemToCollection } from "@/lib/items/collections";
  */
 export async function POST(req: Request) {
   return runSessionRoute(async (user) => {
-    await upsertAppUser(user);
-
     const parsed = await parseJsonRequestBody(req, feedbackMoveBodySchema, {
       envelope: "ok",
     });
     if (!parsed.ok) return parsed.response;
 
     try {
-      const ok = await moveItemToCollection({
-        userId: user.id,
-        itemId: parsed.data.itemId,
-        targetCollectionId: parsed.data.targetCollectionId,
-      });
-      if (!ok) return sessionError("not_found", 404);
+      const result = await moveSavedItemRoutePayload(user, parsed.data);
+      if (!result.ok) return sessionError(result.error, result.status);
       return sessionOk();
     } catch (err) {
       return sessionServerError("api/feedback/move", err);
