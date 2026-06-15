@@ -74,6 +74,10 @@ Shipped cleanup:
   `lib/api/collection-routes.ts`, so both surfaces reuse the same
   `duplicate_name` and `not_found` decisions while keeping their own auth,
   request schemas, and response envelopes.
+- Policy editor edit previews now reuse the shared `diffLines` +
+  `DiffViewer` contract and register a dirty-draft `beforeunload` guard, so
+  policy edits are reviewed against the committed baseline before publishing
+  and tab-close protection is covered by a source contract test.
 - Shared saved-item request parsing through `lib/api/saved-requests.ts`;
   `/api/v1/saved` now delegates GET query extraction to
   `parseV1SavedQueryRequest`, while `/api/v1/saved` and
@@ -571,7 +575,6 @@ browser-verified. Open DevTools responsive mode + walk through `/`,
   affordable and the product decision is revisited.
 - **Tweaks PATCH floods** — rapid theme/accent scrubbing fires 10+
   PATCH requests in a second. Add 500ms debounce.
-- **Policy editor loses drafts on tab close** — no `beforeunload` handler.
 - **Native `confirm()`/`prompt()` in collection CRUD** — ugly on mobile.
 - **`/admin/users`** still `ComingSoonPanel` — single-user mode so low
   priority until multi-user.

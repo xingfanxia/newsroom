@@ -1,13 +1,15 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { DiffViewer } from "@/components/admin/diff-viewer";
 import { VersionPill } from "@/components/admin/version-pill";
 import { useTweaks } from "@/hooks/use-tweaks";
+import { diffLines } from "@/lib/policy/diff";
 
 /**
  * Editable policy view. Idle = rendered as preformatted markdown; "edit"
- * button swaps to a split textarea + live preview. Saving calls
+ * button swaps to a split textarea + diff preview. Saving calls
  * /api/admin/policy/commit which writes a new `policy_versions` row and
  * refreshes the route.
  */
@@ -29,6 +31,22 @@ export function PolicyEditor({
   const [saving, setSaving] = useState(false);
   const dirty = content !== initialContent;
   const charCount = useMemo(() => content.length, [content]);
+  const diff = useMemo(
+    () => (dirty ? diffLines(initialContent, content) : []),
+    [content, dirty, initialContent],
+  );
+
+  useEffect(() => {
+    if (!dirty) return;
+
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [dirty]);
 
   const save = async () => {
     if (!dirty) {
@@ -147,23 +165,40 @@ export function PolicyEditor({
               borderRadius: 2,
             }}
           />
-          <pre
-            style={{
-              background: "var(--bg-1)",
-              border: "1px solid var(--border-1)",
-              color: "var(--fg-1)",
-              fontFamily: "var(--font-mono)",
-              fontSize: 12.5,
-              lineHeight: 1.7,
-              padding: 14,
-              whiteSpace: "pre-wrap",
-              overflow: "auto",
-              borderRadius: 2,
-              margin: 0,
-            }}
-          >
-            {content}
-          </pre>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div
+              style={{
+                fontSize: 10,
+                textTransform: "uppercase",
+                letterSpacing: "0.1em",
+                color: "var(--fg-3)",
+                fontFamily: "var(--font-mono)",
+              }}
+            >
+              {zh ? "改动预览" : "diff preview"}
+            </div>
+            {dirty ? (
+              <DiffViewer lines={diff} />
+            ) : (
+              <pre
+                style={{
+                  background: "var(--bg-1)",
+                  border: "1px solid var(--border-1)",
+                  color: "var(--fg-1)",
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 12.5,
+                  lineHeight: 1.7,
+                  padding: 14,
+                  whiteSpace: "pre-wrap",
+                  overflow: "auto",
+                  borderRadius: 2,
+                  margin: 0,
+                }}
+              >
+                {content}
+              </pre>
+            )}
+          </div>
         </div>
       ) : (
         <pre

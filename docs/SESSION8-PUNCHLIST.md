@@ -41,8 +41,12 @@ Written at the end of s7 (2026-04-19). User flagged "a lot of issues needs to be
   local state/localStorage immediately, but `/api/tweaks` PATCH now runs
   through a 500ms trailing debounce. Covered by
   `tests/api/tweaks-source.test.ts`.
-- [ ] **Policy editor: close-tab loses drafts** — no confirmation on unload with unsaved changes. Window `beforeunload` handler needed.
-- [ ] **Policy editor: no diff preview before commit** — user commits blindly. Should show a `DiffViewer` of old vs new content + confirm step.
+- [x] **Policy editor: close-tab loses drafts** — fixed; dirty edits now
+  register a `beforeunload` guard. Covered by
+  `tests/policy/policy-editor-source.test.ts`.
+- [x] **Policy editor: no diff preview before commit** — fixed; edit mode now
+  reuses `diffLines` + `DiffViewer` against the committed baseline. Covered by
+  `tests/policy/policy-editor-source.test.ts`.
 - [ ] **Named collections UI uses native `confirm()` / `prompt()`** — ugly on mobile, no styling. Replace with a sonner-based inline confirm or a proper modal.
 - [ ] **Watchlist: case-insensitive dedup missing** — adding `"GPT-6"` after `"gpt-6"` creates two entries. Normalize to lowercase before compare.
 - [x] **X Monitor filter by handle uses `s.source.publisher` string match** —
@@ -60,7 +64,10 @@ Written at the end of s7 (2026-04-19). User flagged "a lot of issues needs to be
 
 - [ ] **#9 `/low-follower` still coming-soon** — blocked on X `/2/tweets/search/all` quota. Decision needed: pay for X Pro, or delete the nav route (currently dangles).
 - [ ] **`/admin/users` still coming-soon** — single-user mode under password gate, so a user-management screen is cosmetic until multi-user returns. Low priority.
-- [ ] **Admin Policy editor: live preview is just `<pre>{content}</pre>`** — no actual markdown rendering. If the policy becomes significantly longer, the preview should use the same Prose/markdown component as podcast detail.
+- [ ] **Admin Policy editor read-only view is raw `<pre>`** — no actual
+  markdown rendering in the committed policy view. If the policy becomes
+  significantly longer, the read-only view should use the same Prose/markdown
+  component as podcast detail.
 - [ ] **Iterations timeline is read-only** — no "revert to v{n}" button. Useful if a bad commit lands.
 - [ ] **Saved page has no search** — if a user saves 200 items, scrolling is the only way to find one.
 

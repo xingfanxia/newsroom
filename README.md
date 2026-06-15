@@ -34,7 +34,7 @@ AX's AI RADAR is a dashboard for editors and analysts who cover the AI industry.
 | `/{locale}/agents` | Agent 接入 — 3-tab integration page (Skill / RSS / REST API). See [`docs/agent-access/`](./docs/agent-access/) |
 | `/{locale}/admin/usage` | 用量 — LLM spend cards (today / 7d / 30d / all-time), task/model breakdowns, and recent-call model labels |
 | `/{locale}/admin/system` | 系统 — Source health, queues, cron schedules + recent activity, and recent errors |
-| `/{locale}/admin/policy` | 精选策略 — **editable** markdown with live preview; commits new version |
+| `/{locale}/admin/policy` | 精选策略 — **editable** markdown with diff preview; commits new version |
 | `/{locale}/admin/iterations` | 策略迭代 — metric cards + agent console + diff preview + **version timeline** |
 | `/{locale}/admin/users` | 用户 (coming soon) |
 
@@ -139,7 +139,7 @@ AX 的 AI 雷达是一款面向 AI 行业编辑和分析师的情报工作台，
 | `/{locale}/admin/usage` | 用量 — LLM 花费卡片（今日 / 7 天 / 30 天 / 全量）、任务/模型拆分、最近调用模型 |
 | `/{locale}/admin/system` | 系统 — 信源健康、队列、cron 调度与最近活动、近期错误 |
 | `/{locale}/admin/iterations` | 策略迭代 — 指标卡片 + Agent 控制台 + Diff 预览 + **版本时间轴** |
-| `/{locale}/admin/policy` | 精选策略 — **可编辑** markdown，带实时预览，可直接提交新版本 |
+| `/{locale}/admin/policy` | 精选策略 — **可编辑** markdown，带改动预览，可直接提交新版本 |
 | `/{locale}/admin/users` | 用户管理（coming soon，当前单用户模式） |
 
 ### 技术栈
