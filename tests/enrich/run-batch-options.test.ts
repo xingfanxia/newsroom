@@ -1,17 +1,9 @@
 import { describe, expect, it } from "bun:test";
-import { readFileSync } from "fs";
-import { dirname, resolve } from "path";
-import { fileURLToPath } from "url";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const root = resolve(__dirname, "../..");
+import { readSource } from "@/tests/helpers/source";
 
 describe("runEnrichBatch backfill options", () => {
-  const worker = readFileSync(resolve(root, "workers/enrich/index.ts"), "utf8");
-  const route = readFileSync(
-    resolve(root, "app/api/cron/enrich/route.ts"),
-    "utf8",
-  );
+  const worker = readSource("workers/enrich/index.ts");
+  const route = readSource("app/api/cron/enrich/route.ts");
 
   it("supports optional publication-window filtering for targeted backfills", () => {
     expect(worker).toContain("export type EnrichBatchOptions");

@@ -1,8 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { readSource as read } from "@/tests/helpers/source";
 
-const root = process.cwd();
 const mapperPaths = [
   "lib/items/live.ts",
   "lib/items/saved.ts",
@@ -10,10 +8,6 @@ const mapperPaths = [
   "lib/items/semantic-search.ts",
 ] as const;
 const storyMapper = "lib/items/story-mapper.ts";
-
-function read(path: string): string {
-  return readFileSync(resolve(root, path), "utf8");
-}
 
 describe("item tag mapper source wiring", () => {
   test("story mappers share item tag flattening", () => {

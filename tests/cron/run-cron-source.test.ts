@@ -1,23 +1,19 @@
 import { describe, expect, it } from "bun:test";
-import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { readSource } from "@/tests/helpers/source";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const root = resolve(__dirname, "../..");
-const scriptPath = resolve(root, "scripts/ops/run-cron.ts");
-const packagePath = resolve(root, "package.json");
-const vercelPath = resolve(root, "vercel.json");
+const scriptPath = "scripts/ops/run-cron.ts";
+const packagePath = "package.json";
+const vercelPath = "vercel.json";
 
 function productionCronSlugs(): string[] {
-  const vercel = JSON.parse(readFileSync(vercelPath, "utf8")) as {
+  const vercel = JSON.parse(readSource(vercelPath)) as {
     crons: Array<{ path: string }>;
   };
   return vercel.crons.map((cron) => cron.path.replace(/^\/api\/cron\//, ""));
 }
 
 describe("local cron runner source wiring", () => {
-  const src = readFileSync(scriptPath, "utf8");
+  const src = readSource(scriptPath);
 
   it("keeps supported buckets in one dispatch table", () => {
     expect(src).toContain("type CronKind = keyof typeof CRON_RUNNERS");
@@ -36,7 +32,7 @@ describe("local cron runner source wiring", () => {
   });
 
   it("exposes every production cron route through package scripts", () => {
-    const pkg = JSON.parse(readFileSync(packagePath, "utf8")) as {
+    const pkg = JSON.parse(readSource(packagePath)) as {
       scripts: Record<string, string>;
     };
 
@@ -48,7 +44,7 @@ describe("local cron runner source wiring", () => {
   });
 
   it("keeps legacy short aliases available for operator muscle memory", () => {
-    const pkg = JSON.parse(readFileSync(packagePath, "utf8")) as {
+    const pkg = JSON.parse(readSource(packagePath)) as {
       scripts: Record<string, string>;
     };
 

@@ -9,15 +9,9 @@
  * expressions and each page wires its filters into the calendar call.
  */
 import { describe, expect, it } from "bun:test";
-import { readFileSync } from "fs";
-import { resolve, dirname } from "path";
-import { fileURLToPath } from "url";
+import { readSource } from "@/tests/helpers/source";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const statsSrc = readFileSync(
-  resolve(__dirname, "../../lib/shell/dashboard-stats.ts"),
-  "utf8",
-);
+const statsSrc = readSource("lib/shell/dashboard-stats.ts");
 
 describe("getDayCounts — filter contract with feed", () => {
   it("accepts a filter-options arg with tier / source-tag / curated", () => {
@@ -71,14 +65,8 @@ describe("dashboard stats display helpers", () => {
 });
 
 describe("page calendars pass the same filters as their feed", () => {
-  const homeSrc = readFileSync(
-    resolve(__dirname, "../../app/[locale]/page.tsx"),
-    "utf8",
-  );
-  const curatedSrc = readFileSync(
-    resolve(__dirname, "../../app/[locale]/curated/page.tsx"),
-    "utf8",
-  );
+  const homeSrc = readSource("app/[locale]/page.tsx");
+  const curatedSrc = readSource("app/[locale]/curated/page.tsx");
 
   // [\s\S]*? is the cross-target-compatible substitute for `.` with the `s`
   // (dotAll) flag — the project targets ES2017 and `s` is ES2018+. Lazy

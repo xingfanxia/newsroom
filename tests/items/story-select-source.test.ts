@@ -1,8 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { readSource as read } from "@/tests/helpers/source";
 
-const root = process.cwd();
 const storySelect = read("lib/items/story-select.ts");
 const baseMapperPaths = [
   "lib/items/live.ts",
@@ -11,10 +9,6 @@ const baseMapperPaths = [
   "lib/items/semantic-search.ts",
 ] as const;
 const eventMapperPaths = ["lib/items/live.ts", "lib/items/saved.ts"] as const;
-
-function read(path: string): string {
-  return readFileSync(resolve(root, path), "utf8");
-}
 
 function storyQuerySource(path: string): string {
   const source = read(path);

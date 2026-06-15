@@ -1,23 +1,20 @@
 import { describe, expect, it } from "bun:test";
-import { existsSync, readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { existsSync } from "node:fs";
+import { readSource, sourcePath } from "@/tests/helpers/source";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const root = resolve(__dirname, "../..");
-const routeHelperPath = resolve(root, "app/api/cron/_fetch-bucket-route.ts");
-const envelopeHelperPath = resolve(root, "app/api/cron/_route.ts");
-const workerHelperPath = resolve(root, "workers/fetcher/pipeline.ts");
-const scriptPath = resolve(root, "scripts/ops/run-cron.ts");
+const routeHelperPath = "app/api/cron/_fetch-bucket-route.ts";
+const envelopeHelperPath = "app/api/cron/_route.ts";
+const workerHelperPath = "workers/fetcher/pipeline.ts";
+const scriptPath = "scripts/ops/run-cron.ts";
 
 function routeSource(name: "fetch-hourly" | "fetch-daily" | "fetch-weekly") {
-  return readFileSync(resolve(root, `app/api/cron/${name}/route.ts`), "utf8");
+  return readSource(`app/api/cron/${name}/route.ts`);
 }
 
 describe("fetch cron routes", () => {
   it("centralizes fetch then normalize sequencing in a worker helper", () => {
-    expect(existsSync(workerHelperPath)).toBe(true);
-    const helper = readFileSync(workerHelperPath, "utf8");
+    expect(existsSync(sourcePath(workerHelperPath))).toBe(true);
+    const helper = readSource(workerHelperPath);
 
     expect(helper).toContain("runFetchAndNormalize");
     expect(helper).toContain("runFetchBucket");
@@ -26,8 +23,8 @@ describe("fetch cron routes", () => {
   });
 
   it("centralizes auth and JSON response wiring in the shared cron route helper", () => {
-    expect(existsSync(envelopeHelperPath)).toBe(true);
-    const helper = readFileSync(envelopeHelperPath, "utf8");
+    expect(existsSync(sourcePath(envelopeHelperPath))).toBe(true);
+    const helper = readSource(envelopeHelperPath);
 
     expect(helper).toContain("runCronJsonRoute");
     expect(helper).toContain("verifyCron");
@@ -36,8 +33,8 @@ describe("fetch cron routes", () => {
   });
 
   it("keeps the fetch HTTP helper focused on payload mapping", () => {
-    expect(existsSync(routeHelperPath)).toBe(true);
-    const helper = readFileSync(routeHelperPath, "utf8");
+    expect(existsSync(sourcePath(routeHelperPath))).toBe(true);
+    const helper = readSource(routeHelperPath);
 
     expect(helper).toContain("runFetchAndNormalize");
     expect(helper).toContain("runCronJsonRoute");
@@ -76,7 +73,7 @@ describe("fetch cron routes", () => {
   });
 
   it("keeps local operator cron buckets on the same fetch+normalize helper", () => {
-    const src = readFileSync(scriptPath, "utf8");
+    const src = readSource(scriptPath);
 
     expect(src).toContain("runFetchAndNormalize");
     expect(src).toContain('runFetchAndNormalize(["live", "hourly"])');

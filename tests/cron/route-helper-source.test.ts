@@ -1,12 +1,9 @@
 import { describe, expect, it } from "bun:test";
-import { existsSync, readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { existsSync } from "node:fs";
+import { readSource, sourcePath } from "@/tests/helpers/source";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const root = resolve(__dirname, "../..");
-const helperPath = resolve(root, "app/api/cron/_route.ts");
-const fetchBucketRoutePath = resolve(root, "app/api/cron/_fetch-bucket-route.ts");
+const helperPath = "app/api/cron/_route.ts";
+const fetchBucketRoutePath = "app/api/cron/_fetch-bucket-route.ts";
 
 const cronJsonRouteFiles = [
   "article-body",
@@ -20,20 +17,16 @@ const cronJsonRouteFiles = [
 ] as const;
 const fetchCronRouteFiles = ["fetch-daily", "fetch-hourly", "fetch-weekly"] as const;
 
-function read(path: string): string {
-  return readFileSync(resolve(root, path), "utf8");
-}
-
 function routeSource(
   name: (typeof cronJsonRouteFiles)[number] | (typeof fetchCronRouteFiles)[number],
 ): string {
-  return read(`app/api/cron/${name}/route.ts`);
+  return readSource(`app/api/cron/${name}/route.ts`);
 }
 
 describe("cron route HTTP envelope helper", () => {
   it("centralizes cron auth, timestamp, and JSON response wiring", () => {
-    expect(existsSync(helperPath)).toBe(true);
-    const helper = readFileSync(helperPath, "utf8");
+    expect(existsSync(sourcePath(helperPath))).toBe(true);
+    const helper = readSource(helperPath);
 
     expect(helper).toContain("runCronJsonRoute");
     expect(helper).toContain("verifyCron");
@@ -72,7 +65,7 @@ describe("cron route HTTP envelope helper", () => {
   });
 
   it("keeps the fetch bucket helper focused on fetch/normalize payload mapping", () => {
-    const src = readFileSync(fetchBucketRoutePath, "utf8");
+    const src = readSource(fetchBucketRoutePath);
 
     expect(src).toContain("runCronJsonRoute");
     expect(src).toContain("runFetchAndNormalize");

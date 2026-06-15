@@ -1,19 +1,13 @@
 import { describe, expect, it } from "bun:test";
-import { readFileSync } from "fs";
-import { dirname, resolve } from "path";
-import { fileURLToPath } from "url";
 import {
   decideSingletonRecluster,
   resolveSingletonReclusterLimit,
   SINGLETON_RECLUSTER_SIMILARITY_THRESHOLD,
   SINGLETON_RECLUSTER_WINDOW_HOURS,
 } from "@/workers/cluster/singletons";
+import { readSource } from "@/tests/helpers/source";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const pipelineSrc = readFileSync(
-  resolve(__dirname, "../../workers/cluster/pipeline.ts"),
-  "utf8",
-);
+const pipelineSrc = readSource("workers/cluster/pipeline.ts");
 
 describe("singleton recluster decision", () => {
   it("moves a singleton into a different cluster when the nearest neighbor is within the Stage A threshold", () => {
@@ -69,10 +63,7 @@ describe("cron singleton recluster wiring", () => {
   it("respects Stage B split audit when choosing a target cluster", () => {
     expect(pipelineSrc).toContain("runSingletonReclusterBatch(");
 
-    const singletonSrc = readFileSync(
-      resolve(__dirname, "../../workers/cluster/singletons.ts"),
-      "utf8",
-    );
+    const singletonSrc = readSource("workers/cluster/singletons.ts");
     expect(singletonSrc).toContain("FROM cluster_splits split_audit");
     expect(singletonSrc).toContain("split_audit.item_id = ${s.item_id}");
     expect(singletonSrc).toContain(

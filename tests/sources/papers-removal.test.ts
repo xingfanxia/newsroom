@@ -1,11 +1,7 @@
 import { describe, expect, it } from "bun:test";
-import { existsSync, readFileSync } from "fs";
-import { dirname, resolve } from "path";
-import { fileURLToPath } from "url";
+import { existsSync } from "fs";
 import { sourceCatalog } from "@/lib/sources/catalog";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const root = resolve(__dirname, "../..");
+import { readSource, sourcePath } from "@/tests/helpers/source";
 
 const PAPER_SOURCE_IDS = [
   "arxiv-cs-ai",
@@ -30,33 +26,25 @@ describe("paper sources are removed from the product", () => {
   });
 
   it("does not expose a papers route or nav item", () => {
-    expect(existsSync(resolve(root, "app/[locale]/papers/page.tsx"))).toBe(
-      false,
-    );
+    expect(existsSync(sourcePath("app/[locale]/papers/page.tsx"))).toBe(false);
 
-    const navSrc = readFileSync(resolve(root, "lib/shell/nav-data.ts"), "utf8");
+    const navSrc = readSource("lib/shell/nav-data.ts");
     expect(navSrc).not.toContain('id: "papers"');
     expect(navSrc).not.toContain('href: "/papers"');
 
-    const sitemapSrc = readFileSync(resolve(root, "app/sitemap.ts"), "utf8");
+    const sitemapSrc = readSource("app/sitemap.ts");
     expect(sitemapSrc).not.toContain('"/papers"');
   });
 
   it("does not expose papers as RSS, MCP, or public skill routing", () => {
-    const rssSrc = readFileSync(
-      resolve(root, "app/api/rss/[slug]/route.ts"),
-      "utf8",
-    );
+    const rssSrc = readSource("app/api/rss/[slug]/route.ts");
     expect(rssSrc).not.toContain("papers:");
     expect(rssSrc).not.toContain('"papers"');
 
-    const mcpSrc = readFileSync(resolve(root, "app/api/mcp/route.ts"), "utf8");
+    const mcpSrc = readSource("app/api/mcp/route.ts");
     expect(mcpSrc).not.toContain("ax-radar://papers");
 
-    const skillSrc = readFileSync(
-      resolve(root, "app/skill.md/route.ts"),
-      "utf8",
-    );
+    const skillSrc = readSource("app/skill.md/route.ts");
     expect(skillSrc).not.toContain("include_source_tags=arxiv,paper");
     expect(skillSrc).not.toContain("latest AI papers");
   });

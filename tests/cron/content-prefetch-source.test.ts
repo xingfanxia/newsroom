@@ -1,18 +1,15 @@
 import { describe, expect, it } from "bun:test";
-import { existsSync, readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { existsSync } from "node:fs";
+import { readSource, sourcePath } from "@/tests/helpers/source";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const root = resolve(__dirname, "../..");
-const helperPath = resolve(root, "workers/fetcher/content-prefetch.ts");
-const routePath = resolve(root, "app/api/cron/article-body/route.ts");
-const scriptPath = resolve(root, "scripts/ops/run-cron.ts");
+const helperPath = "workers/fetcher/content-prefetch.ts";
+const routePath = "app/api/cron/article-body/route.ts";
+const scriptPath = "scripts/ops/run-cron.ts";
 
 describe("content prefetch cron wiring", () => {
   it("centralizes article body + YouTube transcript prefetch in a worker helper", () => {
-    expect(existsSync(helperPath)).toBe(true);
-    const helper = readFileSync(helperPath, "utf8");
+    expect(existsSync(sourcePath(helperPath))).toBe(true);
+    const helper = readSource(helperPath);
 
     expect(helper).toContain("runContentPrefetch");
     expect(helper).toContain("runArticleBodyFetch");
@@ -22,7 +19,7 @@ describe("content prefetch cron wiring", () => {
   });
 
   it("keeps the HTTP article-body cron route on the shared prefetch helper", () => {
-    const src = readFileSync(routePath, "utf8");
+    const src = readSource(routePath);
 
     expect(src).toContain("runContentPrefetch");
     expect(src).toContain("runCronJsonRoute");
@@ -35,7 +32,7 @@ describe("content prefetch cron wiring", () => {
   });
 
   it("keeps the local body bucket on the production prefetch path", () => {
-    const src = readFileSync(scriptPath, "utf8");
+    const src = readSource(scriptPath);
 
     expect(src).toContain("runContentPrefetch");
     expect(src).toContain('"article-body": contentPrefetch');

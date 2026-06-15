@@ -11,13 +11,8 @@
  * Pure source-string + behavior tests.
  */
 import { describe, expect, it } from "bun:test";
-import { readFileSync } from "fs";
-import { resolve, dirname } from "path";
-import { fileURLToPath } from "url";
 import { groupByDay } from "@/lib/feed/group-by-day";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const root = resolve(__dirname, "../..");
+import { readSource } from "@/tests/helpers/source";
 
 describe("groupByDay (shared) — keys are UTC-day YYYY-MM-DD strings", () => {
   it("buckets items by their UTC calendar day", () => {
@@ -54,10 +49,7 @@ describe("groupByDay (shared) — keys are UTC-day YYYY-MM-DD strings", () => {
 });
 
 describe("DayBreak — accepts dayKey string and formats via UTC", () => {
-  const dayBreakSrc = readFileSync(
-    resolve(root, "app/[locale]/_day-break.tsx"),
-    "utf8",
-  );
+  const dayBreakSrc = readSource("app/[locale]/_day-break.tsx");
 
   it("accepts a dayKey: string prop (YYYY-MM-DD)", () => {
     expect(dayBreakSrc).toMatch(/dayKey\s*:\s*string/);
@@ -89,7 +81,7 @@ describe("page.tsx callers pass dayKey strings (not Date objects)", () => {
 
   for (const p of pages) {
     it(`${p} — passes dayKey string, not new Date(dayKey)`, () => {
-      const src = readFileSync(resolve(root, p), "utf8");
+      const src = readSource(p);
       // Old buggy form: <DayBreak date={new Date(dayKey)} />
       expect(src).not.toMatch(/<DayBreak\s+date=\{new Date\(dayKey\)\}/);
       // New form: <DayBreak dayKey={dayKey} />
@@ -98,7 +90,7 @@ describe("page.tsx callers pass dayKey strings (not Date objects)", () => {
   }
 
   it("page.tsx imports the shared groupByDay from lib/feed", () => {
-    const src = readFileSync(resolve(root, "app/[locale]/page.tsx"), "utf8");
+    const src = readSource("app/[locale]/page.tsx");
     expect(src).toMatch(/from\s+["']@\/lib\/feed\/group-by-day["']/);
   });
 });

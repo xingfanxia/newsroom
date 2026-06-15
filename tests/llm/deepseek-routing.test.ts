@@ -1,7 +1,4 @@
 import { describe, expect, it } from "bun:test";
-import { readFileSync } from "fs";
-import { dirname, resolve } from "path";
-import { fileURLToPath } from "url";
 import {
   zhCommentaryNoteSchema,
   zhCommentarySchema,
@@ -13,11 +10,11 @@ import {
   isLLMTask,
   isReasoningEffort,
 } from "@/lib/llm/types";
+import { readSource } from "@/tests/helpers/source";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const llmSrc = readFileSync(resolve(__dirname, "../../lib/llm/index.ts"), "utf8");
-const typesSrc = readFileSync(resolve(__dirname, "../../lib/llm/types.ts"), "utf8");
-const usageSrc = readFileSync(resolve(__dirname, "../../lib/llm/usage.ts"), "utf8");
+const llmSrc = readSource("lib/llm/index.ts");
+const typesSrc = readSource("lib/llm/types.ts");
+const usageSrc = readSource("lib/llm/usage.ts");
 
 describe("Azure DeepSeek routing", () => {
   it("keeps LLM provider/task/reasoning contracts in runtime tuples", () => {

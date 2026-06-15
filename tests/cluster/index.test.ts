@@ -6,21 +6,14 @@
  * the four Stage A changes without spinning up a database.
  */
 import { describe, expect, it } from "bun:test";
-import { readFileSync } from "fs";
-import { resolve, dirname } from "path";
-import { fileURLToPath } from "url";
 import {
   hasReachedSplitRejectionCap,
   MAX_DISTINCT_SPLIT_RETRIES_PER_ITEM,
 } from "@/workers/cluster/split-audit";
+import { readSource } from "@/tests/helpers/source";
 
 // Read the worker source once; all assertions are string searches.
-// Use fileURLToPath for ESM+TSC compatibility (import.meta.dir is Bun-only).
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const workerSrc = readFileSync(
-  resolve(__dirname, "../../workers/cluster/index.ts"),
-  "utf8",
-);
+const workerSrc = readSource("workers/cluster/index.ts");
 
 // ── Constants ────────────────────────────────────────────────────────────────
 

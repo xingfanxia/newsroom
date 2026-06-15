@@ -5,19 +5,10 @@
  * tests/cluster/index.test.ts.
  */
 import { describe, expect, it } from "bun:test";
-import { readFileSync } from "fs";
-import { resolve, dirname } from "path";
-import { fileURLToPath } from "url";
+import { readSource } from "@/tests/helpers/source";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const mergeSrc = readFileSync(
-  resolve(__dirname, "../../workers/cluster/merge.ts"),
-  "utf8",
-);
-const pipelineSrc = readFileSync(
-  resolve(__dirname, "../../workers/cluster/pipeline.ts"),
-  "utf8",
-);
+const mergeSrc = readSource("workers/cluster/merge.ts");
+const pipelineSrc = readSource("workers/cluster/pipeline.ts");
 
 // ── Threshold constants ─────────────────────────────────────────────────────
 
@@ -168,10 +159,7 @@ describe("Cron stage wiring (Stage B+ between B and C)", () => {
   });
 
   it("includes the merge stage report in the JSON response", () => {
-    const routeSrc = readFileSync(
-      resolve(__dirname, "../../app/api/cron/cluster/route.ts"),
-      "utf8",
-    );
+    const routeSrc = readSource("app/api/cron/cluster/route.ts");
     expect(routeSrc).toContain("merge: report.merge");
   });
 });

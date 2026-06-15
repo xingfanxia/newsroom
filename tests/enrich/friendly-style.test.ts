@@ -1,16 +1,9 @@
 import { describe, expect, it } from "bun:test";
-import { readFileSync } from "fs";
-import { dirname, resolve } from "path";
-import { fileURLToPath } from "url";
+import { readSource } from "@/tests/helpers/source";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const root = resolve(__dirname, "../..");
-const promptSrc = readFileSync(resolve(root, "workers/enrich/prompt.ts"), "utf8");
-const chineseSrc = readFileSync(resolve(root, "workers/enrich/chinese.ts"), "utf8");
-const dailyColumnPrompt = readFileSync(
-  resolve(root, "lib/llm/prompts/daily-column.md"),
-  "utf8",
-);
+const promptSrc = readSource("workers/enrich/prompt.ts");
+const chineseSrc = readSource("workers/enrich/chinese.ts");
+const dailyColumnPrompt = readSource("lib/llm/prompts/daily-column.md");
 
 describe("friend-readable editorial style", () => {
   it("tells both English and Chinese generators to sound like a friend sharing a link", () => {

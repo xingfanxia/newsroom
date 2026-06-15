@@ -1,9 +1,7 @@
 import { describe, expect, it } from "bun:test";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { readSource } from "@/tests/helpers/source";
 
-const root = resolve(__dirname, "../..");
-const source = readFileSync(resolve(root, "lib/shell/system-stats.ts"), "utf8");
+const source = readSource("lib/shell/system-stats.ts");
 
 describe("admin system stats source wiring", () => {
   it("derives cron schedules from vercel.json", () => {

@@ -1,22 +1,17 @@
 import { describe, expect, it } from "bun:test";
-import { readFileSync } from "fs";
-import { dirname, resolve } from "path";
-import { fileURLToPath } from "url";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const root = resolve(__dirname, "../..");
+import { readSource } from "@/tests/helpers/source";
 
 function readOptional(rel: string): string {
   try {
-    return readFileSync(resolve(root, rel), "utf8");
+    return readSource(rel);
   } catch {
     return "";
   }
 }
 
 describe("enrich worker claim lock", () => {
-  const schema = readFileSync(resolve(root, "db/schema.ts"), "utf8");
-  const worker = readFileSync(resolve(root, "workers/enrich/index.ts"), "utf8");
+  const schema = readSource("db/schema.ts");
+  const worker = readSource("workers/enrich/index.ts");
   const claimState = readOptional("workers/enrich/claim-state.ts");
   const migration = readOptional(
     "db/migrations/manual/2026-06-11-enrich-claim-lock.sql",
@@ -64,7 +59,7 @@ describe("enrich worker claim lock", () => {
       "scripts/ops/reset-curated-for-backfill.ts",
       "scripts/ops/reset-for-body-and-tone.ts",
     ]) {
-      const src = readFileSync(resolve(root, rel), "utf8");
+      const src = readSource(rel);
       expect(src).toContain("ENRICH_CLAIM_RESET_VALUES");
       expect(src).not.toContain("enrichClaimedAt: null");
       expect(src).not.toContain("enrichAttempts: 0");

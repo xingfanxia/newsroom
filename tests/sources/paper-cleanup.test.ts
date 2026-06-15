@@ -1,22 +1,19 @@
 import { describe, expect, it } from "bun:test";
-import { existsSync, readFileSync } from "fs";
-import { dirname, resolve } from "path";
-import { fileURLToPath } from "url";
+import { existsSync } from "fs";
+import { readSource, sourcePath } from "@/tests/helpers/source";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const root = resolve(__dirname, "../..");
-const cleanupPath = resolve(root, "scripts/ops/cleanup-paper-sources.ts");
+const cleanupPath = "scripts/ops/cleanup-paper-sources.ts";
 
 describe("paper source cleanup script", () => {
   it("exists and defaults to dry-run", () => {
-    expect(existsSync(cleanupPath)).toBe(true);
-    const src = readFileSync(cleanupPath, "utf8");
+    expect(existsSync(sourcePath(cleanupPath))).toBe(true);
+    const src = readSource(cleanupPath);
     expect(src).toContain("dryRun: true");
     expect(src).toContain("--apply");
   });
 
   it("targets only explicit paper sources and never uses table-wide destructive SQL", () => {
-    const src = readFileSync(cleanupPath, "utf8");
+    const src = readSource(cleanupPath);
     expect(src).toContain("PAPER_SOURCE_IDS");
     expect(src).toContain("arxiv-cs-ai");
     expect(src).toContain("hf-papers-takara");
@@ -26,7 +23,7 @@ describe("paper source cleanup script", () => {
   });
 
   it("also removes paper-category items from mixed sources like AI HOT", () => {
-    const src = readFileSync(cleanupPath, "utf8");
+    const src = readSource(cleanupPath);
     expect(src).toContain("MIXED_PAPER_SOURCE_IDS");
     expect(src).toContain("aihot-selected");
     expect(src).toContain("raw_payload->>'category' = 'paper'");
@@ -34,7 +31,7 @@ describe("paper source cleanup script", () => {
   });
 
   it("repairs affected clusters after deleting paper items", () => {
-    const src = readFileSync(cleanupPath, "utf8");
+    const src = readSource(cleanupPath);
     expect(src).toContain("affected_clusters");
     expect(src).toContain("DELETE FROM raw_items");
     expect(src).toContain("DELETE FROM clusters");

@@ -13,18 +13,14 @@
  * Pure source-string test — asserts route wiring and vercel.json schedule.
  */
 import { describe, expect, it } from "bun:test";
-import { existsSync, readFileSync } from "fs";
-import { resolve, dirname } from "path";
-import { fileURLToPath } from "url";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const root = resolve(__dirname, "../..");
+import { existsSync } from "fs";
+import { readSource, sourcePath } from "@/tests/helpers/source";
 
 describe("split enrich cron — each worker has its own route", () => {
   it("/api/cron/article-body route exists and runs articleBody + youtubeTranscript only", () => {
-    const path = resolve(root, "app/api/cron/article-body/route.ts");
-    expect(existsSync(path)).toBe(true);
-    const src = readFileSync(path, "utf8");
+    const path = "app/api/cron/article-body/route.ts";
+    expect(existsSync(sourcePath(path))).toBe(true);
+    const src = readSource(path);
     expect(src).toContain("runContentPrefetch");
     expect(src).toContain("articleBody: report.articleBody");
     expect(src).toContain("youtubeTranscript: report.youtubeTranscript");
@@ -41,9 +37,9 @@ describe("split enrich cron — each worker has its own route", () => {
   });
 
   it("/api/cron/score-backfill route exists and runs only score-backfill", () => {
-    const path = resolve(root, "app/api/cron/score-backfill/route.ts");
-    expect(existsSync(path)).toBe(true);
-    const src = readFileSync(path, "utf8");
+    const path = "app/api/cron/score-backfill/route.ts";
+    expect(existsSync(sourcePath(path))).toBe(true);
+    const src = readSource(path);
     expect(src).toContain("runScoreBackfill");
     expect(src).not.toContain("runEnrichBatch");
     expect(src).not.toContain("runArticleBodyFetch");
@@ -53,9 +49,9 @@ describe("split enrich cron — each worker has its own route", () => {
   });
 
   it("/api/cron/commentary route exists and runs only commentary backfill", () => {
-    const path = resolve(root, "app/api/cron/commentary/route.ts");
-    expect(existsSync(path)).toBe(true);
-    const src = readFileSync(path, "utf8");
+    const path = "app/api/cron/commentary/route.ts";
+    expect(existsSync(sourcePath(path))).toBe(true);
+    const src = readSource(path);
     expect(src).toContain("runCommentaryBackfill");
     expect(src).not.toContain("runEnrichBatch");
     expect(src).not.toContain("runArticleBodyFetch");
@@ -65,9 +61,9 @@ describe("split enrich cron — each worker has its own route", () => {
   });
 
   it("/api/cron/enrich route now ONLY runs enrich (no chained workers)", () => {
-    const path = resolve(root, "app/api/cron/enrich/route.ts");
-    expect(existsSync(path)).toBe(true);
-    const src = readFileSync(path, "utf8");
+    const path = "app/api/cron/enrich/route.ts";
+    expect(existsSync(sourcePath(path))).toBe(true);
+    const src = readSource(path);
     expect(src).toContain("runEnrichBatch");
     // Must no longer chain the other workers — they have their own routes now
     expect(src).not.toContain("runArticleBodyFetch");
@@ -78,9 +74,9 @@ describe("split enrich cron — each worker has its own route", () => {
 });
 
 describe("vercel.json — staggered cron schedules for 4 split routes", () => {
-  const vercelJson = JSON.parse(
-    readFileSync(resolve(root, "vercel.json"), "utf8"),
-  ) as { crons: { path: string; schedule: string }[] };
+  const vercelJson = JSON.parse(readSource("vercel.json")) as {
+    crons: { path: string; schedule: string }[];
+  };
 
   const cronByPath = new Map(vercelJson.crons.map((c) => [c.path, c.schedule]));
 

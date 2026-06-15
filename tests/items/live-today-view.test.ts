@@ -13,15 +13,9 @@
  * the day-aligned rescue clause.
  */
 import { describe, expect, it } from "bun:test";
-import { readFileSync } from "fs";
-import { resolve, dirname } from "path";
-import { fileURLToPath } from "url";
+import { readSource } from "@/tests/helpers/source";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const liveSrc = readFileSync(
-  resolve(__dirname, "../../lib/items/live.ts"),
-  "utf8",
-);
+const liveSrc = readSource("lib/items/live.ts");
 
 describe("view=today filter — fresh-but-cold rescue clause", () => {
   it("includes a day-aligned rescue clause for items published since start of yesterday", () => {
@@ -83,10 +77,7 @@ describe("daily-highlights mode (minImportance + maxPerDay)", () => {
     // feed for their slice. The home page guards with:
     //   !activeDate && !sourceId && sourcePreset === 'all' && tier === 'featured'
     // so opening /zh?source=media or /zh?date=2026-04-21 stays unfiltered.
-    const homeSrc = readFileSync(
-      resolve(__dirname, "../../app/[locale]/page.tsx"),
-      "utf8",
-    );
+    const homeSrc = readSource("app/[locale]/page.tsx");
     expect(homeSrc).toContain("dailyHighlights");
     expect(homeSrc).toMatch(
       /!activeDate\s*&&\s*!sourceId\s*&&\s*sourcePreset === "all"\s*&&\s*tier === "featured"/,
@@ -117,10 +108,7 @@ describe("recent-day rescue (recentDayRescueDays)", () => {
   });
 
   it("home page passes recentDayRescueDays alongside daily-highlights filters", () => {
-    const homeSrc = readFileSync(
-      resolve(__dirname, "../../app/[locale]/page.tsx"),
-      "utf8",
-    );
+    const homeSrc = readSource("app/[locale]/page.tsx");
     // 3 covers today + yesterday + 2 days ago — the typical scoring-lag
     // window. Day with weak news ingest (e.g. 04-25 max imp = 76) still
     // surfaces top-3 by importance instead of being skipped entirely.

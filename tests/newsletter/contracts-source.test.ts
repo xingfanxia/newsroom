@@ -1,18 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import {
   DAILY_NEWSLETTER_KIND,
   MONTHLY_NEWSLETTER_KIND,
   NEWSLETTER_KINDS,
   NEWSLETTER_LOCALES,
 } from "@/lib/types";
-
-const root = process.cwd();
-
-function read(path: string): string {
-  return readFileSync(resolve(root, path), "utf8");
-}
+import { readSource as read } from "@/tests/helpers/source";
 
 const typesSrc = read("lib/types.ts");
 const newsletterWorkerSrc = read("workers/newsletter/index.ts");

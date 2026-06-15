@@ -1,16 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import {
   parseSavedCollectionParam,
   resolveSavedCollectionSelection,
 } from "@/lib/items/saved-collection-selection";
-
-const root = process.cwd();
-
-function read(path: string): string {
-  return readFileSync(resolve(root, path), "utf8");
-}
+import { readSource as read } from "@/tests/helpers/source";
 
 describe("saved collection URL selection", () => {
   test("normalizes empty, all, and inbox params to the inbox view", () => {

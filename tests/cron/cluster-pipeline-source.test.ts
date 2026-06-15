@@ -1,18 +1,15 @@
 import { describe, expect, it } from "bun:test";
-import { existsSync, readFileSync } from "fs";
-import { dirname, resolve } from "path";
-import { fileURLToPath } from "url";
+import { existsSync } from "fs";
+import { readSource, sourcePath } from "@/tests/helpers/source";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const root = resolve(__dirname, "../..");
-const pipelinePath = resolve(root, "workers/cluster/pipeline.ts");
-const routePath = resolve(root, "app/api/cron/cluster/route.ts");
-const scriptPath = resolve(root, "scripts/ops/run-cron.ts");
+const pipelinePath = "workers/cluster/pipeline.ts";
+const routePath = "app/api/cron/cluster/route.ts";
+const scriptPath = "scripts/ops/run-cron.ts";
 
 describe("cluster cron pipeline wiring", () => {
   it("centralizes the full Stage A/A.5/B/B+/C/D sequence in a worker helper", () => {
-    expect(existsSync(pipelinePath)).toBe(true);
-    const src = readFileSync(pipelinePath, "utf8");
+    expect(existsSync(sourcePath(pipelinePath))).toBe(true);
+    const src = readSource(pipelinePath);
 
     const stageOrder = [
       "runClusterBatch()",
@@ -34,7 +31,7 @@ describe("cluster cron pipeline wiring", () => {
   });
 
   it("keeps the HTTP route as shared cron envelope plus response mapping", () => {
-    const src = readFileSync(routePath, "utf8");
+    const src = readSource(routePath);
 
     expect(src).toContain("runClusterPipeline");
     expect(src).toContain("runCronJsonRoute");
@@ -48,7 +45,7 @@ describe("cluster cron pipeline wiring", () => {
   });
 
   it("keeps the local operator cluster command on the production pipeline", () => {
-    const src = readFileSync(scriptPath, "utf8");
+    const src = readSource(scriptPath);
 
     expect(src).toContain("runClusterPipeline");
     expect(src).toContain('"cluster": () => runClusterPipeline()');

@@ -3,7 +3,7 @@ import { join, resolve } from "node:path";
 
 const projectRoot = process.cwd();
 
-function sourcePath(path: string): string {
+export function sourcePath(path: string): string {
   return resolve(projectRoot, path);
 }
 

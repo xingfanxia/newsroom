@@ -1,12 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { readSource } from "@/tests/helpers/source";
 
-const root = process.cwd();
-const source = readFileSync(
-  resolve(root, "components/admin/policy-editor.tsx"),
-  "utf8",
-);
+const source = readSource("components/admin/policy-editor.tsx");
 
 describe("policy editor source wiring", () => {
   test("reuses the shared policy diff contract for edit previews", () => {

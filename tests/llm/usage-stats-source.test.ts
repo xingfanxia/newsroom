@@ -1,23 +1,12 @@
 import { describe, expect, it } from "bun:test";
-import { readFileSync } from "fs";
-import { dirname, resolve } from "path";
-import { fileURLToPath } from "url";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const root = resolve(__dirname, "../..");
+import { readSource } from "@/tests/helpers/source";
 
 describe("usage stats surfaces", () => {
-  const stats = readFileSync(resolve(root, "lib/llm/stats.ts"), "utf8");
-  const page = readFileSync(
-    resolve(root, "app/[locale]/admin/usage/page.tsx"),
-    "utf8",
-  );
-  const route = readFileSync(
-    resolve(root, "app/api/v1/usage/summary/route.ts"),
-    "utf8",
-  );
-  const mcp = readFileSync(resolve(root, "app/api/mcp/route.ts"), "utf8");
-  const summary = readFileSync(resolve(root, "lib/api/usage-summary.ts"), "utf8");
+  const stats = readSource("lib/llm/stats.ts");
+  const page = readSource("app/[locale]/admin/usage/page.tsx");
+  const route = readSource("app/api/v1/usage/summary/route.ts");
+  const mcp = readSource("app/api/mcp/route.ts");
+  const summary = readSource("lib/api/usage-summary.ts");
 
   it("supports an all-time usage window across admin, API, and MCP surfaces", () => {
     expect(stats).toContain("export const USAGE_WINDOWS");
