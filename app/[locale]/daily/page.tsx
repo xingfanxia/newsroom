@@ -6,6 +6,7 @@ import {
   getPulseData,
   getRadarStats,
 } from "@/lib/shell/dashboard-stats";
+import { EMPTY_RADAR_STATS } from "@/lib/shell/radar-stats";
 import {
   dailyColumnDateKey,
   listDailyColumnRows,
@@ -57,12 +58,7 @@ export default async function DailyLandingPage({
     isZh
       ? listDailyColumnRows({ locale: "zh", take: PAGE_SIZE, offset })
       : Promise.resolve([]),
-    getRadarStats().catch(() => ({
-      items_today: 0,
-      items_p1: 0,
-      items_featured: 0,
-      tracked_sources: 0,
-    })),
+    getRadarStats().catch(() => EMPTY_RADAR_STATS),
     getPulseData().catch(() => []),
   ]);
 

@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
 import { getRadarStats, getPulseData } from "@/lib/shell/dashboard-stats";
+import { EMPTY_RADAR_STATS } from "@/lib/shell/radar-stats";
 import { AgentsTabs } from "./_tabs";
 import { PUBLIC_ENDPOINT_COUNT } from "@/lib/api/public-endpoint-config";
 import { publicUrl } from "@/lib/site";
@@ -24,12 +25,7 @@ export default async function AgentsPage({
   setRequestLocale(locale);
 
   const [stats, pulse] = await Promise.all([
-    getRadarStats().catch(() => ({
-      items_today: 0,
-      items_p1: 0,
-      items_featured: 0,
-      tracked_sources: 0,
-    })),
+    getRadarStats().catch(() => EMPTY_RADAR_STATS),
     getPulseData().catch(() => []),
   ]);
 

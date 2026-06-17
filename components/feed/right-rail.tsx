@@ -1,8 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { RadarWidget, type RadarStats } from "./radar-widget";
+import { RadarWidget } from "./radar-widget";
 import { useTweaks } from "@/hooks/use-tweaks";
+import type { RadarStats } from "@/lib/shell/radar-stats";
 import {
   addWatchlistTerm,
   limitWatchlist,

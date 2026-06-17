@@ -5,6 +5,7 @@ import { PageHead } from "@/components/shell/page-head";
 import { PolicyEditor } from "@/components/admin/policy-editor";
 import { getActiveSkill } from "@/lib/policy/skill";
 import { getRadarStats } from "@/lib/shell/dashboard-stats";
+import { EMPTY_RADAR_STATS } from "@/lib/shell/radar-stats";
 import { SKILL_NAME } from "@/workers/agent/iterate";
 
 export const dynamic = "force-dynamic";
@@ -24,12 +25,7 @@ export default async function PolicyPage({
   } catch (err) {
     error = err instanceof Error ? err.message : String(err);
   }
-  const stats = await getRadarStats().catch(() => ({
-    items_today: 0,
-    items_p1: 0,
-    items_featured: 0,
-    tracked_sources: 0,
-  }));
+  const stats = await getRadarStats().catch(() => EMPTY_RADAR_STATS);
 
   return (
     <ViewShell

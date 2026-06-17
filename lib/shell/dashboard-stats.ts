@@ -3,7 +3,7 @@ import { db } from "@/db/client";
 import { items, sources, policyVersions } from "@/db/schema";
 import { highlightTierInSql } from "@/lib/items/tier-sql";
 import { formatCoarseRelativeTime } from "@/lib/time/relative";
-import type { RadarStats } from "@/components/feed/radar-widget";
+import type { RadarStats } from "@/lib/shell/radar-stats";
 import type { PulsePoint } from "@/components/shell/pulse-box";
 import type { TopicEntry } from "@/components/feed/right-rail";
 

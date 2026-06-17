@@ -3,6 +3,7 @@ import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
 import { ComingSoonPanel } from "@/components/shell/coming-soon-panel";
 import { getRadarStats } from "@/lib/shell/dashboard-stats";
+import { EMPTY_RADAR_STATS } from "@/lib/shell/radar-stats";
 
 // Admin pages render per-request — they read live stats and contain client
 // components (ViewShell tree) that call useSearchParams. Static prerender
@@ -17,12 +18,7 @@ export default async function UsersPage({
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
-  const stats = await getRadarStats().catch(() => ({
-    items_today: 0,
-    items_p1: 0,
-    items_featured: 0,
-    tracked_sources: 0,
-  }));
+  const stats = await getRadarStats().catch(() => EMPTY_RADAR_STATS);
 
   return (
     <ViewShell

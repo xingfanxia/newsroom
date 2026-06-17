@@ -11,6 +11,7 @@ import {
   getPulseData,
   getRadarStats,
 } from "@/lib/shell/dashboard-stats";
+import { EMPTY_RADAR_STATS } from "@/lib/shell/radar-stats";
 import type { Story } from "@/lib/types";
 
 export const revalidate = 60;
@@ -66,12 +67,7 @@ export default async function CuratedPage({
   }
 
   const [stats, pulse, days] = await Promise.all([
-    getRadarStats().catch(() => ({
-      items_today: 0,
-      items_p1: 0,
-      items_featured: 0,
-      tracked_sources: 0,
-    })),
+    getRadarStats().catch(() => EMPTY_RADAR_STATS),
     getPulseData().catch(() => []),
     // Curated calendar mirrors the feed's curatedOnly filter so cells
     // count only AX-curated leads — same contract as the home page.

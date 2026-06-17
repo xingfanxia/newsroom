@@ -21,6 +21,7 @@ import {
   getRadarStats,
   getTopTopics,
 } from "@/lib/shell/dashboard-stats";
+import { EMPTY_RADAR_STATS } from "@/lib/shell/radar-stats";
 import { getRecentTickerItems } from "@/lib/shell/ticker";
 import { mockStories } from "@/lib/mock/stories";
 import type { Story } from "@/lib/types";
@@ -153,12 +154,7 @@ export default async function HotNewsPage({
   }
 
   const [radarStats, pulse, topics, policy, tickerItems, days] = await Promise.all([
-    getRadarStats().catch(() => ({
-      items_today: 0,
-      items_p1: 0,
-      items_featured: 0,
-      tracked_sources: 0,
-    })),
+    getRadarStats().catch(() => EMPTY_RADAR_STATS),
     getPulseData().catch(() => []),
     getTopTopics().catch(() => []),
     getPolicySummary().catch(() => ({ version: "v1", lastIterAt: null })),

@@ -4,6 +4,7 @@ import { PageHead } from "@/components/shell/page-head";
 import { SOURCE_GROUP_LABELS, SOURCE_GROUPS } from "@/lib/sources/groups";
 import { getLiveSources, liveSourcesByGroup } from "@/lib/sources/live";
 import { getPulseData, getRadarStats } from "@/lib/shell/dashboard-stats";
+import { EMPTY_RADAR_STATS } from "@/lib/shell/radar-stats";
 import { SourcesViewToggle, type SourcesView } from "./_view-toggle";
 
 export const dynamic = "force-dynamic";
@@ -21,9 +22,7 @@ export default async function SourcesPage({
 
   const [live, stats, pulse] = await Promise.all([
     getLiveSources(),
-    getRadarStats().catch(() => ({
-      items_today: 0, items_p1: 0, items_featured: 0, tracked_sources: 0,
-    })),
+    getRadarStats().catch(() => EMPTY_RADAR_STATS),
     getPulseData().catch(() => []),
   ]);
 

@@ -6,6 +6,7 @@ import {
   getPulseData,
   getRadarStats,
 } from "@/lib/shell/dashboard-stats";
+import { EMPTY_RADAR_STATS } from "@/lib/shell/radar-stats";
 import {
   dailyColumnDateSchema,
   getDailyColumnRowByDate,
@@ -26,12 +27,7 @@ export default async function DailyDatePage({ params }: Props) {
 
   const [row, stats, pulse] = await Promise.all([
     getDailyColumnRowByDate(parsedDate.data, "zh"),
-    getRadarStats().catch(() => ({
-      items_today: 0,
-      items_p1: 0,
-      items_featured: 0,
-      tracked_sources: 0,
-    })),
+    getRadarStats().catch(() => EMPTY_RADAR_STATS),
     getPulseData().catch(() => []),
   ]);
 

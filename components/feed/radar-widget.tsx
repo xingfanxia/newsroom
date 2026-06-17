@@ -1,11 +1,5 @@
 import type { ReactNode } from "react";
-
-export type RadarStats = {
-  items_today: number;
-  items_p1: number;
-  items_featured: number;
-  tracked_sources: number;
-};
+import type { RadarStats } from "@/lib/shell/radar-stats";
 
 const DOTS = [
   { x: 60, y: 48, hot: true },

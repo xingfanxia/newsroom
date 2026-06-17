@@ -7,6 +7,7 @@ import { groupByDay } from "@/lib/feed/group-by-day";
 import { XHandlesSidebar } from "@/components/x-monitor/handles-sidebar";
 import { getFeaturedStories } from "@/lib/items/live";
 import { getPulseData, getRadarStats } from "@/lib/shell/dashboard-stats";
+import { EMPTY_RADAR_STATS } from "@/lib/shell/radar-stats";
 import { getXHandles } from "@/lib/shell/x-handles";
 import type { Story } from "@/lib/types";
 
@@ -24,12 +25,7 @@ export default async function XMonitorPage({
 
   const [handles, stats, pulse] = await Promise.all([
     getXHandles().catch(() => []),
-    getRadarStats().catch(() => ({
-      items_today: 0,
-      items_p1: 0,
-      items_featured: 0,
-      tracked_sources: 0,
-    })),
+    getRadarStats().catch(() => EMPTY_RADAR_STATS),
     getPulseData().catch(() => []),
   ]);
 

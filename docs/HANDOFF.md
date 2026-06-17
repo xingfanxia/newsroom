@@ -24,6 +24,9 @@ Shipped cleanup:
 - Shared admin table shell styling through `components/admin/table-frame.tsx`
   so `/admin/usage` and `/admin/system` do not repeat the same terminal table
   frame wrapper.
+- Shared radar stats ownership through `lib/shell/radar-stats.ts`; shell pages,
+  the radar widget, and DB dashboard stats now reuse the same `RadarStats`
+  type plus empty fallback instead of repeating the four-field zero object.
 - Shared admin mono blocks through `components/admin/mono-block.tsx`; policy
   error states and policy body previews no longer duplicate preformatted
   terminal panel styling.

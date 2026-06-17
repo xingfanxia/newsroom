@@ -7,6 +7,7 @@ import { groupByDay } from "@/lib/feed/group-by-day";
 import { PodcastChannelPills } from "./_channel-pills";
 import { getFeaturedStories } from "@/lib/items/live";
 import { getPulseData, getRadarStats } from "@/lib/shell/dashboard-stats";
+import { EMPTY_RADAR_STATS } from "@/lib/shell/radar-stats";
 import { getPodcastChannels } from "@/lib/shell/podcast-channels";
 import type { Story } from "@/lib/types";
 
@@ -27,9 +28,7 @@ export default async function PodcastsPage({
 
   const [channels, stats, pulse] = await Promise.all([
     getPodcastChannels().catch(() => []),
-    getRadarStats().catch(() => ({
-      items_today: 0, items_p1: 0, items_featured: 0, tracked_sources: 0,
-    })),
+    getRadarStats().catch(() => EMPTY_RADAR_STATS),
     getPulseData().catch(() => []),
   ]);
 

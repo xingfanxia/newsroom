@@ -7,6 +7,7 @@ import { VersionTimeline } from "@/components/admin/version-timeline";
 import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
 import { getRadarStats } from "@/lib/shell/dashboard-stats";
+import { EMPTY_RADAR_STATS } from "@/lib/shell/radar-stats";
 import { getFeedbackCounts, getRecentFeedback } from "@/lib/feedback/metrics";
 import {
   getActiveSkill,
@@ -52,9 +53,7 @@ export default async function IterationsPage({
     getActiveSkill(SKILL_NAME),
     listSkillVersions(SKILL_NAME),
     getLatestIterationRun(SKILL_NAME),
-    getRadarStats().catch(() => ({
-      items_today: 0, items_p1: 0, items_featured: 0, tracked_sources: 0,
-    })),
+    getRadarStats().catch(() => EMPTY_RADAR_STATS),
   ]);
 
   const { total, agreed, disagreed } = counts;

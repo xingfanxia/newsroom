@@ -4,6 +4,7 @@ import { AdminTableFrame } from "@/components/admin/table-frame";
 import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
 import { getRadarStats } from "@/lib/shell/dashboard-stats";
+import { EMPTY_RADAR_STATS } from "@/lib/shell/radar-stats";
 import { getSystemSnapshot } from "@/lib/shell/system-stats";
 
 export const dynamic = "force-dynamic";
@@ -33,12 +34,7 @@ export default async function SystemPage({
 
   const [snap, stats] = await Promise.all([
     getSystemSnapshot(),
-    getRadarStats().catch(() => ({
-      items_today: 0,
-      items_p1: 0,
-      items_featured: 0,
-      tracked_sources: 0,
-    })),
+    getRadarStats().catch(() => EMPTY_RADAR_STATS),
   ]);
 
   const totalSvc = snap.services.length;

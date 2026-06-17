@@ -3,6 +3,7 @@ import { setRequestLocale } from "next-intl/server";
 import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
 import { getRadarStats } from "@/lib/shell/dashboard-stats";
+import { EMPTY_RADAR_STATS } from "@/lib/shell/radar-stats";
 import {
   getUsageDashboardSummary,
   USAGE_WINDOWS,
@@ -49,12 +50,7 @@ export default async function UsagePage({
 
   const [usage, stats] = await Promise.all([
     getUsageDashboardSummary(range, { recentLimit: 25, dailyDays: 30 }),
-    getRadarStats().catch(() => ({
-      items_today: 0,
-      items_p1: 0,
-      items_featured: 0,
-      tracked_sources: 0,
-    })),
+    getRadarStats().catch(() => EMPTY_RADAR_STATS),
   ]);
   const { selected, dailySpend: daily } = usage;
   const { today, week, month, all } = usage.windowTotals;

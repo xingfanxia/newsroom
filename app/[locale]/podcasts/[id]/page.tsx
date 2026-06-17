@@ -7,6 +7,7 @@ import { YouTubeEmbed, extractYouTubeId } from "@/components/podcasts/youtube-em
 import { ViewShell } from "@/components/shell/view-shell";
 import { getItemDetail } from "@/lib/items/detail";
 import { getRadarStats } from "@/lib/shell/dashboard-stats";
+import { EMPTY_RADAR_STATS } from "@/lib/shell/radar-stats";
 
 // Re-render every 5 min — commentary + transcript only change via background
 // jobs, so there's no need to hit the DB on every navigation.
@@ -25,9 +26,7 @@ export default async function PodcastDetailPage({
 
   const [detail, stats] = await Promise.all([
     getItemDetail(id, locale === "en" ? "en" : "zh"),
-    getRadarStats().catch(() => ({
-      items_today: 0, items_p1: 0, items_featured: 0, tracked_sources: 0,
-    })),
+    getRadarStats().catch(() => EMPTY_RADAR_STATS),
   ]);
   if (!detail) notFound();
 
