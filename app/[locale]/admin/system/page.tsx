@@ -1,4 +1,5 @@
 import { setRequestLocale } from "next-intl/server";
+import { AdminSectionHeader as SectionHeader } from "@/components/admin/section-header";
 import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
 import { getRadarStats } from "@/lib/shell/dashboard-stats";
@@ -395,40 +396,5 @@ export default async function SystemPage({
         </div>
       </main>
     </ViewShell>
-  );
-}
-
-function SectionHeader({
-  title,
-  meta,
-  metaColor,
-  extraStyle,
-}: {
-  title: string;
-  meta?: string;
-  metaColor?: string;
-  extraStyle?: React.CSSProperties;
-}) {
-  return (
-    <h3
-      style={{
-        fontSize: 11,
-        color: "var(--fg-3)",
-        letterSpacing: "0.1em",
-        textTransform: "uppercase",
-        margin: "16px 0 8px",
-        fontWeight: 500,
-        display: "flex",
-        justifyContent: "space-between",
-        ...extraStyle,
-      }}
-    >
-      <span>{title}</span>
-      {meta && (
-        <span style={{ color: metaColor ?? "var(--fg-0)", fontWeight: 500 }}>
-          {meta}
-        </span>
-      )}
-    </h3>
   );
 }

@@ -13,11 +13,10 @@ import {
   USAGE_RANGE_LABELS,
   formatUsageCount,
   formatUsageShortDate,
-  formatUsageTaskModels,
   formatUsageTokens,
   usageRangeLabel,
-  usageTaskTone,
 } from "@/lib/llm/usage-display";
+import { UsageBreakdownTables } from "./_usage-tables";
 
 export const dynamic = "force-dynamic";
 
@@ -57,16 +56,9 @@ export default async function UsagePage({
       tracked_sources: 0,
     })),
   ]);
-  const {
-    selected,
-    byTask,
-    byModel,
-    recentCalls: recent,
-    dailySpend: daily,
-  } = usage;
+  const { selected, dailySpend: daily } = usage;
   const { today, week, month, all } = usage.windowTotals;
 
-  const totalTaskCost = byTask.reduce((a, t) => a + t.costUsd, 0) || 1;
   const peakDaily = Math.max(1, ...daily.map((d) => d.spend));
   const usedPct = Math.min(
     100,
@@ -75,13 +67,6 @@ export default async function UsagePage({
   const tokMixTotal = selected.inputTokens + selected.outputTokens || 1;
   const inputPct = Math.round((selected.inputTokens / tokMixTotal) * 100);
   const outputPct = 100 - inputPct;
-
-  const timeFmt = new Intl.DateTimeFormat(zh ? "zh-CN" : "en-US", {
-    month: "numeric",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 
   return (
     <ViewShell
@@ -347,247 +332,13 @@ export default async function UsagePage({
           </div>
         )}
 
-        {/* Bottom grid — cost by task (with share bars) + cost by model
-            stacked with recent-calls table. */}
-        <div
-          style={{
-            marginTop: 18,
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: 18,
-          }}
-        >
-          <div>
-            <SectionHeader
-              title={zh ? "按任务花费" : "cost by task"}
-              meta={`$${byTask.reduce((a, t) => a + t.costUsd, 0).toFixed(2)}`}
-            />
-            <div
-              style={{
-                background: "var(--bg-1)",
-                border: "1px solid var(--border-1)",
-              }}
-            >
-              <table className="dt">
-                <thead>
-                  <tr>
-                    <th>{zh ? "任务" : "task"}</th>
-                    <th>{zh ? "模型" : "model"}</th>
-                    <th className="right">{zh ? "次数" : "calls"}</th>
-                    <th className="right">{zh ? "输入" : "input"}</th>
-                    <th className="right">{zh ? "输出" : "output"}</th>
-                    <th className="right">{zh ? "花费" : "cost"}</th>
-                    <th className="right">{zh ? "占比" : "share"}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {byTask.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="muted" style={{ padding: 20 }}>
-                        {zh ? "窗口内无活动" : "no activity in window"}
-                      </td>
-                    </tr>
-                  ) : (
-                    byTask.map((t) => {
-                      const share = (t.costUsd / totalTaskCost) * 100;
-                      return (
-                        <tr key={t.task ?? "untagged"}>
-                          <td
-                            style={{
-                              color: "var(--fg-0)",
-                              fontFamily: "var(--font-mono)",
-                            }}
-                          >
-                            {t.task ?? "untagged"}
-                          </td>
-                          <td
-                            className="muted"
-                            style={{
-                              fontFamily: "var(--font-mono)",
-                              fontSize: 10.5,
-                              maxWidth: 180,
-                              whiteSpace: "normal",
-                            }}
-                          >
-                            {formatUsageTaskModels(t.models)}
-                          </td>
-                          <td className="right">{formatUsageCount(t.calls)}</td>
-                          <td className="right">
-                            <span className="muted">
-                              {formatUsageTokens(t.inputTokens)}
-                            </span>
-                          </td>
-                          <td className="right">
-                            <span className="muted">
-                              {formatUsageTokens(t.outputTokens)}
-                            </span>
-                          </td>
-                          <td
-                            className="right"
-                            style={{ color: "var(--accent-orange)" }}
-                          >
-                            ${t.costUsd.toFixed(2)}
-                          </td>
-                          <td className="right">
-                            <div className="hbar">
-                              <div className="track">
-                                <div
-                                  className="fill"
-                                  style={{ width: `${share}%` }}
-                                />
-                              </div>
-                              <span className="num">{share.toFixed(0)}%</span>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div>
-            <SectionHeader title={zh ? "按模型花费" : "cost by model"} />
-            <div
-              style={{
-                background: "var(--bg-1)",
-                border: "1px solid var(--border-1)",
-                marginBottom: 18,
-              }}
-            >
-              <table className="dt">
-                <thead>
-                  <tr>
-                    <th>{zh ? "模型" : "model"}</th>
-                    <th>{zh ? "供应商" : "provider"}</th>
-                    <th className="right">{zh ? "次数" : "calls"}</th>
-                    <th className="right">{zh ? "花费" : "cost"}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {byModel.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className="muted" style={{ padding: 20 }}>
-                        {zh ? "窗口内无活动" : "no activity in window"}
-                      </td>
-                    </tr>
-                  ) : (
-                    byModel.map((m) => (
-                      <tr key={`${m.provider}/${m.model}`}>
-                        <td
-                          style={{
-                            color: "var(--fg-0)",
-                            fontFamily: "var(--font-mono)",
-                            fontSize: 11,
-                          }}
-                        >
-                          {m.model}
-                        </td>
-                        <td>
-                          <span className="muted">{m.provider}</span>
-                        </td>
-                        <td className="right">{formatUsageCount(m.calls)}</td>
-                        <td
-                          className="right"
-                          style={{ color: "var(--accent-orange)" }}
-                        >
-                          ${m.costUsd.toFixed(2)}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            <SectionHeader
-              title={zh ? "最近调用" : "recent calls"}
-              meta={`${recent.length}`}
-            />
-            <div
-              style={{
-                background: "var(--bg-1)",
-                border: "1px solid var(--border-1)",
-                maxHeight: 360,
-                overflow: "auto",
-              }}
-            >
-              <table className="dt">
-                <thead>
-                  <tr>
-                    <th>{zh ? "时间" : "time"}</th>
-                    <th>{zh ? "任务" : "task"}</th>
-                    <th>{zh ? "模型" : "model"}</th>
-                    <th className="right">in</th>
-                    <th className="right">out</th>
-                    <th className="right">dur</th>
-                    <th className="right">{zh ? "花费" : "cost"}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recent.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="muted" style={{ padding: 20 }}>
-                        {zh ? "无调用记录" : "no calls recorded yet"}
-                      </td>
-                    </tr>
-                  ) : (
-                    recent.map((c) => (
-                      <tr key={c.id}>
-                        <td className="muted" style={{ fontSize: 10.5 }}>
-                          {timeFmt.format(c.createdAt)}
-                        </td>
-                        <td>
-                          <span className={`pill-s ${usageTaskTone(c.task)}`}>
-                            {c.task ?? "—"}
-                          </span>
-                        </td>
-                        <td
-                          className="muted"
-                          style={{
-                            fontFamily: "var(--font-mono)",
-                            fontSize: 10,
-                            maxWidth: 150,
-                            whiteSpace: "normal",
-                          }}
-                        >
-                          {c.model}
-                        </td>
-                        <td className="right">
-                          <span className="muted">
-                            {formatUsageTokens(c.inputTokens)}
-                          </span>
-                        </td>
-                        <td className="right">
-                          <span className="muted">
-                            {formatUsageTokens(c.outputTokens)}
-                          </span>
-                        </td>
-                        <td className="right">
-                          <span className="muted">
-                            {c.durationMs
-                              ? `${(c.durationMs / 1000).toFixed(1)}s`
-                              : "—"}
-                          </span>
-                        </td>
-                        <td
-                          className="right"
-                          style={{ color: "var(--accent-orange)" }}
-                        >
-                          {c.costUsd !== null
-                            ? `$${c.costUsd.toFixed(4)}`
-                            : "—"}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+        <UsageBreakdownTables
+          byTask={usage.byTask}
+          byModel={usage.byModel}
+          recent={usage.recentCalls}
+          zh={zh}
+          timeLocale={zh ? "zh-CN" : "en-US"}
+        />
       </main>
     </ViewShell>
   );
@@ -755,31 +506,5 @@ function MiniSpend({ label, totals }: { label: string; totals: WindowTotals }) {
         {totals.calls} calls · {formatUsageTokens(totals.inputTokens)} in
       </div>
     </div>
-  );
-}
-
-function SectionHeader({
-  title,
-  meta,
-}: {
-  title: string;
-  meta?: string;
-}) {
-  return (
-    <h3
-      style={{
-        fontSize: 11,
-        color: "var(--fg-3)",
-        letterSpacing: "0.1em",
-        textTransform: "uppercase",
-        margin: "0 0 8px",
-        fontWeight: 500,
-        display: "flex",
-        justifyContent: "space-between",
-      }}
-    >
-      <span>{title}</span>
-      {meta && <span style={{ color: "var(--fg-0)" }}>{meta}</span>}
-    </h3>
   );
 }

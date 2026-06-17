@@ -17,6 +17,10 @@ Shipped cleanup:
 - Shared resumable operator state-file path/load/save behavior through
   `scripts/ops/state.ts`; backfill scripts keep their own state shape but no
   longer duplicate JSON parsing, `updatedAt` refreshes, or ENOENT handling.
+- Shared admin section headings through `components/admin/section-header.tsx`
+  and moved `/admin/usage` task/model/recent-call tables into a private
+  `_usage-tables.tsx`, so the page owns data orchestration instead of table
+  rendering details.
 - Updated README / `.env.example` / architecture docs so Tavily is not advertised as wired, cron docs match the current split route set, and cluster docs match the 0.75 / 72h runtime.
 - Clarified the AI HOT documentation source of truth: root README and
   `docs/architecture/ingestion.md` now route current runtime behavior to the

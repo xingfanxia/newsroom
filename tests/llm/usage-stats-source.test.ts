@@ -4,6 +4,9 @@ import { readSource } from "@/tests/helpers/source";
 describe("usage stats surfaces", () => {
   const stats = readSource("lib/llm/stats.ts");
   const page = readSource("app/[locale]/admin/usage/page.tsx");
+  const usageTables = readSource("app/[locale]/admin/usage/_usage-tables.tsx");
+  const systemPage = readSource("app/[locale]/admin/system/page.tsx");
+  const adminSectionHeader = readSource("components/admin/section-header.tsx");
   const route = readSource("app/api/v1/usage/summary/route.ts");
   const mcp = readSource("app/api/mcp/route.ts");
   const summary = readSource("lib/api/usage-summary.ts");
@@ -31,20 +34,24 @@ describe("usage stats surfaces", () => {
   it("includes task-level model breakdowns for the task spend table", () => {
     expect(stats).toContain("type TaskModelBreakdown");
     expect(stats).toContain("models: TaskModelBreakdown[]");
-    expect(page).toContain("formatUsageTaskModels(t.models)");
+    expect(usageTables).toContain("formatUsageTaskModels(t.models)");
     expect(summary).toContain("models: t.models.map");
   });
 
   it("renders model labels in recent calls", () => {
-    expect(page).toContain("{zh ? \"模型\" : \"model\"}");
-    expect(page).toContain("{c.model}");
+    expect(usageTables).toContain("{zh ? \"模型\" : \"model\"}");
+    expect(usageTables).toContain("{c.model}");
   });
 
-  it("keeps usage presentation helpers out of the admin page component", () => {
+  it("keeps usage table presentation out of the admin page component", () => {
     expect(page).toContain("@/lib/llm/usage-display");
     expect(page).toContain("usageRangeLabel");
-    expect(page).toContain("usageTaskTone(c.task)");
-    expect(page).toContain("formatUsageTaskModels(t.models)");
+    expect(page).toContain("UsageBreakdownTables");
+    expect(page).not.toContain("usageTaskTone(c.task)");
+    expect(page).not.toContain("formatUsageTaskModels(t.models)");
+    expect(usageTables).toContain("@/lib/llm/usage-display");
+    expect(usageTables).toContain("usageTaskTone(c.task)");
+    expect(usageTables).toContain("formatUsageTaskModels(t.models)");
     expect(page).not.toContain("function taskPillColor");
     expect(page).not.toContain("function formatTokens");
     expect(page).not.toContain("function formatNumber");
@@ -83,5 +90,13 @@ describe("usage stats surfaces", () => {
     expect(summary).toContain("by_task");
     expect(summary).toContain("by_model");
     expect(summary).toContain("recent_calls");
+  });
+
+  it("shares admin section headings instead of duplicating local h3 components", () => {
+    expect(adminSectionHeader).toContain("export function AdminSectionHeader");
+    expect(usageTables).toContain("@/components/admin/section-header");
+    expect(systemPage).toContain("@/components/admin/section-header");
+    expect(page).not.toContain("function SectionHeader");
+    expect(systemPage).not.toContain("function SectionHeader");
   });
 });
