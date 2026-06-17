@@ -1,5 +1,5 @@
-import type { CSSProperties, ReactNode } from "react";
 import { AdminSectionHeader } from "@/components/admin/section-header";
+import { AdminTableFrame } from "@/components/admin/table-frame";
 import type { UsageDashboardSummary } from "@/lib/api/usage-summary";
 import {
   formatUsageCount,
@@ -59,7 +59,7 @@ function CostByTaskTable({
         meta={`$${byTask.reduce((a, t) => a + t.costUsd, 0).toFixed(2)}`}
         extraStyle={{ margin: "0 0 8px" }}
       />
-      <TableFrame>
+      <AdminTableFrame>
         <table className="dt">
           <thead>
             <tr>
@@ -137,7 +137,7 @@ function CostByTaskTable({
             )}
           </tbody>
         </table>
-      </TableFrame>
+      </AdminTableFrame>
     </div>
   );
 }
@@ -155,7 +155,7 @@ function CostByModelTable({
         title={zh ? "按模型花费" : "cost by model"}
         extraStyle={{ margin: "0 0 8px" }}
       />
-      <TableFrame style={{ marginBottom: 18 }}>
+      <AdminTableFrame style={{ marginBottom: 18 }}>
         <table className="dt">
           <thead>
             <tr>
@@ -199,7 +199,7 @@ function CostByModelTable({
             )}
           </tbody>
         </table>
-      </TableFrame>
+      </AdminTableFrame>
     </>
   );
 }
@@ -227,7 +227,7 @@ function RecentCallsTable({
         meta={`${recent.length}`}
         extraStyle={{ margin: "0 0 8px" }}
       />
-      <TableFrame style={{ maxHeight: 360, overflow: "auto" }}>
+      <AdminTableFrame style={{ maxHeight: 360, overflow: "auto" }}>
         <table className="dt">
           <thead>
             <tr>
@@ -297,27 +297,7 @@ function RecentCallsTable({
             )}
           </tbody>
         </table>
-      </TableFrame>
+      </AdminTableFrame>
     </>
-  );
-}
-
-function TableFrame({
-  children,
-  style,
-}: {
-  children: ReactNode;
-  style?: CSSProperties;
-}) {
-  return (
-    <div
-      style={{
-        background: "var(--bg-1)",
-        border: "1px solid var(--border-1)",
-        ...style,
-      }}
-    >
-      {children}
-    </div>
   );
 }

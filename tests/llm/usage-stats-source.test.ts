@@ -7,6 +7,7 @@ describe("usage stats surfaces", () => {
   const usageTables = readSource("app/[locale]/admin/usage/_usage-tables.tsx");
   const systemPage = readSource("app/[locale]/admin/system/page.tsx");
   const adminSectionHeader = readSource("components/admin/section-header.tsx");
+  const adminTableFrame = readSource("components/admin/table-frame.tsx");
   const route = readSource("app/api/v1/usage/summary/route.ts");
   const mcp = readSource("app/api/mcp/route.ts");
   const summary = readSource("lib/api/usage-summary.ts");
@@ -98,5 +99,14 @@ describe("usage stats surfaces", () => {
     expect(systemPage).toContain("@/components/admin/section-header");
     expect(page).not.toContain("function SectionHeader");
     expect(systemPage).not.toContain("function SectionHeader");
+  });
+
+  it("shares admin table frames instead of repeating table shell styles", () => {
+    expect(adminTableFrame).toContain("export function AdminTableFrame");
+    expect(usageTables).toContain("@/components/admin/table-frame");
+    expect(usageTables).toContain("<AdminTableFrame");
+    expect(usageTables).not.toContain("function TableFrame");
+    expect(systemPage).toContain("@/components/admin/table-frame");
+    expect(systemPage).toContain("<AdminTableFrame>");
   });
 });

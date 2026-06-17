@@ -1,5 +1,6 @@
 import { setRequestLocale } from "next-intl/server";
 import { AdminSectionHeader as SectionHeader } from "@/components/admin/section-header";
+import { AdminTableFrame } from "@/components/admin/table-frame";
 import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
 import { getRadarStats } from "@/lib/shell/dashboard-stats";
@@ -191,12 +192,7 @@ export default async function SystemPage({
         >
           <div>
             <SectionHeader title={zh ? "队列 · queues" : "queues · 队列"} />
-            <div
-              style={{
-                background: "var(--bg-1)",
-                border: "1px solid var(--border-1)",
-              }}
-            >
+            <AdminTableFrame>
               <table className="dt">
                 <thead>
                   <tr>
@@ -235,18 +231,13 @@ export default async function SystemPage({
                   ))}
                 </tbody>
               </table>
-            </div>
+            </AdminTableFrame>
 
             <SectionHeader
               title={zh ? "定时 · cron" : "cron · 定时"}
               extraStyle={{ marginTop: 16 }}
             />
-            <div
-              style={{
-                background: "var(--bg-1)",
-                border: "1px solid var(--border-1)",
-              }}
-            >
+            <AdminTableFrame>
               <table className="dt">
                 <thead>
                   <tr>
@@ -289,7 +280,7 @@ export default async function SystemPage({
                   ))}
                 </tbody>
               </table>
-            </div>
+            </AdminTableFrame>
           </div>
 
           <div>

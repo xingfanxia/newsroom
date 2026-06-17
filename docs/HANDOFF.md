@@ -21,6 +21,9 @@ Shipped cleanup:
   and moved `/admin/usage` task/model/recent-call tables into a private
   `_usage-tables.tsx`, so the page owns data orchestration instead of table
   rendering details.
+- Shared admin table shell styling through `components/admin/table-frame.tsx`
+  so `/admin/usage` and `/admin/system` do not repeat the same terminal table
+  frame wrapper.
 - Updated README / `.env.example` / architecture docs so Tavily is not advertised as wired, cron docs match the current split route set, and cluster docs match the 0.75 / 72h runtime.
 - Clarified the AI HOT documentation source of truth: root README and
   `docs/architecture/ingestion.md` now route current runtime behavior to the
