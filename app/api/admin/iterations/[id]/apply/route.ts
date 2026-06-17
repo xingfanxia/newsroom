@@ -21,7 +21,9 @@ export async function POST(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  return runAdminIterationIdRoute(params, (id, admin) =>
-    applyIterationRunRoutePayload(admin, id),
+  return runAdminIterationIdRoute(
+    params,
+    (id, admin) => applyIterationRunRoutePayload(admin, id),
+    { serverErrorLabel: "api/admin/iterations/:id/apply" },
   );
 }

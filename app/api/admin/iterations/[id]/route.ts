@@ -15,7 +15,9 @@ export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  return runAdminIterationIdRoute(params, (id) =>
-    getIterationRunRoutePayload(id),
+  return runAdminIterationIdRoute(
+    params,
+    (id) => getIterationRunRoutePayload(id),
+    { serverErrorLabel: "api/admin/iterations/:id GET" },
   );
 }

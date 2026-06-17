@@ -14,6 +14,7 @@ describe("admin iteration route source wiring", () => {
 
       expect(source).toContain("@/lib/api/iteration-routes");
       expect(source).toContain("runAdminIterationIdRoute");
+      expect(source).toContain("serverErrorLabel:");
       expect(source).not.toContain("@/lib/api/admin-route");
       expect(source).not.toContain("runAdminRoute");
       expect(source).not.toContain("@/lib/api/admin-auth");
@@ -34,6 +35,8 @@ describe("admin iteration route source wiring", () => {
 
     expect(helper).toContain("parseIterationRunRouteId");
     expect(helper).toContain("runAdminIterationIdRoute");
+    expect(helper).toContain("serverErrorLabel?: string");
+    expect(helper).toContain("serverErrorLabel: opts.serverErrorLabel");
     expect(helper).toContain("adminError(parsedId.error, 400)");
     expect(helper).toContain("adminRouteResult(result, adminJson)");
     expect(helper).not.toContain("adminError(result.error");
@@ -45,6 +48,8 @@ describe("admin iteration route source wiring", () => {
       expect(source).not.toContain("parseIterationRunRouteId");
       expect(source).not.toContain("Number(rawId)");
       expect(source).not.toContain("Number.isInteger(id)");
+      expect(source).not.toContain("try {");
+      expect(source).not.toContain("catch (");
     }
   });
 

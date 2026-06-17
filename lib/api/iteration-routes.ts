@@ -35,10 +35,14 @@ type AdminIterationIdRouteHandler<T extends Record<string, unknown>> = (
   id: number,
   admin: SessionUser,
 ) => Promise<IterationRouteResult<T>>;
+type AdminIterationIdRouteOptions = {
+  serverErrorLabel?: string;
+};
 
 export function runAdminIterationIdRoute<T extends Record<string, unknown>>(
   params: Promise<{ id: string }>,
   handler: AdminIterationIdRouteHandler<T>,
+  opts: AdminIterationIdRouteOptions = {},
 ): Promise<Response> {
   return runAdminRoute(async (admin) => {
     const { id: rawId } = await params;
@@ -47,7 +51,7 @@ export function runAdminIterationIdRoute<T extends Record<string, unknown>>(
 
     const result = await handler(parsedId.id, admin);
     return adminRouteResult(result, adminJson);
-  });
+  }, { serverErrorLabel: opts.serverErrorLabel });
 }
 
 export async function getIterationRunRoutePayload(
