@@ -14,7 +14,6 @@ import {
   runV1Route,
   v1Json,
   v1RouteResult,
-  v1ServerError,
 } from "@/lib/api/v1-route";
 import {
   createCollectionRoutePayload,
@@ -32,13 +31,9 @@ import { parseJsonRequestBody } from "@/lib/api/json-body";
 
 export async function GET(req: Request) {
   return runV1Route(req, async (user) => {
-    try {
-      await upsertAppUser(user);
-      return v1Json(await listCollectionRoutePayload(user.id));
-    } catch (err) {
-      return v1ServerError("api/v1/collections GET", err);
-    }
-  });
+    await upsertAppUser(user);
+    return v1Json(await listCollectionRoutePayload(user.id));
+  }, { serverErrorLabel: "api/v1/collections GET" });
 }
 
 export async function POST(req: Request) {
@@ -52,17 +47,13 @@ export async function POST(req: Request) {
     );
     if (!parsed.ok) return parsed.response;
 
-    try {
-      await upsertAppUser(user);
-      const result = await createCollectionRoutePayload({
-        userId: user.id,
-        ...parsed.data,
-      });
-      return v1RouteResult(result, v1Json);
-    } catch (err) {
-      return v1ServerError("api/v1/collections POST", err);
-    }
-  });
+    await upsertAppUser(user);
+    const result = await createCollectionRoutePayload({
+      userId: user.id,
+      ...parsed.data,
+    });
+    return v1RouteResult(result, v1Json);
+  }, { serverErrorLabel: "api/v1/collections POST" });
 }
 
 export async function PATCH(req: Request) {
@@ -76,16 +67,12 @@ export async function PATCH(req: Request) {
     );
     if (!parsed.ok) return parsed.response;
 
-    try {
-      const result = await updateCollectionRoutePayload({
-        userId: user.id,
-        ...parsed.data,
-      });
-      return v1RouteResult(result, () => v1Json({ ok: true }));
-    } catch (err) {
-      return v1ServerError("api/v1/collections PATCH", err);
-    }
-  });
+    const result = await updateCollectionRoutePayload({
+      userId: user.id,
+      ...parsed.data,
+    });
+    return v1RouteResult(result, () => v1Json({ ok: true }));
+  }, { serverErrorLabel: "api/v1/collections PATCH" });
 }
 
 export async function DELETE(req: Request) {
@@ -96,11 +83,7 @@ export async function DELETE(req: Request) {
     });
     if (!parsed.ok) return parsed.response;
 
-    try {
-      const result = await deleteCollectionRoutePayload(user.id, parsed.data.id);
-      return v1RouteResult(result, () => v1Json({ ok: true }));
-    } catch (err) {
-      return v1ServerError("api/v1/collections DELETE", err);
-    }
-  });
+    const result = await deleteCollectionRoutePayload(user.id, parsed.data.id);
+    return v1RouteResult(result, () => v1Json({ ok: true }));
+  }, { serverErrorLabel: "api/v1/collections DELETE" });
 }

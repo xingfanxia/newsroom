@@ -12,7 +12,6 @@ import {
   runV1Route,
   v1InvalidQueryResult,
   v1Json,
-  v1ServerError,
 } from "@/lib/api/v1-route";
 import {
   getUsageSummary,
@@ -27,11 +26,6 @@ export async function GET(req: Request) {
     if (!parsed.ok) return parsed.response;
 
     const w = parsed.data.window;
-
-    try {
-      return v1Json(await getUsageSummary(w));
-    } catch (err) {
-      return v1ServerError("api/v1/usage/summary", err);
-    }
-  });
+    return v1Json(await getUsageSummary(w));
+  }, { serverErrorLabel: "api/v1/usage/summary" });
 }

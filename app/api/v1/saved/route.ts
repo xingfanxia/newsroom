@@ -27,7 +27,6 @@ import {
   v1InvalidQueryResult,
   v1Json,
   v1RouteResult,
-  v1ServerError,
 } from "@/lib/api/v1-route";
 
 export async function GET(req: Request) {
@@ -36,13 +35,8 @@ export async function GET(req: Request) {
     if (!parsed.ok) return parsed.response;
 
     const q = parsed.data;
-
-    try {
-      return v1Json(await listSavedItemsRoutePayload(user, q));
-    } catch (err) {
-      return v1ServerError("api/v1/saved GET", err);
-    }
-  });
+    return v1Json(await listSavedItemsRoutePayload(user, q));
+  }, { serverErrorLabel: "api/v1/saved GET" });
 }
 
 export async function POST(req: Request) {
@@ -53,17 +47,12 @@ export async function POST(req: Request) {
     if (!parsed.ok) return parsed.response;
 
     const b = parsed.data;
-
-    try {
-      const result = await saveItemRoutePayload(user, {
-        itemId: b.item_id,
-        on: b.on,
-        collectionId: b.collection_id,
-        note: b.note,
-      });
-      return v1RouteResult(result, v1Json);
-    } catch (err) {
-      return v1ServerError("api/v1/saved POST", err);
-    }
-  });
+    const result = await saveItemRoutePayload(user, {
+      itemId: b.item_id,
+      on: b.on,
+      collectionId: b.collection_id,
+      note: b.note,
+    });
+    return v1RouteResult(result, v1Json);
+  }, { serverErrorLabel: "api/v1/saved POST" });
 }

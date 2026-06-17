@@ -16,8 +16,14 @@ describe("v1 route source contracts", () => {
       expect(source, path).not.toContain("auth instanceof Response");
       expect(source, path).not.toContain("Response.json(");
       expect(source, path).not.toContain('v1Error("server_error"');
+      expect(source, path).not.toContain("v1ServerError");
+      expect(source, path).not.toContain("try {");
+      expect(source, path).not.toContain("catch (");
       expect(source, path).not.toContain('console.error("[api/v1');
       expect(source.match(/runV1Route\(req/g)?.length ?? 0, path).toBe(
+        handlerCount,
+      );
+      expect(source.match(/serverErrorLabel:/g)?.length ?? 0, path).toBe(
         handlerCount,
       );
     }
@@ -36,6 +42,8 @@ describe("v1 route source contracts", () => {
     expect(helper).toContain("export function v1InvalidQuery");
     expect(helper).toContain("export function v1InvalidQueryResult");
     expect(helper).toContain("export function v1ServerError");
+    expect(helper).toContain("serverErrorLabel?: string");
+    expect(helper).toContain("return v1ServerError(opts.serverErrorLabel, err)");
     expect(helper).toContain('return v1Error("server_error", 500)');
   });
 

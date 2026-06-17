@@ -3,6 +3,9 @@ import type { SessionUser } from "@/lib/auth/session";
 import type { QueryParseResult } from "@/lib/api/query-params";
 
 type V1RouteHandler = (user: SessionUser) => Response | Promise<Response>;
+type V1RouteOptions = {
+  serverErrorLabel?: string;
+};
 type V1InvalidQueryResult<T> =
   | { ok: true; data: T }
   | { ok: false; response: Response };
@@ -19,10 +22,17 @@ export type V1RouteResult<T = undefined> =
 export async function runV1Route(
   req: Request,
   handler: V1RouteHandler,
+  opts: V1RouteOptions = {},
 ): Promise<Response> {
   const auth = await requireApiToken(req);
   if (auth instanceof Response) return auth;
-  return handler(auth.user);
+  if (!opts.serverErrorLabel) return handler(auth.user);
+
+  try {
+    return await handler(auth.user);
+  } catch (err) {
+    return v1ServerError(opts.serverErrorLabel, err);
+  }
 }
 
 export function v1Json(body: unknown, init?: ResponseInit): Response {

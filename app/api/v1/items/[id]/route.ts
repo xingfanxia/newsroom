@@ -19,7 +19,6 @@ import {
   runV1Route,
   v1Error,
   v1Json,
-  v1ServerError,
 } from "@/lib/api/v1-route";
 import { getAgentItemDetailRoutePayload } from "@/lib/api/item-detail";
 
@@ -30,14 +29,10 @@ export async function GET(
   return runV1Route(req, async () => {
     const { id: idRaw } = await ctx.params;
 
-    try {
-      const found = await getAgentItemDetailRoutePayload(idRaw);
-      if (!found.ok) {
-        return v1Error(found.error, found.status);
-      }
-      return v1Json(found.payload);
-    } catch (err) {
-      return v1ServerError("api/v1/items/:id", err);
+    const found = await getAgentItemDetailRoutePayload(idRaw);
+    if (!found.ok) {
+      return v1Error(found.error, found.status);
     }
-  });
+    return v1Json(found.payload);
+  }, { serverErrorLabel: "api/v1/items/:id" });
 }

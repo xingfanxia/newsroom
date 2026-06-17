@@ -35,7 +35,6 @@ import {
   runV1Route,
   v1InvalidQueryResult,
   v1Json,
-  v1ServerError,
 } from "@/lib/api/v1-route";
 import {
   runFeedQuery,
@@ -53,12 +52,7 @@ export async function GET(req: Request) {
 
     const q = parsed.data;
     const feedQuery = feedQueryFromParams(q);
-
-    try {
-      const result = await runFeedQuery(feedQuery);
-      return v1Json(toAgentFeedPayload(result, q.locale));
-    } catch (err) {
-      return v1ServerError("api/v1/feed", err);
-    }
-  });
+    const result = await runFeedQuery(feedQuery);
+    return v1Json(toAgentFeedPayload(result, q.locale));
+  }, { serverErrorLabel: "api/v1/feed" });
 }

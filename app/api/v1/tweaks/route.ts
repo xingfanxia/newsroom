@@ -16,7 +16,6 @@ import {
   runV1Route,
   v1Json,
   v1RouteResult,
-  v1ServerError,
 } from "@/lib/api/v1-route";
 import {
   getTweaksRoutePayload,
@@ -25,12 +24,8 @@ import {
 
 export async function GET(req: Request) {
   return runV1Route(req, async (user) => {
-    try {
-      return v1Json(await getTweaksRoutePayload(user));
-    } catch (err) {
-      return v1ServerError("api/v1/tweaks GET", err);
-    }
-  });
+    return v1Json(await getTweaksRoutePayload(user));
+  }, { serverErrorLabel: "api/v1/tweaks GET" });
 }
 
 export async function PATCH(req: Request) {
@@ -40,11 +35,7 @@ export async function PATCH(req: Request) {
     });
     if (!parsed.ok) return parsed.response;
 
-    try {
-      const result = await saveTweaksRoutePayload(user, parsed.data);
-      return v1RouteResult(result, () => v1Json({ ok: true }));
-    } catch (err) {
-      return v1ServerError("api/v1/tweaks PATCH", err);
-    }
-  });
+    const result = await saveTweaksRoutePayload(user, parsed.data);
+    return v1RouteResult(result, () => v1Json({ ok: true }));
+  }, { serverErrorLabel: "api/v1/tweaks PATCH" });
 }

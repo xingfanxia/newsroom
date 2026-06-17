@@ -26,7 +26,6 @@ import {
   runV1Route,
   v1InvalidQueryResult,
   v1Json,
-  v1ServerError,
 } from "@/lib/api/v1-route";
 import { parseV1SearchQueryRequest } from "@/lib/api/feed-query-params";
 import {
@@ -40,12 +39,7 @@ export async function GET(req: Request) {
     if (!parsed.ok) return parsed.response;
 
     const p = parsed.data;
-
-    try {
-      const result = await runSearchQuery(p);
-      return v1Json(toAgentSearchPayload(result, p.locale));
-    } catch (err) {
-      return v1ServerError("api/v1/search", err);
-    }
-  });
+    const result = await runSearchQuery(p);
+    return v1Json(toAgentSearchPayload(result, p.locale));
+  }, { serverErrorLabel: "api/v1/search" });
 }

@@ -10,7 +10,6 @@
 import {
   runV1Route,
   v1Json,
-  v1ServerError,
 } from "@/lib/api/v1-route";
 import {
   listSourceCatalogRows,
@@ -19,14 +18,10 @@ import {
 
 export async function GET(req: Request) {
   return runV1Route(req, async () => {
-    try {
-      const rows = await listSourceCatalogRows("priority");
-      return v1Json({
-        sources: rows.map(toV1SourceApiItem),
-        total: rows.length,
-      });
-    } catch (err) {
-      return v1ServerError("api/v1/sources", err);
-    }
-  });
+    const rows = await listSourceCatalogRows("priority");
+    return v1Json({
+      sources: rows.map(toV1SourceApiItem),
+      total: rows.length,
+    });
+  }, { serverErrorLabel: "api/v1/sources" });
 }

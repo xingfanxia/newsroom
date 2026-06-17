@@ -20,7 +20,6 @@ import {
   runV1Route,
   v1Json,
   v1RouteResult,
-  v1ServerError,
 } from "@/lib/api/v1-route";
 import {
   getEventMembersRequestPayload,
@@ -34,16 +33,12 @@ export async function GET(
   return runV1Route(req, async () => {
     const { id: idRaw } = await ctx.params;
 
-    try {
-      const result = await getEventMembersRequestPayload(req, {
-        rawId: idRaw,
-        defaultLocale: "zh",
-      });
-      return v1RouteResult(result, (payload) =>
-        v1Json(toEventMembersListEnvelope(payload)),
-      );
-    } catch (err) {
-      return v1ServerError("api/v1/events/:id/members", err);
-    }
-  });
+    const result = await getEventMembersRequestPayload(req, {
+      rawId: idRaw,
+      defaultLocale: "zh",
+    });
+    return v1RouteResult(result, (payload) =>
+      v1Json(toEventMembersListEnvelope(payload)),
+    );
+  }, { serverErrorLabel: "api/v1/events/:id/members" });
 }

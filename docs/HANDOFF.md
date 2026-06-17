@@ -223,9 +223,10 @@ Shipped cleanup:
   `publicRouteResult`; public daily and event-member routes now keep only
   success body/ETag-signal shaping while the public helper maps
   `{ ok: false, error, status }` branches.
-- Shared v1 server-error logging/envelope through `v1ServerError` in
-  `lib/api/v1-route.ts`; v1 route files keep their business 4xx branches but
-  no longer hand-copy `console.error` plus `v1Error("server_error", 500)`.
+- Shared v1 server-error logging/envelope through `runV1Route(..., {
+  serverErrorLabel })` in `lib/api/v1-route.ts`; v1 route files keep their
+  business 4xx branches but no longer hand-copy `try/catch`, `console.error`,
+  or `v1Error("server_error", 500)`.
 - Shared admin/v1 domain-result envelope mapping through `adminRouteResult`
   and `v1RouteResult`; collection, saved, event-member, and tweak leaf routes
   now keep only success payload shaping while the surface helpers map
@@ -278,11 +279,12 @@ Shipped cleanup:
   `lib/api/usage-summary.ts`; `/admin/usage`, `/api/v1/usage/summary`, and
   MCP usage now all enter through the same summary boundary instead of the
   page importing low-level LLM stat queries directly.
-- Shared bearer-gated `/api/v1/*` auth and plain JSON/error envelopes through
-  `lib/api/v1-route.ts`; v1 route files now call `runV1Route` and return
-  `v1Json` / `v1RouteResult` / `v1InvalidQueryResult`, so token verification,
-  query validation envelopes, domain-result failures, and response shape cannot
-  drift between agent endpoints.
+- Shared bearer-gated `/api/v1/*` auth, catch-all server-error handling, and
+  plain JSON/error envelopes through `lib/api/v1-route.ts`; v1 route files now
+  call `runV1Route` with `serverErrorLabel` and return `v1Json` /
+  `v1RouteResult` / `v1InvalidQueryResult`, so token verification, query
+  validation envelopes, domain-result failures, and response shape cannot drift
+  between agent endpoints.
 - Shared agent bearer auth through `lib/auth/api-token.ts` for both
   `/api/v1/*` and `/api/mcp`; v1 routes enter via `runV1Route`, while MCP
   calls `requireApiToken` directly before handing control to the Streamable
