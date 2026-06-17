@@ -16,8 +16,6 @@
  *   bun scripts/ops/backfill-style.ts --batch-size 30 --max-cost-usd 50
  *   bun scripts/ops/backfill-style.ts --resume --tier featured,p1,all
  */
-import { writeFile, readFile } from "node:fs/promises";
-import path from "node:path";
 import pLimit from "p-limit";
 import {
   and,
@@ -61,13 +59,18 @@ import {
   type VisibleItemTier,
 } from "@/lib/types";
 import { treatmentForScore } from "@/workers/enrich/treatment";
+import {
+  loadOpsState,
+  opsStatePath,
+  saveOpsState,
+} from "@/scripts/ops/state";
 
 type Capability = (typeof CAPABILITIES)[number];
 type Topic = (typeof TOPICS)[number];
 type Targets = "items" | "clusters" | "both";
 
 // ── Constants ────────────────────────────────────────────────────────
-const STATE_FILE = path.resolve(process.cwd(), "scripts/ops/backfill-state.json");
+const STATE_FILE = opsStatePath("backfill-state.json");
 const FALLBACK_POLICY_BUMP = "2026-05-08T00:00:00Z";
 const EST_INPUT_TOK = 3000;
 // Forecast for the FULL path (锐评): ~200 字 zh + ~160 words en + 2 short
@@ -173,34 +176,38 @@ interface BackfillState {
 }
 
 async function loadState(resume: boolean): Promise<BackfillState> {
-  const empty: BackfillState = {
+  return loadOpsState<BackfillState>({
+    resume,
+    file: STATE_FILE,
+    empty: emptyBackfillState,
+    normalize: normalizeBackfillState,
+    onMissing: (file) => console.log(`[state] no prior state at ${file}; starting fresh`),
+  });
+}
+
+async function saveState(s: BackfillState): Promise<void> {
+  await saveOpsState(STATE_FILE, s);
+}
+
+function emptyBackfillState(): BackfillState {
+  return {
     doneItems: [],
     doneClusters: [],
     cumulativeCostUsd: 0,
     updatedAt: new Date().toISOString(),
   };
-  if (!resume) return empty;
-  try {
-    const raw = await readFile(STATE_FILE, "utf8");
-    const p = JSON.parse(raw) as Partial<BackfillState>;
-    return {
-      doneItems: p.doneItems ?? [],
-      doneClusters: p.doneClusters ?? [],
-      cumulativeCostUsd: p.cumulativeCostUsd ?? 0,
-      updatedAt: p.updatedAt ?? empty.updatedAt,
-    };
-  } catch (err) {
-    if (err instanceof Error && (err as NodeJS.ErrnoException).code === "ENOENT") {
-      console.log(`[state] no prior state at ${STATE_FILE}; starting fresh`);
-      return empty;
-    }
-    throw err;
-  }
 }
 
-async function saveState(s: BackfillState): Promise<void> {
-  s.updatedAt = new Date().toISOString();
-  await writeFile(STATE_FILE, JSON.stringify(s, null, 2) + "\n", "utf8");
+function normalizeBackfillState(
+  parsed: Partial<BackfillState>,
+  empty: BackfillState,
+): BackfillState {
+  return {
+    doneItems: parsed.doneItems ?? [],
+    doneClusters: parsed.doneClusters ?? [],
+    cumulativeCostUsd: parsed.cumulativeCostUsd ?? 0,
+    updatedAt: parsed.updatedAt ?? empty.updatedAt,
+  };
 }
 
 async function getPolicyBumpTimestamp(): Promise<Date> {

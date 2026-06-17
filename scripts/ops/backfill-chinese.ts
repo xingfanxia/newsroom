@@ -10,8 +10,6 @@
  */
 
 import pLimit from "p-limit";
-import { readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
 import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { closeDb, db } from "@/db/client";
 import { clusters, items, type Item } from "@/db/schema";
@@ -33,6 +31,11 @@ import {
 } from "@/workers/cluster/prompt";
 import { isHighlightItemTier } from "@/lib/types";
 import { treatmentForScore } from "@/workers/enrich/treatment";
+import {
+  loadOpsState,
+  opsStatePath,
+  saveOpsState,
+} from "@/scripts/ops/state";
 
 type Capability = (typeof CAPABILITIES)[number];
 type Topic = (typeof TOPICS)[number];
@@ -75,10 +78,7 @@ type ChineseBackfillState = {
   updatedAt: string;
 };
 
-const STATE_FILE = path.resolve(
-  process.cwd(),
-  "scripts/ops/backfill-chinese-state.json",
-);
+const STATE_FILE = opsStatePath("backfill-chinese-state.json");
 
 function parseArgs(argv: string[]): Flags {
   const flags: Flags = {
@@ -120,35 +120,39 @@ function parseArgs(argv: string[]): Flags {
 }
 
 async function loadState(resume: boolean): Promise<ChineseBackfillState> {
-  const empty: ChineseBackfillState = {
+  return loadOpsState<ChineseBackfillState>({
+    resume,
+    file: STATE_FILE,
+    empty: emptyChineseBackfillState,
+    normalize: normalizeChineseBackfillState,
+  });
+}
+
+async function saveState(state: ChineseBackfillState): Promise<void> {
+  await saveOpsState(STATE_FILE, state);
+}
+
+function emptyChineseBackfillState(): ChineseBackfillState {
+  return {
     enrichItems: [],
     scoreItems: [],
     commentaryItems: [],
     clusters: [],
     updatedAt: new Date().toISOString(),
   };
-  if (!resume) return empty;
-  try {
-    const raw = await readFile(STATE_FILE, "utf8");
-    const parsed = JSON.parse(raw) as Partial<ChineseBackfillState>;
-    return {
-      enrichItems: parsed.enrichItems ?? [],
-      scoreItems: parsed.scoreItems ?? [],
-      commentaryItems: parsed.commentaryItems ?? [],
-      clusters: parsed.clusters ?? [],
-      updatedAt: parsed.updatedAt ?? empty.updatedAt,
-    };
-  } catch (err) {
-    if (err instanceof Error && (err as NodeJS.ErrnoException).code === "ENOENT") {
-      return empty;
-    }
-    throw err;
-  }
 }
 
-async function saveState(state: ChineseBackfillState): Promise<void> {
-  state.updatedAt = new Date().toISOString();
-  await writeFile(STATE_FILE, JSON.stringify(state, null, 2) + "\n", "utf8");
+function normalizeChineseBackfillState(
+  parsed: Partial<ChineseBackfillState>,
+  empty: ChineseBackfillState,
+): ChineseBackfillState {
+  return {
+    enrichItems: parsed.enrichItems ?? [],
+    scoreItems: parsed.scoreItems ?? [],
+    commentaryItems: parsed.commentaryItems ?? [],
+    clusters: parsed.clusters ?? [],
+    updatedAt: parsed.updatedAt ?? empty.updatedAt,
+  };
 }
 
 function maybeLimit<T>(rows: T[], limit: number | null): T[] {

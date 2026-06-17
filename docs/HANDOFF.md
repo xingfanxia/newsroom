@@ -14,6 +14,9 @@ Shipped cleanup:
 - Removed/de-exported unused internal value exports across auth, i18n navigation, policy, rate-limit, utility, worker, X API, newsletter, normalizer, and cluster modules.
 - Removed/de-exported unused internal type-only exports in the LLM usage and facade modules.
 - Replaced stale `tsx` operator-script hints with `bun`.
+- Shared resumable operator state-file path/load/save behavior through
+  `scripts/ops/state.ts`; backfill scripts keep their own state shape but no
+  longer duplicate JSON parsing, `updatedAt` refreshes, or ENOENT handling.
 - Updated README / `.env.example` / architecture docs so Tavily is not advertised as wired, cron docs match the current split route set, and cluster docs match the 0.75 / 72h runtime.
 - Clarified the AI HOT documentation source of truth: root README and
   `docs/architecture/ingestion.md` now route current runtime behavior to the

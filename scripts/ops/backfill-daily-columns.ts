@@ -5,8 +5,6 @@
  * It only targets dates that already have a daily column row, so the script
  * rewrites historical prose without inventing new publication dates.
  */
-import { readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
 import pLimit from "p-limit";
 import { and, desc, gte, lte, sql } from "drizzle-orm";
 import { closeDb, db } from "@/db/client";
@@ -14,13 +12,15 @@ import { newsletters } from "@/db/schema";
 import { DAILY_NEWSLETTER_KIND, type NewsletterLocale } from "@/lib/types";
 import { runDailyColumn } from "@/workers/newsletter/run-daily-column";
 import { runTimeForDailyPeriodStart } from "@/workers/newsletter/windows";
+import {
+  loadOpsState,
+  opsStatePath,
+  saveOpsState,
+} from "@/scripts/ops/state";
 
 const DAILY_COLUMN_LOCALE = "zh" satisfies NewsletterLocale;
 
-const STATE_FILE = path.resolve(
-  process.cwd(),
-  "scripts/ops/backfill-daily-columns-state.json",
-);
+const STATE_FILE = opsStatePath("backfill-daily-columns-state.json");
 
 type Flags = {
   dryRun: boolean;
@@ -99,26 +99,30 @@ function parseArgs(argv: string[]): Flags {
 }
 
 async function loadState(resume: boolean): Promise<State> {
-  const empty: State = { donePeriods: [], updatedAt: new Date().toISOString() };
-  if (!resume) return empty;
-  try {
-    const raw = await readFile(STATE_FILE, "utf8");
-    const parsed = JSON.parse(raw) as Partial<State>;
-    return {
-      donePeriods: parsed.donePeriods ?? [],
-      updatedAt: parsed.updatedAt ?? empty.updatedAt,
-    };
-  } catch (err) {
-    if (err instanceof Error && (err as NodeJS.ErrnoException).code === "ENOENT") {
-      return empty;
-    }
-    throw err;
-  }
+  return loadOpsState<State>({
+    resume,
+    file: STATE_FILE,
+    empty: emptyDailyColumnBackfillState,
+    normalize: normalizeDailyColumnBackfillState,
+  });
 }
 
 async function saveState(state: State): Promise<void> {
-  state.updatedAt = new Date().toISOString();
-  await writeFile(STATE_FILE, JSON.stringify(state, null, 2) + "\n", "utf8");
+  await saveOpsState(STATE_FILE, state);
+}
+
+function emptyDailyColumnBackfillState(): State {
+  return { donePeriods: [], updatedAt: new Date().toISOString() };
+}
+
+function normalizeDailyColumnBackfillState(
+  parsed: Partial<State>,
+  empty: State,
+): State {
+  return {
+    donePeriods: parsed.donePeriods ?? [],
+    updatedAt: parsed.updatedAt ?? empty.updatedAt,
+  };
 }
 
 function startOfUtcDate(date: string): Date {
