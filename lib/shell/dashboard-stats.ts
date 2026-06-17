@@ -1,6 +1,7 @@
 import { and, eq, gte, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items, sources, policyVersions } from "@/db/schema";
+import { highlightTierInSql } from "@/lib/items/tier-sql";
 import { formatCoarseRelativeTime } from "@/lib/time/relative";
 import type { RadarStats } from "@/components/feed/radar-widget";
 import type { PulsePoint } from "@/components/shell/pulse-box";
@@ -137,7 +138,7 @@ export async function getDayCounts(
     tier === "p1"
       ? sql`coalesce(c.event_tier, i.tier) = 'p1'`
       : tier === "featured"
-        ? sql`coalesce(c.event_tier, i.tier) IN ('featured', 'p1')`
+        ? highlightTierInSql(sql`coalesce(c.event_tier, i.tier)`)
         : sql`coalesce(c.event_tier, i.tier, 'all') <> 'excluded'`;
 
   // Drizzle binds JS arrays as tuples ($1,$2) which the planner rejects for

@@ -1,6 +1,7 @@
 import { and, eq, sql, isNotNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items, sources, clusters } from "@/db/schema";
+import { highlightTierInSql } from "@/lib/items/tier-sql";
 import {
   eventStorySelectFields,
   storySelectFields,
@@ -112,7 +113,7 @@ function buildFeedWhere(q: FeedQuery) {
     tier === "p1"
       ? sql`${effectiveTier} = 'p1'`
       : tier === "featured"
-        ? sql`${effectiveTier} IN ('featured', 'p1')`
+        ? highlightTierInSql(effectiveTier)
         : sql`${effectiveTier} <> 'excluded'`;
 
   // Cluster dedup: only return the item that's its cluster's lead.

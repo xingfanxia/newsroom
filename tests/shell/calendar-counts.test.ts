@@ -46,11 +46,11 @@ describe("getDayCounts — filter contract with feed", () => {
     expect(statsSrc).toMatch(/s\.curated\s*=\s*TRUE/i);
   });
 
-  it("composes tier filter via coalesce(c.event_tier, i.tier) IN (...)", () => {
-    // tier='featured' → IN ('featured','p1'); 'p1' → = 'p1'; 'all' → <> 'excluded' (existing).
-    expect(statsSrc).toMatch(
-      /coalesce\(c\.event_tier,\s*i\.tier[^)]*\)\s+IN\s*\(\s*'featured'\s*,\s*'p1'\s*\)/i,
-    );
+  it("composes the featured tier filter through the shared highlight-tier SQL helper", () => {
+    // tier='featured' stays inclusive; the tuple itself lives in lib/types.ts.
+    expect(statsSrc).toContain("highlightTierInSql");
+    expect(statsSrc).toContain("coalesce(c.event_tier, i.tier)");
+    expect(statsSrc).not.toMatch(/IN\s*\(\s*'featured'\s*,\s*'p1'\s*\)/i);
   });
 });
 

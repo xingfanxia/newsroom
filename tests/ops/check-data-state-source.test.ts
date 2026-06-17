@@ -37,4 +37,10 @@ describe("check-data-state operator diagnostic", () => {
     expect(source).toContain("editor_analysis_zh IS NOT NULL");
     expect(source).not.toContain("AS with_commentary");
   });
+
+  test("counts curated rows through the shared highlight-tier SQL helper", () => {
+    expect(source).toContain("highlightTierInSql");
+    expect(source).not.toContain("tier = 'featured' OR tier = 'p1'");
+    expect(source).not.toMatch(/IN\s*\(\s*'featured'\s*,\s*'p1'\s*\)/i);
+  });
 });

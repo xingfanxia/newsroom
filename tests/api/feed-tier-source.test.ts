@@ -8,6 +8,7 @@ import {
 import { readSource } from "@/tests/helpers/source";
 
 const types = readSource("lib/types.ts");
+const tierSql = readSource("lib/items/tier-sql.ts");
 const feedParams = readSource("lib/api/feed-query-params.ts");
 const mcpRoute = readSource("app/api/mcp/route.ts");
 const sourcePresets = readSource("app/[locale]/_source-presets.ts");
@@ -29,8 +30,14 @@ const itemCommentary = readSource("workers/enrich/commentary.ts");
 const eventCommentary = readSource("workers/cluster/commentary.ts");
 const enrichWorker = readSource("workers/enrich/index.ts");
 const systemStats = readSource("lib/shell/system-stats.ts");
+const dashboardStats = readSource("lib/shell/dashboard-stats.ts");
+const ticker = readSource("lib/shell/ticker.ts");
 const backfillStyle = readSource("scripts/ops/backfill-style.ts");
 const backfillChinese = readSource("scripts/ops/backfill-chinese.ts");
+const checkDataState = readSource("scripts/ops/check-data-state.ts");
+const seedFeedbackFixture = readSource(
+  "scripts/ops/seed-feedback-fixture.ts",
+);
 const resetCuratedForBackfill = readSource(
   "scripts/ops/reset-curated-for-backfill.ts",
 );
@@ -59,6 +66,25 @@ describe("feed tier/view source wiring", () => {
     expect(isHighlightItemTier("featured")).toBe(true);
     expect(isHighlightItemTier("p1")).toBe(true);
     expect(isHighlightItemTier("all")).toBe(false);
+  });
+
+  test("highlight tier SQL predicates reuse the shared tuple", () => {
+    expect(tierSql).toContain("HIGHLIGHT_ITEM_TIERS");
+    expect(tierSql).toContain("highlightTierSqlList");
+    expect(tierSql).toContain("highlightTierInSql");
+    expect(tierSql).not.toMatch(/IN\s*\(\s*'featured'\s*,\s*'p1'\s*\)/i);
+
+    for (const source of [
+      liveItems,
+      dashboardStats,
+      ticker,
+      checkDataState,
+      seedFeedbackFixture,
+    ]) {
+      expect(source).toContain("highlightTierInSql");
+      expect(source).not.toMatch(/IN\s*\(\s*'featured'\s*,\s*'p1'\s*\)/i);
+      expect(source).not.toContain("tier = 'featured' OR tier = 'p1'");
+    }
   });
 
   test("feed-facing schemas use shared visible tiers, views, and source filters", () => {

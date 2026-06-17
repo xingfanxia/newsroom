@@ -9,6 +9,7 @@
  */
 import { sql } from "drizzle-orm";
 import { closeDb, db, schema } from "@/db/client";
+import { highlightTierInSql } from "@/lib/items/tier-sql";
 
 const FIXTURE_USER_ID = "fixture-editor-00000001";
 const FIXTURE_EMAIL = "fixture-editor@example.com";
@@ -54,7 +55,7 @@ console.log(`[seed] user ${FIXTURE_EMAIL} ok`);
 const pool = await client
   .select({ id: schema.items.id, title: schema.items.title })
   .from(schema.items)
-  .where(sql`${schema.items.tier} IN ('featured', 'p1')`)
+  .where(highlightTierInSql(schema.items.tier))
   .orderBy(sql`${schema.items.publishedAt} DESC`)
   .limit(fixtures.length * 2);
 

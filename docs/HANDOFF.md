@@ -224,6 +224,10 @@ Shipped cleanup:
   `HIGHLIGHT_ITEM_TIERS` and `isHighlightItemTier` in `lib/types.ts`, so
   feed serializers, item/event commentary dispatch, treatment routing, and
   operator backfill scripts no longer repeat that decision locally.
+- Shared highlight-tier SQL predicates through `lib/items/tier-sql.ts`, so
+  feed/calendar counts, ticker selection, diagnostics, and feedback fixtures
+  reuse the same `HIGHLIGHT_ITEM_TIERS` tuple instead of hand-writing
+  equivalent two-value `IN` or `OR` clauses.
 - Shared public/agent API item source-field types and cluster lead-pick source
   authority types through `SourceGroup` / `SourceKind` from `lib/types.ts`;
   the archived s9 MCP plan is now labeled historical so old enum examples

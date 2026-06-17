@@ -1,6 +1,7 @@
-import { desc, gte, and, sql, isNotNull, eq } from "drizzle-orm";
+import { desc, gte, and, isNotNull, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items, sources } from "@/db/schema";
+import { highlightTierInSql } from "@/lib/items/tier-sql";
 import type { TickerItem } from "@/components/feed/ticker";
 
 /**
@@ -30,7 +31,7 @@ export async function getRecentTickerItems(
       and(
         gte(items.createdAt, since),
         isNotNull(items.importance),
-        sql`${items.tier} IN ('featured', 'p1')`,
+        highlightTierInSql(items.tier),
       ),
     )
     .orderBy(desc(items.importance))
