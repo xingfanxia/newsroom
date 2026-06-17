@@ -15,6 +15,10 @@ Shipped cleanup:
 - Removed/de-exported unused internal type-only exports in the LLM usage and facade modules.
 - Replaced stale `tsx` operator-script hints with `bun`.
 - Updated README / `.env.example` / architecture docs so Tavily is not advertised as wired, cron docs match the current split route set, and cluster docs match the 0.75 / 72h runtime.
+- Clarified the AI HOT documentation source of truth: root README and
+  `docs/architecture/ingestion.md` now route current runtime behavior to the
+  architecture doc, while `docs/aihot-integration/PLAN.md` is explicitly a
+  shipped historical design record.
 - Aligned `/admin/system` queue telemetry with worker predicates: item commentary now counts only singleton/unclustered item candidates, event commentary is shown as its own queue, and the cron table derives schedules from `vercel.json`.
 - Centralized `/admin/system` queue display metadata in
   `lib/shell/system-queues.ts`; queue names, order, throughput labels, and
