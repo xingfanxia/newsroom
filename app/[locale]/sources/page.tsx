@@ -3,9 +3,7 @@ import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
 import { SOURCE_GROUP_LABELS, SOURCE_GROUPS } from "@/lib/sources/groups";
 import { getLiveSources, liveSourcesByGroup } from "@/lib/sources/live";
-import { getPulseData, getRadarStats } from "@/lib/shell/dashboard-stats";
-import { EMPTY_RADAR_STATS } from "@/lib/shell/radar-stats";
-import { topBarStatsFromRadar } from "@/lib/shell/top-bar-stats";
+import { getShellChromeData } from "@/lib/shell/chrome-data";
 import { SourcesViewToggle, type SourcesView } from "./_view-toggle";
 
 export const dynamic = "force-dynamic";
@@ -21,10 +19,9 @@ export default async function SourcesPage({
   setRequestLocale(locale);
   const view: SourcesView = sp.view === "cards" ? "cards" : "table";
 
-  const [live, stats, pulse] = await Promise.all([
+  const [live, chrome] = await Promise.all([
     getLiveSources(),
-    getRadarStats().catch(() => EMPTY_RADAR_STATS),
-    getPulseData().catch(() => []),
+    getShellChromeData({ pulse: true }),
   ]);
 
   const totalItems = live.reduce((a, b) => a + b.health.totalItemsCount, 0);
@@ -35,8 +32,8 @@ export default async function SourcesPage({
   return (
     <ViewShell
       locale={locale as "en" | "zh"}
-      stats={topBarStatsFromRadar(stats)}
-      pulse={pulse}
+      stats={chrome.topBarStats}
+      pulse={chrome.pulse}
       crumb="~/sources"
       cmd={view === "cards" ? "ls -l sources/" : "cat sources.tsv | column -t"}
     >

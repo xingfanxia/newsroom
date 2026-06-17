@@ -6,9 +6,7 @@ import { IterationRunner } from "@/components/admin/iteration-runner";
 import { VersionTimeline } from "@/components/admin/version-timeline";
 import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
-import { getRadarStats } from "@/lib/shell/dashboard-stats";
-import { EMPTY_RADAR_STATS } from "@/lib/shell/radar-stats";
-import { topBarStatsFromRadar } from "@/lib/shell/top-bar-stats";
+import { getShellChromeData } from "@/lib/shell/chrome-data";
 import { getFeedbackCounts, getRecentFeedback } from "@/lib/feedback/metrics";
 import {
   getActiveSkill,
@@ -48,13 +46,13 @@ export default async function IterationsPage({
   const t = await getTranslations("iteration");
   const trm = await getTranslations("iteration.metrics");
 
-  const [counts, recent, skill, history, latestRun, stats] = await Promise.all([
+  const [counts, recent, skill, history, latestRun, chrome] = await Promise.all([
     getFeedbackCounts(),
     getRecentFeedback(locale === "en" ? "en" : "zh", 10),
     getActiveSkill(SKILL_NAME),
     listSkillVersions(SKILL_NAME),
     getLatestIterationRun(SKILL_NAME),
-    getRadarStats().catch(() => EMPTY_RADAR_STATS),
+    getShellChromeData(),
   ]);
 
   const { total, agreed, disagreed } = counts;
@@ -82,7 +80,7 @@ export default async function IterationsPage({
   return (
     <ViewShell
       locale={locale as "en" | "zh"}
-      stats={topBarStatsFromRadar(stats)}
+      stats={chrome.topBarStats}
       crumb="~/admin/iterations"
       cmd="git log --oneline editorial.skill.md"
     >

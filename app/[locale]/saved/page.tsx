@@ -11,9 +11,7 @@ import { SavedTags } from "@/components/saved/saved-tags";
 import { getSavedStories, getSavedTags, getSavedTotals } from "@/lib/items/saved";
 import { getInboxCount, listCollections } from "@/lib/items/collections";
 import { resolveSavedCollectionSelection } from "@/lib/items/saved-collection-selection";
-import { getPulseData, getRadarStats } from "@/lib/shell/dashboard-stats";
-import { EMPTY_RADAR_STATS } from "@/lib/shell/radar-stats";
-import { topBarStatsFromRadar } from "@/lib/shell/top-bar-stats";
+import { getShellChromeData } from "@/lib/shell/chrome-data";
 import { ADMIN_USER_ID, getSessionUser, upsertAppUser } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
@@ -37,14 +35,12 @@ export default async function SavedPage({
     collections,
     inboxCount,
     totals,
-    stats,
-    pulse,
+    chrome,
   ] = await Promise.all([
     listCollections(userId).catch(() => []),
     getInboxCount(userId).catch(() => 0),
     getSavedTotals(userId).catch(() => ({ total: 0, thisWeek: 0, thisMonth: 0 })),
-    getRadarStats().catch(() => EMPTY_RADAR_STATS),
-    getPulseData().catch(() => []),
+    getShellChromeData({ pulse: true }),
   ]);
   const selection = resolveSavedCollectionSelection(sp.collection, collections);
   if (selection.shouldRedirect) redirect(`/${locale}/saved`);
@@ -68,8 +64,8 @@ export default async function SavedPage({
   return (
     <ViewShell
       locale={locale as "en" | "zh"}
-      stats={topBarStatsFromRadar(stats)}
-      pulse={pulse}
+      stats={chrome.topBarStats}
+      pulse={chrome.pulse}
       crumb={
         activeId === "inbox"
           ? "~/saved"

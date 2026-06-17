@@ -6,9 +6,7 @@ import { Transcript } from "@/components/podcasts/transcript";
 import { YouTubeEmbed, extractYouTubeId } from "@/components/podcasts/youtube-embed";
 import { ViewShell } from "@/components/shell/view-shell";
 import { getItemDetail } from "@/lib/items/detail";
-import { getRadarStats } from "@/lib/shell/dashboard-stats";
-import { EMPTY_RADAR_STATS } from "@/lib/shell/radar-stats";
-import { topBarStatsFromRadar } from "@/lib/shell/top-bar-stats";
+import { getShellChromeData } from "@/lib/shell/chrome-data";
 
 // Re-render every 5 min — commentary + transcript only change via background
 // jobs, so there's no need to hit the DB on every navigation.
@@ -25,9 +23,9 @@ export default async function PodcastDetailPage({
   const id = Number.parseInt(idRaw, 10);
   if (!Number.isInteger(id) || id <= 0) notFound();
 
-  const [detail, stats] = await Promise.all([
+  const [detail, chrome] = await Promise.all([
     getItemDetail(id, locale === "en" ? "en" : "zh"),
-    getRadarStats().catch(() => EMPTY_RADAR_STATS),
+    getShellChromeData(),
   ]);
   if (!detail) notFound();
 
@@ -38,7 +36,7 @@ export default async function PodcastDetailPage({
   return (
     <ViewShell
       locale={locale as "en" | "zh"}
-      stats={topBarStatsFromRadar(stats)}
+      stats={chrome.topBarStats}
       crumb={`~/podcasts/${id}`}
       cmd={`cat ${id}.transcript.md`}
     >

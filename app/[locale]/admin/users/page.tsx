@@ -2,9 +2,7 @@ import { setRequestLocale } from "next-intl/server";
 import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
 import { ComingSoonPanel } from "@/components/shell/coming-soon-panel";
-import { getRadarStats } from "@/lib/shell/dashboard-stats";
-import { EMPTY_RADAR_STATS } from "@/lib/shell/radar-stats";
-import { topBarStatsFromRadar } from "@/lib/shell/top-bar-stats";
+import { getShellChromeData } from "@/lib/shell/chrome-data";
 
 // Admin pages render per-request — they read live stats and contain client
 // components (ViewShell tree) that call useSearchParams. Static prerender
@@ -19,12 +17,12 @@ export default async function UsersPage({
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
-  const stats = await getRadarStats().catch(() => EMPTY_RADAR_STATS);
+  const chrome = await getShellChromeData();
 
   return (
     <ViewShell
       locale={locale as "en" | "zh"}
-      stats={topBarStatsFromRadar(stats)}
+      stats={chrome.topBarStats}
       crumb="~/admin/users"
       cmd="cat /etc/passwd"
     >

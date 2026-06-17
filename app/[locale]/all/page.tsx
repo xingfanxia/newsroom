@@ -20,11 +20,8 @@ import {
 import { getFeaturedStories } from "@/lib/items/live";
 import {
   getDayCounts,
-  getPulseData,
-  getRadarStats,
 } from "@/lib/shell/dashboard-stats";
-import { EMPTY_RADAR_STATS } from "@/lib/shell/radar-stats";
-import { topBarStatsFromRadar } from "@/lib/shell/top-bar-stats";
+import { getShellChromeData } from "@/lib/shell/chrome-data";
 import type { Story } from "@/lib/types";
 
 export const revalidate = 60;
@@ -68,9 +65,8 @@ export default async function AllPostsPage({
     stories = [];
   }
 
-  const [stats, pulse, days] = await Promise.all([
-    getRadarStats().catch(() => EMPTY_RADAR_STATS),
-    getPulseData().catch(() => []),
+  const [chrome, days] = await Promise.all([
+    getShellChromeData({ pulse: true }),
     getDayCounts(60).catch(() => []),
   ]);
 
@@ -82,8 +78,8 @@ export default async function AllPostsPage({
   return (
     <ViewShell
       locale={locale as "en" | "zh"}
-      stats={topBarStatsFromRadar(stats)}
-      pulse={pulse}
+      stats={chrome.topBarStats}
+      pulse={chrome.pulse}
       crumb="~/all"
       cmd="grep -v 'tier=excluded' stream.log"
     >

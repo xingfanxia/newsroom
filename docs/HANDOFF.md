@@ -30,6 +30,9 @@ Shipped cleanup:
 - Shared top-bar stats mapping through `lib/shell/top-bar-stats.ts`; pages now
   pass radar stats through one helper instead of hand-copying tracked-source
   counts and signal-ratio rules into every `ViewShell`.
+- Shared shell chrome data loading through `lib/shell/chrome-data.ts`;
+  `ViewShell` pages no longer repeat radar fallback, optional pulse loading,
+  or top-bar stat mapping before rendering.
 - Shared newest-first feed sorting through `sortStoriesNewestFirst` in
   `lib/feed/group-by-day.ts`; archive-style pages no longer hand-copy
   published-at descending comparators before UTC day grouping.

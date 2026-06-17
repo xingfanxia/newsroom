@@ -6,9 +6,7 @@ import { DayBreak } from "../_day-break";
 import { groupByDay, sortStoriesNewestFirst } from "@/lib/feed/group-by-day";
 import { PodcastChannelPills } from "./_channel-pills";
 import { getFeaturedStories } from "@/lib/items/live";
-import { getPulseData, getRadarStats } from "@/lib/shell/dashboard-stats";
-import { EMPTY_RADAR_STATS } from "@/lib/shell/radar-stats";
-import { topBarStatsFromRadar } from "@/lib/shell/top-bar-stats";
+import { getShellChromeData } from "@/lib/shell/chrome-data";
 import { getPodcastChannels } from "@/lib/shell/podcast-channels";
 import type { Story } from "@/lib/types";
 
@@ -27,10 +25,9 @@ export default async function PodcastsPage({
   setRequestLocale(locale);
   const activeTier: PodTier = sp.tier === "all" ? "all" : "featured";
 
-  const [channels, stats, pulse] = await Promise.all([
+  const [channels, chrome] = await Promise.all([
     getPodcastChannels().catch(() => []),
-    getRadarStats().catch(() => EMPTY_RADAR_STATS),
-    getPulseData().catch(() => []),
+    getShellChromeData({ pulse: true }),
   ]);
 
   const activeChannel =
@@ -60,8 +57,8 @@ export default async function PodcastsPage({
   return (
     <ViewShell
       locale={locale as "en" | "zh"}
-      stats={topBarStatsFromRadar(stats)}
-      pulse={pulse}
+      stats={chrome.topBarStats}
+      pulse={chrome.pulse}
       crumb={activeChannel ? `~/podcasts/${activeChannel}` : "~/podcasts"}
       cmd="ls -t podcasts/"
     >

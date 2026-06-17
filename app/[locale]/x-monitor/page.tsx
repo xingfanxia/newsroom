@@ -6,9 +6,7 @@ import { DayBreak } from "../_day-break";
 import { groupByDay, sortStoriesNewestFirst } from "@/lib/feed/group-by-day";
 import { XHandlesSidebar } from "@/components/x-monitor/handles-sidebar";
 import { getFeaturedStories } from "@/lib/items/live";
-import { getPulseData, getRadarStats } from "@/lib/shell/dashboard-stats";
-import { EMPTY_RADAR_STATS } from "@/lib/shell/radar-stats";
-import { topBarStatsFromRadar } from "@/lib/shell/top-bar-stats";
+import { getShellChromeData } from "@/lib/shell/chrome-data";
 import { getXHandles } from "@/lib/shell/x-handles";
 import type { Story } from "@/lib/types";
 
@@ -24,10 +22,9 @@ export default async function XMonitorPage({
   const [{ locale }, sp] = await Promise.all([params, searchParams]);
   setRequestLocale(locale);
 
-  const [handles, stats, pulse] = await Promise.all([
+  const [handles, chrome] = await Promise.all([
     getXHandles().catch(() => []),
-    getRadarStats().catch(() => EMPTY_RADAR_STATS),
-    getPulseData().catch(() => []),
+    getShellChromeData({ pulse: true }),
   ]);
 
   const activeHandle = sp.handle ?? null;
@@ -53,8 +50,8 @@ export default async function XMonitorPage({
   return (
     <ViewShell
       locale={locale as "en" | "zh"}
-      stats={topBarStatsFromRadar(stats)}
-      pulse={pulse}
+      stats={chrome.topBarStats}
+      pulse={chrome.pulse}
       crumb={activeIsValid ? `~/x/${activeLabel.replace("@", "")}` : "~/x"}
       cmd={
         activeIsValid

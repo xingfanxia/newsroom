@@ -18,15 +18,9 @@ import { getFeaturedStories } from "@/lib/items/live";
 import {
   getDayCounts,
   getPolicySummary,
-  getPulseData,
-  getRadarStats,
   getTopTopics,
 } from "@/lib/shell/dashboard-stats";
-import { EMPTY_RADAR_STATS } from "@/lib/shell/radar-stats";
-import {
-  signalRatioFromRadar,
-  topBarStatsFromRadar,
-} from "@/lib/shell/top-bar-stats";
+import { getShellChromeData } from "@/lib/shell/chrome-data";
 import { getRecentTickerItems } from "@/lib/shell/ticker";
 import { mockStories } from "@/lib/mock/stories";
 import type { Story } from "@/lib/types";
@@ -156,9 +150,8 @@ export default async function HotNewsPage({
     }
   }
 
-  const [radarStats, pulse, topics, policy, tickerItems, days] = await Promise.all([
-    getRadarStats().catch(() => EMPTY_RADAR_STATS),
-    getPulseData().catch(() => []),
+  const [chrome, topics, policy, tickerItems, days] = await Promise.all([
+    getShellChromeData({ pulse: true, signalRatio: "fromRadar" }),
     getTopTopics().catch(() => []),
     getPolicySummary().catch(() => ({ version: "v1", lastIterAt: null })),
     getRecentTickerItems(locale as "zh" | "en").catch(() => []),
@@ -178,11 +171,8 @@ export default async function HotNewsPage({
   return (
     <ViewShell
       locale={locale as "en" | "zh"}
-      stats={topBarStatsFromRadar(
-        radarStats,
-        signalRatioFromRadar(radarStats),
-      )}
-      pulse={pulse}
+      stats={chrome.topBarStats}
+      pulse={chrome.pulse}
       crumb="~/feed"
       cmd="tail -f signal.log"
     >
@@ -191,7 +181,7 @@ export default async function HotNewsPage({
           en={activeDate ? `hot events · ${activeDate}` : "hot events"}
           cjk={activeDate ? `热点聚合 · ${activeDate}` : "热点聚合"}
           count={stories.length}
-          live={<>live · {radarStats.items_today} today</>}
+          live={<>live · {chrome.radarStats.items_today} today</>}
           policyLabel={`policy ${policy.version}`}
         />
         <Ticker items={ticker} />
@@ -222,7 +212,7 @@ export default async function HotNewsPage({
         </div>
       </main>
       <RightRail
-        stats={radarStats}
+        stats={chrome.radarStats}
         watchlist={DEFAULT_WATCHLIST}
         topics={topics}
         policyVersion={policy.version}

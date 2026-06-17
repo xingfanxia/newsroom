@@ -2,12 +2,7 @@ import { notFound } from "next/navigation";
 import { setRequestLocale } from "next-intl/server";
 import { ViewShell } from "@/components/shell/view-shell";
 import { DailyColumnRenderer } from "../_renderer";
-import {
-  getPulseData,
-  getRadarStats,
-} from "@/lib/shell/dashboard-stats";
-import { EMPTY_RADAR_STATS } from "@/lib/shell/radar-stats";
-import { topBarStatsFromRadar } from "@/lib/shell/top-bar-stats";
+import { getShellChromeData } from "@/lib/shell/chrome-data";
 import {
   dailyColumnDateSchema,
   getDailyColumnRowByDate,
@@ -26,10 +21,9 @@ export default async function DailyDatePage({ params }: Props) {
   const parsedDate = dailyColumnDateSchema.safeParse(date);
   if (!parsedDate.success) notFound();
 
-  const [row, stats, pulse] = await Promise.all([
+  const [row, chrome] = await Promise.all([
     getDailyColumnRowByDate(parsedDate.data, "zh"),
-    getRadarStats().catch(() => EMPTY_RADAR_STATS),
-    getPulseData().catch(() => []),
+    getShellChromeData({ pulse: true }),
   ]);
 
   if (!row) notFound();
@@ -37,8 +31,8 @@ export default async function DailyDatePage({ params }: Props) {
   return (
     <ViewShell
       locale="zh"
-      stats={topBarStatsFromRadar(stats)}
-      pulse={pulse}
+      stats={chrome.topBarStats}
+      pulse={chrome.pulse}
       crumb={`~/daily/${date}`}
       cmd={`cat newsletter/daily/${date}.md`}
     >

@@ -4,9 +4,7 @@ import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
 import { PolicyEditor } from "@/components/admin/policy-editor";
 import { getActiveSkill } from "@/lib/policy/skill";
-import { getRadarStats } from "@/lib/shell/dashboard-stats";
-import { EMPTY_RADAR_STATS } from "@/lib/shell/radar-stats";
-import { topBarStatsFromRadar } from "@/lib/shell/top-bar-stats";
+import { getShellChromeData } from "@/lib/shell/chrome-data";
 import { SKILL_NAME } from "@/workers/agent/iterate";
 
 export const dynamic = "force-dynamic";
@@ -26,12 +24,12 @@ export default async function PolicyPage({
   } catch (err) {
     error = err instanceof Error ? err.message : String(err);
   }
-  const stats = await getRadarStats().catch(() => EMPTY_RADAR_STATS);
+  const chrome = await getShellChromeData();
 
   return (
     <ViewShell
       locale={locale as "en" | "zh"}
-      stats={topBarStatsFromRadar(stats)}
+      stats={chrome.topBarStats}
       crumb="~/admin/policy"
       cmd="vi editorial.skill.md"
     >

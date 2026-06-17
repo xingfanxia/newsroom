@@ -29,6 +29,19 @@ const RADAR_FALLBACK_PAGE_PATHS = [
 const INLINE_EMPTY_RADAR_STATS_RE =
   /items_today:\s*0[\s\S]*?items_p1:\s*0[\s\S]*?items_featured:\s*0[\s\S]*?tracked_sources:\s*0/;
 
+const PULSE_CHROME_PAGE_PATHS = [
+  "app/[locale]/page.tsx",
+  "app/[locale]/curated/page.tsx",
+  "app/[locale]/sources/page.tsx",
+  "app/[locale]/all/page.tsx",
+  "app/[locale]/x-monitor/page.tsx",
+  "app/[locale]/saved/page.tsx",
+  "app/[locale]/agents/page.tsx",
+  "app/[locale]/daily/page.tsx",
+  "app/[locale]/daily/[date]/page.tsx",
+  "app/[locale]/podcasts/page.tsx",
+] as const;
+
 describe("radar stats shell contract", () => {
   it("defines the empty radar fallback once", () => {
     expect(EMPTY_RADAR_STATS).toEqual({
@@ -50,13 +63,32 @@ describe("radar stats shell contract", () => {
     expect(widget).not.toContain("export type RadarStats");
   });
 
-  it("keeps page fallbacks on the shared empty object", () => {
+  it("keeps shell chrome fallbacks on the shared empty object", () => {
+    const chromeData = readSource("lib/shell/chrome-data.ts");
+
+    expect(chromeData).toContain("@/lib/shell/radar-stats");
+    expect(chromeData).toContain("getRadarStats().catch(() => EMPTY_RADAR_STATS)");
+    expect(chromeData).toContain("getPulseData().catch(() => [])");
+    expect(chromeData).not.toMatch(INLINE_EMPTY_RADAR_STATS_RE);
+  });
+
+  it("keeps page chrome loading on the shared shell helper", () => {
     for (const path of RADAR_FALLBACK_PAGE_PATHS) {
       const source = readSource(path);
 
-      expect(source).toContain("@/lib/shell/radar-stats");
-      expect(source).toContain("getRadarStats().catch(() => EMPTY_RADAR_STATS)");
+      expect(source).toContain("@/lib/shell/chrome-data");
+      expect(source).not.toContain("@/lib/shell/radar-stats");
+      expect(source).not.toContain("getRadarStats().catch");
       expect(source).not.toMatch(INLINE_EMPTY_RADAR_STATS_RE);
+    }
+  });
+
+  it("keeps pulse-enabled pages explicit about loading pulse data", () => {
+    for (const path of PULSE_CHROME_PAGE_PATHS) {
+      const source = readSource(path);
+
+      expect(source).toContain("getShellChromeData({ pulse: true");
+      expect(source).toContain("pulse={chrome.pulse}");
     }
   });
 
@@ -109,15 +141,30 @@ describe("radar stats shell contract", () => {
   });
 
   it("keeps page top-bar stats mapping on the shared mapper", () => {
+    const chromeData = readSource("lib/shell/chrome-data.ts");
+    expect(chromeData).toContain("@/lib/shell/top-bar-stats");
+    expect(chromeData).toContain("topBarStatsFromRadar(");
+    expect(chromeData).toContain("signalRatioFromRadar(");
+
     for (const path of RADAR_FALLBACK_PAGE_PATHS) {
       const source = readSource(path);
 
-      expect(source).toContain("@/lib/shell/top-bar-stats");
-      expect(source).toContain("stats={topBarStatsFromRadar(");
+      expect(source).not.toContain("@/lib/shell/top-bar-stats");
+      expect(source).not.toContain("topBarStatsFromRadar(");
+      expect(source).toContain("stats={chrome.topBarStats}");
       expect(source).not.toContain("signal_ratio: 0.72");
       expect(source).not.toMatch(
         /tracked_sources:\s*(?:stats|radarStats)\.tracked_sources/,
       );
     }
+  });
+
+  it("keeps the home signal-ratio derivation inside the shell helper", () => {
+    const source = readSource("app/[locale]/page.tsx");
+
+    expect(source).toContain(
+      'getShellChromeData({ pulse: true, signalRatio: "fromRadar" })',
+    );
+    expect(source).not.toContain("signalRatioFromRadar(");
   });
 });

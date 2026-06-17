@@ -2,9 +2,7 @@ import { setRequestLocale } from "next-intl/server";
 import type { Metadata } from "next";
 import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
-import { getRadarStats, getPulseData } from "@/lib/shell/dashboard-stats";
-import { EMPTY_RADAR_STATS } from "@/lib/shell/radar-stats";
-import { topBarStatsFromRadar } from "@/lib/shell/top-bar-stats";
+import { getShellChromeData } from "@/lib/shell/chrome-data";
 import { AgentsTabs } from "./_tabs";
 import { PUBLIC_ENDPOINT_COUNT } from "@/lib/api/public-endpoint-config";
 import { publicUrl } from "@/lib/site";
@@ -25,16 +23,13 @@ export default async function AgentsPage({
   const { locale } = await params;
   setRequestLocale(locale);
 
-  const [stats, pulse] = await Promise.all([
-    getRadarStats().catch(() => EMPTY_RADAR_STATS),
-    getPulseData().catch(() => []),
-  ]);
+  const chrome = await getShellChromeData({ pulse: true });
 
   return (
     <ViewShell
       locale={locale as "en" | "zh"}
-      stats={topBarStatsFromRadar(stats)}
-      pulse={pulse}
+      stats={chrome.topBarStats}
+      pulse={chrome.pulse}
       crumb="~/agents"
       cmd={`curl ${publicUrl("/api/public/feed")}`}
     >

@@ -2,9 +2,7 @@ import Link from "next/link";
 import { setRequestLocale } from "next-intl/server";
 import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
-import { getRadarStats } from "@/lib/shell/dashboard-stats";
-import { EMPTY_RADAR_STATS } from "@/lib/shell/radar-stats";
-import { topBarStatsFromRadar } from "@/lib/shell/top-bar-stats";
+import { getShellChromeData } from "@/lib/shell/chrome-data";
 import {
   getUsageDashboardSummary,
   USAGE_WINDOWS,
@@ -49,9 +47,9 @@ export default async function UsagePage({
     ? (sp.range as WindowKey)
     : "week";
 
-  const [usage, stats] = await Promise.all([
+  const [usage, chrome] = await Promise.all([
     getUsageDashboardSummary(range, { recentLimit: 25, dailyDays: 30 }),
-    getRadarStats().catch(() => EMPTY_RADAR_STATS),
+    getShellChromeData(),
   ]);
   const { selected, dailySpend: daily } = usage;
   const { today, week, month, all } = usage.windowTotals;
@@ -68,7 +66,7 @@ export default async function UsagePage({
   return (
     <ViewShell
       locale={locale as "en" | "zh"}
-      stats={topBarStatsFromRadar(stats)}
+      stats={chrome.topBarStats}
       crumb="~/admin/usage"
       cmd="aws ce get-cost-and-usage --granularity DAILY"
     >

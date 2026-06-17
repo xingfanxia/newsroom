@@ -2,12 +2,7 @@ import Link from "next/link";
 import { setRequestLocale } from "next-intl/server";
 import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
-import {
-  getPulseData,
-  getRadarStats,
-} from "@/lib/shell/dashboard-stats";
-import { EMPTY_RADAR_STATS } from "@/lib/shell/radar-stats";
-import { topBarStatsFromRadar } from "@/lib/shell/top-bar-stats";
+import { getShellChromeData } from "@/lib/shell/chrome-data";
 import {
   dailyColumnDateKey,
   listDailyColumnRows,
@@ -55,19 +50,18 @@ export default async function DailyLandingPage({
   const offset = (page - 1) * PAGE_SIZE;
   const isZh = locale === "zh";
 
-  const [rows, stats, pulse] = await Promise.all([
+  const [rows, chrome] = await Promise.all([
     isZh
       ? listDailyColumnRows({ locale: "zh", take: PAGE_SIZE, offset })
       : Promise.resolve([]),
-    getRadarStats().catch(() => EMPTY_RADAR_STATS),
-    getPulseData().catch(() => []),
+    getShellChromeData({ pulse: true }),
   ]);
 
   return (
     <ViewShell
       locale={locale as "en" | "zh"}
-      stats={topBarStatsFromRadar(stats)}
-      pulse={pulse}
+      stats={chrome.topBarStats}
+      pulse={chrome.pulse}
       crumb="~/daily"
       cmd="cat newsletter/daily/*.md"
     >

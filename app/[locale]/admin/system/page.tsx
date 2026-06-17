@@ -3,9 +3,7 @@ import { AdminSectionHeader as SectionHeader } from "@/components/admin/section-
 import { AdminTableFrame } from "@/components/admin/table-frame";
 import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
-import { getRadarStats } from "@/lib/shell/dashboard-stats";
-import { EMPTY_RADAR_STATS } from "@/lib/shell/radar-stats";
-import { topBarStatsFromRadar } from "@/lib/shell/top-bar-stats";
+import { getShellChromeData } from "@/lib/shell/chrome-data";
 import { getSystemSnapshot } from "@/lib/shell/system-stats";
 
 export const dynamic = "force-dynamic";
@@ -33,9 +31,9 @@ export default async function SystemPage({
   setRequestLocale(locale);
   const zh = locale === "zh";
 
-  const [snap, stats] = await Promise.all([
+  const [snap, chrome] = await Promise.all([
     getSystemSnapshot(),
-    getRadarStats().catch(() => EMPTY_RADAR_STATS),
+    getShellChromeData(),
   ]);
 
   const totalSvc = snap.services.length;
@@ -48,7 +46,7 @@ export default async function SystemPage({
   return (
     <ViewShell
       locale={locale as "en" | "zh"}
-      stats={topBarStatsFromRadar(stats)}
+      stats={chrome.topBarStats}
       crumb="~/admin/system"
       cmd="htop -u ax-radar && tail -f /var/log/ax/*.log"
     >
