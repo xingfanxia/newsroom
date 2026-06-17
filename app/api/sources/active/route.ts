@@ -1,4 +1,4 @@
-import { plainJson, plainServerError } from "@/lib/api/plain-response";
+import { plainJson, runPlainRoute } from "@/lib/api/plain-response";
 import { getActiveSourcesRoutePayload } from "@/lib/api/source-catalog";
 
 export const revalidate = 300;
@@ -10,9 +10,7 @@ export const revalidate = 300;
  * full catalog + health for external agents.
  */
 export async function GET() {
-  try {
+  return runPlainRoute(async () => {
     return plainJson(await getActiveSourcesRoutePayload());
-  } catch (err) {
-    return plainServerError("api/sources/active", err);
-  }
+  }, { serverErrorLabel: "api/sources/active" });
 }

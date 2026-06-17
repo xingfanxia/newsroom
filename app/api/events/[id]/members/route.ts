@@ -22,16 +22,15 @@ import {
 import {
   plainJson,
   plainRouteResult,
-  plainServerError,
+  runPlainRoute,
 } from "@/lib/api/plain-response";
 
 export async function GET(
   req: Request,
   ctx: { params: Promise<{ id: string }> },
 ) {
-  const { id: idRaw } = await ctx.params;
-
-  try {
+  return runPlainRoute(async () => {
+    const { id: idRaw } = await ctx.params;
     const result = await getEventMembersRequestPayload(req, {
       rawId: idRaw,
       defaultLocale: "zh",
@@ -39,7 +38,5 @@ export async function GET(
     return plainRouteResult(result, (payload) =>
       plainJson(toEventMembersListEnvelope(payload)),
     );
-  } catch (err) {
-    return plainServerError("api/events/:id/members", err);
-  }
+  }, { serverErrorLabel: "api/events/:id/members" });
 }

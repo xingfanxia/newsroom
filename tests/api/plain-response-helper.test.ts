@@ -4,6 +4,7 @@ import {
   plainJson,
   plainRouteResult,
   plainServerError,
+  runPlainRoute,
 } from "@/lib/api/plain-response";
 
 describe("plain response helpers", () => {
@@ -52,6 +53,30 @@ describe("plain response helpers", () => {
       expect(res.status).toBe(500);
       expect(await res.json()).toEqual({ error: "server_error" });
       expect(calls).toEqual([["[api/example] failed", err]]);
+    } finally {
+      console.error = originalError;
+    }
+  });
+
+  test("runPlainRoute catches handler failures when a server-error label is provided", async () => {
+    const originalError = console.error;
+    const calls: unknown[][] = [];
+    console.error = (...args: unknown[]) => {
+      calls.push(args);
+    };
+
+    try {
+      const err = new Error("boom");
+      const res = await runPlainRoute(
+        async () => {
+          throw err;
+        },
+        { serverErrorLabel: "api/plain/example" },
+      );
+
+      expect(res.status).toBe(500);
+      expect(await res.json()).toEqual({ error: "server_error" });
+      expect(calls).toEqual([["[api/plain/example] failed", err]]);
     } finally {
       console.error = originalError;
     }

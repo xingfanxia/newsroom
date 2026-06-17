@@ -50,10 +50,11 @@ Shipped cleanup:
   helpers, auth-denial helpers, and admin login/logout cookie responses now
   reuse that implementation while keeping domain-specific names.
 - Shared plain JSON success/error envelopes for small legacy/internal routes
-  through `lib/api/plain-response.ts`; `/api/events/:id/members` and
+  through `runPlainRoute(..., { serverErrorLabel })` in
+  `lib/api/plain-response.ts`; `/api/events/:id/members` and
   `/api/sources/active` no longer hand-copy `Response.json` or catch-all
-  `console.error` server-error branches, and event-member domain failures map
-  through `plainRouteResult`.
+  `try/catch`/`console.error` server-error branches, and event-member domain
+  failures map through `plainRouteResult`.
 - Shared active source-picker payload lookup through
   `lib/api/source-catalog.ts`; `/api/sources/active` now keeps only the
   plain JSON/error envelope while the source-catalog helper owns the enabled
@@ -239,7 +240,8 @@ Shipped cleanup:
   status }` branches.
 - Shared plain domain-result envelope mapping through `plainRouteResult`;
   `/api/events/:id/members` now keeps only success payload shaping while the
-  plain-response helper maps `{ ok: false, error, status }` branches.
+  plain-response helper maps `{ ok: false, error, status }` branches and
+  `runPlainRoute(..., { serverErrorLabel })` owns catch-all server errors.
 - Shared admin iteration id route adapters through `runAdminIterationIdRoute`
   in `lib/api/iteration-routes.ts`; `/api/admin/iterations/[id]`, `/apply`,
   and `/reject` now keep only the action binding while the shared helper owns
