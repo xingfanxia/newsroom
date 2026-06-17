@@ -97,9 +97,8 @@ describe("runtime contract source wiring", () => {
     expect(agentIterate).toContain("ITERATION_RUNNING_STATUS");
     expect(agentIterate).toContain("ITERATION_PROPOSED_STATUS");
     expect(agentIterate).toContain("ITERATION_FAILED_STATUS");
-    expect(iterationRunRoute).toContain("ITERATION_PROPOSED_STATUS");
-    expect(iterationRunRoute).toContain("ITERATION_FAILED_STATUS");
     expect(iterationRouteHelpers).toContain("ITERATION_PROPOSED_STATUS");
+    expect(iterationRouteHelpers).toContain("ITERATION_FAILED_STATUS");
     expect(iterationRouteHelpers).toContain("ITERATION_APPLIED_STATUS");
     expect(iterationRouteHelpers).toContain("ITERATION_REJECTED_STATUS");
 

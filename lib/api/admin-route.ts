@@ -5,6 +5,9 @@ import type { SessionUser } from "@/lib/auth/session";
 type AdminRouteHandler = (admin: SessionUser) => Response | Promise<Response>;
 type AdminRouteOptions = {
   serverErrorLabel?: string;
+  serverErrorExtra?:
+    | Record<string, unknown>
+    | ((err: unknown) => Record<string, unknown>);
 };
 export type AdminRouteResult<T = undefined> =
   | { ok: true; payload: T }
@@ -27,7 +30,11 @@ export async function runAdminRoute(
   try {
     return await handler(auth.admin);
   } catch (err) {
-    return adminServerError(opts.serverErrorLabel, err);
+    const extra =
+      typeof opts.serverErrorExtra === "function"
+        ? opts.serverErrorExtra(err)
+        : (opts.serverErrorExtra ?? {});
+    return adminServerError(opts.serverErrorLabel, err, extra);
   }
 }
 

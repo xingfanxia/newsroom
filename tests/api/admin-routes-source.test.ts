@@ -27,7 +27,8 @@ describe("protected admin route source wiring", () => {
     expect(source).toContain("adminRouteResult");
     expect(source).toContain("adminServerError");
     expect(source).toContain("serverErrorLabel?: string");
-    expect(source).toContain("return adminServerError(opts.serverErrorLabel, err)");
+    expect(source).toContain("serverErrorExtra?:");
+    expect(source).toContain("return adminServerError(opts.serverErrorLabel, err, extra)");
     expect(source).not.toContain("Response.json({ ok:");
   });
 
@@ -38,6 +39,11 @@ describe("protected admin route source wiring", () => {
       if (path.includes("/iterations/[id]/")) {
         expect(source).toContain("@/lib/api/iteration-routes");
         expect(source).toContain("runAdminIterationIdRoute");
+        expect(source).not.toContain("@/lib/api/admin-route");
+        expect(source).not.toContain("runAdminRoute");
+      } else if (path.includes("/iterations/run/")) {
+        expect(source).toContain("@/lib/api/iteration-routes");
+        expect(source).toContain("runAdminIterationStartRoute");
         expect(source).not.toContain("@/lib/api/admin-route");
         expect(source).not.toContain("runAdminRoute");
       } else {

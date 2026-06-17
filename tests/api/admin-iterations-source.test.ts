@@ -6,6 +6,7 @@ const routePaths = [
   "app/api/admin/iterations/[id]/apply/route.ts",
   "app/api/admin/iterations/[id]/reject/route.ts",
 ] as const;
+const runRoutePath = "app/api/admin/iterations/run/route.ts";
 
 describe("admin iteration route source wiring", () => {
   test("all routes share admin auth response handling", () => {
@@ -25,9 +26,18 @@ describe("admin iteration route source wiring", () => {
       expect(source).not.toContain("requireAdmin,");
     }
 
-    const runRoute = read("app/api/admin/iterations/run/route.ts");
-    expect(runRoute).toContain("@/lib/api/admin-route");
-    expect(runRoute).toContain("runAdminRoute");
+    const runRoute = read(runRoutePath);
+    expect(runRoute).toContain("@/lib/api/iteration-routes");
+    expect(runRoute).toContain("runAdminIterationStartRoute");
+    expect(runRoute).not.toContain("@/lib/api/admin-route");
+    expect(runRoute).not.toContain("runAdminRoute");
+    expect(runRoute).not.toContain("@/workers/agent/iterate");
+    expect(runRoute).not.toContain("runIteration");
+    expect(runRoute).not.toContain("IterationGuardError");
+    expect(runRoute).not.toContain("ITERATION_FAILED_STATUS");
+    expect(runRoute).not.toContain("ITERATION_PROPOSED_STATUS");
+    expect(runRoute).not.toContain("try {");
+    expect(runRoute).not.toContain("catch (");
   });
 
   test("all id routes delegate iteration run route-id parsing to the shared helper", () => {
@@ -61,6 +71,11 @@ describe("admin iteration route source wiring", () => {
     expect(helper).toContain("getIterationRunRoutePayload");
     expect(helper).toContain("applyIterationRunRoutePayload");
     expect(helper).toContain("rejectIterationRunRoutePayload");
+    expect(helper).toContain("runAdminIterationStartRoute");
+    expect(helper).toContain("runIteration({ requestedBy })");
+    expect(helper).toContain("IterationGuardError");
+    expect(helper).toContain('serverErrorLabel: "api/admin/iterations/run"');
+    expect(helper).toContain("serverErrorExtra:");
     expect(helper).toContain("runAdminIterationIdRoute");
     expect(helper).toContain("runAdminRoute");
     expect(helper).toContain("commitSkillVersion");

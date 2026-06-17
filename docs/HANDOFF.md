@@ -242,11 +242,12 @@ Shipped cleanup:
   `/api/events/:id/members` now keeps only success payload shaping while the
   plain-response helper maps `{ ok: false, error, status }` branches and
   `runPlainRoute(..., { serverErrorLabel })` owns catch-all server errors.
-- Shared admin iteration id route adapters through `runAdminIterationIdRoute`
-  in `lib/api/iteration-routes.ts`; `/api/admin/iterations/[id]`, `/apply`,
-  and `/reject` now keep only the action binding and `serverErrorLabel` while
-  the shared helper owns admin auth, route-id parsing, catch-all server-error
-  logging, and `adminRouteResult` envelope mapping.
+- Shared admin iteration route adapters through `lib/api/iteration-routes.ts`;
+  `/api/admin/iterations/run` now keeps only the route config and
+  `runAdminIterationStartRoute`, while `/api/admin/iterations/[id]`, `/apply`,
+  and `/reject` keep only the action binding and `serverErrorLabel`. The
+  shared helper owns admin auth, route-id parsing, agent-run guard errors,
+  catch-all server-error logging, and `adminRouteResult` envelope mapping.
 - Shared RSS XML/HTTP response envelope, XML escaping, CDATA splitting, and
   lightweight markdown-to-HTML rendering through `lib/rss/render.ts`;
   `/api/rss/*`, the featured-locale feeds, and the legacy newsletter feeds now

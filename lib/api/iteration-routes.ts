@@ -12,10 +12,15 @@ import { parseIterationRunRouteId } from "@/lib/policy/iterations";
 import { commitSkillVersion } from "@/lib/policy/skill";
 import {
   ITERATION_APPLIED_STATUS,
+  ITERATION_FAILED_STATUS,
   ITERATION_PROPOSED_STATUS,
   ITERATION_REJECTED_STATUS,
 } from "@/lib/types";
-import { SKILL_NAME } from "@/workers/agent/iterate";
+import {
+  IterationGuardError,
+  runIteration,
+  SKILL_NAME,
+} from "@/workers/agent/iterate";
 import { invalidatePolicyCache } from "@/workers/enrich/policy";
 
 type IterationRouteError =
@@ -39,6 +44,18 @@ type AdminIterationIdRouteOptions = {
   serverErrorLabel?: string;
 };
 
+export function runAdminIterationStartRoute(): Promise<Response> {
+  return runAdminRoute(
+    async (admin) => iterationStartRouteResponse(admin.email),
+    {
+      serverErrorLabel: "api/admin/iterations/run",
+      serverErrorExtra: (err) => ({
+        detail: err instanceof Error ? err.message : String(err),
+      }),
+    },
+  );
+}
+
 export function runAdminIterationIdRoute<T extends Record<string, unknown>>(
   params: Promise<{ id: string }>,
   handler: AdminIterationIdRouteHandler<T>,
@@ -52,6 +69,33 @@ export function runAdminIterationIdRoute<T extends Record<string, unknown>>(
     const result = await handler(parsedId.id, admin);
     return adminRouteResult(result, adminJson);
   }, { serverErrorLabel: opts.serverErrorLabel });
+}
+
+async function iterationStartRouteResponse(requestedBy: string): Promise<Response> {
+  try {
+    const result = await runIteration({ requestedBy });
+    if (result.status === ITERATION_FAILED_STATUS) {
+      return adminError("agent_failed", 500, {
+        runId: result.run.id,
+        status: ITERATION_FAILED_STATUS,
+        detail: result.error,
+      });
+    }
+    return adminJson(
+      {
+        runId: result.run.id,
+        status: ITERATION_PROPOSED_STATUS,
+        baseVersion: result.run.baseVersion,
+        proposal: result.proposal,
+      },
+      { status: 202 },
+    );
+  } catch (err) {
+    if (err instanceof IterationGuardError) {
+      return adminError(err.code, 400, { detail: err.message });
+    }
+    throw err;
+  }
 }
 
 export async function getIterationRunRoutePayload(
