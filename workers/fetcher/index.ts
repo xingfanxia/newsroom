@@ -3,7 +3,11 @@ import { sql, and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import { sources, rawItems, sourceHealth } from "@/db/schema";
 import type { Source } from "@/db/schema";
-import { FETCHABLE_SOURCE_KINDS, type FetchableSourceKind } from "@/lib/types";
+import {
+  FETCHABLE_SOURCE_KINDS,
+  type Cadence,
+  type FetchableSourceKind,
+} from "@/lib/types";
 import { fetchWithRetry, type FetchErrorCode } from "./http";
 import { parseFeed, type FeedItem } from "./rss";
 import {
@@ -34,7 +38,7 @@ export type FetchReport = {
 
 /** Fetch all enabled sources matching the given cadences, in parallel. */
 export async function runFetchBucket(
-  cadences: ("live" | "hourly" | "daily" | "weekly")[],
+  cadences: Cadence[],
 ): Promise<FetchReport> {
   const started = Date.now();
   const client = db();

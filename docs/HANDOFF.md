@@ -33,6 +33,9 @@ Shipped cleanup:
 - Reused `VISIBLE_ITEM_TIERS` in `/admin/system` queue SQL and enrich-worker
   retry priority SQL, so queue telemetry and re-enrich ordering cannot drift
   from the feed/commentary tier contract.
+- Centralized fetch-cron cadence buckets in `workers/fetcher/pipeline.ts`;
+  HTTP fetch routes and local `scripts/ops/run-cron.ts` now pass only the
+  fetch-cron slug and cannot drift on `live/hourly/daily/weekly` membership.
 - Updated README / `.env.example` / architecture docs so Tavily is not advertised as wired, cron docs match the current split route set, and cluster docs match the 0.75 / 72h runtime.
 - Clarified the AI HOT documentation source of truth: root README and
   `docs/architecture/ingestion.md` now route current runtime behavior to the

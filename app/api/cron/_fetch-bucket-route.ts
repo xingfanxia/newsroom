@@ -1,19 +1,17 @@
 import {
-  runFetchAndNormalize,
-  type FetchCadences,
+  runFetchCronBucket,
+  type FetchCronKind,
 } from "@/workers/fetcher/pipeline";
 import { runCronJsonRoute } from "./_route";
 
-type FetchCronKind = "fetch-hourly" | "fetch-daily" | "fetch-weekly";
-
 export async function runFetchBucketCronRoute(
   req: Request,
-  options: { kind: FetchCronKind; cadences: FetchCadences },
+  kind: FetchCronKind,
 ) {
   return runCronJsonRoute(req, async () => {
-    const report = await runFetchAndNormalize(options.cadences);
+    const report = await runFetchCronBucket(kind);
     return {
-      kind: options.kind,
+      kind,
       fetch: report.fetch,
       normalize: report.normalize,
     };

@@ -68,7 +68,7 @@ describe("cron route HTTP envelope helper", () => {
     const src = readSource(fetchBucketRoutePath);
 
     expect(src).toContain("runCronJsonRoute");
-    expect(src).toContain("runFetchAndNormalize");
+    expect(src).toContain("runFetchCronBucket");
     expect(src).toContain("fetch: report.fetch");
     expect(src).toContain("normalize: report.normalize");
     expect(src).not.toContain("NextResponse");

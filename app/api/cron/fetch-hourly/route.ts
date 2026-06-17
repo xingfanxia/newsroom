@@ -5,8 +5,5 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
-  return runFetchBucketCronRoute(req, {
-    kind: "fetch-hourly",
-    cadences: ["live", "hourly"],
-  });
+  return runFetchBucketCronRoute(req, "fetch-hourly");
 }

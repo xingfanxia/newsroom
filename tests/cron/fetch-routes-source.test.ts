@@ -17,6 +17,8 @@ describe("fetch cron routes", () => {
     const helper = readSource(workerHelperPath);
 
     expect(helper).toContain("runFetchAndNormalize");
+    expect(helper).toContain("FETCH_CRON_CADENCES");
+    expect(helper).toContain("runFetchCronBucket");
     expect(helper).toContain("runFetchBucket");
     expect(helper).toContain("runNormalizer");
     expect(helper).toContain("return { fetch, normalize }");
@@ -36,7 +38,7 @@ describe("fetch cron routes", () => {
     expect(existsSync(sourcePath(routeHelperPath))).toBe(true);
     const helper = readSource(routeHelperPath);
 
-    expect(helper).toContain("runFetchAndNormalize");
+    expect(helper).toContain("runFetchCronBucket");
     expect(helper).toContain("runCronJsonRoute");
     expect(helper).toContain("fetch: report.fetch");
     expect(helper).toContain("normalize: report.normalize");
@@ -47,20 +49,13 @@ describe("fetch cron routes", () => {
   });
 
   it("keeps leaf routes limited to their public kind and source cadences", () => {
-    const routes = [
-      {
-        name: "fetch-hourly" as const,
-        cadenceSnippet: 'cadences: ["live", "hourly"]',
-      },
-      { name: "fetch-daily" as const, cadenceSnippet: 'cadences: ["daily"]' },
-      { name: "fetch-weekly" as const, cadenceSnippet: 'cadences: ["weekly"]' },
-    ];
+    const routes = ["fetch-hourly", "fetch-daily", "fetch-weekly"] as const;
 
     for (const route of routes) {
-      const src = routeSource(route.name);
+      const src = routeSource(route);
       expect(src).toContain("runFetchBucketCronRoute");
-      expect(src).toContain(`kind: "${route.name}"`);
-      expect(src).toContain(route.cadenceSnippet);
+      expect(src).toContain(`runFetchBucketCronRoute(req, "${route}")`);
+      expect(src).not.toContain("cadences:");
       expect(src).toMatch(/maxDuration\s*=\s*800/);
       expect(src).toContain('dynamic = "force-dynamic"');
       expect(src).toContain('runtime = "nodejs"');
@@ -75,11 +70,13 @@ describe("fetch cron routes", () => {
   it("keeps local operator cron buckets on the same fetch+normalize helper", () => {
     const src = readSource(scriptPath);
 
-    expect(src).toContain("runFetchAndNormalize");
-    expect(src).toContain('runFetchAndNormalize(["live", "hourly"])');
-    expect(src).toContain('runFetchAndNormalize(["daily"])');
-    expect(src).toContain('runFetchAndNormalize(["weekly"])');
+    expect(src).toContain("runFetchCronBucket");
+    expect(src).toContain('runFetchCronBucket("fetch-hourly")');
+    expect(src).toContain('runFetchCronBucket("fetch-daily")');
+    expect(src).toContain('runFetchCronBucket("fetch-weekly")');
+    expect(src).not.toContain('["live", "hourly"]');
     expect(src).not.toContain("runFetchBucket");
+    expect(src).not.toContain("runFetchAndNormalize");
     expect(src).toContain('"fetch-hourly": fetchHourly');
     expect(src).toContain('"fetch-daily": fetchDaily');
     expect(src).toContain('"fetch-weekly": fetchWeekly');

@@ -13,16 +13,16 @@ import { runEnrichBatch } from "@/workers/enrich";
 import { runCommentaryBackfill } from "@/workers/enrich/commentary";
 import { runScoreBackfill } from "@/workers/enrich/score-backfill";
 import { runClusterPipeline } from "@/workers/cluster/pipeline";
-import { runFetchAndNormalize } from "@/workers/fetcher/pipeline";
+import { runFetchCronBucket } from "@/workers/fetcher/pipeline";
 import { runContentPrefetch } from "@/workers/fetcher/content-prefetch";
 import { runYoutubeTranscriptFetch } from "@/workers/fetcher/youtube-transcript";
 import { runDailyColumn, runNewsletterBatch } from "@/workers/newsletter";
 
 type CronRunner = () => Promise<unknown>;
 
-const fetchHourly = () => runFetchAndNormalize(["live", "hourly"]);
-const fetchDaily = () => runFetchAndNormalize(["daily"]);
-const fetchWeekly = () => runFetchAndNormalize(["weekly"]);
+const fetchHourly = () => runFetchCronBucket("fetch-hourly");
+const fetchDaily = () => runFetchCronBucket("fetch-daily");
+const fetchWeekly = () => runFetchCronBucket("fetch-weekly");
 const contentPrefetch = () => runContentPrefetch();
 const youtubeTranscript = async () => ({
   youtube: await runYoutubeTranscriptFetch(),
