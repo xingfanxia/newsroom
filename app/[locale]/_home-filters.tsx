@@ -2,6 +2,7 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
 import { useTweaks } from "@/hooks/use-tweaks";
+import { mainRssFeedMeta } from "@/lib/rss/main-feed-meta";
 import type { SourcePreset } from "./_source-presets";
 
 export type HomeTier = "featured" | "p1";
@@ -47,6 +48,7 @@ export function HomeFilters({
   const sp = useSearchParams();
   const [pending, start] = useTransition();
   const zh = tweaks.language === "zh";
+  const mainRssPath = mainRssFeedMeta(zh ? "zh" : "en").apiPath;
 
   const push = (patch: Record<string, string | undefined>) => {
     const next = new URLSearchParams(sp.toString());
@@ -132,7 +134,7 @@ export function HomeFilters({
       <div className="fil-spacer" />
       <div className="fil-right">
         <a
-          href={zh ? "/api/feed/zh/rss.xml" : "/api/feed/en/rss.xml"}
+          href={mainRssPath}
           className="mini-btn"
           target="_blank"
           rel="noreferrer"

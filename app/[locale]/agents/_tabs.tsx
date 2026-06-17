@@ -7,6 +7,7 @@ import {
   publicRateLimitReqLabel,
 } from "@/lib/api/public-endpoint-config";
 import { LEGACY_RSS_FEEDS } from "@/lib/rss/legacy-feed-meta";
+import { MAIN_RSS_FEEDS } from "@/lib/rss/main-feed-meta";
 import { PUBLIC_SITE_URL } from "@/lib/site";
 
 type Tab = "skill" | "rss" | "api";
@@ -315,28 +316,11 @@ function RssPane({ lang }: { lang: Lang }) {
           : "recommended"
         : undefined,
     })),
-    {
-      title:
-        lang === "zh"
-          ? "AX Radar — 双语主 feed (zh)"
-          : "AX Radar — main feed (zh)",
-      url: `${SITE}/api/feed/zh/rss.xml`,
-      desc:
-        lang === "zh"
-          ? "featured + p1 合集,带 锐评 + content:encoded 全文。"
-          : "Featured + p1 union with editor commentary in content:encoded.",
-    },
-    {
-      title:
-        lang === "zh"
-          ? "AX Radar — 双语主 feed (en)"
-          : "AX Radar — main feed (en)",
-      url: `${SITE}/api/feed/en/rss.xml`,
-      desc:
-        lang === "zh"
-          ? "英文版主 feed。"
-          : "English main feed (English titles + summaries).",
-    },
+    ...MAIN_RSS_FEEDS.map((feed) => ({
+      title: feed.integrationTitle[lang],
+      url: `${SITE}${feed.apiPath}`,
+      desc: feed.integrationDescription[lang],
+    })),
   ];
 
   return (

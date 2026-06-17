@@ -1,5 +1,9 @@
 import { getFeaturedStories } from "@/lib/items/live";
 import {
+  coerceMainRssLocale,
+  mainRssFeedMeta,
+} from "@/lib/rss/main-feed-meta";
+import {
   escapeXml,
   renderMarkdownishHtml,
   renderRssFeed,
@@ -12,18 +16,13 @@ import type { Story } from "@/lib/types";
 /** Cache for 10 min — the underlying feed updates every 15 min via enrich cron. */
 export const revalidate = 600;
 
-const BRAND = { en: "AX's AI RADAR", zh: "AX 的 AI 雷达" };
-const DESCRIPTION = {
-  en: "Bilingual AI intelligence radar — curated daily signal from the monitored source catalog.",
-  zh: "双语 AI 情报雷达 — 从已监控的精选信源目录中提炼每日高价值内容。",
-};
-
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ locale: string }> },
 ) {
   const { locale: raw } = await params;
-  const locale: "zh" | "en" = raw === "en" ? "en" : "zh";
+  const locale = coerceMainRssLocale(raw);
+  const meta = mainRssFeedMeta(locale);
 
   // Featured + p1 union, dedupped; fall back to `all` on slow days
   let stories: Story[] = await getFeaturedStories({
@@ -57,13 +56,13 @@ export async function GET(
   });
 
   const xml = renderRssFeed({
-    title: BRAND[locale],
-    link: publicUrl(`/${locale}`),
-    description: DESCRIPTION[locale],
-    language: locale === "zh" ? "zh-CN" : "en-US",
+    title: meta.channelTitle,
+    link: publicUrl(meta.route),
+    description: meta.channelDescription,
+    language: meta.language,
     lastBuildDate: items[0]?.pubDate ?? new Date(),
-    selfLink: publicUrl(`/api/feed/${locale}/rss.xml`),
-    generator: `${BRAND[locale]} (${PUBLIC_SITE_HOST})`,
+    selfLink: publicUrl(meta.apiPath),
+    generator: `${meta.channelTitle} (${PUBLIC_SITE_HOST})`,
     namespaces: {
       radar: publicUrl("/schemas/radar/1.0"),
     },

@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { getMessages, setRequestLocale } from "next-intl/server";
 import { Toaster } from "sonner";
 import { routing } from "@/i18n/routing";
+import { MAIN_RSS_FEEDS } from "@/lib/rss/main-feed-meta";
 import "../globals.css";
 import "../terminal.css";
 
@@ -35,10 +36,10 @@ export const metadata: Metadata = {
   icons: { icon: "/favicon.svg" },
   alternates: {
     types: {
-      "application/rss+xml": [
-        { url: "/api/feed/en/rss.xml", title: "AX's AI RADAR (English)" },
-        { url: "/api/feed/zh/rss.xml", title: "AX 的 AI 雷达 (中文)" },
-      ],
+      "application/rss+xml": MAIN_RSS_FEEDS.map((feed) => ({
+        url: feed.apiPath,
+        title: feed.alternateTitle,
+      })),
     },
   },
 };
