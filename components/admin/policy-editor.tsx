@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { DiffViewer } from "@/components/admin/diff-viewer";
 import { AdminMonoBlock } from "@/components/admin/mono-block";
+import { AdminMonoInput, AdminMonoTextarea } from "@/components/admin/mono-field";
 import { VersionPill } from "@/components/admin/version-pill";
 import { useTweaks } from "@/hooks/use-tweaks";
 import { diffLines } from "@/lib/policy/diff";
@@ -244,23 +245,9 @@ export function PolicyEditor({
             minHeight: 480,
           }}
         >
-          <textarea
+          <AdminMonoTextarea
             value={content}
             onChange={(e) => editContent(e.target.value)}
-            spellCheck={false}
-            style={{
-              background: "var(--bg-1)",
-              border: "1px solid var(--border-1)",
-              color: "var(--fg-1)",
-              fontFamily: "var(--font-mono)",
-              fontSize: 12.5,
-              lineHeight: 1.7,
-              padding: 14,
-              resize: "vertical",
-              minHeight: 480,
-              outline: "none",
-              borderRadius: 2,
-            }}
           />
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <div
@@ -313,21 +300,11 @@ export function PolicyEditor({
           >
             {zh ? "本次改动说明（可选）" : "commit reasoning (optional)"}
           </div>
-          <input
+          <AdminMonoInput
             value={reasoning}
             onChange={(e) => editReasoning(e.target.value)}
             maxLength={2000}
             placeholder={zh ? "例如：收紧 P1 门槛" : "e.g. tighten P1 threshold"}
-            style={{
-              background: "var(--bg-1)",
-              border: "1px solid var(--border-1)",
-              color: "var(--fg-1)",
-              fontFamily: "var(--font-mono)",
-              fontSize: 12,
-              padding: "8px 10px",
-              outline: "none",
-              borderRadius: 2,
-            }}
           />
         </div>
       )}

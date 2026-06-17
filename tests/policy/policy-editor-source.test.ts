@@ -4,6 +4,7 @@ import { readSource } from "@/tests/helpers/source";
 const source = readSource("components/admin/policy-editor.tsx");
 const policyPage = readSource("app/[locale]/admin/policy/page.tsx");
 const monoBlock = readSource("components/admin/mono-block.tsx");
+const monoField = readSource("components/admin/mono-field.tsx");
 
 describe("policy editor source wiring", () => {
   test("reuses the shared policy diff contract for edit previews", () => {
@@ -44,5 +45,17 @@ describe("policy editor source wiring", () => {
     expect(policyPage).toContain("@/components/admin/mono-block");
     expect(policyPage).toContain('tone="error"');
     expect(policyPage).not.toContain("<pre");
+  });
+
+  test("reuses shared admin mono fields for editable policy controls", () => {
+    expect(monoField).toContain("export function AdminMonoTextarea");
+    expect(monoField).toContain("export function AdminMonoInput");
+    expect(source).toContain("@/components/admin/mono-field");
+    expect(source).toContain("<AdminMonoTextarea");
+    expect(source).toContain("<AdminMonoInput");
+    expect(source).not.toContain("<textarea");
+    expect(source).not.toContain("<input");
+    expect(source).not.toContain('resize: "vertical"');
+    expect(source).not.toContain('outline: "none"');
   });
 });
