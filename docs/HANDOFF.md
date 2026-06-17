@@ -234,6 +234,9 @@ Shipped cleanup:
   and `v1RouteResult`; collection, saved, event-member, and tweak leaf routes
   now keep only success payload shaping while the surface helpers map
   `{ ok: false, error, status }` branches.
+- Shared route payload result types through `lib/api/route-result.ts`; admin,
+  session, v1, plain, and public helpers now alias the same ok/error contract
+  instead of repeating local `{ ok, payload/error/status }` unions.
 - Shared required-session domain-result envelope mapping through
   `sessionRouteResult`; `/api/tweaks` and `/api/feedback/move` now keep only
   success payload shaping while the session helper maps `{ ok: false, error,

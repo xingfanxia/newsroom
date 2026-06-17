@@ -35,6 +35,7 @@ describe("v1 route source contracts", () => {
     expect(helper).toContain(
       'import { requireApiToken } from "@/lib/auth/api-token"',
     );
+    expect(helper).toContain("@/lib/api/route-result");
     expect(helper).toContain("export async function runV1Route");
     expect(helper).toContain("export function v1Json");
     expect(helper).toContain("export function v1Error");
@@ -43,6 +44,8 @@ describe("v1 route source contracts", () => {
     expect(helper).toContain("export function v1InvalidQueryResult");
     expect(helper).toContain("export function v1ServerError");
     expect(helper).toContain("serverErrorLabel?: string");
+    expect(helper).toContain("export type V1RouteResult<T = undefined> = RouteResult<T>");
+    expect(helper).toContain("return onOk(routeResultPayload(result))");
     expect(helper).toContain("return v1ServerError(opts.serverErrorLabel, err)");
     expect(helper).toContain('return v1Error("server_error", 500)');
   });

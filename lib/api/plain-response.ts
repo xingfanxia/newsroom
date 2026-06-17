@@ -5,6 +5,8 @@
  * rate-limit behavior. Unlike admin/session routes, they do not use an
  * `{ ok: ... }` envelope.
  */
+import type { RequiredPayloadRouteResult } from "@/lib/api/route-result";
+
 type PlainRouteHandler = () => Response | Promise<Response>;
 type PlainRouteOptions = {
   serverErrorLabel?: string;
@@ -31,9 +33,7 @@ export function plainError(error: string, status: number): Response {
   return plainJson({ error }, { status });
 }
 
-export type PlainRouteResult<T> =
-  | { ok: true; payload: T }
-  | { ok: false; error: string; status: number };
+export type PlainRouteResult<T> = RequiredPayloadRouteResult<T>;
 
 export function plainRouteResult<T>(
   result: PlainRouteResult<T>,

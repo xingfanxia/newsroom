@@ -13,6 +13,7 @@ describe("required session route source wiring", () => {
 
     expect(source).toContain("@/lib/api/session-auth");
     expect(source).toContain("@/lib/api/ok-response");
+    expect(source).toContain("@/lib/api/route-result");
     expect(source).toContain("runSessionRoute");
     expect(source).toContain("sessionJson");
     expect(source).toContain("sessionOk");
@@ -20,6 +21,8 @@ describe("required session route source wiring", () => {
     expect(source).toContain("sessionRouteResult");
     expect(source).toContain("sessionServerError");
     expect(source).toContain("serverErrorLabel?: string");
+    expect(source).toContain("export type SessionRouteResult<T = undefined> = RouteResult<T>");
+    expect(source).toContain("return onOk(routeResultPayload(result))");
     expect(source).toContain(
       "return sessionServerError(opts.serverErrorLabel, err)",
     );

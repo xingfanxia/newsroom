@@ -1,5 +1,9 @@
 import { requireAdminForRoute } from "@/lib/api/admin-auth";
 import { okEmpty, okError, okJson } from "@/lib/api/ok-response";
+import {
+  routeResultPayload,
+  type RouteResult,
+} from "@/lib/api/route-result";
 import type { SessionUser } from "@/lib/auth/session";
 
 type AdminRouteHandler = (admin: SessionUser) => Response | Promise<Response>;
@@ -9,15 +13,7 @@ type AdminRouteOptions = {
     | Record<string, unknown>
     | ((err: unknown) => Record<string, unknown>);
 };
-export type AdminRouteResult<T = undefined> =
-  | { ok: true; payload: T }
-  | { ok: true; payload?: undefined }
-  | {
-      ok: false;
-      error: string;
-      status: number;
-      extra?: Record<string, unknown>;
-    };
+export type AdminRouteResult<T = undefined> = RouteResult<T>;
 
 export async function runAdminRoute(
   handler: AdminRouteHandler,
@@ -49,7 +45,7 @@ export function adminRouteResult<T>(
   if (!result.ok) {
     return adminError(result.error, result.status, result.extra);
   }
-  return onOk(("payload" in result ? result.payload : undefined) as T);
+  return onOk(routeResultPayload(result));
 }
 
 export function adminServerError(

@@ -20,6 +20,7 @@ describe("protected admin route source wiring", () => {
 
     expect(source).toContain("@/lib/api/admin-auth");
     expect(source).toContain("@/lib/api/ok-response");
+    expect(source).toContain("@/lib/api/route-result");
     expect(source).toContain("runAdminRoute");
     expect(source).toContain("adminJson");
     expect(source).toContain("adminOk");
@@ -28,6 +29,8 @@ describe("protected admin route source wiring", () => {
     expect(source).toContain("adminServerError");
     expect(source).toContain("serverErrorLabel?: string");
     expect(source).toContain("serverErrorExtra?:");
+    expect(source).toContain("export type AdminRouteResult<T = undefined> = RouteResult<T>");
+    expect(source).toContain("return onOk(routeResultPayload(result))");
     expect(source).toContain("return adminServerError(opts.serverErrorLabel, err, extra)");
     expect(source).not.toContain("Response.json({ ok:");
   });

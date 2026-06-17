@@ -20,6 +20,10 @@ import {
   type PublicEndpointKey,
 } from "@/lib/api/public-endpoint-config";
 import { invalidQueryError } from "@/lib/api/query-params";
+import type {
+  RequiredPayloadRouteResult,
+  RouteErrorResult,
+} from "@/lib/api/route-result";
 import { publicRateLimit } from "@/lib/rate-limit/public";
 
 type PublicCachedJsonArgs = {
@@ -31,11 +35,9 @@ type PublicCachedJsonArgs = {
 
 export type PublicCachedRouteResult =
   | { ok: true; signal: string; body: unknown }
-  | { ok: false; error: string; status: number };
+  | RouteErrorResult;
 
-export type PublicRouteResult<T> =
-  | { ok: true; payload: T }
-  | { ok: false; error: string; status: number };
+export type PublicRouteResult<T> = RequiredPayloadRouteResult<T>;
 
 type PublicCachedRouteArgs = {
   endpoint: PublicEndpointKey;

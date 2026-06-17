@@ -121,6 +121,17 @@ describe("public API endpoint contract", () => {
     }
   });
 
+  test("public route helpers reuse the shared domain-result contract", () => {
+    const source = readProjectFile("lib/api/public-helpers.ts");
+
+    expect(source).toContain("@/lib/api/route-result");
+    expect(source).toContain("RequiredPayloadRouteResult");
+    expect(source).toContain("RouteErrorResult");
+    expect(source).toContain(
+      "export type PublicRouteResult<T> = RequiredPayloadRouteResult<T>",
+    );
+  });
+
   test("agent-facing runtime surfaces render labels/counts from the shared contract", async () => {
     const skillSource = readProjectFile("app/skill.md/route.ts");
     const agentsTabsSource = readProjectFile("app/[locale]/agents/_tabs.tsx");

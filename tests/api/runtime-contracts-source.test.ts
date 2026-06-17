@@ -6,6 +6,12 @@ const schema = read("db/schema.ts");
 const feedParams = read("lib/api/feed-query-params.ts");
 const eventMembers = read("lib/api/event-members.ts");
 const dailyColumns = read("lib/api/daily-columns.ts");
+const routeResult = read("lib/api/route-result.ts");
+const adminRoute = read("lib/api/admin-route.ts");
+const sessionRoute = read("lib/api/session-route.ts");
+const plainResponse = read("lib/api/plain-response.ts");
+const publicHelpers = read("lib/api/public-helpers.ts");
+const v1Route = read("lib/api/v1-route.ts");
 const savedRequests = read("lib/api/saved-requests.ts");
 const feedbackToggle = read("lib/feedback/toggle.ts");
 const feedbackMetrics = read("lib/feedback/metrics.ts");
@@ -79,6 +85,30 @@ describe("runtime contract source wiring", () => {
       expect(source).not.toContain('["up", "down"]');
       expect(source).not.toContain('"up" | "down" | "save"');
     }
+  });
+
+  test("route result contracts have one runtime source of truth", () => {
+    expect(routeResult).toContain("export type RouteErrorResult");
+    expect(routeResult).toContain("export type RouteSuccessResult");
+    expect(routeResult).toContain("export type RouteResult");
+    expect(routeResult).toContain("export type RequiredPayloadRouteResult");
+    expect(routeResult).toContain("export function routeResultPayload");
+
+    for (const source of [adminRoute, sessionRoute, v1Route]) {
+      expect(source).toContain("@/lib/api/route-result");
+      expect(source).toContain("type RouteResult");
+      expect(source).toContain("routeResultPayload(result)");
+      expect(source).not.toContain("| { ok: true; payload: T }");
+      expect(source).not.toContain("payload?: undefined");
+      expect(source).not.toContain("extra?: Record<string, unknown>;");
+    }
+
+    for (const source of [plainResponse, publicHelpers]) {
+      expect(source).toContain("@/lib/api/route-result");
+      expect(source).toContain("RequiredPayloadRouteResult");
+      expect(source).not.toContain("| { ok: false; error: string; status: number }");
+    }
+    expect(publicHelpers).toContain("RouteErrorResult");
   });
 
   test("user roles and iteration statuses have one runtime source of truth", () => {
