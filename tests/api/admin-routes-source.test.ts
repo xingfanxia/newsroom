@@ -9,6 +9,10 @@ const protectedAdminRoutePaths = [
   "app/api/admin/iterations/[id]/reject/route.ts",
   "app/api/admin/iterations/run/route.ts",
 ] as const;
+const standardAdminRoutePaths = [
+  "app/api/admin/collections/route.ts",
+  "app/api/admin/policy/commit/route.ts",
+] as const;
 
 describe("protected admin route source wiring", () => {
   test("admin route helper centralizes auth and aliases shared ok/error envelopes", () => {
@@ -22,6 +26,8 @@ describe("protected admin route source wiring", () => {
     expect(source).toContain("adminError");
     expect(source).toContain("adminRouteResult");
     expect(source).toContain("adminServerError");
+    expect(source).toContain("serverErrorLabel?: string");
+    expect(source).toContain("return adminServerError(opts.serverErrorLabel, err)");
     expect(source).not.toContain("Response.json({ ok:");
   });
 
@@ -47,6 +53,20 @@ describe("protected admin route source wiring", () => {
       expect(source).not.toContain("ForbiddenError");
       expect(source).not.toContain('console.error("[api/admin');
       expect(source).not.toContain('adminError("server_error"');
+    }
+  });
+
+  test("standard protected admin routes delegate catch-all server errors to runAdminRoute", () => {
+    for (const path of standardAdminRoutePaths) {
+      const source = read(path);
+      const handlerCount = source.match(/runAdminRoute\(async/g)?.length ?? 0;
+
+      expect(source.match(/serverErrorLabel:/g)?.length ?? 0, path).toBe(
+        handlerCount,
+      );
+      expect(source).not.toContain("adminServerError");
+      expect(source).not.toContain("try {");
+      expect(source).not.toContain("catch (");
     }
   });
 

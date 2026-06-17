@@ -5,7 +5,6 @@ import {
   runSessionRoute,
   sessionOk,
   sessionRouteResult,
-  sessionServerError,
 } from "@/lib/api/session-route";
 
 /**
@@ -22,11 +21,7 @@ export async function POST(req: Request) {
     });
     if (!parsed.ok) return parsed.response;
 
-    try {
-      const result = await moveSavedItemRoutePayload(user, parsed.data);
-      return sessionRouteResult(result, () => sessionOk());
-    } catch (err) {
-      return sessionServerError("api/feedback/move", err);
-    }
-  });
+    const result = await moveSavedItemRoutePayload(user, parsed.data);
+    return sessionRouteResult(result, () => sessionOk());
+  }, { serverErrorLabel: "api/feedback/move" });
 }

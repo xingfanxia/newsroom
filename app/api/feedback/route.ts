@@ -2,7 +2,6 @@ import { parseJsonRequestBody } from "@/lib/api/json-body";
 import {
   runSessionRoute,
   sessionJson,
-  sessionServerError,
 } from "@/lib/api/session-route";
 import {
   applyFeedbackToggle,
@@ -24,11 +23,7 @@ export async function POST(req: Request) {
     });
     if (!parsed.ok) return parsed.response;
 
-    try {
-      const userVotes = await applyFeedbackToggle(user, parsed.data);
-      return sessionJson({ userVotes });
-    } catch (err) {
-      return sessionServerError("api/feedback", err);
-    }
-  });
+    const userVotes = await applyFeedbackToggle(user, parsed.data);
+    return sessionJson({ userVotes });
+  }, { serverErrorLabel: "api/feedback" });
 }

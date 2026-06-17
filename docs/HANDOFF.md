@@ -37,13 +37,14 @@ Shipped cleanup:
   `getSystemSnapshot` and display cannot drift when a cron path changes.
 - Shared `/api/admin/iterations/[id]` route-id parsing through `lib/policy/iterations.ts` so fetch/apply/reject stay behaviorally aligned.
 - Shared protected-admin route auth, ok/error JSON envelopes, and catch-all
-  server-error logging through `lib/api/admin-route.ts`, wrapping the
-  lower-level `lib/api/admin-auth.ts` auth/admin-required response mapping.
+  server-error logging through `runAdminRoute(..., { serverErrorLabel })` in
+  `lib/api/admin-route.ts`, wrapping the lower-level `lib/api/admin-auth.ts`
+  auth/admin-required response mapping.
 - Shared cookie-session route auth and ok/error JSON envelopes for
   required-session user routes (`/api/feedback*`, `/api/tweaks`), plus their
   domain-result mapping and catch-all server-error logging, through
-  `lib/api/session-route.ts`, wrapping the lower-level
-  `lib/api/session-auth.ts` auth-required response.
+  `runSessionRoute(..., { serverErrorLabel })` in `lib/api/session-route.ts`,
+  wrapping the lower-level `lib/api/session-auth.ts` auth-required response.
 - Shared the underlying `{ ok: true }` / `{ ok: false, error }` response
   envelope construction through `lib/api/ok-response.ts`; admin/session route
   helpers, auth-denial helpers, and admin login/logout cookie responses now
@@ -116,10 +117,11 @@ Shipped cleanup:
   user upsert, preferences/watchlist loading, DB patch construction, and
   `empty_body` decisions stay aligned while each route keeps its own auth and
   response envelope.
-- Cookie-gated `/api/tweaks` now wraps shared persistence failures with
-  `sessionServerError`, matching the other required-session routes instead of
-  falling through to the framework's default 500 response. Covered by
-  `tests/api/tweaks-source.test.ts`.
+- Cookie-gated `/api/tweaks` now delegates shared persistence failures to
+  `runSessionRoute(..., { serverErrorLabel })`, matching the other
+  required-session routes instead of falling through to the framework's default
+  500 response. Covered by `tests/api/tweaks-source.test.ts` and
+  `tests/api/session-routes-source.test.ts`.
 - Shared watchlist normalization through `lib/watchlist.ts`; browser right-rail
   add/remove flows and cookie/v1 tweak PATCH validation now trim, lowercase,
   and case-insensitively dedupe terms before persistence.

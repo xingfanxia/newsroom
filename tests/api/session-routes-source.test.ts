@@ -19,20 +19,31 @@ describe("required session route source wiring", () => {
     expect(source).toContain("sessionError");
     expect(source).toContain("sessionRouteResult");
     expect(source).toContain("sessionServerError");
+    expect(source).toContain("serverErrorLabel?: string");
+    expect(source).toContain(
+      "return sessionServerError(opts.serverErrorLabel, err)",
+    );
     expect(source).not.toContain("Response.json({ ok:");
   });
 
   test("cookie-gated user routes share session auth response handling", () => {
     for (const path of requiredSessionRoutePaths) {
       const source = read(path);
+      const handlerCount = source.match(/runSessionRoute\(async/g)?.length ?? 0;
 
       expect(source).toContain("@/lib/api/session-route");
       expect(source).toContain("runSessionRoute");
+      expect(source.match(/serverErrorLabel:/g)?.length ?? 0, path).toBe(
+        handlerCount,
+      );
       expect(source).not.toContain("@/lib/api/session-auth");
       expect(source).not.toContain("requireSessionForRoute");
       expect(source).not.toContain("getSessionUser");
       expect(source).not.toContain('{ ok: false, error: "auth_required" }');
       expect(source).not.toContain("NextResponse.json(");
+      expect(source).not.toContain("sessionServerError");
+      expect(source).not.toContain("try {");
+      expect(source).not.toContain("catch (");
       expect(source).not.toContain('console.error("[api/feedback');
       expect(source).not.toContain('sessionError("server_error"');
     }

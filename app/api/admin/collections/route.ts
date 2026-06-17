@@ -3,7 +3,6 @@ import {
   adminJson,
   adminOk,
   adminRouteResult,
-  adminServerError,
   runAdminRoute,
 } from "@/lib/api/admin-route";
 import { parseJsonRequestBody } from "@/lib/api/json-body";
@@ -25,7 +24,7 @@ export async function GET() {
     await upsertAppUser(user);
     const { collections } = await listCollectionRoutePayload(user.id);
     return adminJson({ collections });
-  });
+  }, { serverErrorLabel: "api/admin/collections GET" });
 }
 
 /** POST — create a new collection. */
@@ -38,16 +37,12 @@ export async function POST(req: Request) {
     });
     if (!parsed.ok) return parsed.response;
 
-    try {
-      const result = await createCollectionRoutePayload({
-        userId: user.id,
-        ...parsed.data,
-      });
-      return adminRouteResult(result, adminJson);
-    } catch (err) {
-      return adminServerError("api/admin/collections POST", err);
-    }
-  });
+    const result = await createCollectionRoutePayload({
+      userId: user.id,
+      ...parsed.data,
+    });
+    return adminRouteResult(result, adminJson);
+  }, { serverErrorLabel: "api/admin/collections POST" });
 }
 
 /** PATCH — rename / pin / unpin. */
@@ -58,16 +53,12 @@ export async function PATCH(req: Request) {
     });
     if (!parsed.ok) return parsed.response;
 
-    try {
-      const result = await updateCollectionRoutePayload({
-        userId: user.id,
-        ...parsed.data,
-      });
-      return adminRouteResult(result, () => adminOk());
-    } catch (err) {
-      return adminServerError("api/admin/collections PATCH", err);
-    }
-  });
+    const result = await updateCollectionRoutePayload({
+      userId: user.id,
+      ...parsed.data,
+    });
+    return adminRouteResult(result, () => adminOk());
+  }, { serverErrorLabel: "api/admin/collections PATCH" });
 }
 
 /** DELETE — remove a collection. Saves get reparented to inbox (SET NULL). */
@@ -79,11 +70,7 @@ export async function DELETE(req: Request) {
     });
     if (!parsed.ok) return parsed.response;
 
-    try {
-      const result = await deleteCollectionRoutePayload(user.id, parsed.data.id);
-      return adminRouteResult(result, () => adminOk());
-    } catch (err) {
-      return adminServerError("api/admin/collections DELETE", err);
-    }
-  });
+    const result = await deleteCollectionRoutePayload(user.id, parsed.data.id);
+    return adminRouteResult(result, () => adminOk());
+  }, { serverErrorLabel: "api/admin/collections DELETE" });
 }

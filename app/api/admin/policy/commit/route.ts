@@ -1,6 +1,5 @@
 import {
   adminJson,
-  adminServerError,
   runAdminRoute,
 } from "@/lib/api/admin-route";
 import { parseJsonRequestBody } from "@/lib/api/json-body";
@@ -24,10 +23,6 @@ export async function POST(req: Request) {
     });
     if (!parsed.ok) return parsed.response;
 
-    try {
-      return adminJson(await commitPolicyRoutePayload(user, parsed.data));
-    } catch (err) {
-      return adminServerError("api/admin/policy/commit", err);
-    }
-  });
+    return adminJson(await commitPolicyRoutePayload(user, parsed.data));
+  }, { serverErrorLabel: "api/admin/policy/commit" });
 }

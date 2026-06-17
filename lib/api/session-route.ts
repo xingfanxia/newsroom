@@ -3,6 +3,9 @@ import { okEmpty, okError, okJson } from "@/lib/api/ok-response";
 import type { SessionUser } from "@/lib/auth/session";
 
 type SessionRouteHandler = (user: SessionUser) => Response | Promise<Response>;
+type SessionRouteOptions = {
+  serverErrorLabel?: string;
+};
 export type SessionRouteResult<T = undefined> =
   | { ok: true; payload: T }
   | { ok: true; payload?: undefined }
@@ -15,10 +18,17 @@ export type SessionRouteResult<T = undefined> =
 
 export async function runSessionRoute(
   handler: SessionRouteHandler,
+  opts: SessionRouteOptions = {},
 ): Promise<Response> {
   const auth = await requireSessionForRoute();
   if (!auth.ok) return auth.response;
-  return handler(auth.user);
+  if (!opts.serverErrorLabel) return handler(auth.user);
+
+  try {
+    return await handler(auth.user);
+  } catch (err) {
+    return sessionServerError(opts.serverErrorLabel, err);
+  }
 }
 
 export const sessionJson = okJson;

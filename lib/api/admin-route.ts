@@ -3,6 +3,9 @@ import { okEmpty, okError, okJson } from "@/lib/api/ok-response";
 import type { SessionUser } from "@/lib/auth/session";
 
 type AdminRouteHandler = (admin: SessionUser) => Response | Promise<Response>;
+type AdminRouteOptions = {
+  serverErrorLabel?: string;
+};
 export type AdminRouteResult<T = undefined> =
   | { ok: true; payload: T }
   | { ok: true; payload?: undefined }
@@ -15,10 +18,17 @@ export type AdminRouteResult<T = undefined> =
 
 export async function runAdminRoute(
   handler: AdminRouteHandler,
+  opts: AdminRouteOptions = {},
 ): Promise<Response> {
   const auth = await requireAdminForRoute();
   if (!auth.ok) return auth.response;
-  return handler(auth.admin);
+  if (!opts.serverErrorLabel) return handler(auth.admin);
+
+  try {
+    return await handler(auth.admin);
+  } catch (err) {
+    return adminServerError(opts.serverErrorLabel, err);
+  }
 }
 
 export const adminJson = okJson;
