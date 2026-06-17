@@ -1,4 +1,5 @@
 import { setRequestLocale } from "next-intl/server";
+import { AdminMonoBlock } from "@/components/admin/mono-block";
 import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
 import { PolicyEditor } from "@/components/admin/policy-editor";
@@ -56,22 +57,16 @@ export default async function PolicyPage({
             version={skill.version}
           />
         ) : (
-          <pre
+          <AdminMonoBlock
+            tone="error"
             style={{
-              background: "var(--bg-1)",
-              border: "1px solid var(--border-1)",
               padding: 24,
-              fontFamily: "var(--font-mono)",
-              fontSize: 12.5,
               lineHeight: 1.7,
-              color: "var(--accent-red)",
-              whiteSpace: "pre-wrap",
               marginTop: 14,
-              borderRadius: 2,
             }}
           >
             {error ?? "editorial.skill.md not found."}
-          </pre>
+          </AdminMonoBlock>
         )}
       </main>
     </ViewShell>

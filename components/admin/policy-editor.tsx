@@ -3,6 +3,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { DiffViewer } from "@/components/admin/diff-viewer";
+import { AdminMonoBlock } from "@/components/admin/mono-block";
 import { VersionPill } from "@/components/admin/version-pill";
 import { useTweaks } from "@/hooks/use-tweaks";
 import { diffLines } from "@/lib/policy/diff";
@@ -276,43 +277,27 @@ export function PolicyEditor({
             {dirty ? (
               <DiffViewer lines={diff} />
             ) : (
-              <pre
+              <AdminMonoBlock
                 style={{
-                  background: "var(--bg-1)",
-                  border: "1px solid var(--border-1)",
-                  color: "var(--fg-1)",
-                  fontFamily: "var(--font-mono)",
-                  fontSize: 12.5,
                   lineHeight: 1.7,
                   padding: 14,
-                  whiteSpace: "pre-wrap",
                   overflow: "auto",
-                  borderRadius: 2,
                   margin: 0,
                 }}
               >
                 {content}
-              </pre>
+              </AdminMonoBlock>
             )}
           </div>
         </div>
       ) : (
-        <pre
+        <AdminMonoBlock
           style={{
-            background: "var(--bg-1)",
-            border: "1px solid var(--border-1)",
-            padding: 20,
-            fontFamily: "var(--font-mono)",
-            fontSize: 12.5,
-            lineHeight: 1.75,
-            color: "var(--fg-1)",
-            whiteSpace: "pre-wrap",
             overflowX: "auto",
-            borderRadius: 2,
           }}
         >
           {content}
-        </pre>
+        </AdminMonoBlock>
       )}
 
       {editing && (

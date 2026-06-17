@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { readSource } from "@/tests/helpers/source";
 
 const source = readSource("components/admin/policy-editor.tsx");
+const policyPage = readSource("app/[locale]/admin/policy/page.tsx");
+const monoBlock = readSource("components/admin/mono-block.tsx");
 
 describe("policy editor source wiring", () => {
   test("reuses the shared policy diff contract for edit previews", () => {
@@ -32,5 +34,15 @@ describe("policy editor source wiring", () => {
     expect(source).toContain("const editReasoning = (nextReasoning: string) => {");
     expect(source).toContain("onChange={(e) => editContent(e.target.value)}");
     expect(source).toContain("onChange={(e) => editReasoning(e.target.value)}");
+  });
+
+  test("reuses the shared admin mono block for policy body previews", () => {
+    expect(monoBlock).toContain("export function AdminMonoBlock");
+    expect(source).toContain("@/components/admin/mono-block");
+    expect(source).toContain("<AdminMonoBlock");
+    expect(source).not.toContain("<pre");
+    expect(policyPage).toContain("@/components/admin/mono-block");
+    expect(policyPage).toContain('tone="error"');
+    expect(policyPage).not.toContain("<pre");
   });
 });
