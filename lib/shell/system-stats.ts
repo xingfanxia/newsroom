@@ -15,7 +15,7 @@
  *  - **errors**: joins `source_health.last_error` with the failing source
  *    for an error-log view.
  */
-import { and, eq, isNotNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   clusters,
@@ -37,6 +37,7 @@ import {
   formatElapsedSince,
   latestDate,
 } from "@/lib/time/relative";
+import { VISIBLE_ITEM_TIERS } from "@/lib/types";
 import {
   bodyPrefetchPendingSql,
   enrichBodyPrefetchReadySql,
@@ -152,7 +153,7 @@ export async function getSystemSnapshot(): Promise<SystemSnapshot> {
           and ${enrichBodyPrefetchReadySql(items.bodyFetchedAt, items.canonicalUrl)}
       )::int`,
       itemCommentaryPending: sql<number>`count(*) filter (
-        where ${items.tier} in ('featured','p1','all')
+        where ${inArray(items.tier, VISIBLE_ITEM_TIERS)}
           and ${items.commentaryAt} is null
           and (
             ${items.clusterId} is null
@@ -170,7 +171,7 @@ export async function getSystemSnapshot(): Promise<SystemSnapshot> {
   const [clustersRow] = await client
     .select({
       eventCommentaryPending: sql<number>`count(*) filter (
-        where ${clusters.eventTier} in ('featured','p1','all')
+        where ${inArray(clusters.eventTier, VISIBLE_ITEM_TIERS)}
           and ${clusters.memberCount} >= 2
           and ${clusters.commentaryAt} is null
           and COALESCE(${clusters.latestMemberAt}, ${clusters.firstSeenAt}) >= now() - make_interval(hours => ${EVENT_COMMENTARY_CRON_RECENCY_HOURS})

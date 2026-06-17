@@ -27,6 +27,8 @@ const enrichTreatment = readSource("workers/enrich/treatment.ts");
 const enrichPrompt = readSource("workers/enrich/prompt.ts");
 const itemCommentary = readSource("workers/enrich/commentary.ts");
 const eventCommentary = readSource("workers/cluster/commentary.ts");
+const enrichWorker = readSource("workers/enrich/index.ts");
+const systemStats = readSource("lib/shell/system-stats.ts");
 const backfillStyle = readSource("scripts/ops/backfill-style.ts");
 const backfillChinese = readSource("scripts/ops/backfill-chinese.ts");
 const resetCuratedForBackfill = readSource(
@@ -114,6 +116,14 @@ describe("feed tier/view source wiring", () => {
     expect(enrichPrompt).toContain("z.enum(ITEM_TIERS)");
     expect(itemCommentary).toContain("VISIBLE_ITEM_TIERS");
     expect(eventCommentary).toContain("VISIBLE_ITEM_TIERS");
+  });
+
+  test("worker queue and priority SQL reuse visible tier tuples", () => {
+    for (const source of [systemStats, enrichWorker]) {
+      expect(source).toContain("VISIBLE_ITEM_TIERS");
+      expect(source).not.toContain("IN ('featured','p1','all')");
+      expect(source).not.toContain("in ('featured','p1','all')");
+    }
   });
 
   test("highlight tier decisions use the shared helper", () => {

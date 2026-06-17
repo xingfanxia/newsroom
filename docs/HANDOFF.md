@@ -30,6 +30,9 @@ Shipped cleanup:
 - Shared admin monospace form controls through `components/admin/mono-field.tsx`;
   `PolicyEditor` now reuses common textarea/input styling while keeping its
   save, dirty-state, and confirmation behavior local.
+- Reused `VISIBLE_ITEM_TIERS` in `/admin/system` queue SQL and enrich-worker
+  retry priority SQL, so queue telemetry and re-enrich ordering cannot drift
+  from the feed/commentary tier contract.
 - Updated README / `.env.example` / architecture docs so Tavily is not advertised as wired, cron docs match the current split route set, and cluster docs match the 0.75 / 72h runtime.
 - Clarified the AI HOT documentation source of truth: root README and
   `docs/architecture/ingestion.md` now route current runtime behavior to the

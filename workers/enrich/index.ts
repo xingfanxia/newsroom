@@ -9,6 +9,7 @@ import {
   profiles,
   LLMError,
 } from "@/lib/llm";
+import { VISIBLE_ITEM_TIERS } from "@/lib/types";
 import { enrichBodyPrefetchReadySql } from "@/lib/urls/media";
 import {
   enrichSchema,
@@ -159,7 +160,7 @@ async function claimPendingEnrichItems(
       WHERE ${and(...filters)}
       ORDER BY
         CASE
-          WHEN ${items.tier} IN ('featured','p1','all') THEN 0
+          WHEN ${inArray(items.tier, VISIBLE_ITEM_TIERS)} THEN 0
           WHEN ${items.bodyMd} IS NOT NULL THEN 1
           WHEN ${items.tier} = 'excluded' THEN 3
           ELSE 2
