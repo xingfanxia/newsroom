@@ -1,11 +1,15 @@
+import { readdirSync } from "node:fs";
 import { describe, expect, test } from "bun:test";
-import { readSource } from "@/tests/helpers/source";
+import { readSource, sourcePath } from "@/tests/helpers/source";
 
 const rootReadme = readSource("README.md");
 const docsReadme = readSource("docs/README.md");
 const ingestionDoc = readSource("docs/architecture/ingestion.md");
 const aggregationHandoff = readSource("docs/HANDOFF-AGGREGATION.md");
 const aihotPlan = readSource("docs/aihot-integration/PLAN.md");
+const aggregationHandoffFiles = readdirSync(sourcePath("docs/aggregation"))
+  .filter((name) => /^HANDOFF.*\.md$/.test(name))
+  .sort();
 
 describe("docs routing source contracts", () => {
   test("root aggregation handoff is clearly archived, not current guidance", () => {
@@ -16,6 +20,22 @@ describe("docs routing source contracts", () => {
     expect(aggregationHandoff.slice(0, 500)).toContain("Historical archive");
     expect(aggregationHandoff.slice(0, 500)).toContain("not current implementation guidance");
     expect(aggregationHandoff.slice(0, 500)).toContain("docs/architecture/ingestion.md");
+  });
+
+  test("aggregation handoff archives self-identify before read-order instructions", () => {
+    expect(docsReadme).toContain("[`aggregation/HANDOFF*.md`](./aggregation/)");
+    expect(aggregationHandoffFiles.length).toBeGreaterThanOrEqual(7);
+    expect(aggregationHandoffFiles).toContain("HANDOFF.md");
+
+    for (const file of aggregationHandoffFiles) {
+      const lead = readSource(`docs/aggregation/${file}`).slice(0, 700);
+      expect(lead, file).toContain("Historical archive");
+      expect(lead, file).toContain("not current implementation guidance");
+      expect(lead, file).toContain("../architecture/ingestion.md");
+      expect(lead.indexOf("Historical archive"), file).toBeLessThan(
+        lead.indexOf("Read order"),
+      );
+    }
   });
 
   test("AI HOT plan is routed as a shipped design record, not the runtime source", () => {

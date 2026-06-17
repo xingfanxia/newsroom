@@ -19,6 +19,9 @@ Shipped cleanup:
   `docs/architecture/ingestion.md` now route current runtime behavior to the
   architecture doc, while `docs/aihot-integration/PLAN.md` is explicitly a
   shipped historical design record.
+- Added archive banners to every `docs/aggregation/HANDOFF*.md` entry so
+  direct readers see current clustering/cron/feed behavior is documented in
+  `docs/architecture/ingestion.md`, not in older session handoffs.
 - Aligned `/admin/system` queue telemetry with worker predicates: item commentary now counts only singleton/unclustered item candidates, event commentary is shown as its own queue, and the cron table derives schedules from `vercel.json`.
 - Centralized `/admin/system` queue display metadata in
   `lib/shell/system-queues.ts`; queue names, order, throughput labels, and

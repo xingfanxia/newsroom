@@ -1,5 +1,11 @@
 # Newsroom — handoff after cluster-merge fix (2026-04-25, evening session)
 
+> **Historical archive.** This aggregation handoff preserves an older
+> event-aggregation session and is not current implementation guidance.
+> Current clustering, cron, and feed behavior lives in
+> [`../architecture/ingestion.md`](../architecture/ingestion.md) and runtime
+> source.
+
 > **Read order**:
 > 1. This file (cluster-merge fix + cron pipeline change + threshold validation)
 > 2. `docs/aggregation/HANDOFF-2026-04-25.md` (morning session — gpt-5.5 + Stage A recall fix)

@@ -1,5 +1,11 @@
 # Newsroom — handoff after pipeline recovery session (2026-04-28)
 
+> **Historical archive.** This aggregation handoff preserves an older
+> event-aggregation session and is not current implementation guidance.
+> Current clustering, cron, and feed behavior lives in
+> [`../architecture/ingestion.md`](../architecture/ingestion.md) and runtime
+> source.
+
 > **Read order**:
 > 1. This file (calendar contract + enrich cron split + TZ grouping + Azure content filter unblock)
 > 2. `docs/aggregation/HANDOFF-2026-04-27-daily-highlights.md` (daily-highlights default — same prior session)

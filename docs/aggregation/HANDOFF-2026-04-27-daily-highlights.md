@@ -1,5 +1,11 @@
 # Newsroom — handoff after daily-highlights default + relax tuning (2026-04-27)
 
+> **Historical archive.** This aggregation handoff preserves an older
+> event-aggregation session and is not current implementation guidance.
+> Current clustering, cron, and feed behavior lives in
+> [`../architecture/ingestion.md`](../architecture/ingestion.md) and runtime
+> source.
+
 > **Read order**:
 > 1. This file (daily-highlights default + threshold/cap tuning)
 > 2. `docs/aggregation/HANDOFF-2026-04-26-lead-pick.md` (lead-pick + de-biased title prompt — same PR)

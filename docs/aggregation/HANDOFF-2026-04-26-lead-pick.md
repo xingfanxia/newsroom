@@ -1,5 +1,11 @@
 # Newsroom — handoff after authority-aware lead pick + de-biased title prompt (2026-04-26)
 
+> **Historical archive.** This aggregation handoff preserves an older
+> event-aggregation session and is not current implementation guidance.
+> Current clustering, cron, and feed behavior lives in
+> [`../architecture/ingestion.md`](../architecture/ingestion.md) and runtime
+> source.
+
 > **Read order**:
 > 1. This file (lead-pick + Stage C prompt fix)
 > 2. `docs/aggregation/HANDOFF-2026-04-25-cluster-merge.md` (cluster-merge fix — same PR)

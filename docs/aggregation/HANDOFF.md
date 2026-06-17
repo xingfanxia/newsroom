@@ -1,10 +1,10 @@
 # AX's AI RADAR — Event aggregation handoff (Waves 1-4 implemented, 2026-04-24)
 
-> **Archived historical snapshot.** This file preserves the 2026-04-24
-> aggregation rollout state and contains obsolete operational notes. Current
-> cluster cron wiring lives in `workers/cluster/pipeline.ts`, which is used by
-> both `/api/cron/cluster` and `scripts/ops/run-cron.ts cluster`; do not follow
-> the old "Worker wiring into cron" TODO below as current guidance.
+> **Historical archive.** This file preserves the 2026-04-24 aggregation
+> rollout state and is not current implementation guidance. Current clustering,
+> cron, and feed behavior lives in
+> [`../architecture/ingestion.md`](../architecture/ingestion.md) and runtime
+> source; do not follow old cron TODOs below as current guidance.
 
 > **Read order**:
 > 1. This file (operational status + runbook)

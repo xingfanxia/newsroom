@@ -1,5 +1,11 @@
 # Event aggregation — handoff after live deploy + agent surfacing (2026-04-25)
 
+> **Historical archive.** This aggregation handoff preserves an older
+> event-aggregation session and is not current implementation guidance.
+> Current clustering, cron, and feed behavior lives in
+> [`../architecture/ingestion.md`](../architecture/ingestion.md) and runtime
+> source.
+
 > **Read order**:
 > 1. This file (current state + open optimization items)
 > 2. `docs/aggregation/HANDOFF.md` (Wave 1-4 implementation handoff)
