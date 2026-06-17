@@ -2,7 +2,6 @@ import { describe, expect, test } from "bun:test";
 import { readSource as read } from "@/tests/helpers/source";
 
 const sharedJsonBodyRoutePaths = [
-  "app/api/admin/auth/route.ts",
   "app/api/admin/collections/route.ts",
   "app/api/admin/policy/commit/route.ts",
   "app/api/feedback/route.ts",
@@ -12,10 +11,17 @@ const sharedJsonBodyRoutePaths = [
   "app/api/v1/saved/route.ts",
   "app/api/v1/tweaks/route.ts",
 ] as const;
+const sharedJsonBodyHelperPaths = [
+  "lib/api/admin-session-routes.ts",
+] as const;
+const sharedJsonBodySourcePaths = [
+  ...sharedJsonBodyRoutePaths,
+  ...sharedJsonBodyHelperPaths,
+] as const;
 
 describe("JSON body parsing source wiring", () => {
   test("mutating API routes share JSON parse and Zod error handling", () => {
-    for (const path of sharedJsonBodyRoutePaths) {
+    for (const path of sharedJsonBodySourcePaths) {
       const source = read(path);
 
       expect(source).toContain("@/lib/api/json-body");
@@ -27,11 +33,21 @@ describe("JSON body parsing source wiring", () => {
   });
 
   test("each surface keeps its intended error envelope", () => {
-    for (const path of sharedJsonBodyRoutePaths) {
+    for (const path of sharedJsonBodySourcePaths) {
       const source = read(path);
       const expectedEnvelope = path.includes("/api/v1/") ? "plain" : "ok";
 
       expect(source).toContain(`envelope: "${expectedEnvelope}"`);
     }
+  });
+
+  test("admin login route delegates JSON parsing to admin session helpers", () => {
+    const route = read("app/api/admin/auth/route.ts");
+
+    expect(route).toContain("@/lib/api/admin-session-routes");
+    expect(route).toContain("adminLoginResponse(req)");
+    expect(route).not.toContain("@/lib/api/json-body");
+    expect(route).not.toContain("parseJsonRequestBody");
+    expect(route).not.toContain("adminLoginBodySchema");
   });
 });

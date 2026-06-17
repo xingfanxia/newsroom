@@ -1,8 +1,10 @@
 import { z } from "zod";
+import { parseJsonRequestBody } from "@/lib/api/json-body";
 import { okEmpty, okError, okJson } from "@/lib/api/ok-response";
 import {
   expiredAdminSessionCookie,
   freshAdminSessionCookie,
+  isValidPassword,
 } from "@/lib/auth/password";
 
 export const adminLoginBodySchema = z.object({
@@ -12,6 +14,20 @@ export const adminLoginBodySchema = z.object({
 
 export function adminLoginInvalidResponse(): Response {
   return okError("invalid", 401);
+}
+
+export async function adminLoginResponse(req: Request): Promise<Response> {
+  const parsed = await parseJsonRequestBody(req, adminLoginBodySchema, {
+    envelope: "ok",
+    includeIssues: false,
+  });
+  if (!parsed.ok) return parsed.response;
+
+  if (!isValidPassword(parsed.data.password)) {
+    return adminLoginInvalidResponse();
+  }
+
+  return adminLoginSuccessResponse(parsed.data.next);
 }
 
 export function adminLoginSuccessResponse(rawNext: string | undefined): Response {

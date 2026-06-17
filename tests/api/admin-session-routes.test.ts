@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import {
   adminLoginBodySchema,
   adminLoginInvalidResponse,
+  adminLoginResponse,
   adminLoginSuccessResponse,
   adminLogoutResponse,
   sanitizeAdminNext,
@@ -13,6 +14,14 @@ const ORIGINAL_PASSWORD = process.env.ADMIN_PASSWORD;
 function setPassword(value: string | undefined) {
   if (value === undefined) delete process.env.ADMIN_PASSWORD;
   else process.env.ADMIN_PASSWORD = value;
+}
+
+function jsonRequest(body: string): Request {
+  return new Request("https://example.test/api/admin/auth", {
+    method: "POST",
+    body,
+    headers: { "content-type": "application/json" },
+  });
 }
 
 describe("admin session route helpers", () => {
@@ -51,6 +60,45 @@ describe("admin session route helpers", () => {
 
     expect(res.status).toBe(401);
     expect(await res.json()).toEqual({ ok: false, error: "invalid" });
+  });
+
+  test("login request helper validates JSON and rejects malformed bodies", async () => {
+    const res = await adminLoginResponse(jsonRequest("{"));
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      ok: false,
+      error: "invalid_json",
+    });
+  });
+
+  test("login request helper rejects wrong passwords", async () => {
+    const res = await adminLoginResponse(
+      jsonRequest(JSON.stringify({ password: "wrong" })),
+    );
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ ok: false, error: "invalid" });
+  });
+
+  test("login request helper accepts valid passwords and sanitizes next", async () => {
+    const res = await adminLoginResponse(
+      jsonRequest(
+        JSON.stringify({
+          password: "admin-session-route-test",
+          next: "/api/admin/system",
+        }),
+      ),
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      ok: true,
+      next: "/",
+    });
+    expect(res.headers.get("set-cookie") ?? "").toContain(
+      `${ADMIN_SESSION_COOKIE}=`,
+    );
   });
 
   test("successful login response sets a fresh admin session cookie", async () => {

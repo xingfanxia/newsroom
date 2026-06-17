@@ -9,9 +9,13 @@ describe("admin session cookie source wiring", () => {
 
     expect(login).toContain("@/lib/api/admin-session-routes");
     expect(logout).toContain("@/lib/api/admin-session-routes");
-    expect(login).toContain("adminLoginSuccessResponse");
-    expect(login).toContain("adminLoginInvalidResponse");
+    expect(login).toContain("adminLoginResponse");
     expect(logout).toContain("adminLogoutResponse");
+    expect(helper).toContain("parseJsonRequestBody");
+    expect(helper).toContain("adminLoginBodySchema");
+    expect(helper).toContain("isValidPassword");
+    expect(helper).toContain("adminLoginSuccessResponse");
+    expect(helper).toContain("adminLoginInvalidResponse");
     expect(helper).toContain("@/lib/api/ok-response");
     expect(helper).toContain("okJson");
     expect(helper).toContain("okError");
@@ -32,6 +36,9 @@ describe("admin session cookie source wiring", () => {
       expect(source).not.toContain("secure:");
       expect(source).not.toContain("maxAge:");
     }
+    expect(login).not.toContain("@/lib/api/json-body");
+    expect(login).not.toContain("parseJsonRequestBody");
+    expect(login).not.toContain("isValidPassword");
   });
 
   test("password module owns the cookie attributes and session value minting", () => {

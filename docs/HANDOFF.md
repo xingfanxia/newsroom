@@ -68,10 +68,11 @@ Shipped cleanup:
   `freshAdminSessionCookie` and `expiredAdminSessionCookie` in
   `lib/auth/password.ts`, so login/logout cannot drift on cookie name,
   `httpOnly`, `secure`, `sameSite`, path, or max-age attributes.
-- Shared admin login/logout HTTP response construction through
-  `lib/api/admin-session-routes.ts`, so next-target sanitization, invalid
-  password envelopes, ok envelopes, and Set-Cookie attachment stay out of
-  route leaf files while still using the common ok-response helpers.
+- Shared admin login/logout request and response construction through
+  `lib/api/admin-session-routes.ts`, so login JSON parsing, password checks,
+  next-target sanitization, invalid password envelopes, ok envelopes, and
+  Set-Cookie attachment stay out of route leaf files while still using the
+  common ok-response helpers.
 - Shared admin policy commit request validation and `commitSkillVersion`
   mapping through `lib/api/policy-commit.ts`, so
   `/api/admin/policy/commit` keeps only admin auth, JSON parsing, and response

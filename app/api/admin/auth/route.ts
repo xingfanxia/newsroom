@@ -1,12 +1,4 @@
-import { parseJsonRequestBody } from "@/lib/api/json-body";
-import {
-  adminLoginBodySchema,
-  adminLoginInvalidResponse,
-  adminLoginSuccessResponse,
-} from "@/lib/api/admin-session-routes";
-import {
-  isValidPassword,
-} from "@/lib/auth/password";
+import { adminLoginResponse } from "@/lib/api/admin-session-routes";
 
 export const dynamic = "force-dynamic";
 
@@ -21,15 +13,5 @@ export const dynamic = "force-dynamic";
  * - 401 wrong password — never returns WHY, just "invalid"
  */
 export async function POST(req: Request) {
-  const parsed = await parseJsonRequestBody(req, adminLoginBodySchema, {
-    envelope: "ok",
-    includeIssues: false,
-  });
-  if (!parsed.ok) return parsed.response;
-
-  if (!isValidPassword(parsed.data.password)) {
-    return adminLoginInvalidResponse();
-  }
-
-  return adminLoginSuccessResponse(parsed.data.next);
+  return adminLoginResponse(req);
 }
