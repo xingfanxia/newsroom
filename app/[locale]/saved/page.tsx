@@ -13,6 +13,7 @@ import { getInboxCount, listCollections } from "@/lib/items/collections";
 import { resolveSavedCollectionSelection } from "@/lib/items/saved-collection-selection";
 import { getPulseData, getRadarStats } from "@/lib/shell/dashboard-stats";
 import { EMPTY_RADAR_STATS } from "@/lib/shell/radar-stats";
+import { topBarStatsFromRadar } from "@/lib/shell/top-bar-stats";
 import { ADMIN_USER_ID, getSessionUser, upsertAppUser } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
@@ -71,10 +72,7 @@ export default async function SavedPage({
   return (
     <ViewShell
       locale={locale as "en" | "zh"}
-      stats={{
-        tracked_sources: stats.tracked_sources,
-        signal_ratio: 0.72,
-      }}
+      stats={topBarStatsFromRadar(stats)}
       pulse={pulse}
       crumb={
         activeId === "inbox"

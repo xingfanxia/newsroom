@@ -7,6 +7,7 @@ import {
   getRadarStats,
 } from "@/lib/shell/dashboard-stats";
 import { EMPTY_RADAR_STATS } from "@/lib/shell/radar-stats";
+import { topBarStatsFromRadar } from "@/lib/shell/top-bar-stats";
 import {
   dailyColumnDateSchema,
   getDailyColumnRowByDate,
@@ -36,10 +37,7 @@ export default async function DailyDatePage({ params }: Props) {
   return (
     <ViewShell
       locale="zh"
-      stats={{
-        tracked_sources: stats.tracked_sources,
-        signal_ratio: 0.72,
-      }}
+      stats={topBarStatsFromRadar(stats)}
       pulse={pulse}
       crumb={`~/daily/${date}`}
       cmd={`cat newsletter/daily/${date}.md`}

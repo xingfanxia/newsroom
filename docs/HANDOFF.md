@@ -27,6 +27,9 @@ Shipped cleanup:
 - Shared radar stats ownership through `lib/shell/radar-stats.ts`; shell pages,
   the radar widget, and DB dashboard stats now reuse the same `RadarStats`
   type plus empty fallback instead of repeating the four-field zero object.
+- Shared top-bar stats mapping through `lib/shell/top-bar-stats.ts`; pages now
+  pass radar stats through one helper instead of hand-copying tracked-source
+  counts and signal-ratio rules into every `ViewShell`.
 - Shared admin mono blocks through `components/admin/mono-block.tsx`; policy
   error states and policy body previews no longer duplicate preformatted
   terminal panel styling.

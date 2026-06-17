@@ -8,6 +8,7 @@ import { ViewShell } from "@/components/shell/view-shell";
 import { getItemDetail } from "@/lib/items/detail";
 import { getRadarStats } from "@/lib/shell/dashboard-stats";
 import { EMPTY_RADAR_STATS } from "@/lib/shell/radar-stats";
+import { topBarStatsFromRadar } from "@/lib/shell/top-bar-stats";
 
 // Re-render every 5 min — commentary + transcript only change via background
 // jobs, so there's no need to hit the DB on every navigation.
@@ -37,7 +38,7 @@ export default async function PodcastDetailPage({
   return (
     <ViewShell
       locale={locale as "en" | "zh"}
-      stats={{ tracked_sources: stats.tracked_sources, signal_ratio: 0.72 }}
+      stats={topBarStatsFromRadar(stats)}
       crumb={`~/podcasts/${id}`}
       cmd={`cat ${id}.transcript.md`}
     >

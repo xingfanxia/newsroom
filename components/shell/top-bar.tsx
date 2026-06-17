@@ -1,10 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-
-export type TopBarStats = {
-  tracked_sources: number;
-  signal_ratio: number;
-};
+import type { TopBarStats } from "@/lib/shell/top-bar-stats";
 
 /**
  * Terminal-style system bar with macOS traffic lights, breadcrumb prompt, and

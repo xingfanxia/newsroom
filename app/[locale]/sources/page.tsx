@@ -5,6 +5,7 @@ import { SOURCE_GROUP_LABELS, SOURCE_GROUPS } from "@/lib/sources/groups";
 import { getLiveSources, liveSourcesByGroup } from "@/lib/sources/live";
 import { getPulseData, getRadarStats } from "@/lib/shell/dashboard-stats";
 import { EMPTY_RADAR_STATS } from "@/lib/shell/radar-stats";
+import { topBarStatsFromRadar } from "@/lib/shell/top-bar-stats";
 import { SourcesViewToggle, type SourcesView } from "./_view-toggle";
 
 export const dynamic = "force-dynamic";
@@ -34,7 +35,7 @@ export default async function SourcesPage({
   return (
     <ViewShell
       locale={locale as "en" | "zh"}
-      stats={{ tracked_sources: stats.tracked_sources, signal_ratio: 0.72 }}
+      stats={topBarStatsFromRadar(stats)}
       pulse={pulse}
       crumb="~/sources"
       cmd={view === "cards" ? "ls -l sources/" : "cat sources.tsv | column -t"}

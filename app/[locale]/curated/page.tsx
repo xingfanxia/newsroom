@@ -12,6 +12,7 @@ import {
   getRadarStats,
 } from "@/lib/shell/dashboard-stats";
 import { EMPTY_RADAR_STATS } from "@/lib/shell/radar-stats";
+import { topBarStatsFromRadar } from "@/lib/shell/top-bar-stats";
 import type { Story } from "@/lib/types";
 
 export const revalidate = 60;
@@ -84,10 +85,7 @@ export default async function CuratedPage({
   return (
     <ViewShell
       locale={locale as "en" | "zh"}
-      stats={{
-        tracked_sources: stats.tracked_sources,
-        signal_ratio: 0.72,
-      }}
+      stats={topBarStatsFromRadar(stats)}
       pulse={pulse}
       crumb="~/curated"
       cmd="grep -l 'curated=true' sources/"

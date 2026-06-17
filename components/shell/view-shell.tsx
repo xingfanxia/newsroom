@@ -1,10 +1,11 @@
 "use client";
 import type { ReactNode } from "react";
-import { TopBar, type TopBarStats } from "./top-bar";
+import { TopBar } from "./top-bar";
 import { LeftRail } from "./left-rail";
 import { Tweaks } from "./tweaks";
 import { MobileChrome } from "./mobile-chrome";
 import { TweaksProvider } from "@/hooks/use-tweaks";
+import type { TopBarStats } from "@/lib/shell/top-bar-stats";
 import type { PulsePoint } from "./pulse-box";
 
 /**

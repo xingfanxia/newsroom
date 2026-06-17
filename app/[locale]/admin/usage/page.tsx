@@ -4,6 +4,7 @@ import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
 import { getRadarStats } from "@/lib/shell/dashboard-stats";
 import { EMPTY_RADAR_STATS } from "@/lib/shell/radar-stats";
+import { topBarStatsFromRadar } from "@/lib/shell/top-bar-stats";
 import {
   getUsageDashboardSummary,
   USAGE_WINDOWS,
@@ -67,7 +68,7 @@ export default async function UsagePage({
   return (
     <ViewShell
       locale={locale as "en" | "zh"}
-      stats={{ tracked_sources: stats.tracked_sources, signal_ratio: 0.72 }}
+      stats={topBarStatsFromRadar(stats)}
       crumb="~/admin/usage"
       cmd="aws ce get-cost-and-usage --granularity DAILY"
     >

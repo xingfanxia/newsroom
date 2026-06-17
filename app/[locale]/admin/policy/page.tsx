@@ -6,6 +6,7 @@ import { PolicyEditor } from "@/components/admin/policy-editor";
 import { getActiveSkill } from "@/lib/policy/skill";
 import { getRadarStats } from "@/lib/shell/dashboard-stats";
 import { EMPTY_RADAR_STATS } from "@/lib/shell/radar-stats";
+import { topBarStatsFromRadar } from "@/lib/shell/top-bar-stats";
 import { SKILL_NAME } from "@/workers/agent/iterate";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +31,7 @@ export default async function PolicyPage({
   return (
     <ViewShell
       locale={locale as "en" | "zh"}
-      stats={{ tracked_sources: stats.tracked_sources, signal_ratio: 0.72 }}
+      stats={topBarStatsFromRadar(stats)}
       crumb="~/admin/policy"
       cmd="vi editorial.skill.md"
     >

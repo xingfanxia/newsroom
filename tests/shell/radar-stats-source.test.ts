@@ -1,5 +1,10 @@
 import { describe, expect, it } from "bun:test";
 import { EMPTY_RADAR_STATS } from "@/lib/shell/radar-stats";
+import {
+  DEFAULT_SIGNAL_RATIO,
+  signalRatioFromRadar,
+  topBarStatsFromRadar,
+} from "@/lib/shell/top-bar-stats";
 import { readSource } from "@/tests/helpers/source";
 
 const RADAR_FALLBACK_PAGE_PATHS = [
@@ -52,6 +57,67 @@ describe("radar stats shell contract", () => {
       expect(source).toContain("@/lib/shell/radar-stats");
       expect(source).toContain("getRadarStats().catch(() => EMPTY_RADAR_STATS)");
       expect(source).not.toMatch(INLINE_EMPTY_RADAR_STATS_RE);
+    }
+  });
+
+  it("maps radar stats into top-bar stats with one shared default ratio", () => {
+    expect(
+      topBarStatsFromRadar({
+        items_today: 20,
+        items_p1: 3,
+        items_featured: 7,
+        tracked_sources: 41,
+      }),
+    ).toEqual({
+      tracked_sources: 41,
+      signal_ratio: DEFAULT_SIGNAL_RATIO,
+    });
+
+    expect(
+      topBarStatsFromRadar(
+        {
+          items_today: 20,
+          items_p1: 3,
+          items_featured: 7,
+          tracked_sources: 41,
+        },
+        0.5,
+      ),
+    ).toEqual({
+      tracked_sources: 41,
+      signal_ratio: 0.5,
+    });
+
+    expect(
+      signalRatioFromRadar({
+        items_today: 20,
+        items_p1: 3,
+        items_featured: 7,
+        tracked_sources: 41,
+      }),
+    ).toBe(0.5);
+    expect(signalRatioFromRadar(EMPTY_RADAR_STATS)).toBe(DEFAULT_SIGNAL_RATIO);
+  });
+
+  it("keeps the top-bar stats type owned by the shell contract", () => {
+    const topBar = readSource("components/shell/top-bar.tsx");
+    const viewShell = readSource("components/shell/view-shell.tsx");
+
+    expect(topBar).toContain("@/lib/shell/top-bar-stats");
+    expect(viewShell).toContain("@/lib/shell/top-bar-stats");
+    expect(topBar).not.toContain("export type TopBarStats");
+  });
+
+  it("keeps page top-bar stats mapping on the shared mapper", () => {
+    for (const path of RADAR_FALLBACK_PAGE_PATHS) {
+      const source = readSource(path);
+
+      expect(source).toContain("@/lib/shell/top-bar-stats");
+      expect(source).toContain("stats={topBarStatsFromRadar(");
+      expect(source).not.toContain("signal_ratio: 0.72");
+      expect(source).not.toMatch(
+        /tracked_sources:\s*(?:stats|radarStats)\.tracked_sources/,
+      );
     }
   });
 });

@@ -8,6 +8,7 @@ import { XHandlesSidebar } from "@/components/x-monitor/handles-sidebar";
 import { getFeaturedStories } from "@/lib/items/live";
 import { getPulseData, getRadarStats } from "@/lib/shell/dashboard-stats";
 import { EMPTY_RADAR_STATS } from "@/lib/shell/radar-stats";
+import { topBarStatsFromRadar } from "@/lib/shell/top-bar-stats";
 import { getXHandles } from "@/lib/shell/x-handles";
 import type { Story } from "@/lib/types";
 
@@ -56,10 +57,7 @@ export default async function XMonitorPage({
   return (
     <ViewShell
       locale={locale as "en" | "zh"}
-      stats={{
-        tracked_sources: stats.tracked_sources,
-        signal_ratio: 0.72,
-      }}
+      stats={topBarStatsFromRadar(stats)}
       pulse={pulse}
       crumb={activeIsValid ? `~/x/${activeLabel.replace("@", "")}` : "~/x"}
       cmd={

@@ -4,6 +4,7 @@ import { PageHead } from "@/components/shell/page-head";
 import { ComingSoonPanel } from "@/components/shell/coming-soon-panel";
 import { getRadarStats } from "@/lib/shell/dashboard-stats";
 import { EMPTY_RADAR_STATS } from "@/lib/shell/radar-stats";
+import { topBarStatsFromRadar } from "@/lib/shell/top-bar-stats";
 
 // Admin pages render per-request — they read live stats and contain client
 // components (ViewShell tree) that call useSearchParams. Static prerender
@@ -23,7 +24,7 @@ export default async function UsersPage({
   return (
     <ViewShell
       locale={locale as "en" | "zh"}
-      stats={{ tracked_sources: stats.tracked_sources, signal_ratio: 0.72 }}
+      stats={topBarStatsFromRadar(stats)}
       crumb="~/admin/users"
       cmd="cat /etc/passwd"
     >

@@ -22,6 +22,10 @@ import {
   getTopTopics,
 } from "@/lib/shell/dashboard-stats";
 import { EMPTY_RADAR_STATS } from "@/lib/shell/radar-stats";
+import {
+  signalRatioFromRadar,
+  topBarStatsFromRadar,
+} from "@/lib/shell/top-bar-stats";
 import { getRecentTickerItems } from "@/lib/shell/ticker";
 import { mockStories } from "@/lib/mock/stories";
 import type { Story } from "@/lib/types";
@@ -175,14 +179,10 @@ export default async function HotNewsPage({
   return (
     <ViewShell
       locale={locale as "en" | "zh"}
-      stats={{
-        tracked_sources: radarStats.tracked_sources,
-        signal_ratio:
-          radarStats.items_today > 0
-            ? (radarStats.items_p1 + radarStats.items_featured) /
-              radarStats.items_today
-            : 0.72,
-      }}
+      stats={topBarStatsFromRadar(
+        radarStats,
+        signalRatioFromRadar(radarStats),
+      )}
       pulse={pulse}
       crumb="~/feed"
       cmd="tail -f signal.log"
