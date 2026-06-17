@@ -11,6 +11,12 @@ import {
   type SourcePreset,
 } from "../_source-presets";
 import { groupByDay, sortStoriesNewestFirst } from "@/lib/feed/group-by-day";
+import {
+  coerceFeedDateKey,
+  coerceFeedOffset,
+  feedPageLimitForDate,
+  FEED_PAGE_SIZE,
+} from "@/lib/feed/page-query";
 import { getFeaturedStories } from "@/lib/items/live";
 import {
   getDayCounts,
@@ -22,10 +28,6 @@ import { topBarStatsFromRadar } from "@/lib/shell/top-bar-stats";
 import type { Story } from "@/lib/types";
 
 export const revalidate = 60;
-
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-
-const PAGE_SIZE = 200;
 
 export default async function AllPostsPage({
   params,
@@ -46,14 +48,11 @@ export default async function AllPostsPage({
   const sourceFilter = sourceId
     ? { sourceId }
     : sourcePresetToFeedFilter(sourcePreset);
-  const activeDate = sp.date && DATE_RE.test(sp.date) ? sp.date : undefined;
+  const activeDate = coerceFeedDateKey(sp.date);
   // When a day is picked, show everything from that day uncapped (500 is
-  // the safety ceiling). Otherwise paginate in PAGE_SIZE chunks via `offset`.
-  const offset = (() => {
-    const n = Number.parseInt(sp.offset ?? "0", 10);
-    return Number.isFinite(n) && n >= 0 ? n : 0;
-  })();
-  const limit = activeDate ? 500 : PAGE_SIZE;
+  // the safety ceiling). Otherwise paginate in shared page-size chunks.
+  const offset = coerceFeedOffset(sp.offset);
+  const limit = feedPageLimitForDate(activeDate);
 
   let stories: Story[] = [];
   try {
@@ -129,7 +128,7 @@ export default async function AllPostsPage({
         {!activeDate && stories.length > 0 && (
           <Pagination
             offset={offset}
-            pageSize={PAGE_SIZE}
+            pageSize={FEED_PAGE_SIZE}
             currentCount={stories.length}
             source={sourcePreset}
             sourceId={sourceId}

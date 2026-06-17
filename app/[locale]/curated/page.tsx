@@ -5,6 +5,11 @@ import { Item } from "@/components/feed/item";
 import { CalendarGrid } from "@/components/feed/calendar-grid";
 import { DayBreak } from "../_day-break";
 import { groupByDay, sortStoriesNewestFirst } from "@/lib/feed/group-by-day";
+import {
+  coerceFeedDateKey,
+  coerceFeedOffset,
+  feedPageLimitForDate,
+} from "@/lib/feed/page-query";
 import { getFeaturedStories } from "@/lib/items/live";
 import {
   getDayCounts,
@@ -16,10 +21,6 @@ import { topBarStatsFromRadar } from "@/lib/shell/top-bar-stats";
 import type { Story } from "@/lib/types";
 
 export const revalidate = 60;
-
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-
-const PAGE_SIZE = 200;
 
 /**
  * AX 严选 / curated — operator hand-picked sources (sources.curated = true).
@@ -45,12 +46,9 @@ export default async function CuratedPage({
   const [{ locale }, sp] = await Promise.all([params, searchParams]);
   setRequestLocale(locale);
   const sourceId = sp.source_id?.trim() || undefined;
-  const activeDate = sp.date && DATE_RE.test(sp.date) ? sp.date : undefined;
-  const offset = (() => {
-    const n = Number.parseInt(sp.offset ?? "0", 10);
-    return Number.isFinite(n) && n >= 0 ? n : 0;
-  })();
-  const limit = activeDate ? 500 : PAGE_SIZE;
+  const activeDate = coerceFeedDateKey(sp.date);
+  const offset = coerceFeedOffset(sp.offset);
+  const limit = feedPageLimitForDate(activeDate);
 
   let stories: Story[] = [];
   try {

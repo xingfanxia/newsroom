@@ -33,6 +33,9 @@ Shipped cleanup:
 - Shared newest-first feed sorting through `sortStoriesNewestFirst` in
   `lib/feed/group-by-day.ts`; archive-style pages no longer hand-copy
   published-at descending comparators before UTC day grouping.
+- Shared feed page query coercion through `lib/feed/page-query.ts`; home,
+  all-posts, and curated routes no longer duplicate the date drilldown key,
+  nonnegative offset parsing, or 500-row day drilldown limit.
 - Shared admin mono blocks through `components/admin/mono-block.tsx`; policy
   error states and policy body previews no longer duplicate preformatted
   terminal panel styling.
