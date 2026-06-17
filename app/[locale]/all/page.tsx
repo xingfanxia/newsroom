@@ -10,7 +10,7 @@ import {
   sourcePresetToFeedFilter,
   type SourcePreset,
 } from "../_source-presets";
-import { groupByDay } from "@/lib/feed/group-by-day";
+import { groupByDay, sortStoriesNewestFirst } from "@/lib/feed/group-by-day";
 import { getFeaturedStories } from "@/lib/items/live";
 import {
   getDayCounts,
@@ -78,11 +78,7 @@ export default async function AllPostsPage({
   // /all is a chronological full-feed view — sort by publishedAt DESC
   // before grouping (the SQL already does this, but the explicit sort
   // protects against any caller that passes mixed-order input).
-  const sorted = [...stories].sort(
-    (a, b) =>
-      new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
-  );
-  const grouped = groupByDay(sorted);
+  const grouped = groupByDay(sortStoriesNewestFirst(stories));
 
   return (
     <ViewShell

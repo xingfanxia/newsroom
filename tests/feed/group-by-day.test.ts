@@ -11,10 +11,23 @@
  * Pure source-string + behavior tests.
  */
 import { describe, expect, it } from "bun:test";
-import { groupByDay } from "@/lib/feed/group-by-day";
+import { groupByDay, sortStoriesNewestFirst } from "@/lib/feed/group-by-day";
 import { readSource } from "@/tests/helpers/source";
 
 describe("groupByDay (shared) — keys are UTC-day YYYY-MM-DD strings", () => {
+  it("sorts stories newest-first without mutating caller order", () => {
+    const stories = [
+      { publishedAt: "2026-04-23T18:06:00.000Z", id: "older" },
+      { publishedAt: "2026-04-24T20:00:00.000Z", id: "newest" },
+      { publishedAt: "2026-04-24T03:07:00.000Z", id: "middle" },
+    ];
+
+    const sorted = sortStoriesNewestFirst(stories);
+
+    expect(sorted.map((s) => s.id)).toEqual(["newest", "middle", "older"]);
+    expect(stories.map((s) => s.id)).toEqual(["older", "newest", "middle"]);
+  });
+
   it("buckets items by their UTC calendar day", () => {
     const stories = [
       { publishedAt: "2026-04-24T03:07:00.000Z" }, // UTC 04-24
@@ -93,4 +106,25 @@ describe("page.tsx callers pass dayKey strings (not Date objects)", () => {
     const src = readSource("app/[locale]/page.tsx");
     expect(src).toMatch(/from\s+["']@\/lib\/feed\/group-by-day["']/);
   });
+});
+
+describe("archive-style pages share newest-first sorting", () => {
+  const newestFirstPages = [
+    "app/[locale]/all/page.tsx",
+    "app/[locale]/curated/page.tsx",
+    "app/[locale]/podcasts/page.tsx",
+    "app/[locale]/x-monitor/page.tsx",
+    "app/[locale]/saved/page.tsx",
+  ];
+
+  for (const p of newestFirstPages) {
+    it(`${p} — uses shared newest-first helper before grouping`, () => {
+      const src = readSource(p);
+
+      expect(src).toContain("sortStoriesNewestFirst");
+      expect(src).toMatch(/groupByDay\(sortStoriesNewestFirst\(/);
+      expect(src).not.toContain("new Date(b.publishedAt)");
+      expect(src).not.toContain("new Date(a.publishedAt)");
+    });
+  }
 });

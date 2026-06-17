@@ -4,7 +4,7 @@ import { PageHead } from "@/components/shell/page-head";
 import { Item } from "@/components/feed/item";
 import { CalendarGrid } from "@/components/feed/calendar-grid";
 import { DayBreak } from "../_day-break";
-import { groupByDay } from "@/lib/feed/group-by-day";
+import { groupByDay, sortStoriesNewestFirst } from "@/lib/feed/group-by-day";
 import { getFeaturedStories } from "@/lib/items/live";
 import {
   getDayCounts,
@@ -75,11 +75,7 @@ export default async function CuratedPage({
     getDayCounts(60, { curatedOnly: true }).catch(() => []),
   ]);
 
-  const sorted = [...stories].sort(
-    (a, b) =>
-      new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
-  );
-  const grouped = groupByDay(sorted);
+  const grouped = groupByDay(sortStoriesNewestFirst(stories));
   const zh = locale === "zh";
 
   return (

@@ -3,7 +3,7 @@ import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
 import { Item } from "@/components/feed/item";
 import { DayBreak } from "../_day-break";
-import { groupByDay } from "@/lib/feed/group-by-day";
+import { groupByDay, sortStoriesNewestFirst } from "@/lib/feed/group-by-day";
 import { PodcastChannelPills } from "./_channel-pills";
 import { getFeaturedStories } from "@/lib/items/live";
 import { getPulseData, getRadarStats } from "@/lib/shell/dashboard-stats";
@@ -48,11 +48,7 @@ export default async function PodcastsPage({
     limit: activeChannel ? 300 : 120,
   }).catch((): Story[] => []);
 
-  const sorted = [...filtered].sort(
-    (a, b) =>
-      new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
-  );
-  const grouped = groupByDay(sorted);
+  const grouped = groupByDay(sortStoriesNewestFirst(filtered));
   const activeLabel = activeChannel
     ? (locale === "zh"
         ? channels.find((c) => c.id === activeChannel)?.nameZh

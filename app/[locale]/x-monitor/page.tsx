@@ -3,7 +3,7 @@ import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
 import { Item } from "@/components/feed/item";
 import { DayBreak } from "../_day-break";
-import { groupByDay } from "@/lib/feed/group-by-day";
+import { groupByDay, sortStoriesNewestFirst } from "@/lib/feed/group-by-day";
 import { XHandlesSidebar } from "@/components/x-monitor/handles-sidebar";
 import { getFeaturedStories } from "@/lib/items/live";
 import { getPulseData, getRadarStats } from "@/lib/shell/dashboard-stats";
@@ -43,11 +43,7 @@ export default async function XMonitorPage({
     limit: activeIsValid ? 200 : 80,
   }).catch((): Story[] => []);
 
-  const sorted = [...narrowedStories].sort(
-    (a, b) =>
-      new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
-  );
-  const grouped = groupByDay(sorted);
+  const grouped = groupByDay(sortStoriesNewestFirst(narrowedStories));
   const activeLabel: string = activeIsValid
     ? handles.find((h) => h.id === activeHandle)?.handle ?? activeHandle ?? ""
     : locale === "zh"

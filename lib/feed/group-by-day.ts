@@ -17,6 +17,15 @@
  * archive-view (publishedAt DESC) and today-view (importance/heat) both
  * round-trip without re-sorting.
  */
+export function sortStoriesNewestFirst<T extends { publishedAt: string }>(
+  stories: readonly T[],
+): T[] {
+  return [...stories].sort(
+    (a, b) =>
+      new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
+  );
+}
+
 export function groupByDay<T extends { publishedAt: string }>(
   stories: T[],
 ): Record<string, T[]> {

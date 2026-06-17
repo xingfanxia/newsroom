@@ -4,7 +4,7 @@ import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
 import { Item } from "@/components/feed/item";
 import { DayBreak } from "../_day-break";
-import { groupByDay } from "@/lib/feed/group-by-day";
+import { groupByDay, sortStoriesNewestFirst } from "@/lib/feed/group-by-day";
 import { CollectionSidebar } from "@/components/saved/collection-sidebar";
 import { SavedMetaStrip } from "@/components/saved/saved-meta-strip";
 import { SavedTags } from "@/components/saved/saved-tags";
@@ -57,11 +57,7 @@ export default async function SavedPage({
     getSavedTags(userId, { collection: collectionFilter }).catch(() => []),
   ]);
 
-  const sorted = [...stories].sort(
-    (a, b) =>
-      new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
-  );
-  const grouped = groupByDay(sorted);
+  const grouped = groupByDay(sortStoriesNewestFirst(stories));
   const activeCollectionName = (() => {
     if (activeId === "inbox") return locale === "zh" ? "收件箱" : "inbox";
     const c = collections.find((x) => x.id === activeId);
