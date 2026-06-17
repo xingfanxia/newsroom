@@ -34,10 +34,13 @@ describe("enrich worker claim lock", () => {
   });
 
   it("waits for body prefetch before claiming non-X web items", () => {
-    expect(worker).toContain("BODY_PREFETCH_READY_SQL");
-    expect(worker).toContain("${items.bodyFetchedAt} IS NOT NULL");
-    expect(worker).toContain("x.com/%/status/%");
-    expect(worker).toContain("twitter.com/%/status/%");
+    expect(worker).toContain("@/lib/urls/media");
+    expect(worker).toContain("enrichBodyPrefetchReadySql(");
+    expect(worker).toContain("items.bodyFetchedAt");
+    expect(worker).toContain("items.canonicalUrl");
+    expect(worker).not.toContain("BODY_PREFETCH_READY_SQL");
+    expect(worker).not.toContain("x.com/%/status/%");
+    expect(worker).not.toContain("twitter.com/%/status/%");
   });
 
   it("backs off failed rows and caps automatic retries", () => {

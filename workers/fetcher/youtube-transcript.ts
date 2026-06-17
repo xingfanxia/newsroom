@@ -24,6 +24,10 @@ import { YoutubeTranscript } from "youtube-transcript";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items } from "@/db/schema";
+import {
+  extractYouTubeId,
+  youtubeVideoUrlSql,
+} from "@/lib/urls/media";
 
 const TIMEOUT_MS = 25_000;
 const MAX_BODY_CHARS = 12_000;
@@ -80,11 +84,7 @@ export async function runYoutubeTranscriptFetch(): Promise<YoutubeTranscriptRepo
     .where(
       and(
         isNull(items.bodyFetchedAt),
-        sql`(
-          ${items.canonicalUrl} LIKE '%youtube.com/watch%'
-          OR ${items.canonicalUrl} LIKE '%youtu.be/%'
-          OR ${items.canonicalUrl} LIKE '%youtube.com/shorts/%'
-        )`,
+        youtubeVideoUrlSql(items.canonicalUrl),
       ),
     )
     .orderBy(tierRank, desc(items.publishedAt))
@@ -114,7 +114,7 @@ export async function runYoutubeTranscriptFetch(): Promise<YoutubeTranscriptRepo
   await Promise.allSettled(
     pending.map((item) =>
       limit(async () => {
-        const videoId = extractVideoId(item.canonicalUrl || item.url);
+        const videoId = extractYouTubeId(item.canonicalUrl || item.url);
         if (!videoId) {
           await client
             .update(items)
@@ -182,22 +182,6 @@ export async function runYoutubeTranscriptFetch(): Promise<YoutubeTranscriptRepo
     durationMs: Date.now() - started,
     errors,
   };
-}
-
-// ── URL / video-ID parsing ─────────────────────────────────────
-
-const WATCH_RE = /[?&]v=([A-Za-z0-9_-]{11})/;
-const SHORT_RE = /youtu\.be\/([A-Za-z0-9_-]{11})/;
-const SHORTS_RE = /\/shorts\/([A-Za-z0-9_-]{11})/;
-
-function extractVideoId(url: string): string | null {
-  if (!url) return null;
-  return (
-    url.match(WATCH_RE)?.[1] ??
-    url.match(SHORT_RE)?.[1] ??
-    url.match(SHORTS_RE)?.[1] ??
-    null
-  );
 }
 
 // ── Transcript fetch with multi-language fallback ──────────────

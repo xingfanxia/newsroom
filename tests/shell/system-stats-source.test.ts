@@ -52,9 +52,26 @@ describe("admin system stats source wiring", () => {
     expect(source).toContain("make_interval(hours => ${EVENT_COMMENTARY_CRON_RECENCY_HOURS})");
   });
 
+  it("keeps body-prefetch and enrich queue predicates shared with workers", () => {
+    expect(source).toContain("@/lib/urls/media");
+    expect(source).toContain("bodyPrefetchPendingSql(");
+    expect(source).toContain("enrichBodyPrefetchReadySql(");
+    expect(source).toContain("bodyPrefetchPending");
+    expect(source).toContain("enrichClaimable");
+    expect(source).toContain('systemQueueSnapshot("article-body"');
+    expect(source).toContain(
+      'systemQueueSnapshot("enrich", itemsRow?.enrichClaimable',
+    );
+    expect(source).not.toContain("unenriched:");
+    expect(source).not.toContain(
+      "count(*) filter (where ${items.enrichedAt} is null)::int",
+    );
+  });
+
   it("keeps queue display metadata in the shared queue contract", () => {
     expect(source).toContain("@/lib/shell/system-queues");
     expect(source).toContain("systemQueueSnapshot(");
+    expect(source).not.toContain('rate: "≈ 20-300/15m"');
     expect(source).not.toContain('rate: "≈ 60/15m"');
     expect(source).not.toContain('rate: "≈ 200/30m"');
     expect(source).not.toContain('rate: "≈ 8/30m"');

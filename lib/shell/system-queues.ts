@@ -1,5 +1,6 @@
 export type SystemQueueName =
   | "normalize"
+  | "article-body"
   | "enrich"
   | "commentary"
   | "event-commentary"
@@ -20,6 +21,7 @@ type SystemQueueConfig = Readonly<{
 
 export const SYSTEM_QUEUE_CONFIGS = [
   { name: "normalize", rate: "≈ 280/hr" },
+  { name: "article-body", rate: "≈ 20-300/15m" },
   { name: "enrich", rate: "≈ 60/15m" },
   { name: "commentary", rate: "≈ 200/30m" },
   { name: "event-commentary", rate: "≈ 8/30m" },

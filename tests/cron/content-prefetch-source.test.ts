@@ -18,6 +18,26 @@ describe("content prefetch cron wiring", () => {
     expect(helper).toContain("return { articleBody, youtubeTranscript }");
   });
 
+  it("keeps content URL ownership rules in the shared media helper", () => {
+    const mediaHelper = readSource("lib/urls/media.ts");
+    const articleBody = readSource("workers/fetcher/article-body.ts");
+    const youtubeTranscript = readSource("workers/fetcher/youtube-transcript.ts");
+
+    expect(mediaHelper).toContain("articleBodyFetchUrlSql");
+    expect(mediaHelper).toContain("youtubeVideoUrlSql");
+    expect(mediaHelper).toContain("xStatusUrlSql");
+    expect(mediaHelper).toContain("enrichBodyPrefetchReadySql");
+    expect(articleBody).toContain("@/lib/urls/media");
+    expect(articleBody).toContain("articleBodyFetchUrlSql(items.canonicalUrl)");
+    expect(articleBody).toContain("isYouTubeVideoUrl(target)");
+    expect(youtubeTranscript).toContain("@/lib/urls/media");
+    expect(youtubeTranscript).toContain("youtubeVideoUrlSql(items.canonicalUrl)");
+    expect(youtubeTranscript).toContain("extractYouTubeId(");
+    expect(articleBody).not.toContain("NOT LIKE '%youtube.com/watch%'");
+    expect(articleBody).not.toContain("NOT LIKE '%x.com/%/status/%'");
+    expect(youtubeTranscript).not.toContain("LIKE '%youtube.com/watch%'");
+  });
+
   it("keeps the HTTP article-body cron route on the shared prefetch helper", () => {
     const src = readSource(routePath);
 

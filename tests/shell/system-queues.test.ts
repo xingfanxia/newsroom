@@ -9,6 +9,7 @@ describe("system queue metadata", () => {
   test("keeps queue order and rates in one contract", () => {
     expect(SYSTEM_QUEUE_NAMES).toEqual([
       "normalize",
+      "article-body",
       "enrich",
       "commentary",
       "event-commentary",
@@ -17,6 +18,7 @@ describe("system queue metadata", () => {
 
     expect(SYSTEM_QUEUE_CONFIGS.map((q) => q.rate)).toEqual([
       "≈ 280/hr",
+      "≈ 20-300/15m",
       "≈ 60/15m",
       "≈ 200/30m",
       "≈ 8/30m",

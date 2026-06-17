@@ -113,6 +113,10 @@ Converts `raw_items` → `items`:
   `workers/fetcher/content-prefetch.ts`, which runs the Jina article-body
   fetcher and YouTube transcript fetcher together before enrichment consumes
   `body_md`.
+- URL ownership for article-body, YouTube transcript, and X/Twitter status
+  rows lives in `lib/urls/media.ts`; the prefetch workers, enrich claim query,
+  podcast embed parser, and `/admin/system` queue depths share that helper so
+  pending/ready counts cannot drift from worker pickup behavior.
 - Uses the fetcher-provided `published_at` timestamp, falling back to the
   current insert time only when the raw row lacks a timestamp.
 - Canonicalizes the URL locally by stripping fragments and tracking params;

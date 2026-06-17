@@ -9,6 +9,7 @@ import {
   profiles,
   LLMError,
 } from "@/lib/llm";
+import { enrichBodyPrefetchReadySql } from "@/lib/urls/media";
 import {
   enrichSchema,
   scoreSchema,
@@ -40,12 +41,6 @@ const CONCURRENCY = 10;
 const MAX_PER_RUN = 60;
 const CLAIM_STALE_MINUTES = 45;
 const MAX_ATTEMPTS = 3;
-const BODY_PREFETCH_READY_SQL = sql`(
-  ${items.bodyFetchedAt} IS NOT NULL
-  OR ${items.canonicalUrl} ILIKE '%x.com/%/status/%'
-  OR ${items.canonicalUrl} ILIKE '%twitter.com/%/status/%'
-)`;
-
 export type EnrichReport = {
   processed: number;
   enriched: number;
@@ -132,7 +127,7 @@ async function claimPendingEnrichItems(
   const maxAttempts = opts.maxAttempts ?? MAX_ATTEMPTS;
   const filters = [
     sql`${items.enrichedAt} IS NULL`,
-    BODY_PREFETCH_READY_SQL,
+    enrichBodyPrefetchReadySql(items.bodyFetchedAt, items.canonicalUrl),
     sql`coalesce(${items.enrichAttempts}, 0) < ${maxAttempts}`,
     sql`(
       ${items.enrichClaimedAt} IS NULL

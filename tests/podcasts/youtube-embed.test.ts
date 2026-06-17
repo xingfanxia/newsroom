@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { extractYouTubeId } from "@/components/podcasts/youtube-embed";
+import { readSource } from "@/tests/helpers/source";
+import { extractYouTubeId } from "@/lib/urls/media";
 
 describe("extractYouTubeId", () => {
   it("extracts ID from /watch?v=<id>", () => {
@@ -60,5 +61,14 @@ describe("extractYouTubeId", () => {
 
   it("rejects IDs that are too short to be real", () => {
     expect(extractYouTubeId("https://youtu.be/ab")).toBeNull();
+  });
+
+  it("keeps the component on the shared media URL helper", () => {
+    const source = readSource("components/podcasts/youtube-embed.tsx");
+
+    expect(source).toContain("@/lib/urls/media");
+    expect(source).toContain("export { extractYouTubeId }");
+    expect(source).not.toContain("function isValidYouTubeId");
+    expect(source).not.toContain("new URL(url)");
   });
 });

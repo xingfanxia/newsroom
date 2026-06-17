@@ -27,6 +27,10 @@ Shipped cleanup:
   `lib/shell/system-queues.ts`; queue names, order, throughput labels, and
   default latency/drift fields now have one tested source instead of inline
   objects inside `getSystemSnapshot`.
+- Shared media/content URL ownership predicates through `lib/urls/media.ts`;
+  article-body prefetch, YouTube transcript prefetch, enrich claim readiness,
+  podcast embeds, and `/admin/system` queue depths now agree on which URLs
+  need body prefetch and which X/Twitter rows can skip it before LLM spend.
 - Capped scheduled event-level commentary to active 24h events via
   `EVENT_COMMENTARY_CRON_RECENCY_HOURS`; historical event-commentary backlog
   remains visible to operator scripts/backfills but no longer spends every
@@ -306,6 +310,10 @@ Shipped cleanup:
 - Shared article body + YouTube transcript prefetch sequencing through
   `workers/fetcher/content-prefetch.ts`, so `/api/cron/article-body` and
   `bun scripts/ops/run-cron.ts body` use the same production path.
+- Shared article-body / YouTube / X-status URL predicates through
+  `lib/urls/media.ts`; content-prefetch workers, enrich claim readiness, the
+  podcast embed parser, and `/admin/system` body/enrich queue depths now use
+  the same source of truth instead of repeating URL `LIKE` patterns.
 - Table-drove `scripts/ops/run-cron.ts` through one `CRON_RUNNERS` map and
   exposed all production cron route slugs as `bun run cron:<bucket>` aliases,
   including `fetch-*`, `article-body`, `commentary`, `score-backfill`,

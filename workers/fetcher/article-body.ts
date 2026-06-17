@@ -21,9 +21,13 @@
  * backfills.
  */
 import pLimit from "p-limit";
-import { and, desc, eq, isNull, isNotNull, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items } from "@/db/schema";
+import {
+  articleBodyFetchUrlSql,
+  isYouTubeVideoUrl,
+} from "@/lib/urls/media";
 
 const JINA_BASE = "https://r.jina.ai/";
 const TIMEOUT_MS = 20_000;
@@ -40,14 +44,6 @@ const hasValidKey = (() => {
 const CONCURRENCY = hasValidKey ? 30 : 1;
 const ANON_DELAY_MS = 1200;
 const MAX_PER_RUN = hasValidKey ? 300 : 20;
-
-// Matches youtube.com, youtu.be, m.youtube.com, music.youtube.com — anything
-// that the youtube-transcript worker should own. Shorts URLs (youtube.com/
-// shorts/<id>) parse to youtube.com host, so this catches them naturally.
-const YT_HOST_RE = /(^|\.)youtube\.com$|(^|\.)youtu\.be$/i;
-// X.com / twitter.com tweets are skipped via SQL LIKE in the pending query —
-// the x-api adapter already writes full tweet text to items.body, so Jina
-// would be both redundant and futile (X blocks unauthed scrapers).
 
 export type ArticleBodyReport = {
   candidates: number;
@@ -82,16 +78,7 @@ export async function runArticleBodyFetch(): Promise<ArticleBodyReport> {
     .where(
       and(
         isNull(items.bodyFetchedAt),
-        isNotNull(items.canonicalUrl),
-        // YouTube URLs belong to workers/fetcher/youtube-transcript.ts
-        // which fetches captions instead of Jina-scraped page HTML.
-        sql`${items.canonicalUrl} NOT LIKE '%youtube.com/watch%'`,
-        sql`${items.canonicalUrl} NOT LIKE '%youtu.be/%'`,
-        sql`${items.canonicalUrl} NOT LIKE '%youtube.com/shorts/%'`,
-        // Tweets: the x-api adapter ingests full tweet text directly into
-        // items.body, and Jina can't scrape X anyway (auth wall). Skip.
-        sql`${items.canonicalUrl} NOT LIKE '%x.com/%/status/%'`,
-        sql`${items.canonicalUrl} NOT LIKE '%twitter.com/%/status/%'`,
+        articleBodyFetchUrlSql(items.canonicalUrl),
       ),
     )
     .orderBy(tierRank, desc(items.publishedAt))
@@ -127,7 +114,7 @@ export async function runArticleBodyFetch(): Promise<ArticleBodyReport> {
           skipped++;
           return;
         }
-        if (isYouTubeUrl(target)) {
+        if (isYouTubeVideoUrl(target)) {
           // Leave bodyFetchedAt NULL — the YouTube transcript worker
           // (workers/fetcher/youtube-transcript.ts) owns these URLs.
           skipped++;
@@ -187,14 +174,6 @@ export async function runArticleBodyFetch(): Promise<ArticleBodyReport> {
     durationMs: Date.now() - started,
     errors,
   };
-}
-
-function isYouTubeUrl(url: string): boolean {
-  try {
-    return YT_HOST_RE.test(new URL(url).hostname);
-  } catch {
-    return false;
-  }
 }
 
 type JinaResult =

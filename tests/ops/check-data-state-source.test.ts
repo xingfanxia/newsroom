@@ -9,6 +9,7 @@ describe("check-data-state operator diagnostic", () => {
     expect(source).toContain("getSystemSnapshot()");
     expect(source).toContain("=== worker queues ===");
     expect(source).toContain("=== cron activity ===");
+    expect(readSource("lib/shell/system-queues.ts")).toContain('"article-body"');
     expect(source).not.toContain("pending_normalize");
     expect(source).not.toContain("FROM llm_usage");
   });

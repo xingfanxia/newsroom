@@ -8,9 +8,9 @@
  *    healthy / degraded / error by `consecutive_failures` + recency of
  *    `last_success_at`. Plus synthetic rows for the pipeline workers
  *    (normalizer, enricher, commentary) derived from recent write activity.
- *  - **queues**: pending normalization depth, unenriched items, item rows
- *    missing singleton commentary, and multi-member events missing
- *    event-level commentary.
+ *  - **queues**: pending normalization depth, body-prefetch candidates,
+ *    enrich-claimable items, item rows missing singleton commentary, and
+ *    multi-member events missing event-level commentary.
  *  - **cron**: mirrors `vercel.json` schedules.
  *  - **errors**: joins `source_health.last_error` with the failing source
  *    for an error-log view.
@@ -37,6 +37,10 @@ import {
   formatElapsedSince,
   latestDate,
 } from "@/lib/time/relative";
+import {
+  bodyPrefetchPendingSql,
+  enrichBodyPrefetchReadySql,
+} from "@/lib/urls/media";
 
 type SystemService = {
   id: string;
@@ -142,7 +146,11 @@ export async function getSystemSnapshot(): Promise<SystemSnapshot> {
 
   const [itemsRow] = await client
     .select({
-      unenriched: sql<number>`count(*) filter (where ${items.enrichedAt} is null)::int`,
+      bodyPrefetchPending: sql<number>`count(*) filter (where ${bodyPrefetchPendingSql(items.bodyFetchedAt, items.canonicalUrl)})::int`,
+      enrichClaimable: sql<number>`count(*) filter (
+        where ${items.enrichedAt} is null
+          and ${enrichBodyPrefetchReadySql(items.bodyFetchedAt, items.canonicalUrl)}
+      )::int`,
       itemCommentaryPending: sql<number>`count(*) filter (
         where ${items.tier} in ('featured','p1','all')
           and ${items.commentaryAt} is null
@@ -180,7 +188,8 @@ export async function getSystemSnapshot(): Promise<SystemSnapshot> {
 
   const queues: SystemQueue[] = [
     systemQueueSnapshot("normalize", queueRow?.rawPending ?? 0),
-    systemQueueSnapshot("enrich", itemsRow?.unenriched ?? 0),
+    systemQueueSnapshot("article-body", itemsRow?.bodyPrefetchPending ?? 0),
+    systemQueueSnapshot("enrich", itemsRow?.enrichClaimable ?? 0),
     systemQueueSnapshot("commentary", itemsRow?.itemCommentaryPending ?? 0),
     systemQueueSnapshot(
       "event-commentary",
