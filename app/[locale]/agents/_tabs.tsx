@@ -6,6 +6,7 @@ import {
   PUBLIC_RATE_LIMIT_DOC_GROUPS,
   publicRateLimitReqLabel,
 } from "@/lib/api/public-endpoint-config";
+import { LEGACY_RSS_FEEDS } from "@/lib/rss/legacy-feed-meta";
 import { PUBLIC_SITE_URL } from "@/lib/site";
 
 type Tab = "skill" | "rss" | "api";
@@ -304,32 +305,16 @@ function RssPane({ lang }: { lang: Lang }) {
     desc: string;
     badge?: string;
   }> = [
-    {
-      title: lang === "zh" ? "AX Radar — 热点聚合" : "AX Radar — hot today",
-      url: `${SITE}/api/rss/today.xml`,
-      desc:
-        lang === "zh"
-          ? "今日 AI 行业要闻,自动聚合多源覆盖。"
-          : "Today's AI news and multi-source events.",
-      badge: lang === "zh" ? "推荐订阅" : "recommended",
-    },
-    {
-      title: lang === "zh" ? "AX Radar — AX 严选" : "AX Radar — curated",
-      url: `${SITE}/api/rss/curated.xml`,
-      desc:
-        lang === "zh"
-          ? "操作员手选信源:鸭哥/grapeot、AI 群聊日报、阮一峰等。"
-          : "Operator-curated publishers — Grapeot, AI 群聊日报, Ruanyifeng, etc.",
-    },
-    {
-      title:
-        lang === "zh" ? "AX Radar — 每日 AI 日报" : "AX Radar — daily column",
-      url: `${SITE}/api/rss/daily.xml`,
-      desc:
-        lang === "zh"
-          ? "每日 9pm PT 一篇 AI 日报,像朋友分享一样讲清楚当天重点。"
-          : "Daily 9pm PT — a clear editorial column that reads like sharing the day's signal with a friend.",
-    },
+    ...LEGACY_RSS_FEEDS.map((feed) => ({
+      title: feed.integrationTitle[lang],
+      url: `${SITE}${feed.apiPath}`,
+      desc: feed.integrationDescription[lang],
+      badge: feed.recommended
+        ? lang === "zh"
+          ? "推荐订阅"
+          : "recommended"
+        : undefined,
+    })),
     {
       title:
         lang === "zh"

@@ -4,6 +4,10 @@ import {
   legacyLaneRssItem,
   parseLegacyRssSlug,
 } from "@/lib/rss/legacy-feeds";
+import {
+  LEGACY_RSS_FEEDS,
+  legacyRssFeedMeta,
+} from "@/lib/rss/legacy-feed-meta";
 
 describe("legacy RSS feed helpers", () => {
   test("parses supported slugs with or without the .xml suffix", () => {
@@ -12,6 +16,21 @@ describe("legacy RSS feed helpers", () => {
     expect(parseLegacyRssSlug("today.xml")).toBe("today");
     expect(parseLegacyRssSlug("curated.xml")).toBe("curated");
     expect(parseLegacyRssSlug("papers.xml")).toBeNull();
+  });
+
+  test("keeps public RSS metadata in one ordered contract", () => {
+    expect(LEGACY_RSS_FEEDS.map((feed) => feed.slug)).toEqual([
+      "today",
+      "curated",
+      "daily",
+    ]);
+    expect(LEGACY_RSS_FEEDS.map((feed) => feed.apiPath)).toEqual([
+      "/api/rss/today.xml",
+      "/api/rss/curated.xml",
+      "/api/rss/daily.xml",
+    ]);
+    expect(legacyRssFeedMeta("today").recommended).toBe(true);
+    expect(legacyRssFeedMeta("daily").route).toBe("/zh/daily");
   });
 
   test("maps daily-column rows to stable RSS items", () => {

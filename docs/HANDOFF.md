@@ -290,6 +290,9 @@ Shipped cleanup:
 - Shared legacy `/api/rss/{daily,today,curated}.xml` feed construction through
   `lib/rss/legacy-feeds.ts`; the slug route now owns only rate-limit, slug
   validation, 404 handling, and the RSS HTTP response envelope.
+- Shared legacy RSS slug metadata through `lib/rss/legacy-feed-meta.ts`; the
+  RSS renderer and `/agents` integration page now reuse one slug/path/title
+  contract instead of separately hand-writing `/api/rss/*.xml` cards.
 - Shared legacy structured newsletter RSS construction through
   `lib/rss/newsletter-feed.ts`; `/api/feed/newsletter/{locale}/rss.xml` now
   owns only locale normalization and the RSS HTTP response envelope.

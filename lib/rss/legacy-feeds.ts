@@ -5,37 +5,15 @@ import {
   listDailyColumnRows,
   type DailyColumnRow,
 } from "@/lib/api/daily-columns";
+import {
+  legacyRssFeedMeta,
+  type LegacyLaneRssSlug,
+  type LegacyRssSlug,
+} from "@/lib/rss/legacy-feed-meta";
 import { publicUrl } from "@/lib/site";
 import { renderRssFeed, type RssItem } from "@/lib/rss/render";
 
-const LEGACY_RSS_SLUGS = ["daily", "today", "curated"] as const;
-type LegacyRssSlug = (typeof LEGACY_RSS_SLUGS)[number];
-type LegacyLaneRssSlug = Exclude<LegacyRssSlug, "daily">;
-
-type LegacyRssFeedMeta = {
-  title: string;
-  description: string;
-  route: string;
-};
-
-const LEGACY_RSS_FEED_META: Record<LegacyRssSlug, LegacyRssFeedMeta> = {
-  daily: {
-    title: "AX Radar — 每日 AI 日报",
-    description:
-      "每日 9pm PT 一篇 AI 日报，2500-4500 字编辑视角，作者主笔。",
-    route: "/zh/daily",
-  },
-  today: {
-    title: "AX Radar — 热点聚合",
-    description: "今日 AI 行业要闻，自动聚合多源覆盖。",
-    route: "/zh",
-  },
-  curated: {
-    title: "AX Radar — AX 严选",
-    description: "操作员手选信源，鸭哥/grapeot, AI 群聊日报, 阮一峰等。",
-    route: "/zh/curated",
-  },
-};
+export { parseLegacyRssSlug } from "@/lib/rss/legacy-feed-meta";
 
 type DailyColumnRssRow = Pick<
   DailyColumnRow,
@@ -57,13 +35,6 @@ type LegacyLaneRssRow = {
   published_at: Date | string;
   url: string;
 };
-
-export function parseLegacyRssSlug(rawSlug: string): LegacyRssSlug | null {
-  const slug = rawSlug.replace(/\.xml$/, "");
-  return (LEGACY_RSS_SLUGS as readonly string[]).includes(slug)
-    ? (slug as LegacyRssSlug)
-    : null;
-}
 
 export async function renderLegacyRssFeed(
   slug: LegacyRssSlug,
@@ -138,14 +109,14 @@ function renderLegacyRssChannel(
   slug: LegacyRssSlug,
   items: RssItem[],
 ): string {
-  const meta = LEGACY_RSS_FEED_META[slug];
+  const meta = legacyRssFeedMeta(slug);
 
   return renderRssFeed({
-    title: meta.title,
+    title: meta.channelTitle,
     link: publicUrl(meta.route),
-    description: meta.description,
+    description: meta.channelDescription,
     lastBuildDate: items[0]?.pubDate ?? new Date(),
     items,
-    selfLink: publicUrl(`/api/rss/${slug}.xml`),
+    selfLink: publicUrl(meta.apiPath),
   });
 }

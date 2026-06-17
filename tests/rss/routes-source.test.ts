@@ -6,6 +6,8 @@ const newsletterFeedRoute = read(
   "app/api/feed/newsletter/[locale]/rss.xml/route.ts",
 );
 const dailyFeedRoute = read("app/api/rss/[slug]/route.ts");
+const agentsTabs = read("app/[locale]/agents/_tabs.tsx");
+const legacyFeedMeta = read("lib/rss/legacy-feed-meta.ts");
 const legacyFeeds = read("lib/rss/legacy-feeds.ts");
 const newsletterFeed = read("lib/rss/newsletter-feed.ts");
 
@@ -66,10 +68,25 @@ describe("RSS route source contracts", () => {
     expect(dailyFeedRoute).not.toContain("JOIN sources");
     expect(dailyFeedRoute).not.toContain(".execute(sql");
 
+    expect(legacyFeeds).toContain("@/lib/rss/legacy-feed-meta");
     expect(legacyFeeds).toContain("renderRssFeed");
     expect(legacyFeeds).toContain("listDailyColumnRows");
     expect(legacyFeeds).toContain("dailyColumnRssItem");
     expect(legacyFeeds).toContain("legacyLaneRssItem");
+  });
+
+  test("legacy RSS metadata is shared by RSS rendering and the agents page", () => {
+    expect(legacyFeedMeta).toContain("LEGACY_RSS_FEEDS");
+    expect(legacyFeedMeta).toContain("/api/rss/today.xml");
+    expect(legacyFeedMeta).toContain("/api/rss/curated.xml");
+    expect(legacyFeedMeta).toContain("/api/rss/daily.xml");
+
+    for (const source of [legacyFeeds, agentsTabs]) {
+      expect(source).toContain("@/lib/rss/legacy-feed-meta");
+      expect(source).not.toContain("/api/rss/today.xml");
+      expect(source).not.toContain("/api/rss/curated.xml");
+      expect(source).not.toContain("/api/rss/daily.xml");
+    }
   });
 
   test("legacy newsletter RSS route delegates digest construction to a shared helper", () => {
