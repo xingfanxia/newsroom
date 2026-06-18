@@ -1,10 +1,10 @@
 # Daily AI Column — Implementation Plan
 
-> **Archived completed plan.** Do not execute this checklist as current work.
-> It preserves the 2026-04-25 implementation sequence and includes retired
-> `/papers` / `papers.xml` and older model references. Current routing starts
-> at [`../README.md`](../README.md) and current behavior is in code plus
-> [`../HANDOFF.md`](../HANDOFF.md).
+> **Historical archive.** This completed 2026-04-25 implementation plan is not current implementation guidance.
+> Do not execute this checklist as current work. It preserves the original
+> implementation sequence and includes retired `/papers` / `papers.xml` plus
+> older model references. Current routing starts at [`../README.md`](../README.md)
+> and current behavior is in code plus [`../HANDOFF.md`](../HANDOFF.md).
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

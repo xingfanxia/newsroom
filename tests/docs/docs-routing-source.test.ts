@@ -8,6 +8,9 @@ const handoffDoc = readSource("docs/HANDOFF.md");
 const architectureOverviewDoc = readSource("docs/architecture/overview.md");
 const ingestionDoc = readSource("docs/architecture/ingestion.md");
 const testingStrategyDoc = readSource("docs/testing/strategy.md");
+const dailyColumnDesign = readSource("docs/daily-column/DESIGN.md");
+const dailyColumnPlan = readSource("docs/daily-column/PLAN.md");
+const dailyColumnHandoff = readSource("docs/daily-column/HANDOFF-2026-04-25.md");
 const aggregationHandoff = readSource("docs/HANDOFF-AGGREGATION.md");
 const aggregationDesign = readSource("docs/aggregation/DESIGN.md");
 const aggregationPlan = readSource("docs/aggregation/PLAN.md");
@@ -90,6 +93,44 @@ describe("docs routing source contracts", () => {
     expect(planLead).toContain("../architecture/ingestion.md");
     expect(planLead.indexOf("Historical archive")).toBeLessThan(
       planLead.indexOf("For agentic workers"),
+    );
+  });
+
+  test("daily-column design, plan, and handoff archive themselves before old instructions", () => {
+    expect(docsReadme).toContain("[`daily-column/DESIGN.md`](./daily-column/DESIGN.md)");
+    expect(docsReadme).toContain("Original 2026-04-25 daily-column structure");
+    expect(docsReadme).toContain("[`daily-column/PLAN.md`](./daily-column/PLAN.md)");
+    expect(docsReadme).toContain("Do not execute its checklist");
+    expect(docsReadme).toContain("[`daily-column/HANDOFF-2026-04-25.md`](./daily-column/HANDOFF-2026-04-25.md)");
+    expect(docsReadme).toContain("Historical voice/page iteration notes");
+
+    const designLead = dailyColumnDesign.slice(0, 700);
+    expect(designLead).toContain("Historical archive");
+    expect(designLead).toContain("not current implementation guidance");
+    expect(designLead).toContain("../architecture/ingestion.md");
+    expect(designLead).toContain("../../lib/llm/prompts/daily-column.md");
+    expect(designLead.indexOf("Historical archive")).toBeLessThan(
+      designLead.indexOf("**Status**"),
+    );
+
+    const planLead = dailyColumnPlan.slice(0, 700);
+    expect(planLead).toContain("Historical archive");
+    expect(planLead).toContain("not current implementation guidance");
+    expect(planLead).toContain("Do not execute this checklist");
+    expect(planLead).toContain("../HANDOFF.md");
+    expect(planLead.indexOf("Historical archive")).toBeLessThan(
+      planLead.indexOf("For agentic workers"),
+    );
+
+    const handoffLead = dailyColumnHandoff.slice(0, 900);
+    expect(handoffLead).toContain("Historical archive");
+    expect(handoffLead).toContain("not current implementation guidance");
+    expect(handoffLead).toContain("../../lib/llm/prompts/daily-column.md");
+    expect(handoffLead).toContain("Historical read order");
+    expect(handoffLead).toContain("launch-era state + voice journey");
+    expect(handoffLead).not.toContain("current state + voice journey");
+    expect(handoffLead.indexOf("Historical archive")).toBeLessThan(
+      handoffLead.indexOf("Historical read order"),
     );
   });
 
