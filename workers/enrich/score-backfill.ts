@@ -20,6 +20,10 @@ import {
 } from "./prompt";
 import { generateChineseScoreRationale } from "./chinese";
 import { loadPolicy } from "./policy";
+import {
+  applyNeverExcludeTierFloor,
+  loadNeverExcludeSourceIds,
+} from "./source-tier";
 import { treatmentForScore, type EnrichTreatment } from "./treatment";
 
 const CONCURRENCY = 30;
@@ -69,6 +73,7 @@ export async function runScoreBackfill(): Promise<ScoreBackfillReport> {
   }
 
   const policy = await loadPolicy();
+  const neverExcludeSourceIds = await loadNeverExcludeSourceIds(client);
   const limit = pLimit(CONCURRENCY);
   const errors: { itemId: number; reason: string }[] = [];
   let rescored = 0;
@@ -93,18 +98,26 @@ export async function runScoreBackfill(): Promise<ScoreBackfillReport> {
             tags,
             treatment: "fast",
           });
-          // Mirror enrichOne: YT sources never go to 'excluded' — floor at
-          // 'all' so the backfill can't drop hand-picked podcasts off the feed.
-          const isYoutube = item.sourceId.endsWith("-yt");
-          let finalTier = isYoutube && s.tier === "excluded" ? "all" : s.tier;
-          if (treatmentForScore({ importance: s.importance, tier: finalTier }) === "high") {
+          let finalTier = applyNeverExcludeTierFloor({
+            sourceId: item.sourceId,
+            tier: s.tier,
+            neverExcludeSourceIds,
+          });
+          if (
+            treatmentForScore({ importance: s.importance, tier: finalTier }) ===
+            "high"
+          ) {
             s = await scoreItem({
               item,
               policyContent: policy.content,
               tags,
               treatment: "high",
             });
-            finalTier = isYoutube && s.tier === "excluded" ? "all" : s.tier;
+            finalTier = applyNeverExcludeTierFloor({
+              sourceId: item.sourceId,
+              tier: s.tier,
+              neverExcludeSourceIds,
+            });
           }
           await client
             .update(items)

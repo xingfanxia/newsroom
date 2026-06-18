@@ -1,7 +1,7 @@
 import pLimit from "p-limit";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { items, sources } from "@/db/schema";
+import { items } from "@/db/schema";
 import type { Item } from "@/db/schema";
 import {
   generateStructured,
@@ -27,6 +27,11 @@ import {
 } from "./chinese";
 import { ENRICH_CLAIM_RESET_VALUES } from "./claim-state";
 import { loadPolicy } from "./policy";
+import {
+  applyNeverExcludeTierFloor,
+  loadNeverExcludeSourceIds,
+  type NeverExcludeSourceIds,
+} from "./source-tier";
 import { treatmentForScore, type EnrichTreatment } from "./treatment";
 
 // Enrich does stages 1-3 (summary + tags → embed → score). Commentary used
@@ -76,14 +81,7 @@ export async function runEnrichBatch(
   }
 
   const policy = await loadPolicy();
-
-  // Source-level allow-list: sources flagged never_exclude get a tier floor
-  // of "all". Load once and pass through instead of querying per item.
-  const neverExcludeRows = await client
-    .select({ id: sources.id })
-    .from(sources)
-    .where(eq(sources.neverExclude, true));
-  const neverExcludeSet = new Set(neverExcludeRows.map((r) => r.id));
+  const neverExcludeSourceIds = await loadNeverExcludeSourceIds(client);
 
   const limit = pLimit(opts.concurrency ?? CONCURRENCY);
   const errors: { itemId: number; stage: string; code: string }[] = [];
@@ -93,7 +91,7 @@ export async function runEnrichBatch(
     pending.map((item) =>
       limit(async () => {
         try {
-          await enrichOne(item, policy, neverExcludeSet);
+          await enrichOne(item, policy, neverExcludeSourceIds);
           enriched++;
         } catch (err) {
           const code =
@@ -218,7 +216,7 @@ class StageError extends Error {
 async function enrichOne(
   item: Item,
   policy: PolicyT,
-  neverExcludeSet: Set<string>,
+  neverExcludeSourceIds: NeverExcludeSourceIds,
 ): Promise<void> {
   const client = db();
 
@@ -226,19 +224,22 @@ async function enrichOne(
   let embedding = await generateEmbedding(item, enriched);
   let scored = await generateScore(item, enriched, policy, "fast");
 
-  // Operator-flagged sources (sources.never_exclude) keep tier floored at
-  // "all" regardless of scorer verdict. YouTube channels and community
-  // digests (ai-chatgroup-daily) are the primary cases: interesting by
-  // virtue of being hand-added to the allow-list. Low importance still
-  // sorts them below curated AI content — they just stay browseable.
-  const finalTier =
-    neverExcludeSet.has(item.sourceId) && scored.tier === "excluded"
-      ? "all"
-      : scored.tier;
+  const finalTier = applyNeverExcludeTierFloor({
+    sourceId: item.sourceId,
+    tier: scored.tier,
+    neverExcludeSourceIds,
+  });
 
   let effectiveTier = finalTier;
-  if (treatmentForScore({ importance: scored.importance, tier: finalTier }) === "high") {
-    const upgraded = await regenerateHighValueItem(item, policy, neverExcludeSet);
+  if (
+    treatmentForScore({ importance: scored.importance, tier: finalTier }) ===
+    "high"
+  ) {
+    const upgraded = await regenerateHighValueItem(
+      item,
+      policy,
+      neverExcludeSourceIds,
+    );
     enriched = upgraded.enriched;
     embedding = upgraded.embedding;
     scored = upgraded.scored;
@@ -383,7 +384,7 @@ async function generateScore(
 async function regenerateHighValueItem(
   item: Item,
   policy: PolicyT,
-  neverExcludeSet: Set<string>,
+  neverExcludeSourceIds: NeverExcludeSourceIds,
 ): Promise<{
   enriched: EnrichOutput;
   embedding: number[];
@@ -393,10 +394,11 @@ async function regenerateHighValueItem(
   const enriched = await generateEnrichment(item, "high");
   const embedding = await generateEmbedding(item, enriched);
   const scored = await generateScore(item, enriched, policy, "high");
-  const finalTier =
-    neverExcludeSet.has(item.sourceId) && scored.tier === "excluded"
-      ? "all"
-      : scored.tier;
+  const finalTier = applyNeverExcludeTierFloor({
+    sourceId: item.sourceId,
+    tier: scored.tier,
+    neverExcludeSourceIds,
+  });
   return { enriched, embedding, scored, finalTier };
 }
 

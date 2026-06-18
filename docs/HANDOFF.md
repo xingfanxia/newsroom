@@ -63,6 +63,9 @@ Shipped cleanup:
 - Centralized `AppLocale` to BCP-47 language-tag mapping in
   `appLocaleLanguageTag`, so RSS rendering and saved-export date formatting no
   longer repeat `zh-CN` / `en-US` branches.
+- Shared `sources.never_exclude` tier-floor handling through
+  `workers/enrich/source-tier.ts`; live enrich and score-backfill now use the
+  same source allow-list instead of a YouTube suffix heuristic.
 - Derived main RSS feed ordering and locale coercion from `APP_LOCALES`, so RSS
   discovery metadata cannot drift from the app/API locale contract.
 - Shared admin mono blocks through `components/admin/mono-block.tsx`; policy
@@ -680,8 +683,9 @@ Commentary: 106/106 enriched items have deep notes.
 11. **X billing discipline** — `since_id` cursor on
     `source_health.lastExternalId` keeps steady-state near zero.
     Historical backfills bill per tweet.
-12. **YT tier floor** — `source_id LIKE '%-yt'` + scorer `excluded`
-    gets silently upgraded to `'all'` in both `enrichOne` and
+12. **Never-exclude tier floor** — `sources.never_exclude=true` + scorer
+    `excluded` gets silently upgraded to `'all'` through
+    `workers/enrich/source-tier.ts` in both live enrich and
     `runScoreBackfill`. Don't remove without asking operator.
 
 ---
