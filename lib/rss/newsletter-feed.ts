@@ -8,7 +8,11 @@ import {
   type RssItem,
 } from "@/lib/rss/render";
 import { publicUrl } from "@/lib/site";
-import { MONTHLY_NEWSLETTER_KIND, type NewsletterLocale } from "@/lib/types";
+import {
+  MONTHLY_NEWSLETTER_KIND,
+  NEWSLETTER_LOCALES,
+  type NewsletterLocale,
+} from "@/lib/types";
 
 const NEWSLETTER_RSS_BRAND: Record<NewsletterLocale, string> = {
   en: "AX's AI RADAR — Daily + Monthly Brief",
@@ -19,6 +23,8 @@ const NEWSLETTER_RSS_DESCRIPTION: Record<NewsletterLocale, string> = {
   en: "Editorial digest synthesized from the radar's featured stories — daily at 09:00 UTC, plus a monthly recap.",
   zh: "雷达精选的编辑摘要 — 每天 UTC 09:00 出品，附加每月综合。",
 };
+
+const NEWSLETTER_RSS_LOCALE_SET = new Set<string>(NEWSLETTER_LOCALES);
 
 type StructuredNewsletterRssRow = Pick<
   Newsletter,
@@ -35,7 +41,7 @@ type StructuredNewsletterRssRow = Pick<
 >;
 
 export function parseNewsletterRssLocale(raw: string): NewsletterLocale {
-  return raw === "en" ? "en" : "zh";
+  return NEWSLETTER_RSS_LOCALE_SET.has(raw) ? (raw as NewsletterLocale) : "zh";
 }
 
 export async function renderStructuredNewsletterRssFeed(

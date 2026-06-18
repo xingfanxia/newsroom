@@ -3,8 +3,15 @@ import {
   parseNewsletterRssLocale,
   structuredNewsletterRssItem,
 } from "@/lib/rss/newsletter-feed";
+import { NEWSLETTER_LOCALES } from "@/lib/types";
 
 describe("newsletter RSS feed helpers", () => {
+  test("accepts every newsletter locale from the shared runtime tuple", () => {
+    for (const locale of NEWSLETTER_LOCALES) {
+      expect(parseNewsletterRssLocale(locale)).toBe(locale);
+    }
+  });
+
   test("parses newsletter RSS locales with zh fallback", () => {
     expect(parseNewsletterRssLocale("en")).toBe("en");
     expect(parseNewsletterRssLocale("zh")).toBe("zh");

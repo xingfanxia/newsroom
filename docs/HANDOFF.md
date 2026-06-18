@@ -200,6 +200,9 @@ Shipped cleanup:
 - Shared newsletter kind and locale labels through `NEWSLETTER_KINDS` and
   `NEWSLETTER_LOCALES` in `lib/types.ts`; digest workers, daily-column queries,
   and backfill scripts no longer carry local `daily|monthly` / `zh|en` unions.
+- Reused `NEWSLETTER_LOCALES` in the legacy structured-newsletter RSS locale
+  parser, so `/api/feed/newsletter/{locale}/rss.xml` cannot drift from the
+  newsletter worker/API locale contract.
 - Shared newsletter window calculations through `workers/newsletter/windows.ts`;
   daily digest, daily-column selection, monthly digest, and daily-column
   backfill scripts now reuse the same snapped UTC window and period-start
