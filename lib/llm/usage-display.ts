@@ -57,8 +57,15 @@ export function formatUsageTaskModels(
   if (models.length === 0) return "—";
   return models
     .slice(0, 2)
-    .map((m) => `${m.model} ${formatUsageCount(m.calls)}`)
+    .map((m) => `${formatUsageModelLabel(m)} ${formatUsageCount(m.calls)}`)
     .join(" · ");
+}
+
+export function formatUsageModelLabel(model: {
+  provider: string;
+  model: string;
+}): string {
+  return `${model.provider}/${model.model}`;
 }
 
 export function formatUsageShortDate(iso: string): string {

@@ -72,6 +72,9 @@ Shipped cleanup:
   `USAGE_WINDOWS` / usage-summary helpers; `/admin/usage` no longer depends on
   hand-written `today/week/month/all` totals or local query-param casts when the
   usage window contract changes.
+- Shared `/admin/usage` provider/model label formatting through
+  `lib/llm/usage-display.ts`, so task spend summaries and recent-call rows
+  both identify the provider instead of showing ambiguous deployment names.
 - Reused `APP_LOCALES` in `i18n/routing.ts`, so Next locale routing and
   API/OpenAPI/agent locale contracts no longer carry separate hard-coded
   `zh/en` tuples.

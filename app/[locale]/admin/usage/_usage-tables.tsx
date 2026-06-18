@@ -3,6 +3,7 @@ import { AdminTableFrame } from "@/components/admin/table-frame";
 import type { UsageDashboardSummary } from "@/lib/api/usage-summary";
 import {
   formatUsageCount,
+  formatUsageModelLabel,
   formatUsageTaskModels,
   formatUsageTokens,
   usageTaskTone,
@@ -99,6 +100,7 @@ function CostByTaskTable({
                         fontSize: 10.5,
                         maxWidth: 180,
                         whiteSpace: "normal",
+                        overflowWrap: "anywhere",
                       }}
                     >
                       {formatUsageTaskModels(t.models)}
@@ -265,9 +267,10 @@ function RecentCallsTable({
                       fontSize: 10,
                       maxWidth: 150,
                       whiteSpace: "normal",
+                      overflowWrap: "anywhere",
                     }}
                   >
-                    {c.model}
+                    {formatUsageModelLabel(c)}
                   </td>
                   <td className="right">
                     <span className="muted">

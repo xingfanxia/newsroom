@@ -43,12 +43,15 @@ describe("usage stats surfaces", () => {
     expect(stats).toContain("type TaskModelBreakdown");
     expect(stats).toContain("models: TaskModelBreakdown[]");
     expect(usageTables).toContain("formatUsageTaskModels(t.models)");
+    expect(usageTables).toContain("formatUsageModelLabel");
     expect(summary).toContain("models: t.models.map");
   });
 
-  it("renders model labels in recent calls", () => {
+  it("renders provider/model labels in recent calls", () => {
     expect(usageTables).toContain("{zh ? \"模型\" : \"model\"}");
-    expect(usageTables).toContain("{c.model}");
+    expect(usageTables).toContain("formatUsageModelLabel(c)");
+    expect(usageTables).toContain('overflowWrap: "anywhere"');
+    expect(usageTables).not.toContain("{c.model}");
   });
 
   it("keeps usage table presentation out of the admin page component", () => {

@@ -5,6 +5,7 @@ import {
   USAGE_RANGE_LABELS,
   USAGE_TASK_TONES,
   formatUsageCount,
+  formatUsageModelLabel,
   formatUsageShortDate,
   formatUsageTaskModels,
   formatUsageTokens,
@@ -49,7 +50,15 @@ describe("usage display contract", () => {
         { provider: "azure-deepseek", model: "DeepSeek-V4-Flash", calls: 41 },
         { provider: "anthropic", model: "claude-haiku-4-5", calls: 7 },
       ]),
-    ).toBe("DeepSeek-V4-Pro 2.2K · DeepSeek-V4-Flash 41");
+    ).toBe(
+      "azure-deepseek/DeepSeek-V4-Pro 2.2K · azure-deepseek/DeepSeek-V4-Flash 41",
+    );
+    expect(
+      formatUsageModelLabel({
+        provider: "anthropic",
+        model: "claude-haiku-4-5",
+      }),
+    ).toBe("anthropic/claude-haiku-4-5");
   });
 
   test("formats short dates for the sparkline axis", () => {
