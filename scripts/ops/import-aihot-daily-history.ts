@@ -2,8 +2,8 @@
 /**
  * One-shot ingest of AI HOT historical daily reports into our newsletters
  * table. Pulls from /api/public/dailies (index) + /api/public/daily/<date>
- * (full payload), upserts into newsletters as kind='daily' locale='zh' rows
- * keyed by aihot_daily_date.
+ * (full payload), upserts into the same daily-column newsletter kind/locale
+ * rows keyed by aihot_daily_date.
  *
  * Existing daily-column rows already authored by our pipeline are preserved —
  * this script only fills in the AI HOT payload columns (aihot_daily_payload +
@@ -19,6 +19,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import { db, closeDb } from "@/db/client";
 import { newsletters } from "@/db/schema";
+import { DAILY_COLUMN_LOCALE, DAILY_NEWSLETTER_KIND } from "@/lib/types";
 import {
   AihotError,
   fetchDailiesIndex,
@@ -146,8 +147,8 @@ async function main(): Promise<void> {
       .from(newsletters)
       .where(
         and(
-          eq(newsletters.kind, "daily"),
-          eq(newsletters.locale, "zh"),
+          eq(newsletters.kind, DAILY_NEWSLETTER_KIND),
+          eq(newsletters.locale, DAILY_COLUMN_LOCALE),
           eq(newsletters.aihotDailyDate, date),
         ),
       )
@@ -212,8 +213,8 @@ async function main(): Promise<void> {
       await client
         .insert(newsletters)
         .values({
-          kind: "daily",
-          locale: "zh",
+          kind: DAILY_NEWSLETTER_KIND,
+          locale: DAILY_COLUMN_LOCALE,
           periodStart: start,
           periodEnd: end,
           storyCount: 0,
@@ -250,12 +251,14 @@ async function main(): Promise<void> {
       .from(newsletters)
       .where(
         and(
-          eq(newsletters.kind, "daily"),
-          eq(newsletters.locale, "zh"),
+          eq(newsletters.kind, DAILY_NEWSLETTER_KIND),
+          eq(newsletters.locale, DAILY_COLUMN_LOCALE),
           sql`${newsletters.aihotDailyPayload} IS NOT NULL`,
         ),
       );
-    console.log(`  newsletters with aihot payload (kind=daily, locale=zh): ${withPayload?.n ?? 0}`);
+    console.log(
+      `  newsletters with aihot payload (kind=${DAILY_NEWSLETTER_KIND}, locale=${DAILY_COLUMN_LOCALE}): ${withPayload?.n ?? 0}`,
+    );
   }
 
   await closeDb();

@@ -225,6 +225,9 @@ Shipped cleanup:
 - Shared newsletter kind and locale labels through `NEWSLETTER_KINDS` and
   `NEWSLETTER_LOCALES` in `lib/types.ts`; digest workers, daily-column queries,
   and backfill scripts no longer carry local `daily|monthly` / `zh|en` unions.
+- Shared the daily-column writer locale through `DAILY_COLUMN_LOCALE`, so the
+  daily writer, daily-column backfill, and AI HOT history importer cannot drift
+  on which newsletter locale receives generated columns and payloads.
 - Reused `NEWSLETTER_LOCALES` in the legacy structured-newsletter RSS locale
   parser, so `/api/feed/newsletter/{locale}/rss.xml` cannot drift from the
   newsletter worker/API locale contract.

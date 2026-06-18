@@ -59,6 +59,7 @@ export type NewsletterKind = (typeof NEWSLETTER_KINDS)[number];
 
 export const NEWSLETTER_LOCALES = APP_LOCALES;
 export type NewsletterLocale = AppLocale;
+export const DAILY_COLUMN_LOCALE = "zh" satisfies NewsletterLocale;
 
 export const SOURCE_LOCALES = ["en", "zh", "multi"] as const;
 type SourceLocale = (typeof SOURCE_LOCALES)[number];

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  DAILY_COLUMN_LOCALE,
   DAILY_NEWSLETTER_KIND,
   MONTHLY_NEWSLETTER_KIND,
   NEWSLETTER_KINDS,
@@ -13,6 +14,7 @@ const dailyColumnWorkerSrc = read("workers/newsletter/run-daily-column.ts");
 const dailyColumnSelectSrc = read("workers/newsletter/select.ts");
 const newsletterWindowsSrc = read("workers/newsletter/windows.ts");
 const dailyColumnBackfillSrc = read("scripts/ops/backfill-daily-columns.ts");
+const aihotDailyImportSrc = read("scripts/ops/import-aihot-daily-history.ts");
 const dailyColumnRegenSrc = read("scripts/ops/regen-daily-column.ts");
 const dailyColumnWeekBackfillSrc = read("scripts/ops/backfill-daily-week.ts");
 const dailyColumnApiSrc = read("lib/api/daily-columns.ts");
@@ -21,6 +23,7 @@ const newsletterRssFeedSrc = read("lib/rss/newsletter-feed.ts");
 describe("newsletter runtime contracts", () => {
   test("newsletter kind and locale labels have one runtime source of truth", () => {
     expect(DAILY_NEWSLETTER_KIND).toBe("daily");
+    expect(DAILY_COLUMN_LOCALE).toBe("zh");
     expect(MONTHLY_NEWSLETTER_KIND).toBe("monthly");
     expect(NEWSLETTER_KINDS).toEqual(["daily", "monthly"]);
     expect(NEWSLETTER_LOCALES).toEqual(["zh", "en"]);
@@ -31,6 +34,7 @@ describe("newsletter runtime contracts", () => {
     );
     expect(typesSrc).toContain("export const NEWSLETTER_LOCALES");
     expect(typesSrc).toContain("export type NewsletterLocale = AppLocale");
+    expect(typesSrc).toContain("export const DAILY_COLUMN_LOCALE");
   });
 
   test("newsletter workers and daily-column API reuse the shared contracts", () => {
@@ -45,6 +49,14 @@ describe("newsletter runtime contracts", () => {
     );
 
     expect(dailyColumnWorkerSrc).toContain("DAILY_NEWSLETTER_KIND");
+    expect(dailyColumnWorkerSrc).toContain("DAILY_COLUMN_LOCALE");
+    expect(dailyColumnBackfillSrc).toContain("DAILY_COLUMN_LOCALE");
+    expect(aihotDailyImportSrc).toContain("DAILY_COLUMN_LOCALE");
+    expect(aihotDailyImportSrc).toContain("DAILY_NEWSLETTER_KIND");
+    expect(aihotDailyImportSrc).not.toContain('eq(newsletters.kind, "daily")');
+    expect(aihotDailyImportSrc).not.toContain('eq(newsletters.locale, "zh")');
+    expect(aihotDailyImportSrc).not.toContain('kind: "daily"');
+    expect(aihotDailyImportSrc).not.toContain('locale: "zh"');
     expect(dailyColumnApiSrc).toContain("DAILY_NEWSLETTER_KIND");
     expect(dailyColumnApiSrc).toContain("NEWSLETTER_LOCALES");
     expect(dailyColumnApiSrc).toContain("z.enum(NEWSLETTER_LOCALES)");

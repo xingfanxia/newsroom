@@ -18,8 +18,8 @@ import { newsletters, columnQcLog } from "@/db/schema";
 import { generateStructured, profiles } from "@/lib/llm";
 import { loadDailyColumnPrompt } from "@/lib/llm/prompts/load";
 import {
+  DAILY_COLUMN_LOCALE,
   DAILY_NEWSLETTER_KIND,
-  type NewsletterLocale,
 } from "@/lib/types";
 import { selectDailyColumnPool, type SelectedRow } from "./select";
 import { runColumnSelfCheck } from "./qc/self-check";
@@ -29,8 +29,6 @@ import {
   renderAihotDailyForPrompt,
 } from "./aihot-daily";
 import type { AihotDailyReport } from "@/lib/sources/aihot";
-
-const DAILY_COLUMN_LOCALE = "zh" satisfies NewsletterLocale;
 
 const dailyColumnSchema = z.object({
   title: z.string().min(1).transform((s) =>
@@ -240,7 +238,7 @@ function renderItemsForPrompt(
 
   const aihotBlock = renderAihotDailyForPrompt(aihotDaily);
 
-  return `<window kind="daily-column" locale="zh" story_count="${rows.length}">
+  return `<window kind="daily-column" locale="${DAILY_COLUMN_LOCALE}" story_count="${rows.length}">
 ${lines.join("\n\n")}
 </window>${aihotBlock ? `\n\n${aihotBlock}` : ""}
 

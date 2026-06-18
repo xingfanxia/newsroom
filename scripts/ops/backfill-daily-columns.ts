@@ -9,7 +9,7 @@ import pLimit from "p-limit";
 import { and, desc, gte, lte, sql } from "drizzle-orm";
 import { closeDb, db } from "@/db/client";
 import { newsletters } from "@/db/schema";
-import { DAILY_NEWSLETTER_KIND, type NewsletterLocale } from "@/lib/types";
+import { DAILY_COLUMN_LOCALE, DAILY_NEWSLETTER_KIND } from "@/lib/types";
 import { runDailyColumn } from "@/workers/newsletter/run-daily-column";
 import { runTimeForDailyPeriodStart } from "@/workers/newsletter/windows";
 import {
@@ -17,8 +17,6 @@ import {
   opsStatePath,
   saveOpsState,
 } from "@/scripts/ops/state";
-
-const DAILY_COLUMN_LOCALE = "zh" satisfies NewsletterLocale;
 
 const STATE_FILE = opsStatePath("backfill-daily-columns-state.json");
 
