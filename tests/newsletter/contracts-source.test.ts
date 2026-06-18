@@ -15,6 +15,7 @@ const dailyColumnSelectSrc = read("workers/newsletter/select.ts");
 const newsletterWindowsSrc = read("workers/newsletter/windows.ts");
 const dailyColumnBackfillSrc = read("scripts/ops/backfill-daily-columns.ts");
 const aihotDailyImportSrc = read("scripts/ops/import-aihot-daily-history.ts");
+const aihotDailyRepairSrc = read("scripts/ops/repair-aihot-daily-windows.ts");
 const dailyColumnRegenSrc = read("scripts/ops/regen-daily-column.ts");
 const dailyColumnWeekBackfillSrc = read("scripts/ops/backfill-daily-week.ts");
 const dailyColumnApiSrc = read("lib/api/daily-columns.ts");
@@ -80,6 +81,10 @@ describe("newsletter runtime contracts", () => {
     expect(aihotDailyImportSrc).toContain("dailyColumnWindowForDate");
     expect(aihotDailyImportSrc).not.toContain("function periodForDate");
     expect(aihotDailyImportSrc).not.toContain("T00:00:00Z");
+    expect(aihotDailyRepairSrc).toContain("dailyColumnWindowForDate");
+    expect(aihotDailyRepairSrc).toContain("storyCount} = 0");
+    expect(aihotDailyRepairSrc).toContain("isNull(newsletters.columnTitle)");
+    expect(aihotDailyRepairSrc).toContain("isNull(newsletters.headline)");
     expect(dailyColumnRegenSrc).toContain("runTimeForDailyColumnDate");
     expect(dailyColumnRegenSrc).not.toContain("T05:00:00Z");
     expect(dailyColumnWeekBackfillSrc).toContain("previousDailyColumnRunTimes");
