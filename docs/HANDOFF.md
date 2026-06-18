@@ -337,6 +337,9 @@ Shipped cleanup:
 - Shared main locale RSS metadata through `lib/rss/main-feed-meta.ts`; the
   featured-locale RSS route, layout alternate links, home RSS button, and
   `/agents` integration cards now reuse one locale/path/title contract.
+- Shared main `/api/feed/{locale}/rss.xml` feed construction through
+  `lib/rss/main-feed.ts`; the route now owns only locale coercion and the RSS
+  HTTP response envelope, matching the legacy and newsletter RSS route shape.
 - Shared legacy `/api/rss/{daily,today,curated}.xml` feed construction through
   `lib/rss/legacy-feeds.ts`; the slug route now owns only rate-limit, slug
   validation, 404 handling, and the RSS HTTP response envelope.

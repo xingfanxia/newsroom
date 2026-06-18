@@ -4,9 +4,9 @@ import { readSource as read } from "@/tests/helpers/source";
 const publicSurfaceFiles = [
   "app/sitemap.ts",
   "app/robots.ts",
+  "lib/rss/main-feed.ts",
   "lib/rss/legacy-feeds.ts",
   "lib/rss/newsletter-feed.ts",
-  "app/api/feed/[locale]/rss.xml/route.ts",
   "app/openapi.yaml/route.ts",
   "app/skill.md/route.ts",
   "app/[locale]/agents/page.tsx",

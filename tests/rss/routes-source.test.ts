@@ -9,39 +9,35 @@ const dailyFeedRoute = read("app/api/rss/[slug]/route.ts");
 const appLayout = read("app/[locale]/layout.tsx");
 const agentsTabs = read("app/[locale]/agents/_tabs.tsx");
 const homeFilters = read("app/[locale]/_home-filters.tsx");
+const mainFeed = read("lib/rss/main-feed.ts");
 const mainFeedMeta = read("lib/rss/main-feed-meta.ts");
 const legacyFeedMeta = read("lib/rss/legacy-feed-meta.ts");
 const legacyFeeds = read("lib/rss/legacy-feeds.ts");
 const newsletterFeed = read("lib/rss/newsletter-feed.ts");
 
 describe("RSS route source contracts", () => {
-  test("RSS routes share the envelope renderer", () => {
-    for (const route of [mainFeedRoute]) {
+  test("RSS routes share the HTTP response envelope", () => {
+    for (const route of [mainFeedRoute, dailyFeedRoute, newsletterFeedRoute]) {
       expect(route).toContain("@/lib/rss/render");
-      expect(route).toContain("renderRssFeed");
       expect(route).toContain("rssResponse");
       expect(route).not.toContain("new NextResponse(xml");
       expect(route).not.toContain("new Response(xml");
       expect(route).not.toContain("application/rss+xml; charset=utf-8");
     }
+  });
 
-    expect(dailyFeedRoute).toContain("@/lib/rss/render");
-    expect(dailyFeedRoute).toContain("rssResponse");
-    expect(dailyFeedRoute).not.toContain("new NextResponse(xml");
-    expect(dailyFeedRoute).not.toContain("new Response(xml");
-    expect(dailyFeedRoute).not.toContain("application/rss+xml; charset=utf-8");
-
-    expect(newsletterFeedRoute).toContain("@/lib/rss/render");
-    expect(newsletterFeedRoute).toContain("rssResponse");
-    expect(newsletterFeedRoute).not.toContain("new NextResponse(xml");
-    expect(newsletterFeedRoute).not.toContain("new Response(xml");
-    expect(newsletterFeedRoute).not.toContain(
-      "application/rss+xml; charset=utf-8",
-    );
+  test("RSS feed helpers share the XML renderer", () => {
+    for (const helper of [mainFeed, legacyFeeds, newsletterFeed]) {
+      expect(helper).toContain("@/lib/rss/render");
+      expect(helper).toContain("renderRssFeed");
+      expect(helper).not.toContain("new NextResponse(xml");
+      expect(helper).not.toContain("new Response(xml");
+      expect(helper).not.toContain("application/rss+xml; charset=utf-8");
+    }
   });
 
   test("legacy RSS routes do not hand-roll XML escaping or markdown rendering", () => {
-    for (const source of [mainFeedRoute, newsletterFeed]) {
+    for (const source of [mainFeed, newsletterFeed]) {
       expect(source).toContain("renderMarkdownishHtml");
       expect(source).not.toContain("function buildRss");
       expect(source).not.toContain("function mdToHtml");
@@ -52,25 +48,46 @@ describe("RSS route source contracts", () => {
   });
 
   test("main feed keeps radar metadata through renderer extensions", () => {
-    expect(mainFeedRoute).toContain("namespaces");
-    expect(mainFeedRoute).toContain("radar");
-    expect(mainFeedRoute).toContain("extraElements");
-    expect(mainFeedRoute).toContain("guidIsPermalink: true");
+    expect(mainFeed).toContain("namespaces");
+    expect(mainFeed).toContain("radar");
+    expect(mainFeed).toContain("extraElements");
+    expect(mainFeed).toContain("guidIsPermalink: true");
   });
 
-  test("main feed RSS metadata is shared by route, layout, home filters, and agents page", () => {
+  test("main feed RSS route delegates feed construction to a shared helper", () => {
+    expect(mainFeedRoute).toContain("@/lib/rss/main-feed");
+    expect(mainFeedRoute).toContain("renderMainRssFeed");
+    expect(mainFeedRoute).not.toContain("@/lib/items/live");
+    expect(mainFeedRoute).not.toContain("getFeaturedStories");
+    expect(mainFeedRoute).not.toContain("renderRssFeed");
+    expect(mainFeedRoute).not.toContain("renderMarkdownishHtml");
+    expect(mainFeedRoute).not.toContain("RssItem");
+    expect(mainFeedRoute).not.toContain("PUBLIC_SITE_HOST");
+
+    expect(mainFeed).toContain("getFeaturedStories");
+    expect(mainFeed).toContain("renderMainRssFeed");
+    expect(mainFeed).toContain("mainRssItem");
+  });
+
+  test("main feed RSS metadata is shared by helper, route, layout, home filters, and agents page", () => {
     expect(mainFeedMeta).toContain("MAIN_RSS_FEEDS");
     expect(mainFeedMeta).toContain("/api/feed/zh/rss.xml");
     expect(mainFeedMeta).toContain("/api/feed/en/rss.xml");
 
-    for (const source of [mainFeedRoute, appLayout, homeFilters, agentsTabs]) {
+    for (const source of [
+      mainFeed,
+      mainFeedRoute,
+      appLayout,
+      homeFilters,
+      agentsTabs,
+    ]) {
       expect(source).toContain("@/lib/rss/main-feed-meta");
       expect(source).not.toContain("/api/feed/zh/rss.xml");
       expect(source).not.toContain("/api/feed/en/rss.xml");
     }
 
-    expect(mainFeedRoute).not.toContain("const BRAND");
-    expect(mainFeedRoute).not.toContain("const DESCRIPTION");
+    expect(mainFeed).not.toContain("const BRAND");
+    expect(mainFeed).not.toContain("const DESCRIPTION");
   });
 
   test("legacy slug RSS route delegates feed construction to a shared helper", () => {
@@ -87,7 +104,6 @@ describe("RSS route source contracts", () => {
     expect(dailyFeedRoute).not.toContain(".execute(sql");
 
     expect(legacyFeeds).toContain("@/lib/rss/legacy-feed-meta");
-    expect(legacyFeeds).toContain("renderRssFeed");
     expect(legacyFeeds).toContain("listDailyColumnRows");
     expect(legacyFeeds).toContain("dailyColumnRssItem");
     expect(legacyFeeds).toContain("legacyLaneRssItem");
