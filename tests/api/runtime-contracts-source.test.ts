@@ -25,6 +25,7 @@ const feedbackMetrics = read("lib/feedback/metrics.ts");
 const savedCollections = read("lib/items/collections.ts");
 const savedItems = read("lib/items/saved.ts");
 const authSession = read("lib/auth/session.ts");
+const localeSwitcher = read("components/layout/locale-switcher.tsx");
 const iterationRunner = read("components/admin/iteration-runner.tsx");
 const iterationsPage = read("app/[locale]/admin/iterations/page.tsx");
 const agentIterate = read("workers/agent/iterate.ts");
@@ -107,6 +108,9 @@ describe("runtime contract source wiring", () => {
     expect(routing).toContain("DEFAULT_APP_LOCALE");
     expect(routing).not.toContain('locales: ["zh", "en"]');
     expect(routing).not.toContain('defaultLocale: "zh"');
+    expect(localeSwitcher).toContain("APP_LOCALES");
+    expect(localeSwitcher).not.toContain('{ value: "zh"');
+    expect(localeSwitcher).not.toContain('{ value: "en"');
     expect(schema).toContain('pgEnum("locale_kind", SOURCE_LOCALES)');
 
     for (const source of [

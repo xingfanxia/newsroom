@@ -78,6 +78,8 @@ Shipped cleanup:
 - Reused `APP_LOCALES` in `i18n/routing.ts`, so Next locale routing and
   API/OpenAPI/agent locale contracts no longer carry separate hard-coded
   `zh/en` tuples.
+- Derived the login locale switcher options from `APP_LOCALES`, keeping the
+  compact label mapping local while removing another route-locale enum copy.
 - Reused `APP_LOCALES` for tweak language options, so browser preferences and
   API tweak validation cannot drift from app route locales.
 - Centralized `AppLocale` to BCP-47 language-tag mapping in

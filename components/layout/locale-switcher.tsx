@@ -3,12 +3,17 @@ import { useLocale } from "next-intl";
 import { useTransition } from "react";
 import { usePathname, useRouter } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
+import { APP_LOCALES } from "@/lib/types";
 import type { Locale } from "@/i18n/routing";
 
-const options: { value: Locale; label: string }[] = [
-  { value: "zh", label: "中" },
-  { value: "en", label: "EN" },
-];
+const LOCALE_SWITCHER_LABELS = {
+  zh: "中",
+  en: "EN",
+} satisfies Record<Locale, string>;
+
+const options: { value: Locale; label: string }[] = APP_LOCALES.map(
+  (value) => ({ value, label: LOCALE_SWITCHER_LABELS[value] }),
+);
 
 export function LocaleSwitcher() {
   const locale = useLocale() as Locale;
