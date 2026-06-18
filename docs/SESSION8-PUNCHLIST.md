@@ -1,8 +1,9 @@
 # Session 8 — issue punch list
 
-> Archived historical snapshot. Use `docs/README.md`, `docs/HANDOFF.md`, current
-> runtime code, and tests as implementation guidance. Checked items below may
-> have been resolved after this list was written.
+> **Historical archive.** This old punchlist snapshot is not current implementation guidance.
+> Use `docs/README.md`, `docs/HANDOFF.md`, current runtime code, and tests
+> instead. Checked items below may have been resolved after this list was
+> written.
 
 Written at the end of s7 (2026-04-19). User flagged "a lot of issues needs to be fixed" without specifying. This doc enumerates everything I suspect could be wrong, grouped by type + severity, so s8 can triage fast.
 

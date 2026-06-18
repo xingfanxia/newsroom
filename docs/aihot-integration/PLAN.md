@@ -1,9 +1,13 @@
 # AI HOT Integration + Voice Rebase — PLAN
 
+> **Historical archive.** This shipped 2026-05-08 AI HOT integration and voice
+> rebase plan is not current implementation guidance. Current runtime behavior
+> lives in [`../architecture/ingestion.md`](../architecture/ingestion.md) and
+> the runtime source files remain authoritative.
+
 **Status**: shipped. This document is retained as the design record for the
 2026-05-08 AI HOT integration and voice rebase; current runtime behavior is
-summarized in `docs/architecture/ingestion.md` and implemented in
-`lib/sources/aihot.ts`, `workers/fetcher/aihot.ts`, and
+implemented in `lib/sources/aihot.ts`, `workers/fetcher/aihot.ts`, and
 `workers/newsletter/aihot-daily.ts`.
 **Tier**: 4 (schema + cross-cutting voice change + LLM full backfill).
 **Engine**: superpowers cycle, wave-based parallel implementation.

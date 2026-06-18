@@ -111,6 +111,10 @@ Shipped cleanup:
 - Archived `docs/aggregation/DESIGN.md` and `docs/aggregation/PLAN.md` in the
   same routing layer, so direct readers do not mistake the original
   event-aggregation spec/checklist for current implementation guidance.
+- Standardized archive banners and source-contract coverage for
+  `docs/aihot-integration/PLAN.md`, `docs/AGENT-MCP-PLAN.md`, and
+  `docs/SESSION8-PUNCHLIST.md`, so old shipped plans and punchlists cannot be
+  mistaken for current agent instructions.
 - Aligned `/admin/system` queue telemetry with worker predicates: item commentary now counts only singleton/unclustered item candidates, event commentary is shown as its own queue, and the cron table derives schedules from `vercel.json`.
 - Centralized `/admin/system` queue display metadata in
   `lib/shell/system-queues.ts`; queue names, order, throughput labels, and

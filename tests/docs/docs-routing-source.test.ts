@@ -12,6 +12,8 @@ const aggregationHandoff = readSource("docs/HANDOFF-AGGREGATION.md");
 const aggregationDesign = readSource("docs/aggregation/DESIGN.md");
 const aggregationPlan = readSource("docs/aggregation/PLAN.md");
 const aihotPlan = readSource("docs/aihot-integration/PLAN.md");
+const agentMcpPlan = readSource("docs/AGENT-MCP-PLAN.md");
+const session8Punchlist = readSource("docs/SESSION8-PUNCHLIST.md");
 const aggregationHandoffFiles = readdirSync(sourcePath("docs/aggregation"))
   .filter((name) => /^HANDOFF.*\.md$/.test(name))
   .sort();
@@ -127,9 +129,15 @@ describe("docs routing source contracts", () => {
       "Full design: `docs/aihot-integration/PLAN.md`",
     );
 
-    expect(aihotPlan.slice(0, 500)).toContain("**Status**: shipped");
-    expect(aihotPlan.slice(0, 500)).toContain("retained as the design record");
-    expect(aihotPlan.slice(0, 500)).toContain("current runtime behavior is");
+    const planLead = aihotPlan.slice(0, 700);
+    expect(planLead).toContain("Historical archive");
+    expect(planLead).toContain("not current implementation guidance");
+    expect(planLead).toContain("../architecture/ingestion.md");
+    expect(planLead).toContain("**Status**: shipped");
+    expect(planLead).toContain("retained as the design record");
+    expect(planLead.indexOf("Historical archive")).toBeLessThan(
+      planLead.indexOf("**Tier**"),
+    );
   });
 
   test("handoff routes agent API MCP work to current agent-access guidance", () => {
@@ -149,6 +157,30 @@ describe("docs routing source contracts", () => {
     );
     expect(handoffDoc).not.toContain(
       "Full design in [`docs/AGENT-MCP-PLAN.md`](./AGENT-MCP-PLAN.md). Phases:",
+    );
+
+    const planLead = agentMcpPlan.slice(0, 700);
+    expect(planLead).toContain("Historical archive");
+    expect(planLead).toContain("not current implementation guidance");
+    expect(planLead).toContain("agent-access/README.md");
+    expect(planLead).toContain("../lib/types.ts");
+    expect(planLead.indexOf("Historical archive")).toBeLessThan(
+      planLead.indexOf("Drafted end of session 8"),
+    );
+  });
+
+  test("session 8 punchlist is archived before old triage instructions", () => {
+    expect(docsReadme).toContain("[`SESSION8-PUNCHLIST.md`](./SESSION8-PUNCHLIST.md)");
+    expect(docsReadme).toContain("Old punchlist snapshot");
+    expect(docsReadme).toContain("use current code, tests, and [`HANDOFF.md`](./HANDOFF.md) instead");
+
+    const punchlistLead = session8Punchlist.slice(0, 700);
+    expect(punchlistLead).toContain("Historical archive");
+    expect(punchlistLead).toContain("not current implementation guidance");
+    expect(punchlistLead).toContain("docs/README.md");
+    expect(punchlistLead).toContain("docs/HANDOFF.md");
+    expect(punchlistLead.indexOf("Historical archive")).toBeLessThan(
+      punchlistLead.indexOf("First thing s8 must do"),
     );
   });
 
