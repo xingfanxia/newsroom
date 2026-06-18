@@ -4,6 +4,8 @@
 
 Current maintenance direction:
 - Start docs navigation from `docs/README.md`; historical plans/handoffs are useful context, not current implementation instructions.
+- `bun run verify` is the one-command local quality gate for agents before
+  committing: typecheck, lint, build, Knip gates, and the full Bun test suite.
 - `bun run lint` is expected to be clean with zero warnings.
 - `bun run typecheck` is expected to run standalone `tsc --noEmit` cleanly,
   including tests and Bun runtime APIs.
@@ -12,6 +14,9 @@ Current maintenance direction:
 
 Shipped cleanup:
 - Added repo-specific `knip.json` entry/project patterns for Next routes, tests, workers, scripts, and config files.
+- Added `bun run verify` as the single local gate that chains typecheck, lint,
+  build, dead-code checks, and tests so future agents do not have to infer the
+  expected verification order from handoff prose.
 - Removed unused UI/source-row components, the unused Tavily integration stub, and unused direct package dependencies.
 - Removed/de-exported unused internal value exports across auth, i18n navigation, policy, rate-limit, utility, worker, X API, newsletter, normalizer, and cluster modules.
 - Removed/de-exported unused internal type-only exports in the LLM usage and facade modules.

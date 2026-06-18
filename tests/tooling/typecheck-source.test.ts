@@ -8,10 +8,15 @@ const packageJson = JSON.parse(readSource("package.json")) as {
 const handoffDoc = readSource("docs/HANDOFF.md");
 
 describe("standalone TypeScript tooling source contract", () => {
-  test("typecheck is a first-class quality gate with Bun runtime types", () => {
+  test("typecheck and verify are first-class quality gates", () => {
     expect(packageJson.scripts?.typecheck).toBe("tsc --noEmit");
+    expect(packageJson.scripts?.verify).toBe(
+      "bun run typecheck && bun run lint && bun run build && bun run code:dead && bun run code:dead:exports && bun run code:dead:types && bun run test",
+    );
     expect(packageJson.devDependencies).toHaveProperty("@types/bun");
 
+    expect(handoffDoc).toContain("`bun run verify`");
+    expect(handoffDoc).toContain("one-command local quality gate");
     expect(handoffDoc).toContain("`bun run typecheck`");
     expect(handoffDoc).toContain("tests plus Bun runtime APIs");
     expect(handoffDoc).not.toContain("`bunx tsc --noEmit` still fails");

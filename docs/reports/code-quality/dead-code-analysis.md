@@ -51,6 +51,9 @@ Result after the type-boundary cleanup: exits `0`.
 
 ### Current Tooling Policy
 
+- `bun run verify` is the one-command local gate. It chains typecheck, lint,
+  build, all three Knip gates, and the full Bun test suite.
+- `bun run typecheck` runs standalone `tsc --noEmit` and should stay clean.
 - `bun run code:dead` is the low-noise gate. It should stay clean.
 - `bun run code:dead:exports` checks value exports. It should stay clean.
 - `bun run code:dead:types` checks type exports. It should stay clean.
@@ -62,5 +65,5 @@ Result after the type-boundary cleanup: exits `0`.
 2. Re-run `bun run code:dead` before every cleanup batch.
 3. Run `bun run code:dead:exports` and `bun run code:dead:types` when doing an
    explicit boundary/export pass.
-4. Delete only small, proven-safe batches with `bun test --env-file=.env.local`,
-   `bun run lint`, `bun run build`, and `git diff --check`.
+4. Delete only small, proven-safe batches with `bun run verify` and
+   `git diff --check`.

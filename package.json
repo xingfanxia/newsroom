@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
+    "verify": "bun run typecheck && bun run lint && bun run build && bun run code:dead && bun run code:dead:exports && bun run code:dead:types && bun run test",
     "code:dead": "bunx knip --include files,dependencies,unlisted,binaries,unresolved,catalog --reporter compact",
     "code:dead:exports": "bunx knip --include exports,nsExports --reporter compact",
     "code:dead:types": "bunx knip --include types,nsTypes --reporter compact",
