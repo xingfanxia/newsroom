@@ -26,6 +26,9 @@ describe("usage stats surfaces", () => {
     expect(summary).toContain("USAGE_WINDOWS");
     expect(summary).toContain("usageSummaryWindowSchema");
     expect(summary).toContain("DEFAULT_USAGE_WINDOW");
+    expect(summary).toContain("toUsageWindowTotalsRecord");
+    expect(summary).toContain("USAGE_WINDOWS.map((usageWindow)");
+    expect(summary).not.toContain("windowTotals: { today, week, month, all }");
     expect(summary).not.toContain('export const USAGE_WINDOWS = ["today", "week", "month", "all"]');
     expect(route).toContain("parseUsageSummaryQueryRequest");
     expect(mcp).toContain("usageSummaryWindowSchema");

@@ -1,8 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import {
+  USAGE_WINDOWS,
   parseUsageSummaryQueryRequest,
   toUsageSummaryApi,
+  toUsageWindowTotalsRecord,
   usageWindowOrDefault,
+  type WindowTotals,
 } from "@/lib/api/usage-summary";
 
 describe("usage summary API serialization", () => {
@@ -114,6 +117,30 @@ describe("usage summary API serialization", () => {
         },
       ],
     });
+  });
+
+  test("builds dashboard window totals from the shared runtime tuple", () => {
+    const totals = USAGE_WINDOWS.map((window, index) =>
+      window === "week"
+        ? null
+        : ({
+            window,
+            calls: index + 1,
+            inputTokens: 100 * index,
+            cachedInputTokens: 10 * index,
+            outputTokens: 20 * index,
+            reasoningTokens: 5 * index,
+            costUsd: index / 10,
+          } satisfies WindowTotals),
+    );
+
+    const record = toUsageWindowTotalsRecord(totals);
+
+    expect(Object.keys(record)).toEqual([...USAGE_WINDOWS]);
+    expect(record.today?.window).toBe("today");
+    expect(record.week).toBeNull();
+    expect(record.month?.window).toBe("month");
+    expect(record.all?.window).toBe("all");
   });
 });
 
