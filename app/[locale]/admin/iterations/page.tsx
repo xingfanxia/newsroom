@@ -24,6 +24,7 @@ import {
   ITERATION_IDLE_STATUS,
   ITERATION_PROPOSED_STATUS,
   appLocaleFromParam,
+  appLocaleLanguageTag,
   isIterationStatus,
   type IterationRunnerStatus,
 } from "@/lib/types";
@@ -74,7 +75,7 @@ export default async function IterationsPage({
   const currentVersion = history[0] ?? null;
   const committedDate = currentVersion
     ? new Date(currentVersion.committedAt).toLocaleDateString(
-        appLocale === "zh" ? "zh-CN" : "en-US",
+        appLocaleLanguageTag(appLocale),
         { year: "numeric", month: "2-digit", day: "2-digit" },
       )
     : "";

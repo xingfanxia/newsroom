@@ -83,6 +83,9 @@ Shipped cleanup:
 - Centralized `AppLocale` to BCP-47 language-tag mapping in
   `appLocaleLanguageTag`, so RSS rendering and saved-export date formatting no
   longer repeat `zh-CN` / `en-US` branches.
+- Shared UI/admin date-format language tags through `appLocaleLanguageTag` /
+  `AppLocaleLanguageTag`, so calendar, usage, version timeline, and iteration
+  date formatting do not repeat `zh-CN` / `en-US` branches.
 - Shared `sources.never_exclude` tier-floor handling through
   `workers/enrich/source-tier.ts`; live enrich and score-backfill now use the
   same source allow-list instead of a YouTube suffix heuristic.

@@ -17,7 +17,7 @@ import {
   usageRangeLabel,
 } from "@/lib/llm/usage-display";
 import { UsageBreakdownTables } from "./_usage-tables";
-import { appLocaleFromParam } from "@/lib/types";
+import { appLocaleFromParam, appLocaleLanguageTag } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +43,7 @@ export default async function UsagePage({
   setRequestLocale(appLocale);
   const zh = appLocale === "zh";
   const usageLocale = appLocale;
+  const timeLocale = appLocaleLanguageTag(appLocale);
   const range = usageWindowFromParam(sp.range);
 
   const [usage, chrome] = await Promise.all([
@@ -330,7 +331,7 @@ export default async function UsagePage({
           byModel={usage.byModel}
           recent={usage.recentCalls}
           zh={zh}
-          timeLocale={zh ? "zh-CN" : "en-US"}
+          timeLocale={timeLocale}
         />
       </main>
     </ViewShell>

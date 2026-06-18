@@ -61,6 +61,7 @@ const sourcesPage = read("app/[locale]/sources/page.tsx");
 const dailyPage = read("app/[locale]/daily/page.tsx");
 const dailyDatePage = read("app/[locale]/daily/[date]/page.tsx");
 const adminUsagePage = read("app/[locale]/admin/usage/page.tsx");
+const adminUsageTables = read("app/[locale]/admin/usage/_usage-tables.tsx");
 const adminSystemPage = read("app/[locale]/admin/system/page.tsx");
 const adminPolicyPage = read("app/[locale]/admin/policy/page.tsx");
 const adminUsersPage = read("app/[locale]/admin/users/page.tsx");
@@ -124,6 +125,18 @@ describe("runtime contract source wiring", () => {
       expect(source).toContain("appLocaleLanguageTag");
       expect(source).not.toContain('locale === "zh" ? "zh-CN" : "en-US"');
     }
+    for (const source of [
+      adminUsagePage,
+      adminIterationsPage,
+      calendarGrid,
+      versionTimeline,
+    ]) {
+      expect(source).toContain("appLocaleLanguageTag");
+      expect(source).not.toContain('zh ? "zh-CN" : "en-US"');
+      expect(source).not.toContain('appLocale === "zh" ? "zh-CN" : "en-US"');
+    }
+    expect(adminUsageTables).toContain("AppLocaleLanguageTag");
+    expect(adminUsageTables).not.toContain('timeLocale: "zh-CN" | "en-US"');
 
     for (const source of [
       liveItems,

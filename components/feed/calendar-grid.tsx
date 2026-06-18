@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { DayBucket } from "@/lib/shell/dashboard-stats";
-import type { AppLocale } from "@/lib/types";
+import { appLocaleLanguageTag, type AppLocale } from "@/lib/types";
 
 /**
  * Month-grid calendar for browsing the feed by day. Mirrors the terminal
@@ -60,7 +60,7 @@ export function CalendarGrid({
     : ["M", "T", "W", "T", "F", "S", "S"];
 
   const monthName = (y: number, m: number) =>
-    new Intl.DateTimeFormat(zh ? "zh-CN" : "en-US", {
+    new Intl.DateTimeFormat(appLocaleLanguageTag(locale), {
       month: "long",
       year: "numeric",
     }).format(new Date(y, m, 1));

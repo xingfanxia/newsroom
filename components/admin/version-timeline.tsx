@@ -1,5 +1,5 @@
 import { VersionPill } from "@/components/admin/version-pill";
-import type { AppLocale } from "@/lib/types";
+import { appLocaleLanguageTag, type AppLocale } from "@/lib/types";
 
 export type TimelineVersion = {
   version: number;
@@ -22,7 +22,7 @@ export function VersionTimeline({
   versions: TimelineVersion[];
 }) {
   const zh = locale === "zh";
-  const timeFmt = new Intl.DateTimeFormat(zh ? "zh-CN" : "en-US", {
+  const timeFmt = new Intl.DateTimeFormat(appLocaleLanguageTag(locale), {
     year: "numeric",
     month: "short",
     day: "numeric",

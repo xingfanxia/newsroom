@@ -1,6 +1,7 @@
 import { AdminSectionHeader } from "@/components/admin/section-header";
 import { AdminTableFrame } from "@/components/admin/table-frame";
 import type { UsageDashboardSummary } from "@/lib/api/usage-summary";
+import type { AppLocaleLanguageTag } from "@/lib/types";
 import {
   formatUsageCount,
   formatUsageModelLabel,
@@ -24,7 +25,7 @@ export function UsageBreakdownTables({
   byModel: UsageModelRows;
   recent: UsageRecentRows;
   zh: boolean;
-  timeLocale: "zh-CN" | "en-US";
+  timeLocale: AppLocaleLanguageTag;
 }) {
   return (
     <div
@@ -213,7 +214,7 @@ function RecentCallsTable({
 }: {
   recent: UsageRecentRows;
   zh: boolean;
-  timeLocale: "zh-CN" | "en-US";
+  timeLocale: AppLocaleLanguageTag;
 }) {
   const timeFmt = new Intl.DateTimeFormat(timeLocale, {
     month: "numeric",
