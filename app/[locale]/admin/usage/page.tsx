@@ -6,7 +6,7 @@ import { getShellChromeData } from "@/lib/shell/chrome-data";
 import {
   getUsageDashboardSummary,
   USAGE_WINDOWS,
-  type WindowKey,
+  usageWindowFromParam,
   type WindowTotals,
 } from "@/lib/api/usage-summary";
 import {
@@ -41,11 +41,7 @@ export default async function UsagePage({
   setRequestLocale(locale);
   const zh = locale === "zh";
   const usageLocale = zh ? "zh" : "en";
-  const range: WindowKey = (USAGE_WINDOWS as readonly string[]).includes(
-    sp.range ?? "",
-  )
-    ? (sp.range as WindowKey)
-    : "week";
+  const range = usageWindowFromParam(sp.range);
 
   const [usage, chrome] = await Promise.all([
     getUsageDashboardSummary(range, { recentLimit: 25, dailyDays: 30 }),

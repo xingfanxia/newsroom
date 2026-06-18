@@ -17,6 +17,9 @@ describe("usage stats surfaces", () => {
     expect(stats).toContain('"all"');
     expect(page).toContain("USAGE_WINDOWS");
     expect(page).toContain("USAGE_RANGE_LABELS");
+    expect(page).toContain("usageWindowFromParam(sp.range)");
+    expect(page).not.toContain("USAGE_WINDOWS as readonly string[]");
+    expect(page).not.toContain("sp.range as WindowKey");
     expect(page).toContain("usageRangeLabel(\"today\", usageLocale)");
     expect(page).toContain("usageRangeLabel(\"all\", usageLocale)");
     expect(page).not.toContain('const RANGES = ["today", "week", "month", "all"]');
@@ -26,6 +29,7 @@ describe("usage stats surfaces", () => {
     expect(summary).toContain("USAGE_WINDOWS");
     expect(summary).toContain("usageSummaryWindowSchema");
     expect(summary).toContain("DEFAULT_USAGE_WINDOW");
+    expect(summary).toContain("export function usageWindowFromParam");
     expect(summary).toContain("toUsageWindowTotalsRecord");
     expect(summary).toContain("USAGE_WINDOWS.map((usageWindow)");
     expect(summary).not.toContain("windowTotals: { today, week, month, all }");

@@ -27,6 +27,13 @@ export function usageWindowOrDefault(window: WindowKey | undefined): WindowKey {
   return window ?? DEFAULT_USAGE_WINDOW;
 }
 
+export function usageWindowFromParam(
+  window: string | null | undefined,
+): WindowKey {
+  const parsed = usageSummaryWindowSchema.safeParse(window ?? undefined);
+  return parsed.success ? usageWindowOrDefault(parsed.data) : DEFAULT_USAGE_WINDOW;
+}
+
 export function parseUsageSummaryQueryRequest(req: Request) {
   return parseQueryParams(req, usageSummaryQuerySchema);
 }

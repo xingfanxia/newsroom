@@ -4,6 +4,7 @@ import {
   parseUsageSummaryQueryRequest,
   toUsageSummaryApi,
   toUsageWindowTotalsRecord,
+  usageWindowFromParam,
   usageWindowOrDefault,
   type WindowTotals,
 } from "@/lib/api/usage-summary";
@@ -155,6 +156,8 @@ describe("usage summary request parsing", () => {
       data: { window: "week" },
     });
     expect(usageWindowOrDefault(undefined)).toBe("week");
+    expect(usageWindowFromParam(undefined)).toBe("week");
+    expect(usageWindowFromParam(null)).toBe("week");
   });
 
   test("accepts all-time windows and rejects unknown values before DB work", () => {
@@ -172,5 +175,7 @@ describe("usage summary request parsing", () => {
     );
     expect(invalid.ok).toBe(false);
     if (!invalid.ok) expect(invalid.issues.length).toBeGreaterThan(0);
+    expect(usageWindowFromParam("all")).toBe("all");
+    expect(usageWindowFromParam("forever")).toBe("week");
   });
 });

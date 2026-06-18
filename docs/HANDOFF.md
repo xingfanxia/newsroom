@@ -51,9 +51,10 @@ Shipped cleanup:
 - Kept translated relative-time tokens in `lib/time/relative.ts`; admin
   feedback rows no longer import a time helper from the generic `lib/utils.ts`
   class-name utility module.
-- Derived usage dashboard window totals from the shared `USAGE_WINDOWS` tuple;
-  `/admin/usage` no longer depends on hand-written `today/week/month/all`
-  totals wiring when the usage window contract changes.
+- Derived usage dashboard window totals and admin range parsing from the shared
+  `USAGE_WINDOWS` / usage-summary helpers; `/admin/usage` no longer depends on
+  hand-written `today/week/month/all` totals or local query-param casts when the
+  usage window contract changes.
 - Shared admin mono blocks through `components/admin/mono-block.tsx`; policy
   error states and policy body previews no longer duplicate preformatted
   terminal panel styling.
