@@ -1,4 +1,6 @@
 import type { ZodIssue, ZodType } from "zod";
+import { okError } from "@/lib/api/ok-response";
+import { plainError } from "@/lib/api/plain-response";
 
 export type JsonBodyEnvelope = "ok" | "plain";
 export type JsonBodyError = "invalid_json" | "invalid_body";
@@ -18,11 +20,9 @@ export function jsonBodyErrorResponse(
   issues?: ZodIssue[],
 ): Response {
   const issuePayload = issues ? { issues } : {};
-  const body =
-    envelope === "ok"
-      ? { ok: false, error, ...issuePayload }
-      : { error, ...issuePayload };
-  return Response.json(body, { status: 400 });
+  return envelope === "ok"
+    ? okError(error, 400, issuePayload)
+    : plainError(error, 400, issuePayload);
 }
 
 export async function parseJsonRequestBody<T>(

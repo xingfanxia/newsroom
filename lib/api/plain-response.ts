@@ -29,8 +29,12 @@ export async function runPlainRoute(
   }
 }
 
-export function plainError(error: string, status: number): Response {
-  return plainJson({ error }, { status });
+export function plainError(
+  error: string,
+  status: number,
+  extra: Record<string, unknown> = {},
+): Response {
+  return plainJson({ ...extra, error }, { status });
 }
 
 export type PlainRouteResult<T> = RequiredPayloadRouteResult<T>;

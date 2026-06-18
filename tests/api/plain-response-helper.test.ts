@@ -23,6 +23,16 @@ describe("plain response helpers", () => {
     expect(await res.json()).toEqual({ error: "not_found" });
   });
 
+  test("plainError keeps optional extra fields in the plain envelope", async () => {
+    const res = plainError("invalid_query", 400, { issues: [{ path: ["q"] }] });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      issues: [{ path: ["q"] }],
+      error: "invalid_query",
+    });
+  });
+
   test("plainRouteResult maps domain results to the shared plain envelope", async () => {
     const ok = plainRouteResult(
       { ok: true, payload: { value: 1 } },

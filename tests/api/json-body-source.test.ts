@@ -20,6 +20,18 @@ const sharedJsonBodySourcePaths = [
 ] as const;
 
 describe("JSON body parsing source wiring", () => {
+  test("JSON body parse failures reuse shared response envelope helpers", () => {
+    const source = read("lib/api/json-body.ts");
+
+    expect(source).toContain("@/lib/api/ok-response");
+    expect(source).toContain("@/lib/api/plain-response");
+    expect(source).toContain("okError(error, 400, issuePayload)");
+    expect(source).toContain("plainError(error, 400, issuePayload)");
+    expect(source).not.toContain("Response.json(body");
+    expect(source).not.toContain("ok: false, error");
+    expect(source).not.toContain("{ error, ...issuePayload }");
+  });
+
   test("mutating API routes share JSON parse and Zod error handling", () => {
     for (const path of sharedJsonBodySourcePaths) {
       const source = read(path);
