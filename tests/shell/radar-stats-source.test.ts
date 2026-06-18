@@ -131,6 +131,52 @@ describe("radar stats shell contract", () => {
     expect(signalRatioFromRadar(EMPTY_RADAR_STATS)).toBe(DEFAULT_SIGNAL_RATIO);
   });
 
+  it("keeps signal ratios within top-bar display bounds", () => {
+    expect(
+      signalRatioFromRadar({
+        items_today: 10,
+        items_p1: 8,
+        items_featured: 8,
+        tracked_sources: 41,
+      }),
+    ).toBe(1);
+    expect(
+      topBarStatsFromRadar(
+        {
+          items_today: 10,
+          items_p1: 1,
+          items_featured: 1,
+          tracked_sources: 41,
+        },
+        1.5,
+      ).signal_ratio,
+    ).toBe(1);
+    expect(topBarStatsFromRadar(EMPTY_RADAR_STATS, -0.2).signal_ratio).toBe(0);
+    expect(
+      topBarStatsFromRadar(EMPTY_RADAR_STATS, Number.NaN).signal_ratio,
+    ).toBe(DEFAULT_SIGNAL_RATIO);
+  });
+
+  it("keeps radar top-bar numerator counts in the same 24h window as items_today", () => {
+    const stats = readSource("lib/shell/dashboard-stats.ts");
+
+    expect(stats).toContain(
+      "today: sql<number>`count(*) filter (where ${items.createdAt} >= ${oneDayAgoIso}::timestamptz)::int`",
+    );
+    expect(stats).toContain(
+      "p1: sql<number>`count(*) filter (where ${items.createdAt} >= ${oneDayAgoIso}::timestamptz AND ${items.tier} = 'p1')::int`",
+    );
+    expect(stats).toContain(
+      "featured: sql<number>`count(*) filter (where ${items.createdAt} >= ${oneDayAgoIso}::timestamptz AND ${items.tier} = 'featured')::int`",
+    );
+    expect(stats).not.toContain(
+      "p1: sql<number>`count(*) filter (where ${items.tier} = 'p1')::int`",
+    );
+    expect(stats).not.toContain(
+      "featured: sql<number>`count(*) filter (where ${items.tier} = 'featured')::int`",
+    );
+  });
+
   it("keeps the top-bar stats type owned by the shell contract", () => {
     const topBar = readSource("components/shell/top-bar.tsx");
     const viewShell = readSource("components/shell/view-shell.tsx");

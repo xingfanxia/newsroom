@@ -18,8 +18,8 @@ export async function getRadarStats(): Promise<RadarStats> {
   const [itemsRow] = await client
     .select({
       today: sql<number>`count(*) filter (where ${items.createdAt} >= ${oneDayAgoIso}::timestamptz)::int`,
-      p1: sql<number>`count(*) filter (where ${items.tier} = 'p1')::int`,
-      featured: sql<number>`count(*) filter (where ${items.tier} = 'featured')::int`,
+      p1: sql<number>`count(*) filter (where ${items.createdAt} >= ${oneDayAgoIso}::timestamptz AND ${items.tier} = 'p1')::int`,
+      featured: sql<number>`count(*) filter (where ${items.createdAt} >= ${oneDayAgoIso}::timestamptz AND ${items.tier} = 'featured')::int`,
     })
     .from(items);
 

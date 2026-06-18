@@ -41,6 +41,9 @@ Shipped cleanup:
 - Shared radar stats ownership through `lib/shell/radar-stats.ts`; shell pages,
   the radar widget, and DB dashboard stats now reuse the same `RadarStats`
   type plus empty fallback instead of repeating the four-field zero object.
+- Aligned radar top-bar signal math with the 24h radar window: P1/featured
+  counts now use the same window as `items_today`, and top-bar ratios are
+  clamped to display-safe 0..1 bounds.
 - Shared top-bar stats mapping through `lib/shell/top-bar-stats.ts`; pages now
   pass radar stats through one helper instead of hand-copying tracked-source
   counts and signal-ratio rules into every `ViewShell`.
