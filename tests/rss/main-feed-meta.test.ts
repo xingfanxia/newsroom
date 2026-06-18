@@ -4,14 +4,26 @@ import {
   coerceMainRssLocale,
   mainRssFeedMeta,
 } from "@/lib/rss/main-feed-meta";
+import { APP_LOCALES } from "@/lib/types";
 
 describe("main RSS feed metadata", () => {
   test("keeps the public main-feed paths in one ordered contract", () => {
-    expect(MAIN_RSS_FEEDS.map((feed) => feed.locale)).toEqual(["zh", "en"]);
+    expect(MAIN_RSS_FEEDS.map((feed) => feed.locale)).toEqual([
+      ...APP_LOCALES,
+    ]);
     expect(MAIN_RSS_FEEDS.map((feed) => feed.apiPath)).toEqual([
       "/api/feed/zh/rss.xml",
       "/api/feed/en/rss.xml",
     ]);
+  });
+
+  test("covers every app locale exactly once", () => {
+    const locales = MAIN_RSS_FEEDS.map((feed) => feed.locale);
+    expect(new Set(locales).size).toBe(APP_LOCALES.length);
+    for (const locale of APP_LOCALES) {
+      expect(mainRssFeedMeta(locale).locale).toBe(locale);
+      expect(coerceMainRssLocale(locale)).toBe(locale);
+    }
   });
 
   test("coerces route locales with the existing zh fallback", () => {

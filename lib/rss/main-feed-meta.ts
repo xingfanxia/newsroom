@@ -1,6 +1,25 @@
-export const MAIN_RSS_FEEDS = [
-  {
-    locale: "zh",
+import { APP_LOCALES, type AppLocale } from "@/lib/types";
+
+type LocalizedRssText = Record<AppLocale, string>;
+
+export type MainRssLocale = AppLocale;
+
+export type MainRssFeed = {
+  locale: MainRssLocale;
+  apiPath: `/api/feed/${MainRssLocale}/rss.xml`;
+  route: `/${MainRssLocale}`;
+  channelTitle: string;
+  channelDescription: string;
+  language: string;
+  alternateTitle: string;
+  integrationTitle: LocalizedRssText;
+  integrationDescription: LocalizedRssText;
+};
+
+type MainRssFeedDefinition = Omit<MainRssFeed, "locale">;
+
+const MAIN_RSS_FEED_DEFINITIONS = {
+  zh: {
     apiPath: "/api/feed/zh/rss.xml",
     route: "/zh",
     channelTitle: "AX 的 AI 雷达",
@@ -17,8 +36,7 @@ export const MAIN_RSS_FEEDS = [
       en: "Featured + p1 union with editor commentary in content:encoded.",
     },
   },
-  {
-    locale: "en",
+  en: {
     apiPath: "/api/feed/en/rss.xml",
     route: "/en",
     channelTitle: "AX's AI RADAR",
@@ -35,17 +53,23 @@ export const MAIN_RSS_FEEDS = [
       en: "English main feed (English titles + summaries).",
     },
   },
-] as const;
+} as const satisfies Record<AppLocale, MainRssFeedDefinition>;
 
-export type MainRssFeed = (typeof MAIN_RSS_FEEDS)[number];
-export type MainRssLocale = MainRssFeed["locale"];
-
-const MAIN_RSS_FEED_BY_LOCALE = new Map<MainRssLocale, MainRssFeed>(
-  MAIN_RSS_FEEDS.map((feed) => [feed.locale, feed]),
+export const MAIN_RSS_FEEDS: readonly MainRssFeed[] = APP_LOCALES.map(
+  (locale) => ({
+    locale,
+    ...MAIN_RSS_FEED_DEFINITIONS[locale],
+  }),
 );
 
+const MAIN_RSS_FEED_BY_LOCALE = new Map<MainRssLocale, MainRssFeed>(
+  MAIN_RSS_FEEDS.map((feed) => [feed.locale, feed] as const),
+);
+
+const MAIN_RSS_LOCALE_SET = new Set<string>(APP_LOCALES);
+
 export function coerceMainRssLocale(value: string): MainRssLocale {
-  return value === "en" ? "en" : "zh";
+  return MAIN_RSS_LOCALE_SET.has(value) ? (value as MainRssLocale) : "zh";
 }
 
 export function mainRssFeedMeta(locale: MainRssLocale): MainRssFeed {
