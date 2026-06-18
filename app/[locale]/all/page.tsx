@@ -3,13 +3,13 @@ import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
 import { Item } from "@/components/feed/item";
 import { FeedEmptyState } from "@/components/feed/empty-state";
+import { FeedArchivePagination } from "@/components/feed/archive-pagination";
 import { CalendarGrid } from "@/components/feed/calendar-grid";
 import { DayBreak } from "../_day-break";
 import { HomeFilters } from "../_home-filters";
 import {
   coerceSourcePreset,
   sourcePresetToFeedFilter,
-  type SourcePreset,
 } from "../_source-presets";
 import { groupByDay, sortStoriesNewestFirst } from "@/lib/feed/group-by-day";
 import {
@@ -75,6 +75,11 @@ export default async function AllPostsPage({
   // before grouping (the SQL already does this, but the explicit sort
   // protects against any caller that passes mixed-order input).
   const grouped = groupByDay(sortStoriesNewestFirst(stories));
+  const paginationParams = sourceId
+    ? { source_id: sourceId }
+    : sourcePreset !== "all"
+      ? { source: sourcePreset }
+      : undefined;
 
   return (
     <ViewShell
@@ -121,83 +126,16 @@ export default async function AllPostsPage({
         </div>
 
         {!activeDate && stories.length > 0 && (
-          <Pagination
+          <FeedArchivePagination
+            basePath={`/${locale}/all`}
             offset={offset}
             pageSize={FEED_PAGE_SIZE}
             currentCount={stories.length}
-            source={sourcePreset}
-            sourceId={sourceId}
             locale={locale as "en" | "zh"}
+            preservedParams={paginationParams}
           />
         )}
       </main>
     </ViewShell>
-  );
-}
-
-function Pagination({
-  offset,
-  pageSize,
-  currentCount,
-  source,
-  sourceId,
-  locale,
-}: {
-  offset: number;
-  pageSize: number;
-  currentCount: number;
-  source: SourcePreset;
-  sourceId?: string;
-  locale: "en" | "zh";
-}) {
-  const zh = locale === "zh";
-  const build = (nextOffset: number) => {
-    const qs = new URLSearchParams();
-    if (sourceId) qs.set("source_id", sourceId);
-    else if (source && source !== "all") qs.set("source", source);
-    if (nextOffset > 0) qs.set("offset", String(nextOffset));
-    const s = qs.toString();
-    return `/${locale}/all${s ? `?${s}` : ""}`;
-  };
-  const prevOffset = Math.max(0, offset - pageSize);
-  const nextOffset = offset + pageSize;
-  const hasNext = currentCount >= pageSize;
-  const hasPrev = offset > 0;
-  const pageNum = Math.floor(offset / pageSize) + 1;
-
-  return (
-    <nav
-      aria-label={zh ? "分页" : "pagination"}
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        padding: "18px 0 40px",
-        gap: 12,
-        fontFamily: "var(--font-mono)",
-        fontSize: 11,
-        color: "var(--fg-3)",
-        borderTop: "1px dashed var(--border-1)",
-        marginTop: 18,
-      }}
-    >
-      {hasPrev ? (
-        <a href={build(prevOffset)} className="mini-btn">
-          ← {zh ? "上一页" : "newer"}
-        </a>
-      ) : (
-        <span style={{ opacity: 0.3 }}>← {zh ? "上一页" : "newer"}</span>
-      )}
-      <span style={{ letterSpacing: "0.08em", textTransform: "uppercase" }}>
-        {zh ? "第" : "page"} {pageNum} · {offset + 1}–{offset + currentCount}
-      </span>
-      {hasNext ? (
-        <a href={build(nextOffset)} className="mini-btn">
-          {zh ? "下一页" : "older"} →
-        </a>
-      ) : (
-        <span style={{ opacity: 0.3 }}>{zh ? "下一页" : "older"} →</span>
-      )}
-    </nav>
   );
 }

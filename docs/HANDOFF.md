@@ -42,6 +42,9 @@ Shipped cleanup:
 - Shared feed empty-state styling through `components/feed/empty-state.tsx`;
   feed-like pages now keep their empty copy local but no longer duplicate the
   terminal centered empty-state treatment.
+- Shared archive pagination through `components/feed/archive-pagination.tsx`;
+  `/all` no longer owns local pagination markup, and `/curated` now exposes
+  the offset pagination its query path already supported.
 - Shared admin mono blocks through `components/admin/mono-block.tsx`; policy
   error states and policy body previews no longer duplicate preformatted
   terminal panel styling.

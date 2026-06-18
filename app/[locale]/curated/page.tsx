@@ -3,6 +3,7 @@ import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
 import { Item } from "@/components/feed/item";
 import { FeedEmptyState } from "@/components/feed/empty-state";
+import { FeedArchivePagination } from "@/components/feed/archive-pagination";
 import { CalendarGrid } from "@/components/feed/calendar-grid";
 import { DayBreak } from "../_day-break";
 import { groupByDay, sortStoriesNewestFirst } from "@/lib/feed/group-by-day";
@@ -10,6 +11,7 @@ import {
   coerceFeedDateKey,
   coerceFeedOffset,
   feedPageLimitForDate,
+  FEED_PAGE_SIZE,
 } from "@/lib/feed/page-query";
 import { getFeaturedStories } from "@/lib/items/live";
 import {
@@ -113,6 +115,16 @@ export default async function CuratedPage({
             </FeedEmptyState>
           )}
         </div>
+        {!activeDate && stories.length > 0 && (
+          <FeedArchivePagination
+            basePath={`/${locale}/curated`}
+            offset={offset}
+            pageSize={FEED_PAGE_SIZE}
+            currentCount={stories.length}
+            locale={locale as "en" | "zh"}
+            preservedParams={{ source_id: sourceId }}
+          />
+        )}
       </main>
     </ViewShell>
   );
