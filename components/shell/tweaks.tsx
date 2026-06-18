@@ -1,21 +1,99 @@
 "use client";
 import { useTweaks, type Tweaks } from "@/hooks/use-tweaks";
+import {
+  TWEAK_ACCENTS,
+  TWEAK_CHROME_STYLES,
+  TWEAK_CJK_FONTS,
+  TWEAK_DENSITIES,
+  TWEAK_LANGUAGES,
+  TWEAK_MONO_FONTS,
+  TWEAK_RADII,
+  TWEAK_SCORE_STYLES,
+  TWEAK_THEMES,
+} from "@/lib/tweaks";
 
-const THEME_CARDS = [
-  { id: "midnight" as const, name: "midnight", bg: "#0d1117", fg: "#d1d9e1", ac: "#3fb950" },
-  { id: "obsidian" as const, name: "obsidian", bg: "#000000", fg: "#e6edf3", ac: "#58a6ff" },
-  { id: "slate"    as const, name: "slate",    bg: "#1a1d23", fg: "#cfd3d9", ac: "#a5a5ff" },
-  { id: "paper"    as const, name: "paper",    bg: "#f7f5ef", fg: "#2d2a24", ac: "#b8651d" },
-];
+type SegmentOption<K extends keyof Tweaks> = [Tweaks[K], string];
 
-const ACCENT_SWATCHES: Array<{ id: Tweaks["accent"]; hex: string }> = [
-  { id: "green",  hex: "#3fb950" },
-  { id: "blue",   hex: "#58a6ff" },
-  { id: "purple", hex: "#a371f7" },
-  { id: "orange", hex: "#ffa657" },
-  { id: "red",    hex: "#f85149" },
-  { id: "cyan",   hex: "#39d0d8" },
-];
+const THEME_CARD_DISPLAY = {
+  midnight: { name: "midnight", bg: "#0d1117", fg: "#d1d9e1", ac: "#3fb950" },
+  obsidian: { name: "obsidian", bg: "#000000", fg: "#e6edf3", ac: "#58a6ff" },
+  slate: { name: "slate", bg: "#1a1d23", fg: "#cfd3d9", ac: "#a5a5ff" },
+  paper: { name: "paper", bg: "#f7f5ef", fg: "#2d2a24", ac: "#b8651d" },
+} satisfies Record<Tweaks["theme"], { name: string; bg: string; fg: string; ac: string }>;
+
+const THEME_CARDS: Array<
+  { id: Tweaks["theme"] } & (typeof THEME_CARD_DISPLAY)[Tweaks["theme"]]
+> = TWEAK_THEMES.map((id) => ({ id, ...THEME_CARD_DISPLAY[id] }));
+
+const ACCENT_SWATCH_HEX = {
+  green: "#3fb950",
+  blue: "#58a6ff",
+  purple: "#a371f7",
+  orange: "#ffa657",
+  red: "#f85149",
+  cyan: "#39d0d8",
+} satisfies Record<Tweaks["accent"], string>;
+
+const ACCENT_SWATCHES: Array<{ id: Tweaks["accent"]; hex: string }> =
+  TWEAK_ACCENTS.map((id) => ({ id, hex: ACCENT_SWATCH_HEX[id] }));
+
+const MONO_FONT_LABELS = {
+  jetbrains: "JetBrains",
+  ibm: "IBM Plex",
+  iosevka: "Iosevka",
+  system: "System",
+} satisfies Record<Tweaks["monoFont"], string>;
+
+const MONO_FONT_OPTIONS: Array<SegmentOption<"monoFont">> =
+  TWEAK_MONO_FONTS.map((id): SegmentOption<"monoFont"> => [
+    id,
+    MONO_FONT_LABELS[id],
+  ]);
+
+const CJK_FONT_LABELS = {
+  notoSerif: "Noto 衬线",
+  notoSans: "Noto 无衬线",
+  lxgw: "霞鹜文楷",
+} satisfies Record<Tweaks["cjkFont"], string>;
+
+const CJK_FONT_OPTIONS: Array<SegmentOption<"cjkFont">> =
+  TWEAK_CJK_FONTS.map((id): SegmentOption<"cjkFont"> => [
+    id,
+    CJK_FONT_LABELS[id],
+  ]);
+
+const DENSITY_OPTIONS: Array<SegmentOption<"density">> =
+  TWEAK_DENSITIES.map((id): SegmentOption<"density"> => [id, id]);
+
+const LANGUAGE_LABELS = {
+  zh: "中文",
+  en: "EN",
+} satisfies Record<Tweaks["language"], string>;
+
+const LANGUAGE_OPTIONS: Array<SegmentOption<"language">> =
+  TWEAK_LANGUAGES.map((id): SegmentOption<"language"> => [
+    id,
+    LANGUAGE_LABELS[id],
+  ]);
+
+const RADIUS_OPTIONS: Array<SegmentOption<"radius">> =
+  TWEAK_RADII.map((id): SegmentOption<"radius"> => [id, id]);
+
+const SCORE_STYLE_LABELS = {
+  ring: "◯ ring",
+  bar: "▮ bar",
+  tag: "▢ tag",
+  none: "none",
+} satisfies Record<Tweaks["scoreStyle"], string>;
+
+const SCORE_STYLE_OPTIONS: Array<SegmentOption<"scoreStyle">> =
+  TWEAK_SCORE_STYLES.map((id): SegmentOption<"scoreStyle"> => [
+    id,
+    SCORE_STYLE_LABELS[id],
+  ]);
+
+const CHROME_STYLE_OPTIONS: Array<SegmentOption<"chromeStyle">> =
+  TWEAK_CHROME_STYLES.map((id): SegmentOption<"chromeStyle"> => [id, id]);
 
 type PatchTweaks = <K extends keyof Tweaks>(key: K, value: Tweaks[K]) => void;
 type BooleanTweaksKey = {
@@ -31,7 +109,7 @@ function SegmentControl<K extends keyof Tweaks>({
   tweaks: Tweaks;
   patch: PatchTweaks;
   k: K;
-  opts: Array<[Tweaks[K], string]>;
+  opts: Array<SegmentOption<K>>;
 }) {
   return (
     <div className="seg">
@@ -165,12 +243,7 @@ export function Tweaks() {
               tweaks={tweaks}
               patch={patch}
               k="monoFont"
-              opts={[
-                ["jetbrains", "JetBrains"],
-                ["ibm", "IBM Plex"],
-                ["iosevka", "Iosevka"],
-                ["system", "System"],
-              ]}
+              opts={MONO_FONT_OPTIONS}
             />
           </div>
           <div className="row">
@@ -182,11 +255,7 @@ export function Tweaks() {
               tweaks={tweaks}
               patch={patch}
               k="cjkFont"
-              opts={[
-                ["notoSerif", "Noto 衬线"],
-                ["notoSans", "Noto 无衬线"],
-                ["lxgw", "霞鹜文楷"],
-              ]}
+              opts={CJK_FONT_OPTIONS}
             />
           </div>
           <div className="row">
@@ -198,11 +267,7 @@ export function Tweaks() {
               tweaks={tweaks}
               patch={patch}
               k="density"
-              opts={[
-                ["compact", "compact"],
-                ["comfy", "comfy"],
-                ["reader", "reader"],
-              ]}
+              opts={DENSITY_OPTIONS}
             />
           </div>
           <div className="row">
@@ -214,10 +279,7 @@ export function Tweaks() {
               tweaks={tweaks}
               patch={patch}
               k="language"
-              opts={[
-                ["zh", "中文"],
-                ["en", "EN"],
-              ]}
+              opts={LANGUAGE_OPTIONS}
             />
           </div>
         </div>
@@ -234,12 +296,7 @@ export function Tweaks() {
               tweaks={tweaks}
               patch={patch}
               k="radius"
-              opts={[
-                ["sharp", "sharp"],
-                ["subtle", "subtle"],
-                ["soft", "soft"],
-                ["pill", "pill"],
-              ]}
+              opts={RADIUS_OPTIONS}
             />
           </div>
           <div className="row">
@@ -251,12 +308,7 @@ export function Tweaks() {
               tweaks={tweaks}
               patch={patch}
               k="scoreStyle"
-              opts={[
-                ["ring", "◯ ring"],
-                ["bar", "▮ bar"],
-                ["tag", "▢ tag"],
-                ["none", "none"],
-              ]}
+              opts={SCORE_STYLE_OPTIONS}
             />
           </div>
           <div className="row">
@@ -268,11 +320,7 @@ export function Tweaks() {
               tweaks={tweaks}
               patch={patch}
               k="chromeStyle"
-              opts={[
-                ["terminal", "terminal"],
-                ["clean", "clean"],
-                ["brutalist", "brutalist"],
-              ]}
+              opts={CHROME_STYLE_OPTIONS}
             />
           </div>
         </div>

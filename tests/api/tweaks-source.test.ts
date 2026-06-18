@@ -6,6 +6,7 @@ const v1Route = read("app/api/v1/tweaks/route.ts");
 const sharedRouteHelper = read("lib/api/tweak-routes.ts");
 const tweakContracts = read("lib/tweaks.ts");
 const hook = read("hooks/use-tweaks.tsx");
+const tweakPanel = read("components/shell/tweaks.tsx");
 const rightRail = read("components/feed/right-rail.tsx");
 
 describe("tweaks route source wiring", () => {
@@ -57,6 +58,27 @@ describe("tweaks route source wiring", () => {
     expect(hook).toContain("@/lib/tweaks");
     expect(hook).not.toContain('density: "compact" | "comfy" | "reader"');
     expect(hook).not.toContain('accent: "green" | "blue"');
+  });
+
+  test("client tweaks panel derives option values from shared contracts", () => {
+    for (const sourceOfTruth of [
+      "TWEAK_ACCENTS",
+      "TWEAK_CHROME_STYLES",
+      "TWEAK_CJK_FONTS",
+      "TWEAK_DENSITIES",
+      "TWEAK_LANGUAGES",
+      "TWEAK_MONO_FONTS",
+      "TWEAK_RADII",
+      "TWEAK_SCORE_STYLES",
+      "TWEAK_THEMES",
+    ]) {
+      expect(tweakPanel).toContain(sourceOfTruth);
+    }
+    expect(tweakPanel).toContain("TWEAK_THEMES.map");
+    expect(tweakPanel).toContain("TWEAK_ACCENTS.map");
+    expect(tweakPanel).not.toContain('["compact", "compact"]');
+    expect(tweakPanel).not.toContain('["zh", "中文"]');
+    expect(tweakPanel).not.toContain('["terminal", "terminal"]');
   });
 
   test("client tweaks server sync is debounced off the hot mutation path", () => {
