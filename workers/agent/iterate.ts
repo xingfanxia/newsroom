@@ -3,7 +3,9 @@
  * profiles.agent (pro + xhigh reasoning), persists the proposal as an
  * `iteration_runs` row with status='proposed'. The row is the handoff to
  * the admin UI: user reviews the diff, then POST /apply commits a new
- * `policy_versions` row and the workers pick up the change next tick.
+ * `policy_versions` row. New or reset/backfilled enrich work reads that row;
+ * existing enriched rows require an explicit reset/backfill if they should be
+ * re-scored under the new policy.
  */
 import { eq } from "drizzle-orm";
 import { db } from "@/db/client";

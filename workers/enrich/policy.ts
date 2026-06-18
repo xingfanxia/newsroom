@@ -6,9 +6,11 @@ let cached: Policy | null = null;
 
 /**
  * Load the editorial policy for the scoring worker. Returns content plus an
- * 8-char content hash used as the `items.policy_version` cache key — when the
- * hash changes, workers re-enrich. Backed by `policy_versions` in the DB with
- * a filesystem seed on first boot; see `lib/policy/skill.ts`.
+ * 8-char content hash stored in `items.policy_version` after a successful
+ * enrich/score write. New or deliberately reset rows use the latest policy;
+ * cron does not select already-enriched rows solely because this hash changed.
+ * Backed by `policy_versions` in the DB with a filesystem seed on first boot;
+ * see `lib/policy/skill.ts`.
  */
 export async function loadPolicy(): Promise<Policy> {
   if (cached) return cached;

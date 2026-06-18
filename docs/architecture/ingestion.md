@@ -157,10 +157,17 @@ The pipeline now chooses a treatment tier before calling the model:
 4. **Source-kind** — e.g., `官网动态 (RSS·排除企业/客户案例)`, `深度报告 (独立博客/研究报告)` — classified once per source, cached.
 5. **Embedding** — Azure OpenAI `text-embedding-3-large`; store as pgvector column for later clustering.
 
-All enrichments cached by `(item_id, enricher_version)` so enricher-version bumps re-run only once globally. Operator reset scripts clear the claim fields only when intentionally requeueing items.
+Successful enrich writes persist directly on `items`, including the current
+policy hash in `items.policy_version`. Cron only picks rows whose
+`enriched_at` is null; prompt/policy/model changes for already-enriched rows
+require an explicit reset or cost-bounded backfill script. Operator reset
+scripts clear the claim fields only when intentionally requeueing items.
 
 ### 2.5 Scorer (LLM, policy-driven)
-Separate pass after enrich, because policy can change without re-enriching:
+The scoring stage is part of live enrich, after summary/tags/embedding are
+available. `score-backfill` is a separate maintenance worker for stale enriched
+rows that are missing the current HKR/reasoning shape; it does not re-select all
+historical rows just because the policy file changed.
 
 - **Input**: item + current `editorial.skill.md` (the policy).
 - **Output**: `{ importance: int(0, 100), reasoning: string, tier: "featured" | "all" | "p1" | "excluded" }`.
@@ -172,7 +179,10 @@ Separate pass after enrich, because policy can change without re-enriching:
   commentary dispatch, treatment routing, and backfill scripts should use that
   helper instead of reimplementing the boolean check.
 - Model: Azure AI Foundry DeepSeek V4 Pro for high treatment and DeepSeek V4 Flash for low-value treatment, with Pro fallback when Flash output fails schema validation.
-- Cached by `(item_id, policy_version)`.
+- The successful score is stored on `items` (`importance`, `tier`, `hkr`,
+  `reasoning_zh`, `reasoning_en`, `policy_version`). Existing rows move to a
+  new policy only when an operator intentionally resets/requeues or runs a
+  targeted backfill.
 
 ### 2.6 Deduper / Clusterer
 **Dedup**: hash title + canonical-url shortly after normalize. Drop exact duplicates.
@@ -196,15 +206,20 @@ Separate pass after enrich, because policy can change without re-enriching:
 Postgres (Vercel Postgres / Neon / Supabase) with schema:
 
 ```
-sources          (id, name_en, name_zh, url, kind, locale, cadence, priority, enabled, ...)
-raw_items        (id, source_id, external_id, payload_jsonb, fetched_at)
-items            (id, source_id, title, summary_zh, summary_en, url, published_at, embedding halfvec(3072))
-item_tags        (item_id, axis, tag) — composite PK
-item_scores      (item_id, policy_version, importance, tier, reasoning)
-clusters         (id, lead_item_id, member_item_ids int[])
+sources          (id, name_en, name_zh, url, kind, group, locale, cadence, priority, enabled, never_exclude, curated, ...)
+source_health    (source_id, status, last_fetched_at, last_success_at, last_error, last_external_id, ...)
+raw_items        (id, source_id, external_id, raw_payload, published_at, fetched_at, normalized_at)
+items            (id, source_id, raw_item_id, title, body, body_md, canonical_url, published_at,
+                  title_zh/en, summary_zh/en, tags jsonb, importance, tier, hkr jsonb,
+                  reasoning_zh/en, enriched_at, policy_version, embedding halfvec(3072),
+                  cluster_id, commentary_at, enrich_claimed_at, enrich_attempts, enrich_error, ...)
+clusters         (id, lead_item_id, member_count, first_seen_at, latest_member_at, coverage,
+                  canonical_title_zh/en, event_tier, importance, hkr, commentary_at, verified_at, ...)
+cluster_splits   (id, item_id, from_cluster_id, reason, created_at)
 feedback         (id, user_id, item_id, vote from FEEDBACK_VOTES: up | down | save, note, created_at)
-policy_versions  (version, skill_md, committed_by, committed_at, parent_version, notes)
-iteration_runs   (id, started_at, finished_at, parent_version, new_version, feedback_ids int[], diff_jsonb, status from ITERATION_STATUSES)
+policy_versions  (id, skill_name, version, content, reasoning, feedback_sample, feedback_count, committed_by, committed_at)
+iteration_runs   (id, skill_name, status from ITERATION_STATUSES, base_version, proposed_content,
+                  reasoning_summary, agent_output, feedback_sample, feedback_count, requested_by, created_at, completed_at)
 users            (id, email, role from USER_ROLES)
 ```
 
@@ -212,18 +227,20 @@ users            (id, email, role from USER_ROLES)
 The star of the system. Runs when an editor clicks `开始生成新草稿`.
 
 **Flow**:
-1. Load all unprocessed feedback since `policy_versions.current.committed_at`.
-2. Spin up an agent session with tools:
-   - `read_file(path)` → returns contents of `editorial.skill.md`.
-   - `write_draft(content)` → stages a proposed new `editorial.skill.md`.
-   - `get_feedback_sample(verdict, limit)` → returns curated feedback rows.
-3. System prompt: *"You are the editorial policy maintainer. Read the current policy. Review the feedback. Propose minimal, justified edits. Produce a structured change plan: which signals added/strengthened, which exclusion rules added, which constraints added. Then emit the new full policy. Also output a `### 未做的事` section explaining what you deliberately did NOT change to avoid overfitting."*
-4. Stream agent log to the UI (`策略迭代` console pane) via server-sent events.
-5. On agent completion: diff old vs new, render monospace diff in the UI.
-6. Editor clicks `确认应用` → commit new `policy_versions` row → **worker picks it up on next enrichment scoring pass**.
-7. Toast: `策略已更新为 v{N}, Worker 下次 enrich 将使用新策略。`
+1. Load the latest committed `editorial` skill via `getActiveSkill("editorial")`.
+2. Load a bounded recent feedback sample via `getRecentFeedback(...)`; the
+   agent guard requires at least `MIN_FEEDBACK_TO_ITERATE` feedback rows.
+3. Call the LLM once with the current policy and feedback sample; persist the
+   structured proposal to `iteration_runs` with `status='proposed'`.
+4. Admin UI renders the diff from `proposed_content` against the active policy.
+5. Editor clicks apply → `commitSkillVersion(...)` inserts the next
+   `policy_versions` row and marks the run `applied`; reject/failed runs remain
+   as audit rows.
+6. New or explicitly reset/backfilled enrich work reads the latest policy row.
+   Existing enriched rows are not automatically re-scored solely because a new
+   policy row exists.
 
-**Why this architecture**: the policy is human-readable Markdown, so editors can read + hand-edit it. The agent is only one of multiple authors. Rollback = revert to an older `policy_versions` row; the worker will re-score cached items with the old policy.
+**Why this architecture**: the policy is human-readable Markdown, so editors can read + hand-edit it. The agent is only one of multiple authors. Rollback = commit or restore a prior policy body as a new `policy_versions` row; targeted resets/backfills decide which historical items should be reprocessed.
 
 ---
 

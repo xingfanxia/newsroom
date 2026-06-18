@@ -119,6 +119,11 @@ Shipped cleanup:
   `docs/daily-column/DESIGN.md`, `docs/daily-column/PLAN.md`, and
   `docs/daily-column/HANDOFF-2026-04-25.md`, replacing current-sounding launch
   handoff read-order language with historical routing.
+- Aligned `docs/architecture/ingestion.md` with current runtime schema and
+  policy lifecycle: scores/tags/policy hash live on `items`, policy content
+  lives in `policy_versions.content`, iteration proposals live in
+  `iteration_runs.proposed_content`, and policy changes only affect new or
+  explicitly reset/backfilled enrich work.
 - Aligned `/admin/system` queue telemetry with worker predicates: item commentary now counts only singleton/unclustered item candidates, event commentary is shown as its own queue, and the cron table derives schedules from `vercel.json`.
 - Centralized `/admin/system` queue display metadata in
   `lib/shell/system-queues.ts`; queue names, order, throughput labels, and

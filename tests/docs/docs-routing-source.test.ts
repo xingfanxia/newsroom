@@ -1,6 +1,6 @@
 import { readdirSync } from "node:fs";
 import { describe, expect, test } from "bun:test";
-import { readSource, sourcePath } from "@/tests/helpers/source";
+import { readSource, sectionBetween, sourcePath } from "@/tests/helpers/source";
 
 const rootReadme = readSource("README.md");
 const docsReadme = readSource("docs/README.md");
@@ -44,6 +44,65 @@ describe("docs routing source contracts", () => {
     expect(architectureOverviewDoc).toContain("bun run verify");
     expect(architectureOverviewDoc).not.toContain("Full design");
     expect(architectureOverviewDoc).not.toContain("planned");
+  });
+
+  test("ingestion architecture documents the runtime schema and policy lifecycle", () => {
+    const enrichSection = sectionBetween(
+      ingestionDoc,
+      "### 2.4 Enricher",
+      "### 2.5 Scorer",
+    );
+    expect(enrichSection).toContain("items.policy_version");
+    expect(enrichSection).toContain("Cron only picks rows whose");
+    expect(enrichSection).toContain("`enriched_at` is null");
+    expect(enrichSection).not.toContain("enricher_version");
+
+    const scorerSection = sectionBetween(
+      ingestionDoc,
+      "### 2.5 Scorer",
+      "### 2.6 Deduper",
+    );
+    expect(scorerSection).toContain("The scoring stage is part of live enrich");
+    expect(scorerSection).toContain("score-backfill");
+    expect(scorerSection).toContain("`policy_version`");
+    expect(scorerSection).not.toContain("Cached by `(item_id, policy_version)`");
+
+    const storeSection = sectionBetween(
+      ingestionDoc,
+      "### 2.7 Store",
+      "### 2.8 Editorial Agent",
+    );
+    expect(storeSection).toContain("source_health");
+    expect(storeSection).toContain("tags jsonb");
+    expect(storeSection).toContain("policy_versions  (id, skill_name, version, content");
+    expect(storeSection).toContain("iteration_runs   (id, skill_name, status from ITERATION_STATUSES");
+    expect(storeSection).not.toContain("item_tags");
+    expect(storeSection).not.toContain("item_scores");
+    expect(storeSection).not.toContain("skill_md");
+    expect(storeSection).not.toContain("parent_version");
+
+    const agentSection = sectionBetween(
+      ingestionDoc,
+      "### 2.8 Editorial Agent",
+      "## 3. Concrete RSSHub route catalog",
+    );
+    expect(agentSection).toContain("getActiveSkill(\"editorial\")");
+    expect(agentSection).toContain("MIN_FEEDBACK_TO_ITERATE");
+    expect(agentSection).toContain("status='proposed'");
+    expect(agentSection).toContain("New or explicitly reset/backfilled enrich work");
+    expect(agentSection).not.toContain("policy_versions.current.committed_at");
+    expect(agentSection).not.toContain("read_file(path)");
+    expect(agentSection).not.toContain("write_draft(content)");
+
+    const policyLoader = readSource("workers/enrich/policy.ts");
+    expect(policyLoader).toContain("New or deliberately reset rows use the latest policy");
+    expect(policyLoader).toContain("cron does not select already-enriched rows solely because this hash changed");
+    expect(policyLoader).not.toContain("hash changes, workers re-enrich");
+
+    const iterationWorker = readSource("workers/agent/iterate.ts");
+    expect(iterationWorker).toContain("New or reset/backfilled enrich work reads that row");
+    expect(iterationWorker).toContain("existing enriched rows require an explicit reset/backfill");
+    expect(iterationWorker).not.toContain("workers pick up the change next tick");
   });
 
   test("root aggregation handoff is clearly archived, not current guidance", () => {
