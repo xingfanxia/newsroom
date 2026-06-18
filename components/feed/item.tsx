@@ -6,23 +6,12 @@ import { CoverageChip } from "./coverage-chip";
 import { SignalDrawer } from "./signal-drawer";
 import { useTweaks } from "@/hooks/use-tweaks";
 import { FEEDBACK_SAVE_VOTE, type Story } from "@/lib/types";
+import { formatFeedItemTime } from "@/lib/time/relative";
 
 type Props = {
   story: Story;
   locale: "en" | "zh";
 };
-
-function formatTime(iso: string): { hh: string; date: string; ago: string } {
-  const d = new Date(iso);
-  const hh = d.toTimeString().slice(0, 5);
-  const date = `${String(d.getMonth() + 1).padStart(2, "0")}·${String(d.getDate()).padStart(2, "0")}`;
-  const diffMs = Date.now() - d.getTime();
-  const diffH = Math.floor(diffMs / 3_600_000);
-  const diffD = Math.floor(diffH / 24);
-  const ago =
-    diffH < 1 ? "now" : diffH < 24 ? `${diffH}h ago` : `${diffD}d ago`;
-  return { hh, date, ago };
-}
 
 /**
  * Feed row — bilingual title, source meta, summary (一句话总结), tags, score
@@ -37,7 +26,7 @@ export function Item({ story, locale }: Props) {
   const { tweaks } = useTweaks();
   const lang = tweaks.language;
   const showZh = lang === "zh";
-  const { hh, date, ago } = formatTime(story.publishedAt);
+  const { hh, date, ago } = formatFeedItemTime(story.publishedAt);
 
   const tier = story.tier;
   const tierPill =

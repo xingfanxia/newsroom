@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { Story } from "@/lib/types";
+import { formatLocalizedRelativeTime } from "@/lib/time/relative";
 
 type Member = NonNullable<Story["members"]>[number];
 
@@ -122,7 +123,9 @@ export function SignalDrawer({ clusterId, locale, showZh, open, onClose }: Props
               >
                 <span className="signal-drawer__source">📎 {m.sourceName}</span>
                 <span className="signal-drawer__time">
-                  {formatRelative(m.publishedAt, showZh)}
+                  {formatLocalizedRelativeTime(m.publishedAt, {
+                    locale: showZh ? "zh" : "en",
+                  })}
                 </span>
                 <span className="signal-drawer__member-title">{m.title}</span>
               </a>
@@ -132,15 +135,4 @@ export function SignalDrawer({ clusterId, locale, showZh, open, onClose }: Props
       )}
     </div>
   );
-}
-
-function formatRelative(iso: string, showZh: boolean): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60_000);
-  if (mins < 1) return showZh ? "刚刚" : "just now";
-  if (mins < 60) return showZh ? `${mins}分钟前` : `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return showZh ? `${hrs}小时前` : `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  return showZh ? `${days}天前` : `${days}d ago`;
 }

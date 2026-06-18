@@ -5,11 +5,21 @@ type TimeOptions = {
   nullLabel?: string;
 };
 
+type LocaleTimeOptions = TimeOptions & {
+  locale: "en" | "zh";
+};
+
 type CoarseTimeOptions = TimeOptions & {
   currentLabel?: string;
   hourSuffix?: string;
   daySuffix?: string;
   rounding?: "floor" | "round";
+};
+
+export type FeedItemTimeParts = {
+  hh: string;
+  date: string;
+  ago: string;
 };
 
 const SECOND_MS = 1_000;
@@ -68,6 +78,40 @@ export function formatCoarseRelativeTime(
   if (h < 24) return `${h}${options.hourSuffix ?? "h"} ago`;
   const d = round(h / 24);
   return `${d}${options.daySuffix ?? "d"} ago`;
+}
+
+export function formatFeedItemTime(
+  value: DateLike,
+  options: TimeOptions = {},
+): FeedItemTimeParts {
+  const date = coerceDate(value);
+  if (!date) {
+    const fallback = options.nullLabel ?? "—";
+    return { hh: fallback, date: fallback, ago: fallback };
+  }
+
+  return {
+    hh: date.toTimeString().slice(0, 5),
+    date: `${String(date.getMonth() + 1).padStart(2, "0")}·${String(date.getDate()).padStart(2, "0")}`,
+    ago: formatCoarseRelativeTime(date, options),
+  };
+}
+
+export function formatLocalizedRelativeTime(
+  value: DateLike,
+  options: LocaleTimeOptions,
+): string {
+  const date = coerceDate(value);
+  if (!date) return options.nullLabel ?? "—";
+
+  const zh = options.locale === "zh";
+  const mins = Math.floor(elapsedMs(date, options.now) / MINUTE_MS);
+  if (mins < 1) return zh ? "刚刚" : "just now";
+  if (mins < 60) return zh ? `${mins}分钟前` : `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return zh ? `${hrs}小时前` : `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return zh ? `${days}天前` : `${days}d ago`;
 }
 
 export function formatElapsedSince(

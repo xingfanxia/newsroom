@@ -45,6 +45,9 @@ Shipped cleanup:
 - Shared archive pagination through `components/feed/archive-pagination.tsx`;
   `/all` no longer owns local pagination markup, and `/curated` now exposes
   the offset pagination its query path already supported.
+- Shared feed time display helpers through `lib/time/relative.ts`; feed rows
+  and event-member drawers no longer carry untested local relative-time
+  formatters.
 - Shared admin mono blocks through `components/admin/mono-block.tsx`; policy
   error states and policy body previews no longer duplicate preformatted
   terminal panel styling.
