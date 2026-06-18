@@ -1,4 +1,5 @@
 import { VersionPill } from "@/components/admin/version-pill";
+import type { AppLocale } from "@/lib/types";
 
 export type TimelineVersion = {
   version: number;
@@ -17,7 +18,7 @@ export function VersionTimeline({
   locale,
   versions,
 }: {
-  locale: "en" | "zh";
+  locale: AppLocale;
   versions: TimelineVersion[];
 }) {
   const zh = locale === "zh";

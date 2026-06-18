@@ -8,6 +8,7 @@ import {
   useState,
   useTransition,
 } from "react";
+import type { AppLocale } from "@/lib/types";
 
 type SourceRow = {
   id: string;
@@ -43,8 +44,8 @@ function loadSources(): Promise<SourceRow[]> {
 }
 
 type Props = {
-  locale: "en" | "zh";
-  lang: "en" | "zh";
+  locale: AppLocale;
+  lang: AppLocale;
 };
 
 export function SourcePicker({ locale, lang }: Props) {

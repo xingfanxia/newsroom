@@ -57,6 +57,18 @@ const adminSystemPage = read("app/[locale]/admin/system/page.tsx");
 const adminPolicyPage = read("app/[locale]/admin/policy/page.tsx");
 const adminUsersPage = read("app/[locale]/admin/users/page.tsx");
 const adminIterationsPage = read("app/[locale]/admin/iterations/page.tsx");
+const agentsTabs = read("app/[locale]/agents/_tabs.tsx");
+const viewShell = read("components/shell/view-shell.tsx");
+const leftRail = read("components/shell/left-rail.tsx");
+const mobileChrome = read("components/shell/mobile-chrome.tsx");
+const sourcePicker = read("components/shell/source-picker.tsx");
+const feedItem = read("components/feed/item.tsx");
+const calendarGrid = read("components/feed/calendar-grid.tsx");
+const signalDrawer = read("components/feed/signal-drawer.tsx");
+const collectionSidebar = read("components/saved/collection-sidebar.tsx");
+const xHandlesSidebar = read("components/x-monitor/handles-sidebar.tsx");
+const versionTimeline = read("components/admin/version-timeline.tsx");
+const tweaksHook = read("hooks/use-tweaks.tsx");
 
 describe("runtime contract source wiring", () => {
   test("app locale language tags are centralized", () => {
@@ -135,6 +147,27 @@ describe("runtime contract source wiring", () => {
       expect(source).not.toContain("setRequestLocale(locale)");
       expect(source).not.toContain('locale as "zh" | "en"');
       expect(source).not.toContain('locale as "en" | "zh"');
+    }
+  });
+
+  test("shared UI locale props use the AppLocale contract", () => {
+    for (const source of [
+      agentsTabs,
+      viewShell,
+      leftRail,
+      mobileChrome,
+      sourcePicker,
+      feedItem,
+      calendarGrid,
+      signalDrawer,
+      collectionSidebar,
+      xHandlesSidebar,
+      versionTimeline,
+      tweaksHook,
+    ]) {
+      expect(source).toContain("AppLocale");
+      expect(source).not.toContain('"en" | "zh"');
+      expect(source).not.toContain('"zh" | "en"');
     }
   });
 

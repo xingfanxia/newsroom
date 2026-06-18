@@ -6,6 +6,7 @@ import { Tweaks } from "./tweaks";
 import { MobileChrome } from "./mobile-chrome";
 import { TweaksProvider } from "@/hooks/use-tweaks";
 import type { TopBarStats } from "@/lib/shell/top-bar-stats";
+import type { AppLocale } from "@/lib/types";
 import type { PulsePoint } from "./pulse-box";
 
 /**
@@ -21,7 +22,7 @@ export function ViewShell({
   cmd,
   children,
 }: {
-  locale: "en" | "zh";
+  locale: AppLocale;
   stats: TopBarStats;
   pulse?: PulsePoint[];
   crumb?: string;

@@ -9,9 +9,10 @@ import {
 import { toast } from "sonner";
 import { useTweaks } from "@/hooks/use-tweaks";
 import type { SavedCollection } from "@/lib/items/collections";
+import type { AppLocale } from "@/lib/types";
 
 type Props = {
-  locale: "en" | "zh";
+  locale: AppLocale;
   collections: SavedCollection[];
   inboxCount: number;
   activeId: number | "inbox";

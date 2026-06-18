@@ -9,9 +9,10 @@ import {
 import { LEGACY_RSS_FEEDS } from "@/lib/rss/legacy-feed-meta";
 import { MAIN_RSS_FEEDS } from "@/lib/rss/main-feed-meta";
 import { PUBLIC_SITE_URL } from "@/lib/site";
+import type { AppLocale } from "@/lib/types";
 
 type Tab = "skill" | "rss" | "api";
-type Lang = "en" | "zh";
+type Lang = AppLocale;
 
 const SITE = PUBLIC_SITE_URL;
 

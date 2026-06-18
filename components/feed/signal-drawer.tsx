@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Story } from "@/lib/types";
+import type { AppLocale, Story } from "@/lib/types";
 import { formatLocalizedRelativeTime } from "@/lib/time/relative";
 
 type Member = NonNullable<Story["members"]>[number];
 
 type Props = {
   clusterId: number | undefined;
-  locale: "zh" | "en";
+  locale: AppLocale;
   showZh: boolean;
   open: boolean;
   onClose: () => void;

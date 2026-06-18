@@ -6,13 +6,14 @@ import { PulseBox, type PulsePoint } from "./pulse-box";
 import { SourcePicker } from "./source-picker";
 import { useTweaks } from "@/hooks/use-tweaks";
 import { NAV_ADMIN, NAV_PRIMARY, activeNavId } from "@/lib/shell/nav-data";
+import type { AppLocale } from "@/lib/types";
 
 /** Left-rail nav. Bilingual, active-aware, with a pulse-chart + site-config entry. */
 export function LeftRail({
   locale,
   pulse,
 }: {
-  locale: "en" | "zh";
+  locale: AppLocale;
   pulse?: PulsePoint[];
 }) {
   const pathname = usePathname() ?? "";

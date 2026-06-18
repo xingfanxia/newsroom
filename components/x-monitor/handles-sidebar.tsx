@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useTweaks } from "@/hooks/use-tweaks";
+import type { AppLocale } from "@/lib/types";
 
 export type XHandleEntry = {
   id: string;
@@ -20,7 +21,7 @@ export function XHandlesSidebar({
   handles,
   activeHandle,
 }: {
-  locale: "en" | "zh";
+  locale: AppLocale;
   handles: XHandleEntry[];
   activeHandle: string | null;
 }) {

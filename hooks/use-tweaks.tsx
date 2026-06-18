@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { TWEAK_DEFAULTS, type Tweaks } from "@/lib/tweaks";
+import type { AppLocale } from "@/lib/types";
 
 export type { Tweaks };
 
@@ -56,7 +57,7 @@ export function TweaksProvider({
   initialLanguage,
 }: {
   children: ReactNode;
-  initialLanguage?: "zh" | "en";
+  initialLanguage?: AppLocale;
 }) {
   const base: Tweaks = useMemo(
     () => ({

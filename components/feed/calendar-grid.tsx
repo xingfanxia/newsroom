@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { DayBucket } from "@/lib/shell/dashboard-stats";
+import type { AppLocale } from "@/lib/types";
 
 /**
  * Month-grid calendar for browsing the feed by day. Mirrors the terminal
@@ -24,7 +25,7 @@ export function CalendarGrid({
   basePath: string;
   preserveSource?: string;
   preserveSourceId?: string;
-  locale: "en" | "zh";
+  locale: AppLocale;
   monthsBack?: number;
 }) {
   const zh = locale === "zh";

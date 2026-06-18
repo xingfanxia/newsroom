@@ -321,6 +321,9 @@ Shipped cleanup:
   leaves: admin, agents, sources, daily, login, and podcast detail pages now
   call `appLocaleFromParam` once and pass `AppLocale` through local data
   loading, links, and shell components.
+- Replaced component-local `"en" | "zh"` locale prop aliases with shared
+  `AppLocale` across shell, feed, saved, X-monitor, admin timeline, agent
+  tabs, and tweak-provider UI boundaries.
 - Shared item tier, feed view, search mode, and source filter runtime tuples through
   `lib/types.ts`, so REST feed/search schemas, MCP feed/search input schemas,
   item/event commentary workers, score prompt parsing, and source filtering

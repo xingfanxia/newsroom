@@ -5,12 +5,12 @@ import { EventBadge } from "./event-badge";
 import { CoverageChip } from "./coverage-chip";
 import { SignalDrawer } from "./signal-drawer";
 import { useTweaks } from "@/hooks/use-tweaks";
-import { FEEDBACK_SAVE_VOTE, type Story } from "@/lib/types";
+import { FEEDBACK_SAVE_VOTE, type AppLocale, type Story } from "@/lib/types";
 import { formatFeedItemTime } from "@/lib/time/relative";
 
 type Props = {
   story: Story;
-  locale: "en" | "zh";
+  locale: AppLocale;
 };
 
 /**

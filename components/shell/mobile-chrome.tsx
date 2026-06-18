@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { useTweaks } from "@/hooks/use-tweaks";
 import { NAV_ADMIN, NAV_PRIMARY, activeNavId } from "@/lib/shell/nav-data";
+import type { AppLocale } from "@/lib/types";
 
 const TABS = [
   { id: "hot",      href: "/",             label: "feed",  cn: "热点" },
@@ -14,7 +15,7 @@ const TABS = [
 ];
 
 /** Mobile bottom tab bar + bottom-sheet drawer. Only visible under 720px. */
-export function MobileChrome({ locale }: { locale: "en" | "zh" }) {
+export function MobileChrome({ locale }: { locale: AppLocale }) {
   const pathname = usePathname() ?? "";
   const activeId = activeNavId(pathname);
   const [open, setOpen] = useState(false);
