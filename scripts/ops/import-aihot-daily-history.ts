@@ -26,6 +26,7 @@ import {
   fetchDailyByDate,
   type AihotDailyReport,
 } from "@/lib/sources/aihot";
+import { dailyColumnWindowForDate } from "@/workers/newsletter/windows";
 
 const PAGE_DELAY_MS = 80;
 
@@ -71,13 +72,6 @@ Flags:
   --dry-run       Print what would be imported, no DB writes.
   --force         Overwrite aihot_daily_payload even if already populated.
   --help / -h     This message.`);
-}
-
-function periodForDate(date: string): { start: Date; end: Date } {
-  // YYYY-MM-DD interpreted as UTC midnight; bucket is 24h wide.
-  const start = new Date(`${date}T00:00:00Z`);
-  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
-  return { start, end };
 }
 
 function payloadStats(report: AihotDailyReport): {
@@ -192,7 +186,7 @@ async function main(): Promise<void> {
       continue;
     }
 
-    const { start, end } = periodForDate(date);
+    const { start, end } = dailyColumnWindowForDate(date);
     if (existing) {
       // Preserve any column_* fields already written by the daily-column writer.
       await client

@@ -54,6 +54,10 @@ export function runTimeForDailyColumnDate(date: string): Date {
   );
 }
 
+export function dailyColumnWindowForDate(date: string): NewsletterWindow {
+  return computeDailyNewsletterWindow(runTimeForDailyColumnDate(date));
+}
+
 export function previousDailyColumnRunTimes(
   count: number,
   now: Date = new Date(),

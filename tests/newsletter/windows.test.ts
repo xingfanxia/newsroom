@@ -3,6 +3,7 @@ import {
   computeDailyNewsletterWindow,
   computeMonthlyNewsletterWindow,
   computeNewsletterWindow,
+  dailyColumnWindowForDate,
   previousDailyColumnRunTimes,
   runTimeForDailyColumnDate,
   runTimeForDailyPeriodStart,
@@ -51,6 +52,13 @@ describe("newsletter windows", () => {
     expect(runTimeForDailyColumnDate("2026-04-25").toISOString()).toBe(
       "2026-04-25T05:00:00.000Z",
     );
+  });
+
+  test("maps a public daily-column date to the same 05:00Z window as the writer", () => {
+    const window = dailyColumnWindowForDate("2026-06-18");
+
+    expect(window.start.toISOString()).toBe("2026-06-17T05:00:00.000Z");
+    expect(window.end.toISOString()).toBe("2026-06-18T05:00:00.000Z");
   });
 
   test("lists previous daily-column run times from the standard 05:00Z anchor", () => {

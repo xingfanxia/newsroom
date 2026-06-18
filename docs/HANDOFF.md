@@ -228,6 +228,10 @@ Shipped cleanup:
 - Shared the daily-column writer locale through `DAILY_COLUMN_LOCALE`, so the
   daily writer, daily-column backfill, and AI HOT history importer cannot drift
   on which newsletter locale receives generated columns and payloads.
+- Shared AI HOT history placeholder windowing through
+  `dailyColumnWindowForDate`, so imported daily payload rows use the same 05:00Z
+  period boundaries as the daily-column writer instead of creating midnight
+  placeholder rows that would not conflict with the real cron upsert.
 - Reused `NEWSLETTER_LOCALES` in the legacy structured-newsletter RSS locale
   parser, so `/api/feed/newsletter/{locale}/rss.xml` cannot drift from the
   newsletter worker/API locale contract.

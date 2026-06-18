@@ -77,6 +77,9 @@ describe("newsletter runtime contracts", () => {
     expect(dailyColumnBackfillSrc).not.toContain(
       "new Date(periodStartIso).getTime() + 24 * 60 * 60 * 1000",
     );
+    expect(aihotDailyImportSrc).toContain("dailyColumnWindowForDate");
+    expect(aihotDailyImportSrc).not.toContain("function periodForDate");
+    expect(aihotDailyImportSrc).not.toContain("T00:00:00Z");
     expect(dailyColumnRegenSrc).toContain("runTimeForDailyColumnDate");
     expect(dailyColumnRegenSrc).not.toContain("T05:00:00Z");
     expect(dailyColumnWeekBackfillSrc).toContain("previousDailyColumnRunTimes");
