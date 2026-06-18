@@ -2,6 +2,7 @@ import { setRequestLocale } from "next-intl/server";
 import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
 import { Item } from "@/components/feed/item";
+import { FeedEmptyState } from "@/components/feed/empty-state";
 import { DayBreak } from "../_day-break";
 import { groupByDay, sortStoriesNewestFirst } from "@/lib/feed/group-by-day";
 import { PodcastChannelPills } from "./_channel-pills";
@@ -116,11 +117,11 @@ export default async function PodcastsPage({
             </div>
           ))}
           {filtered.length === 0 && (
-            <div style={{ padding: 60, color: "var(--fg-3)", textAlign: "center" }}>
+            <FeedEmptyState>
               {locale === "zh"
                 ? "暂无剧集"
                 : "no episodes yet — check back soon"}
-            </div>
+            </FeedEmptyState>
           )}
         </div>
       </main>

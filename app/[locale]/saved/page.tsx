@@ -3,6 +3,7 @@ import { setRequestLocale } from "next-intl/server";
 import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
 import { Item } from "@/components/feed/item";
+import { FeedEmptyState } from "@/components/feed/empty-state";
 import { DayBreak } from "../_day-break";
 import { groupByDay, sortStoriesNewestFirst } from "@/lib/feed/group-by-day";
 import { CollectionSidebar } from "@/components/saved/collection-sidebar";
@@ -144,20 +145,11 @@ export default async function SavedPage({
             </div>
 
             {stories.length === 0 ? (
-              <div
-                style={{
-                  padding: 60,
-                  textAlign: "center",
-                  color: "var(--fg-3)",
-                  border: "1px dashed var(--border-1)",
-                  borderRadius: 2,
-                  marginTop: 10,
-                }}
-              >
+              <FeedEmptyState framed>
                 {locale === "zh" ? "当前收藏夹为空 · " : "nothing saved here yet · "}
                 <span style={{ color: "var(--accent-green)" }}>⌘S</span>{" "}
                 {locale === "zh" ? "从信息流保存" : "to save from the feed"}
-              </div>
+              </FeedEmptyState>
             ) : (
               <div className="feed">
                 {Object.entries(grouped).map(([dayKey, list]) => (

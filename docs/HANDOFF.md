@@ -39,6 +39,9 @@ Shipped cleanup:
 - Shared feed page query coercion through `lib/feed/page-query.ts`; home,
   all-posts, and curated routes no longer duplicate the date drilldown key,
   nonnegative offset parsing, or 500-row day drilldown limit.
+- Shared feed empty-state styling through `components/feed/empty-state.tsx`;
+  feed-like pages now keep their empty copy local but no longer duplicate the
+  terminal centered empty-state treatment.
 - Shared admin mono blocks through `components/admin/mono-block.tsx`; policy
   error states and policy body previews no longer duplicate preformatted
   terminal panel styling.

@@ -4,6 +4,7 @@ import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
 import { Ticker } from "@/components/feed/ticker";
 import { Item } from "@/components/feed/item";
+import { FeedEmptyState } from "@/components/feed/empty-state";
 import { RightRail } from "@/components/feed/right-rail";
 import { CalendarGrid } from "@/components/feed/calendar-grid";
 import { DayBreak } from "./_day-break";
@@ -205,9 +206,9 @@ export default async function HotNewsPage({
             </div>
           ))}
           {stories.length === 0 && (
-            <div style={{ padding: 60, color: "var(--fg-3)", textAlign: "center" }}>
+            <FeedEmptyState>
               no items match — try widening filters
-            </div>
+            </FeedEmptyState>
           )}
         </div>
       </main>

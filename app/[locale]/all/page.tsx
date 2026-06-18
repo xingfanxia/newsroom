@@ -2,6 +2,7 @@ import { setRequestLocale } from "next-intl/server";
 import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
 import { Item } from "@/components/feed/item";
+import { FeedEmptyState } from "@/components/feed/empty-state";
 import { CalendarGrid } from "@/components/feed/calendar-grid";
 import { DayBreak } from "../_day-break";
 import { HomeFilters } from "../_home-filters";
@@ -113,11 +114,9 @@ export default async function AllPostsPage({
             </div>
           ))}
           {stories.length === 0 && (
-            <div
-              style={{ padding: 60, color: "var(--fg-3)", textAlign: "center" }}
-            >
+            <FeedEmptyState>
               no items match — check back in a few minutes
-            </div>
+            </FeedEmptyState>
           )}
         </div>
 

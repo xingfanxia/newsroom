@@ -2,6 +2,7 @@ import { setRequestLocale } from "next-intl/server";
 import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
 import { Item } from "@/components/feed/item";
+import { FeedEmptyState } from "@/components/feed/empty-state";
 import { DayBreak } from "../_day-break";
 import { groupByDay, sortStoriesNewestFirst } from "@/lib/feed/group-by-day";
 import { XHandlesSidebar } from "@/components/x-monitor/handles-sidebar";
@@ -112,11 +113,11 @@ export default async function XMonitorPage({
                 </div>
               ))}
               {narrowedStories.length === 0 && (
-                <div style={{ padding: 60, color: "var(--fg-3)", textAlign: "center" }}>
+                <FeedEmptyState>
                   {locale === "zh"
                     ? "此账号最近还没有原创推文"
                     : "no original posts from this handle yet"}
-                </div>
+                </FeedEmptyState>
               )}
             </div>
           </div>

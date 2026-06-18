@@ -2,6 +2,7 @@ import { setRequestLocale } from "next-intl/server";
 import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
 import { Item } from "@/components/feed/item";
+import { FeedEmptyState } from "@/components/feed/empty-state";
 import { CalendarGrid } from "@/components/feed/calendar-grid";
 import { DayBreak } from "../_day-break";
 import { groupByDay, sortStoriesNewestFirst } from "@/lib/feed/group-by-day";
@@ -105,13 +106,11 @@ export default async function CuratedPage({
             </div>
           ))}
           {stories.length === 0 && (
-            <div
-              style={{ padding: 60, color: "var(--fg-3)", textAlign: "center" }}
-            >
+            <FeedEmptyState>
               {zh
                 ? "暂无严选内容 — 手动在 sources 表把信源标为 curated=true 可加入此页"
                 : "no curated items yet — flag a source with curated=true to surface it here"}
-            </div>
+            </FeedEmptyState>
           )}
         </div>
       </main>
