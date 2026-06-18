@@ -18,7 +18,7 @@ import {
   getDayCounts,
 } from "@/lib/shell/dashboard-stats";
 import { getShellChromeData } from "@/lib/shell/chrome-data";
-import type { Story } from "@/lib/types";
+import { appLocaleFromParam, type Story } from "@/lib/types";
 
 export const revalidate = 60;
 
@@ -44,7 +44,8 @@ export default async function CuratedPage({
   }>;
 }) {
   const [{ locale }, sp] = await Promise.all([params, searchParams]);
-  setRequestLocale(locale);
+  const appLocale = appLocaleFromParam(locale);
+  setRequestLocale(appLocale);
   const sourceId = sp.source_id?.trim() || undefined;
   const activeDate = coerceFeedDateKey(sp.date);
   const offset = coerceFeedOffset(sp.offset);
@@ -54,7 +55,7 @@ export default async function CuratedPage({
   try {
     stories = await getFeaturedStories({
       tier: "all",
-      locale: locale as "zh" | "en",
+      locale: appLocale,
       limit,
       offset,
       date: activeDate,
@@ -73,11 +74,11 @@ export default async function CuratedPage({
   ]);
 
   const grouped = groupByDay(sortStoriesNewestFirst(stories));
-  const zh = locale === "zh";
+  const zh = appLocale === "zh";
 
   return (
     <ViewShell
-      locale={locale as "en" | "zh"}
+      locale={appLocale}
       stats={chrome.topBarStats}
       pulse={chrome.pulse}
       crumb="~/curated"
@@ -93,9 +94,9 @@ export default async function CuratedPage({
         <CalendarGrid
           days={days}
           active={activeDate}
-          basePath={`/${locale}/curated`}
+          basePath={`/${appLocale}/curated`}
           preserveSourceId={sourceId}
-          locale={locale as "en" | "zh"}
+          locale={appLocale}
           monthsBack={2}
         />
         <div className="feed">
@@ -103,7 +104,7 @@ export default async function CuratedPage({
             <div key={dayKey}>
               <DayBreak dayKey={dayKey} />
               {list.map((s) => (
-                <Item key={s.id} story={s} locale={locale as "en" | "zh"} />
+                <Item key={s.id} story={s} locale={appLocale} />
               ))}
             </div>
           ))}
@@ -117,11 +118,11 @@ export default async function CuratedPage({
         </div>
         {!activeDate && stories.length > 0 && (
           <FeedArchivePagination
-            basePath={`/${locale}/curated`}
+            basePath={`/${appLocale}/curated`}
             offset={offset}
             pageSize={FEED_PAGE_SIZE}
             currentCount={stories.length}
-            locale={locale as "en" | "zh"}
+            locale={appLocale}
             preservedParams={{ source_id: sourceId }}
           />
         )}

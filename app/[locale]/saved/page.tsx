@@ -14,6 +14,7 @@ import { getInboxCount, listCollections } from "@/lib/items/collections";
 import { resolveSavedCollectionSelection } from "@/lib/items/saved-collection-selection";
 import { getShellChromeData } from "@/lib/shell/chrome-data";
 import { ADMIN_USER_ID, getSessionUser, upsertAppUser } from "@/lib/auth/session";
+import { appLocaleFromParam } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -25,12 +26,12 @@ export default async function SavedPage({
   searchParams: Promise<{ collection?: string }>;
 }) {
   const [{ locale }, sp] = await Promise.all([params, searchParams]);
-  setRequestLocale(locale);
+  const appLocale = appLocaleFromParam(locale);
+  setRequestLocale(appLocale);
 
   const user = await getSessionUser();
   const userId = user?.id ?? ADMIN_USER_ID;
   if (user) await upsertAppUser(user);
-  const appLocale = locale as "zh" | "en";
 
   const [
     collections,
@@ -44,7 +45,7 @@ export default async function SavedPage({
     getShellChromeData({ pulse: true }),
   ]);
   const selection = resolveSavedCollectionSelection(sp.collection, collections);
-  if (selection.shouldRedirect) redirect(`/${locale}/saved`);
+  if (selection.shouldRedirect) redirect(`/${appLocale}/saved`);
 
   const { activeId, collectionFilter } = selection;
   const [stories, tags] = await Promise.all([
@@ -56,15 +57,15 @@ export default async function SavedPage({
 
   const grouped = groupByDay(sortStoriesNewestFirst(stories));
   const activeCollectionName = (() => {
-    if (activeId === "inbox") return locale === "zh" ? "收件箱" : "inbox";
+    if (activeId === "inbox") return appLocale === "zh" ? "收件箱" : "inbox";
     const c = collections.find((x) => x.id === activeId);
-    if (!c) return locale === "zh" ? "收件箱" : "inbox";
-    return locale === "zh" ? c.nameCjk || c.name : c.name;
+    if (!c) return appLocale === "zh" ? "收件箱" : "inbox";
+    return appLocale === "zh" ? c.nameCjk || c.name : c.name;
   })();
 
   return (
     <ViewShell
-      locale={locale as "en" | "zh"}
+      locale={appLocale}
       stats={chrome.topBarStats}
       pulse={chrome.pulse}
       crumb={
@@ -79,10 +80,10 @@ export default async function SavedPage({
           en="saved"
           cjk="收藏"
           count={totals.total}
-          countLabel={locale === "zh" ? "收藏" : "items"}
+          countLabel={appLocale === "zh" ? "收藏" : "items"}
           extra={
             <span>
-              {locale === "zh"
+              {appLocale === "zh"
                 ? `本周 ${totals.thisWeek} · 本月 ${totals.thisMonth}`
                 : `${totals.thisWeek} this week · ${totals.thisMonth} this month`}
             </span>
@@ -100,7 +101,7 @@ export default async function SavedPage({
         >
           <div>
             <CollectionSidebar
-              locale={locale as "en" | "zh"}
+              locale={appLocale}
               collections={collections}
               inboxCount={inboxCount}
               activeId={activeId}
@@ -126,29 +127,29 @@ export default async function SavedPage({
                   color: "var(--accent-orange)",
                   fontWeight: 700,
                   fontFamily:
-                    locale === "zh" ? "var(--font-sans-cjk)" : "var(--font-mono)",
+                    appLocale === "zh" ? "var(--font-sans-cjk)" : "var(--font-mono)",
                 }}
               >
                 ▸ {activeCollectionName}
               </span>
               <span style={{ color: "var(--fg-3)", fontSize: 10.5 }}>
-                {stories.length} {locale === "zh" ? "条" : "saved"}
+                {stories.length} {appLocale === "zh" ? "条" : "saved"}
               </span>
               <span style={{ flex: 1 }} />
               <a
-                href={`/api/saved/export?collection=${activeId}&locale=${locale}`}
+                href={`/api/saved/export?collection=${activeId}&locale=${appLocale}`}
                 className="act-btn"
                 style={{ fontSize: 10.5, padding: "4px 10px" }}
               >
-                <span>⇓</span> {locale === "zh" ? "导出 MD" : "export MD"}
+                <span>⇓</span> {appLocale === "zh" ? "导出 MD" : "export MD"}
               </a>
             </div>
 
             {stories.length === 0 ? (
               <FeedEmptyState framed>
-                {locale === "zh" ? "当前收藏夹为空 · " : "nothing saved here yet · "}
+                {appLocale === "zh" ? "当前收藏夹为空 · " : "nothing saved here yet · "}
                 <span style={{ color: "var(--accent-green)" }}>⌘S</span>{" "}
-                {locale === "zh" ? "从信息流保存" : "to save from the feed"}
+                {appLocale === "zh" ? "从信息流保存" : "to save from the feed"}
               </FeedEmptyState>
             ) : (
               <div className="feed">
@@ -170,7 +171,7 @@ export default async function SavedPage({
                           currentCollectionId={s.collectionId}
                           collections={collections}
                         />
-                        <Item story={s} locale={locale as "en" | "zh"} />
+                        <Item story={s} locale={appLocale} />
                       </div>
                     ))}
                   </div>

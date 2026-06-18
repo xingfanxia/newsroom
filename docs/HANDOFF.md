@@ -312,6 +312,11 @@ Shipped cleanup:
 - Shared app/source locale tuples and the fetcher-supported source-kind subset
   through `lib/types.ts`, so DB locale enums, REST/MCP locale schemas, sitemap
   locales, and fetcher support checks cannot drift.
+- Centralized route-locale defaults and param normalization through
+  `DEFAULT_APP_LOCALE`, `isAppLocale`, and `appLocaleFromParam` in
+  `lib/types.ts`; feed-like locale pages now normalize once and pass
+  `AppLocale` through instead of repeating route-local `locale as "zh" | "en"`
+  casts.
 - Shared item tier, feed view, search mode, and source filter runtime tuples through
   `lib/types.ts`, so REST feed/search schemas, MCP feed/search input schemas,
   item/event commentary workers, score prompt parsing, and source filtering

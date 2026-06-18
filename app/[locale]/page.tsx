@@ -24,7 +24,7 @@ import {
 import { getShellChromeData } from "@/lib/shell/chrome-data";
 import { getRecentTickerItems } from "@/lib/shell/ticker";
 import { mockStories } from "@/lib/mock/stories";
-import type { Story } from "@/lib/types";
+import { appLocaleFromParam, type Story } from "@/lib/types";
 
 export const revalidate = 60;
 
@@ -62,15 +62,16 @@ export default async function HotNewsPage({
   }>;
 }) {
   const [{ locale }, sp] = await Promise.all([params, searchParams]);
+  const appLocale = appLocaleFromParam(locale);
   if (sp.tier === "all") {
     const qs = new URLSearchParams();
     if (sp.source) qs.set("source", sp.source);
     if (sp.source_id) qs.set("source_id", sp.source_id);
     if (sp.date) qs.set("date", sp.date);
     const search = qs.toString();
-    redirect(`/${locale}/all${search ? `?${search}` : ""}`);
+    redirect(`/${appLocale}/all${search ? `?${search}` : ""}`);
   }
-  setRequestLocale(locale);
+  setRequestLocale(appLocale);
   const tier = coerceTier(sp.tier);
   // source_id pins a specific publisher and overrides any preset bucket.
   const sourceId = sp.source_id?.trim() || undefined;
@@ -103,7 +104,7 @@ export default async function HotNewsPage({
   try {
     stories = await getFeaturedStories({
       tier,
-      locale: locale as "zh" | "en",
+      locale: appLocale,
       limit,
       date: activeDate,
       // View selection:
@@ -142,7 +143,7 @@ export default async function HotNewsPage({
     try {
       const probe = await getFeaturedStories({
         tier: "all",
-        locale: locale as "zh" | "en",
+        locale: appLocale,
         limit: 1,
       });
       if (probe.length === 0) stories = mockStories;
@@ -155,7 +156,7 @@ export default async function HotNewsPage({
     getShellChromeData({ pulse: true, signalRatio: "fromRadar" }),
     getTopTopics().catch(() => []),
     getPolicySummary().catch(() => ({ version: "v1", lastIterAt: null })),
-    getRecentTickerItems(locale as "zh" | "en").catch(() => []),
+    getRecentTickerItems(appLocale).catch(() => []),
     // Calendar must apply the SAME filters as the feed — otherwise the cell
     // count can over-promise items that will not render after filtering.
     getDayCounts(60, {
@@ -171,7 +172,7 @@ export default async function HotNewsPage({
 
   return (
     <ViewShell
-      locale={locale as "en" | "zh"}
+      locale={appLocale}
       stats={chrome.topBarStats}
       pulse={chrome.pulse}
       crumb="~/feed"
@@ -190,10 +191,10 @@ export default async function HotNewsPage({
         <CalendarGrid
           days={days}
           active={activeDate}
-          basePath={`/${locale}`}
+          basePath={`/${appLocale}`}
           preserveSource={sourcePreset}
           preserveSourceId={sourceId}
-          locale={locale as "en" | "zh"}
+          locale={appLocale}
           monthsBack={2}
         />
         <div className="feed">
@@ -201,7 +202,7 @@ export default async function HotNewsPage({
             <div key={dayKey}>
               <DayBreak dayKey={dayKey} />
               {dayStories.map((s) => (
-                <Item key={s.id} story={s} locale={locale as "en" | "zh"} />
+                <Item key={s.id} story={s} locale={appLocale} />
               ))}
             </div>
           ))}

@@ -36,6 +36,7 @@ export type Cadence = (typeof CADENCES)[number];
 
 export const APP_LOCALES = ["zh", "en"] as const;
 export type AppLocale = (typeof APP_LOCALES)[number];
+export const DEFAULT_APP_LOCALE = "zh" satisfies AppLocale;
 const APP_LOCALE_LANGUAGE_TAGS = {
   zh: "zh-CN",
   en: "en-US",
@@ -47,6 +48,16 @@ export function appLocaleLanguageTag(
   locale: AppLocale,
 ): AppLocaleLanguageTag {
   return APP_LOCALE_LANGUAGE_TAGS[locale];
+}
+
+export function isAppLocale(value: string): value is AppLocale {
+  return (APP_LOCALES as readonly string[]).includes(value);
+}
+
+export function appLocaleFromParam(
+  value: string | null | undefined,
+): AppLocale {
+  return value && isAppLocale(value) ? value : DEFAULT_APP_LOCALE;
 }
 
 export const DAILY_NEWSLETTER_KIND = "daily";

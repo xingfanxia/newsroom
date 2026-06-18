@@ -23,7 +23,7 @@ import {
   getDayCounts,
 } from "@/lib/shell/dashboard-stats";
 import { getShellChromeData } from "@/lib/shell/chrome-data";
-import type { Story } from "@/lib/types";
+import { appLocaleFromParam, type Story } from "@/lib/types";
 
 export const revalidate = 60;
 
@@ -40,7 +40,8 @@ export default async function AllPostsPage({
   }>;
 }) {
   const [{ locale }, sp] = await Promise.all([params, searchParams]);
-  setRequestLocale(locale);
+  const appLocale = appLocaleFromParam(locale);
+  setRequestLocale(appLocale);
   const sourceId = sp.source_id?.trim() || undefined;
   const sourcePreset = coerceSourcePreset(sp.source);
   const sourceFilter = sourceId
@@ -56,7 +57,7 @@ export default async function AllPostsPage({
   try {
     stories = await getFeaturedStories({
       tier: "all",
-      locale: locale as "zh" | "en",
+      locale: appLocale,
       limit,
       offset,
       date: activeDate,
@@ -83,7 +84,7 @@ export default async function AllPostsPage({
 
   return (
     <ViewShell
-      locale={locale as "en" | "zh"}
+      locale={appLocale}
       stats={chrome.topBarStats}
       pulse={chrome.pulse}
       crumb="~/all"
@@ -103,10 +104,10 @@ export default async function AllPostsPage({
         <CalendarGrid
           days={days}
           active={activeDate}
-          basePath={`/${locale}/all`}
+          basePath={`/${appLocale}/all`}
           preserveSource={sourcePreset}
           preserveSourceId={sourceId}
-          locale={locale as "en" | "zh"}
+          locale={appLocale}
           monthsBack={3}
         />
         <div className="feed">
@@ -114,7 +115,7 @@ export default async function AllPostsPage({
             <div key={dayKey}>
               <DayBreak dayKey={dayKey} />
               {list.map((s) => (
-                <Item key={s.id} story={s} locale={locale as "en" | "zh"} />
+                <Item key={s.id} story={s} locale={appLocale} />
               ))}
             </div>
           ))}
@@ -127,11 +128,11 @@ export default async function AllPostsPage({
 
         {!activeDate && stories.length > 0 && (
           <FeedArchivePagination
-            basePath={`/${locale}/all`}
+            basePath={`/${appLocale}/all`}
             offset={offset}
             pageSize={FEED_PAGE_SIZE}
             currentCount={stories.length}
-            locale={locale as "en" | "zh"}
+            locale={appLocale}
             preservedParams={paginationParams}
           />
         )}

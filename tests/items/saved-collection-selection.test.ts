@@ -38,7 +38,8 @@ describe("saved collection URL selection", () => {
     const source = read("app/[locale]/saved/page.tsx");
 
     expect(source).toContain("resolveSavedCollectionSelection");
-    expect(source).toContain("redirect(`/${locale}/saved`)");
+    expect(source).toContain("const appLocale = appLocaleFromParam(locale)");
+    expect(source).toContain("redirect(`/${appLocale}/saved`)");
     expect(source).not.toContain("function parseCollection");
   });
 });

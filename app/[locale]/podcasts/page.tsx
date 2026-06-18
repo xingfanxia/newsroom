@@ -9,7 +9,7 @@ import { PodcastChannelPills } from "./_channel-pills";
 import { getFeaturedStories } from "@/lib/items/live";
 import { getShellChromeData } from "@/lib/shell/chrome-data";
 import { getPodcastChannels } from "@/lib/shell/podcast-channels";
-import type { Story } from "@/lib/types";
+import { appLocaleFromParam, type AppLocale, type Story } from "@/lib/types";
 
 export const revalidate = 60;
 
@@ -23,7 +23,8 @@ export default async function PodcastsPage({
   searchParams: Promise<{ source?: string; tier?: string }>;
 }) {
   const [{ locale }, sp] = await Promise.all([params, searchParams]);
-  setRequestLocale(locale);
+  const appLocale = appLocaleFromParam(locale);
+  setRequestLocale(appLocale);
   const activeTier: PodTier = sp.tier === "all" ? "all" : "featured";
 
   const [channels, chrome] = await Promise.all([
@@ -39,7 +40,7 @@ export default async function PodcastsPage({
   // filters out of the default featured view.
   const filtered = await getFeaturedStories({
     tier: activeTier,
-    locale: locale as "zh" | "en",
+    locale: appLocale,
     sourceGroup: activeChannel ? undefined : "podcast",
     sourceId: activeChannel ?? undefined,
     includeSourceGroup: true,
@@ -48,16 +49,16 @@ export default async function PodcastsPage({
 
   const grouped = groupByDay(sortStoriesNewestFirst(filtered));
   const activeLabel = activeChannel
-    ? (locale === "zh"
+    ? (appLocale === "zh"
         ? channels.find((c) => c.id === activeChannel)?.nameZh
         : channels.find((c) => c.id === activeChannel)?.nameEn) ?? activeChannel
-    : locale === "zh"
+    : appLocale === "zh"
       ? "全部频道"
       : "all channels";
 
   return (
     <ViewShell
-      locale={locale as "en" | "zh"}
+      locale={appLocale}
       stats={chrome.topBarStats}
       pulse={chrome.pulse}
       crumb={activeChannel ? `~/podcasts/${activeChannel}` : "~/podcasts"}
@@ -71,7 +72,7 @@ export default async function PodcastsPage({
           countLabel="episodes"
           extra={
             <span>
-              {channels.length} {locale === "zh" ? "个频道在监控" : "channels tracked"}
+              {channels.length} {appLocale === "zh" ? "个频道在监控" : "channels tracked"}
             </span>
           }
         />
@@ -83,7 +84,7 @@ export default async function PodcastsPage({
         <TierPills
           activeTier={activeTier}
           activeChannel={activeChannel}
-          locale={locale as "en" | "zh"}
+          locale={appLocale}
         />
 
         <div
@@ -103,7 +104,7 @@ export default async function PodcastsPage({
           </span>
           <span style={{ color: "var(--fg-3)", fontSize: 10.5 }}>
             {filtered.length}{" "}
-            {locale === "zh" ? "集" : "episodes"}
+            {appLocale === "zh" ? "集" : "episodes"}
           </span>
         </div>
 
@@ -112,13 +113,13 @@ export default async function PodcastsPage({
             <div key={dayKey}>
               <DayBreak dayKey={dayKey} />
               {list.map((s) => (
-                <Item key={s.id} story={s} locale={locale as "en" | "zh"} />
+                <Item key={s.id} story={s} locale={appLocale} />
               ))}
             </div>
           ))}
           {filtered.length === 0 && (
             <FeedEmptyState>
-              {locale === "zh"
+              {appLocale === "zh"
                 ? "暂无剧集"
                 : "no episodes yet — check back soon"}
             </FeedEmptyState>
@@ -136,7 +137,7 @@ function TierPills({
 }: {
   activeTier: PodTier;
   activeChannel: string | null;
-  locale: "en" | "zh";
+  locale: AppLocale;
 }) {
   const zh = locale === "zh";
   const build = (tier: PodTier) => {

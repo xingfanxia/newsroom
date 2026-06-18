@@ -9,7 +9,7 @@ import { XHandlesSidebar } from "@/components/x-monitor/handles-sidebar";
 import { getFeaturedStories } from "@/lib/items/live";
 import { getShellChromeData } from "@/lib/shell/chrome-data";
 import { getXHandles } from "@/lib/shell/x-handles";
-import type { Story } from "@/lib/types";
+import { appLocaleFromParam, type Story } from "@/lib/types";
 
 export const revalidate = 60;
 
@@ -21,7 +21,8 @@ export default async function XMonitorPage({
   searchParams: Promise<{ handle?: string }>;
 }) {
   const [{ locale }, sp] = await Promise.all([params, searchParams]);
-  setRequestLocale(locale);
+  const appLocale = appLocaleFromParam(locale);
+  setRequestLocale(appLocale);
 
   const [handles, chrome] = await Promise.all([
     getXHandles().catch(() => []),
@@ -35,7 +36,7 @@ export default async function XMonitorPage({
 
   const narrowedStories = await getFeaturedStories({
     tier: "all",
-    locale: locale as "zh" | "en",
+    locale: appLocale,
     sourceId: activeIsValid && activeHandle ? activeHandle : undefined,
     sourceKind: activeIsValid ? undefined : "x-api",
     limit: activeIsValid ? 200 : 80,
@@ -44,13 +45,13 @@ export default async function XMonitorPage({
   const grouped = groupByDay(sortStoriesNewestFirst(narrowedStories));
   const activeLabel: string = activeIsValid
     ? handles.find((h) => h.id === activeHandle)?.handle ?? activeHandle ?? ""
-    : locale === "zh"
+    : appLocale === "zh"
       ? "全部"
       : "all handles";
 
   return (
     <ViewShell
-      locale={locale as "en" | "zh"}
+      locale={appLocale}
       stats={chrome.topBarStats}
       pulse={chrome.pulse}
       crumb={activeIsValid ? `~/x/${activeLabel.replace("@", "")}` : "~/x"}
@@ -65,8 +66,8 @@ export default async function XMonitorPage({
           en="X monitor"
           cjk="X 监控"
           count={narrowedStories.length}
-          countLabel={locale === "zh" ? "推文" : "tweets"}
-          live={<>{handles.length} {locale === "zh" ? "个账号" : "handles tracked"}</>}
+          countLabel={appLocale === "zh" ? "推文" : "tweets"}
+          live={<>{handles.length} {appLocale === "zh" ? "个账号" : "handles tracked"}</>}
         />
 
         <div
@@ -79,7 +80,7 @@ export default async function XMonitorPage({
           }}
         >
           <XHandlesSidebar
-            locale={locale as "en" | "zh"}
+            locale={appLocale}
             handles={handles}
             activeHandle={activeIsValid ? activeHandle : null}
           />
@@ -100,7 +101,7 @@ export default async function XMonitorPage({
                 ▸ {activeLabel}
               </span>
               <span style={{ color: "var(--fg-3)", fontSize: 10.5 }}>
-                {narrowedStories.length} {locale === "zh" ? "条" : "tweets"}
+                {narrowedStories.length} {appLocale === "zh" ? "条" : "tweets"}
               </span>
             </div>
             <div className="feed">
@@ -108,13 +109,13 @@ export default async function XMonitorPage({
                 <div key={dayKey}>
                   <DayBreak dayKey={dayKey} />
                   {list.map((s) => (
-                    <Item key={s.id} story={s} locale={locale as "en" | "zh"} />
+                    <Item key={s.id} story={s} locale={appLocale} />
                   ))}
                 </div>
               ))}
               {narrowedStories.length === 0 && (
                 <FeedEmptyState>
-                  {locale === "zh"
+                  {appLocale === "zh"
                     ? "此账号最近还没有原创推文"
                     : "no original posts from this handle yet"}
                 </FeedEmptyState>

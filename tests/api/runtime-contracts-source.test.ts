@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { appLocaleLanguageTag } from "@/lib/types";
+import {
+  appLocaleFromParam,
+  appLocaleLanguageTag,
+  DEFAULT_APP_LOCALE,
+  isAppLocale,
+} from "@/lib/types";
 import { readSource as read } from "@/tests/helpers/source";
 
 const types = read("lib/types.ts");
@@ -35,22 +40,41 @@ const sitemap = read("app/sitemap.ts");
 const liveItems = read("lib/items/live.ts");
 const itemDetail = read("lib/items/detail.ts");
 const fetcher = read("workers/fetcher/index.ts");
+const homePage = read("app/[locale]/page.tsx");
+const allPage = read("app/[locale]/all/page.tsx");
+const curatedPage = read("app/[locale]/curated/page.tsx");
+const savedPage = read("app/[locale]/saved/page.tsx");
+const podcastsPage = read("app/[locale]/podcasts/page.tsx");
+const xMonitorPage = read("app/[locale]/x-monitor/page.tsx");
 
 describe("runtime contract source wiring", () => {
   test("app locale language tags are centralized", () => {
+    expect(DEFAULT_APP_LOCALE).toBe("zh");
     expect(appLocaleLanguageTag("zh")).toBe("zh-CN");
     expect(appLocaleLanguageTag("en")).toBe("en-US");
+    expect(isAppLocale("zh")).toBe(true);
+    expect(isAppLocale("en")).toBe(true);
+    expect(isAppLocale("fr")).toBe(false);
+    expect(appLocaleFromParam("en")).toBe("en");
+    expect(appLocaleFromParam("zh")).toBe("zh");
+    expect(appLocaleFromParam("fr")).toBe(DEFAULT_APP_LOCALE);
+    expect(appLocaleFromParam(undefined)).toBe(DEFAULT_APP_LOCALE);
   });
 
   test("locales have shared runtime tuples for app routes and source rows", () => {
     expect(types).toContain("export const APP_LOCALES");
+    expect(types).toContain("export const DEFAULT_APP_LOCALE");
     expect(types).toContain("const APP_LOCALE_LANGUAGE_TAGS");
     expect(types).toContain("export function appLocaleLanguageTag");
+    expect(types).toContain("export function isAppLocale");
+    expect(types).toContain("export function appLocaleFromParam");
     expect(types).toContain("export const SOURCE_LOCALES");
     expect(types).toContain("export const NEWSLETTER_LOCALES");
     expect(routing).toContain("@/lib/types");
     expect(routing).toContain("APP_LOCALES");
+    expect(routing).toContain("DEFAULT_APP_LOCALE");
     expect(routing).not.toContain('locales: ["zh", "en"]');
+    expect(routing).not.toContain('defaultLocale: "zh"');
     expect(schema).toContain('pgEnum("locale_kind", SOURCE_LOCALES)');
 
     for (const source of [
@@ -72,6 +96,23 @@ describe("runtime contract source wiring", () => {
 
     expect(liveItems).toContain("type Locale = AppLocale");
     expect(itemDetail).toContain("type Locale = AppLocale");
+  });
+
+  test("reader route pages normalize locale params through the shared helper", () => {
+    for (const source of [
+      homePage,
+      allPage,
+      curatedPage,
+      savedPage,
+      podcastsPage,
+      xMonitorPage,
+    ]) {
+      expect(source).toContain("appLocaleFromParam");
+      expect(source).toContain("const appLocale = appLocaleFromParam(locale)");
+      expect(source).toContain("setRequestLocale(appLocale)");
+      expect(source).not.toContain('locale as "zh" | "en"');
+      expect(source).not.toContain('locale as "en" | "zh"');
+    }
   });
 
   test("fetcher support is a named subset of source kind tuples", () => {

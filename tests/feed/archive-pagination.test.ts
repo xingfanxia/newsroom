@@ -5,11 +5,11 @@ import { readSource } from "@/tests/helpers/source";
 const ARCHIVE_PAGES = [
   {
     path: "app/[locale]/all/page.tsx",
-    basePath: 'basePath={`/${locale}/all`}',
+    basePath: 'basePath={`/${appLocale}/all`}',
   },
   {
     path: "app/[locale]/curated/page.tsx",
-    basePath: 'basePath={`/${locale}/curated`}',
+    basePath: 'basePath={`/${appLocale}/curated`}',
   },
 ] as const;
 
