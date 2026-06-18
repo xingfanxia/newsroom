@@ -58,6 +58,8 @@ Shipped cleanup:
 - Reused `APP_LOCALES` in `i18n/routing.ts`, so Next locale routing and
   API/OpenAPI/agent locale contracts no longer carry separate hard-coded
   `zh/en` tuples.
+- Reused `APP_LOCALES` for tweak language options, so browser preferences and
+  API tweak validation cannot drift from app route locales.
 - Derived main RSS feed ordering and locale coercion from `APP_LOCALES`, so RSS
   discovery metadata cannot drift from the app/API locale contract.
 - Shared admin mono blocks through `components/admin/mono-block.tsx`; policy

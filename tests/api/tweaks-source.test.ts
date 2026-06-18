@@ -4,6 +4,7 @@ import { readSource as read } from "@/tests/helpers/source";
 const cookieRoute = read("app/api/tweaks/route.ts");
 const v1Route = read("app/api/v1/tweaks/route.ts");
 const sharedRouteHelper = read("lib/api/tweak-routes.ts");
+const tweakContracts = read("lib/tweaks.ts");
 const hook = read("hooks/use-tweaks.tsx");
 const rightRail = read("components/feed/right-rail.tsx");
 
@@ -48,6 +49,11 @@ describe("tweaks route source wiring", () => {
   });
 
   test("client tweaks state uses the same source-of-truth defaults as API schemas", () => {
+    expect(tweakContracts).toContain("APP_LOCALES");
+    expect(tweakContracts).toContain("export const TWEAK_LANGUAGES = APP_LOCALES");
+    expect(tweakContracts).not.toContain(
+      'export const TWEAK_LANGUAGES = ["zh", "en"]',
+    );
     expect(hook).toContain("@/lib/tweaks");
     expect(hook).not.toContain('density: "compact" | "comfy" | "reader"');
     expect(hook).not.toContain('accent: "green" | "blue"');

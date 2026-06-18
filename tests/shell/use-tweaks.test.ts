@@ -1,10 +1,15 @@
 import { describe, expect, it } from "bun:test";
-import { TWEAK_DEFAULTS } from "@/lib/tweaks";
+import { TWEAK_DEFAULTS, TWEAK_LANGUAGES } from "@/lib/tweaks";
+import { APP_LOCALES } from "@/lib/types";
 
 // The full TweaksProvider requires a DOM; we can't exercise React here. Instead
 // we assert the public shape + defaults so a rename or silently dropped field
 // is caught in CI rather than in prod.
 describe("TWEAK_DEFAULTS", () => {
+  it("uses the app locale tuple for tweak language options", () => {
+    expect(TWEAK_LANGUAGES).toEqual(APP_LOCALES);
+  });
+
   it("defaults to English (not legacy 'both')", () => {
     expect(TWEAK_DEFAULTS.language).toBe("en");
   });

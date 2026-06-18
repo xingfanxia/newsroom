@@ -1,3 +1,5 @@
+import { APP_LOCALES, type AppLocale } from "@/lib/types";
+
 export const TWEAK_DENSITIES = ["compact", "comfy", "reader"] as const;
 export const TWEAK_ACCENTS = [
   "green",
@@ -22,7 +24,7 @@ export const TWEAK_CHROME_STYLES = [
   "brutalist",
 ] as const;
 export const TWEAK_SCORE_STYLES = ["ring", "bar", "tag", "none"] as const;
-export const TWEAK_LANGUAGES = ["zh", "en"] as const;
+export const TWEAK_LANGUAGES = APP_LOCALES;
 
 export type Tweaks = {
   density: (typeof TWEAK_DENSITIES)[number];
@@ -39,7 +41,7 @@ export type Tweaks = {
   showBreadcrumb: boolean;
   showLineNumbers: boolean;
   mutedMeta: boolean;
-  language: (typeof TWEAK_LANGUAGES)[number];
+  language: AppLocale;
 };
 
 export const TWEAK_DEFAULTS: Tweaks = {
