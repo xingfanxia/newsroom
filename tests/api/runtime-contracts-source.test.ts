@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readSource as read } from "@/tests/helpers/source";
 
 const types = read("lib/types.ts");
+const routing = read("i18n/routing.ts");
 const schema = read("db/schema.ts");
 const feedParams = read("lib/api/feed-query-params.ts");
 const eventMembers = read("lib/api/event-members.ts");
@@ -37,6 +38,9 @@ describe("runtime contract source wiring", () => {
     expect(types).toContain("export const APP_LOCALES");
     expect(types).toContain("export const SOURCE_LOCALES");
     expect(types).toContain("export const NEWSLETTER_LOCALES");
+    expect(routing).toContain("@/lib/types");
+    expect(routing).toContain("APP_LOCALES");
+    expect(routing).not.toContain('locales: ["zh", "en"]');
     expect(schema).toContain('pgEnum("locale_kind", SOURCE_LOCALES)');
 
     for (const source of [

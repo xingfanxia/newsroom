@@ -55,6 +55,9 @@ Shipped cleanup:
   `USAGE_WINDOWS` / usage-summary helpers; `/admin/usage` no longer depends on
   hand-written `today/week/month/all` totals or local query-param casts when the
   usage window contract changes.
+- Reused `APP_LOCALES` in `i18n/routing.ts`, so Next locale routing and
+  API/OpenAPI/agent locale contracts no longer carry separate hard-coded
+  `zh/en` tuples.
 - Shared admin mono blocks through `components/admin/mono-block.tsx`; policy
   error states and policy body previews no longer duplicate preformatted
   terminal panel styling.
