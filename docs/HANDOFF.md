@@ -501,7 +501,11 @@ Known caveat:
 
 > ### ⭐ Session 9 primary goal: **expose the radar to agents via HTTP API + MCP**
 >
-> Operator asked to expose the radar to tool-using agents (Claude Desktop, custom bots) at end of s8. **Read [`docs/AGENT-MCP-PLAN.md`](./AGENT-MCP-PLAN.md)** for the full design: two-surface architecture (HTTP API as source of truth, MCP as thin adapter), Bearer-token auth, rollout phases. Estimated ~1 full session if focused.
+> Historical note: at the end of s8, the next planned work was to expose the
+> radar to tool-using agents. That plan shipped and is now archived at
+> [`docs/AGENT-MCP-PLAN.md`](./AGENT-MCP-PLAN.md). Current agent/API/MCP
+> behavior and contributor guidance live in
+> [`docs/agent-access/README.md`](./agent-access/README.md).
 
 ---
 
@@ -693,10 +697,15 @@ Commentary: 106/106 enriched items have deep notes.
 
 ---
 
-## Session 9 priorities (in order)
+## Historical Session 9 priorities (superseded)
 
-### 1. Agent/MCP exposure — primary goal
-Full design in [`docs/AGENT-MCP-PLAN.md`](./AGENT-MCP-PLAN.md). Phases:
+### 1. Agent/MCP exposure — shipped
+Do not treat this checklist as current work. Current agent/API/MCP behavior
+lives in [`docs/agent-access/README.md`](./agent-access/README.md); the
+original session-9 design record is archived at
+[`docs/AGENT-MCP-PLAN.md`](./AGENT-MCP-PLAN.md).
+
+Original phase outline:
 1. HTTP API v1 (read): `/api/v1/feed`, `/api/v1/items/[id]`,
    `/api/v1/sources`, lexical `/api/v1/search`. Bearer auth via new
    `api_tokens` table.
