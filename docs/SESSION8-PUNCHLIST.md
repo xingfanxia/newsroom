@@ -89,7 +89,12 @@ Written at the end of s7 (2026-04-19). User flagged "a lot of issues needs to be
   through normalize/enrich/score. Live queue depths are expected to fluctuate
   as fresh cron items arrive; use `/admin/system` or direct DB queue checks for
   current counts.
-- [ ] **`x-ai-watchlist` source row still in DB** — catalog no longer defines it but the seed script doesn't delete rows. Either add a catalog-deletion pass to `seed-sources.ts` or manually `DELETE FROM sources WHERE id = 'x-ai-watchlist'`.
+- [x] **`x-ai-watchlist` source row still in DB** — resolved 2026-06-18.
+  `scripts/ops/seed-sources.ts` now disables enabled DB-only source rows that
+  no longer exist in `lib/sources/catalog.ts`, preserving historical data while
+  preventing stale rows from appearing as cron-pending work. Production
+  `x-ai-watchlist` was also manually disabled after confirming it had no
+  `raw_items` or `items`.
 - [ ] **Supabase env vars on Vercel** — `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` unused since s6 password-gate swap. `vercel env rm` to clean up.
 - [ ] **Key rotation** — OpenAI/Anthropic/Gemini/Azure/Jina keys have been in chat history since s3-4. 5-min task per provider. Deferred 4+ sessions running.
 - [ ] **`iteration_runs` never exercised through prod UI** — the M4 agent end-to-end flow still untested on production. First run is available in `/admin/iterations`.

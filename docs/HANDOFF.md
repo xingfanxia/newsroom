@@ -286,6 +286,10 @@ Shipped cleanup:
 - Shared source kind/group/cadence/source-locale/source-health status runtime tuples through `lib/types.ts` and
   source group display metadata through `lib/sources/groups.ts`, so DB enums
   and the `/sources` group order/labels cannot drift from catalog types.
+- Reconciled `scripts/ops/seed-sources.ts` with `lib/sources/catalog.ts` as the
+  source of truth: seed now upserts catalog rows and disables enabled DB-only
+  orphan source rows, preventing removed sources from staying visible as
+  cron-pending work.
 - Shared app/source locale tuples and the fetcher-supported source-kind subset
   through `lib/types.ts`, so DB locale enums, REST/MCP locale schemas, sitemap
   locales, and fetcher support checks cannot drift.

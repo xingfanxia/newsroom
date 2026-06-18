@@ -63,6 +63,11 @@ type Source = {
 Grouping for the `信源` UI: same enum as `group` above, with labels/order from
 `lib/sources/groups.ts`.
 
+`bun run db:seed` reconciles the database against this catalog: it upserts
+catalog rows and disables enabled DB-only orphan rows with an operator note.
+That keeps removed sources from reappearing as cron-pending work while
+preserving any historical `raw_items`/`items` that still reference them.
+
 **Adapter-routed kinds** (`x-api`, `aihot-api`): `url` field is informational; the fetcher dispatches by `kind` to a dedicated adapter (`workers/fetcher/x-api.ts`, `workers/fetcher/aihot.ts`) that owns the API contract. See §2.9 for AI HOT integration.
 
 **Paper-source retirement (2026-06-10)**: arXiv, Hugging Face Papers, Papers with Code, and similar paper-only feeds were removed from the catalog and cleaned from the database. The `research` group remains in the enum for deep-report feeds such as independent technical blogs and research-report newsletters; it no longer means "paper feed".
