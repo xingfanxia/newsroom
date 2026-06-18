@@ -60,6 +60,9 @@ Shipped cleanup:
   `zh/en` tuples.
 - Reused `APP_LOCALES` for tweak language options, so browser preferences and
   API tweak validation cannot drift from app route locales.
+- Centralized `AppLocale` to BCP-47 language-tag mapping in
+  `appLocaleLanguageTag`, so RSS rendering and saved-export date formatting no
+  longer repeat `zh-CN` / `en-US` branches.
 - Derived main RSS feed ordering and locale coercion from `APP_LOCALES`, so RSS
   discovery metadata cannot drift from the app/API locale contract.
 - Shared admin mono blocks through `components/admin/mono-block.tsx`; policy

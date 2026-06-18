@@ -36,6 +36,18 @@ export type Cadence = (typeof CADENCES)[number];
 
 export const APP_LOCALES = ["zh", "en"] as const;
 export type AppLocale = (typeof APP_LOCALES)[number];
+const APP_LOCALE_LANGUAGE_TAGS = {
+  zh: "zh-CN",
+  en: "en-US",
+} as const satisfies Record<AppLocale, string>;
+export type AppLocaleLanguageTag =
+  (typeof APP_LOCALE_LANGUAGE_TAGS)[AppLocale];
+
+export function appLocaleLanguageTag(
+  locale: AppLocale,
+): AppLocaleLanguageTag {
+  return APP_LOCALE_LANGUAGE_TAGS[locale];
+}
 
 export const DAILY_NEWSLETTER_KIND = "daily";
 export const MONTHLY_NEWSLETTER_KIND = "monthly";

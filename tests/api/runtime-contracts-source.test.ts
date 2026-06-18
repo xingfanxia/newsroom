@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { appLocaleLanguageTag } from "@/lib/types";
 import { readSource as read } from "@/tests/helpers/source";
 
 const types = read("lib/types.ts");
@@ -28,14 +29,23 @@ const iterationRejectRoute = read("app/api/admin/iterations/[id]/reject/route.ts
 const iterationRouteHelpers = read("lib/api/iteration-routes.ts");
 const mcpRoute = read("app/api/mcp/route.ts");
 const v1SavedRoute = read("app/api/v1/saved/route.ts");
+const savedExport = read("lib/api/saved-export.ts");
+const newsletterRssFeed = read("lib/rss/newsletter-feed.ts");
 const sitemap = read("app/sitemap.ts");
 const liveItems = read("lib/items/live.ts");
 const itemDetail = read("lib/items/detail.ts");
 const fetcher = read("workers/fetcher/index.ts");
 
 describe("runtime contract source wiring", () => {
+  test("app locale language tags are centralized", () => {
+    expect(appLocaleLanguageTag("zh")).toBe("zh-CN");
+    expect(appLocaleLanguageTag("en")).toBe("en-US");
+  });
+
   test("locales have shared runtime tuples for app routes and source rows", () => {
     expect(types).toContain("export const APP_LOCALES");
+    expect(types).toContain("const APP_LOCALE_LANGUAGE_TAGS");
+    expect(types).toContain("export function appLocaleLanguageTag");
     expect(types).toContain("export const SOURCE_LOCALES");
     expect(types).toContain("export const NEWSLETTER_LOCALES");
     expect(routing).toContain("@/lib/types");
@@ -55,6 +65,10 @@ describe("runtime contract source wiring", () => {
     expect(v1SavedRoute).toContain("@/lib/api/saved-requests");
     expect(dailyColumns).toContain("NEWSLETTER_LOCALES");
     expect(dailyColumns).toContain("z.enum(NEWSLETTER_LOCALES)");
+    for (const source of [savedExport, newsletterRssFeed]) {
+      expect(source).toContain("appLocaleLanguageTag");
+      expect(source).not.toContain('locale === "zh" ? "zh-CN" : "en-US"');
+    }
 
     expect(liveItems).toContain("type Locale = AppLocale");
     expect(itemDetail).toContain("type Locale = AppLocale");

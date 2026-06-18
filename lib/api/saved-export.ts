@@ -3,7 +3,7 @@ import {
   listCollections,
   type SavedCollection,
 } from "@/lib/items/collections";
-import type { AppLocale, Story } from "@/lib/types";
+import { appLocaleLanguageTag, type AppLocale, type Story } from "@/lib/types";
 
 type SavedExportCollectionFilter = number | "inbox" | null;
 export type SavedExportStory = Story & {
@@ -79,14 +79,11 @@ export function renderSavedExportMarkdown(
   const collLookup = collectionLookup(input.collections);
   const title = savedExportTitle(input.collection, input.locale, collLookup);
   const exportedAt = input.exportedAt ?? new Date();
-  const dateFmt = new Intl.DateTimeFormat(
-    input.locale === "zh" ? "zh-CN" : "en-US",
-    {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    },
-  );
+  const dateFmt = new Intl.DateTimeFormat(appLocaleLanguageTag(input.locale), {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 
   const lines: string[] = [];
   lines.push(`# ${title}`);

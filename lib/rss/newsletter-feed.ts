@@ -9,6 +9,7 @@ import {
 } from "@/lib/rss/render";
 import { publicUrl } from "@/lib/site";
 import {
+  appLocaleLanguageTag,
   MONTHLY_NEWSLETTER_KIND,
   NEWSLETTER_LOCALES,
   type NewsletterLocale,
@@ -54,7 +55,7 @@ export async function renderStructuredNewsletterRssFeed(
     title: NEWSLETTER_RSS_BRAND[locale],
     link: publicUrl(`/${locale}`),
     description: NEWSLETTER_RSS_DESCRIPTION[locale],
-    language: locale === "zh" ? "zh-CN" : "en-US",
+    language: appLocaleLanguageTag(locale),
     lastBuildDate: items[0]?.pubDate ?? new Date(),
     selfLink: publicUrl(`/api/feed/newsletter/${locale}/rss.xml`),
     items,
@@ -155,7 +156,7 @@ function formatNewsletterRange(
   end: Date,
   locale: NewsletterLocale,
 ): string {
-  const fmt = new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US", {
+  const fmt = new Intl.DateTimeFormat(appLocaleLanguageTag(locale), {
     month: "short",
     day: "numeric",
   });
