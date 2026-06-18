@@ -5,6 +5,7 @@ import { readSource, sourcePath } from "@/tests/helpers/source";
 const rootReadme = readSource("README.md");
 const docsReadme = readSource("docs/README.md");
 const handoffDoc = readSource("docs/HANDOFF.md");
+const architectureOverviewDoc = readSource("docs/architecture/overview.md");
 const ingestionDoc = readSource("docs/architecture/ingestion.md");
 const testingStrategyDoc = readSource("docs/testing/strategy.md");
 const aggregationHandoff = readSource("docs/HANDOFF-AGGREGATION.md");
@@ -14,6 +15,30 @@ const aggregationHandoffFiles = readdirSync(sourcePath("docs/aggregation"))
   .sort();
 
 describe("docs routing source contracts", () => {
+  test("architecture overview is routed as the current ownership map", () => {
+    expect(docsReadme).toContain(
+      "Architecture map and ownership boundaries | [`architecture/overview.md`](./architecture/overview.md)",
+    );
+    expect(rootReadme).toContain(
+      "Architecture map and ownership boundaries live in [`docs/architecture/overview.md`](./docs/architecture/overview.md)",
+    );
+    expect(rootReadme).toContain(
+      "架构总图和 ownership 边界见 [`docs/architecture/overview.md`](./docs/architecture/overview.md)",
+    );
+    expect(handoffDoc).toContain("docs/architecture/overview.md");
+
+    expect(architectureOverviewDoc).toContain("Current Architecture Overview");
+    expect(architectureOverviewDoc).toContain("app/api/*");
+    expect(architectureOverviewDoc).toContain("lib/api/*");
+    expect(architectureOverviewDoc).toContain("lib/types.ts");
+    expect(architectureOverviewDoc).toContain("workers/*");
+    expect(architectureOverviewDoc).toContain("scripts/ops/run-cron.ts");
+    expect(architectureOverviewDoc).toContain("tests/**/*-source.test.ts");
+    expect(architectureOverviewDoc).toContain("bun run verify");
+    expect(architectureOverviewDoc).not.toContain("Full design");
+    expect(architectureOverviewDoc).not.toContain("planned");
+  });
+
   test("root aggregation handoff is clearly archived, not current guidance", () => {
     expect(docsReadme).toContain("[`HANDOFF-AGGREGATION.md`](./HANDOFF-AGGREGATION.md)");
     expect(docsReadme).toContain("Root-level 2026-04-24 aggregation handoff");
@@ -42,13 +67,13 @@ describe("docs routing source contracts", () => {
 
   test("AI HOT plan is routed as a shipped design record, not the runtime source", () => {
     expect(rootReadme).toContain(
-      "Current architecture, including AI HOT runtime behavior and blueprint deviations, lives in [`docs/architecture/ingestion.md`](./docs/architecture/ingestion.md)",
+      "Current ingestion architecture, including AI HOT runtime behavior and blueprint deviations, lives in [`docs/architecture/ingestion.md`](./docs/architecture/ingestion.md)",
     );
     expect(rootReadme).toContain(
       "The shipped AI HOT design record is archived at [`docs/aihot-integration/PLAN.md`](./docs/aihot-integration/PLAN.md)",
     );
     expect(rootReadme).toContain(
-      "当前架构（含 AI HOT 运行时行为和蓝图偏差）见 [`docs/architecture/ingestion.md`](./docs/architecture/ingestion.md)",
+      "当前 ingestion 架构（含 AI HOT 运行时行为和蓝图偏差）见 [`docs/architecture/ingestion.md`](./docs/architecture/ingestion.md)",
     );
     expect(rootReadme).toContain(
       "已上线的 AI HOT 设计记录归档在 [`docs/aihot-integration/PLAN.md`](./docs/aihot-integration/PLAN.md)",

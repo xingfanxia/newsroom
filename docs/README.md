@@ -11,6 +11,7 @@ Read these first for current architecture and operational behavior:
 |---|---|
 | Product surface, stack, environment groups, roadmap | [`../README.md`](../README.md) |
 | Latest production state and recent incidents | [`HANDOFF.md`](./HANDOFF.md) |
+| Architecture map and ownership boundaries | [`architecture/overview.md`](./architecture/overview.md) |
 | Ingestion, enrich, scoring, clustering, cron behavior, AI HOT runtime behavior | [`architecture/ingestion.md`](./architecture/ingestion.md) |
 | Agent/API/MCP surface | [`agent-access/README.md`](./agent-access/README.md) |
 | Testing and local verification strategy | [`testing/strategy.md`](./testing/strategy.md) |
