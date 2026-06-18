@@ -6,6 +6,7 @@ const rootReadme = readSource("README.md");
 const docsReadme = readSource("docs/README.md");
 const handoffDoc = readSource("docs/HANDOFF.md");
 const ingestionDoc = readSource("docs/architecture/ingestion.md");
+const testingStrategyDoc = readSource("docs/testing/strategy.md");
 const aggregationHandoff = readSource("docs/HANDOFF-AGGREGATION.md");
 const aihotPlan = readSource("docs/aihot-integration/PLAN.md");
 const aggregationHandoffFiles = readdirSync(sourcePath("docs/aggregation"))
@@ -98,5 +99,21 @@ describe("docs routing source contracts", () => {
     expect(handoffDoc).not.toContain(
       "Full design in [`docs/AGENT-MCP-PLAN.md`](./AGENT-MCP-PLAN.md). Phases:",
     );
+  });
+
+  test("testing guidance is routed through the current docs index", () => {
+    expect(docsReadme).toContain(
+      "Testing and local verification strategy | [`testing/strategy.md`](./testing/strategy.md)",
+    );
+    expect(rootReadme).toContain(
+      "Testing and local verification strategy lives in [`docs/testing/strategy.md`](./docs/testing/strategy.md)",
+    );
+    expect(handoffDoc).toContain("docs/testing/strategy.md");
+
+    expect(testingStrategyDoc).toContain("bun run verify");
+    expect(testingStrategyDoc).toContain("Targeted Tests");
+    expect(testingStrategyDoc).toContain("git diff --check");
+    expect(testingStrategyDoc).not.toContain("vitest");
+    expect(testingStrategyDoc).not.toContain("npm run");
   });
 });

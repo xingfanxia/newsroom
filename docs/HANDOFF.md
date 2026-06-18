@@ -17,6 +17,8 @@ Shipped cleanup:
 - Added `bun run verify` as the single local gate that chains typecheck, lint,
   build, dead-code checks, and tests so future agents do not have to infer the
   expected verification order from handoff prose.
+- Added `docs/testing/strategy.md` as the current testing/verification strategy
+  entry in the docs router.
 - Removed unused UI/source-row components, the unused Tavily integration stub, and unused direct package dependencies.
 - Removed/de-exported unused internal value exports across auth, i18n navigation, policy, rate-limit, utility, worker, X API, newsletter, normalizer, and cluster modules.
 - Removed/de-exported unused internal type-only exports in the LLM usage and facade modules.
