@@ -2,6 +2,7 @@ import { desc, eq, inArray, sql } from "drizzle-orm";
 import { db, schema } from "@/db/client";
 import {
   FEEDBACK_SIGNAL_VOTES,
+  type AppLocale,
   type FeedbackEntry,
   type FeedbackVote,
 } from "@/lib/types";
@@ -44,7 +45,7 @@ export async function getFeedbackCounts(): Promise<FeedbackCounts> {
  * `save` entries are excluded — they're bookmarks, not editorial signal.
  */
 export async function getRecentFeedback(
-  locale: "zh" | "en",
+  locale: AppLocale,
   limit = 20,
 ): Promise<FeedbackEntry[]> {
   const rows = await db()

@@ -324,6 +324,10 @@ Shipped cleanup:
 - Replaced component-local `"en" | "zh"` locale prop aliases with shared
   `AppLocale` across shell, feed, saved, X-monitor, admin timeline, agent
   tabs, and tweak-provider UI boundaries.
+- Replaced library-local locale unions and aliases with `AppLocale` across
+  saved-item queries, public/v1 item serializers, relative-time formatting,
+  feedback metrics, ticker loading, usage labels, admin-gate locale parsing,
+  and agent iteration prompts.
 - Shared item tier, feed view, search mode, and source filter runtime tuples through
   `lib/types.ts`, so REST feed/search schemas, MCP feed/search input schemas,
   item/event commentary workers, score prompt parsing, and source filtering

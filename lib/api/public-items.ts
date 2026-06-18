@@ -1,4 +1,4 @@
-import type { Story } from "@/lib/types";
+import type { AppLocale, Story } from "@/lib/types";
 import {
   toApiItemCommonFields,
   toApiItemEventFields,
@@ -17,7 +17,7 @@ export type PublicApiItem = ApiItemCommonFields<PublicHkr> & ApiItemEventFields;
  */
 export function toPublicApiItem(
   story: Story,
-  locale: "zh" | "en",
+  locale: AppLocale,
 ): PublicApiItem {
   return {
     ...toApiItemCommonFields(story, toPublicHkr(story.hkr)),

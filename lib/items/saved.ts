@@ -6,7 +6,7 @@ import {
   storySelectFields,
 } from "@/lib/items/story-select";
 import { toStory } from "@/lib/items/story-mapper";
-import { FEEDBACK_SAVE_VOTE, type Story } from "@/lib/types";
+import { FEEDBACK_SAVE_VOTE, type AppLocale, type Story } from "@/lib/types";
 
 /**
  * Fetch the current user's saved items (feedback.vote='save') joined with
@@ -18,7 +18,7 @@ import { FEEDBACK_SAVE_VOTE, type Story } from "@/lib/types";
  */
 export async function getSavedStories(
   userId: string,
-  locale: "zh" | "en",
+  locale: AppLocale,
   opts: { limit?: number; collection?: number | "inbox" | null } = {},
 ): Promise<Array<Story & { savedAt: string; collectionId: number | null }>> {
   const limit = opts.limit ?? 80;

@@ -3,6 +3,7 @@ import { db } from "@/db/client";
 import { items, sources } from "@/db/schema";
 import { highlightTierInSql } from "@/lib/items/tier-sql";
 import type { TickerItem } from "@/components/feed/ticker";
+import type { AppLocale } from "@/lib/types";
 
 /**
  * Derive ticker items from recent high-importance stories. Pick the top N
@@ -11,7 +12,7 @@ import type { TickerItem } from "@/components/feed/ticker";
  * no recent data is available — the Ticker component then hides.
  */
 export async function getRecentTickerItems(
-  locale: "zh" | "en",
+  locale: AppLocale,
   limit = 12,
 ): Promise<TickerItem[]> {
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);

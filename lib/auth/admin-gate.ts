@@ -1,3 +1,5 @@
+import { DEFAULT_APP_LOCALE, isAppLocale } from "@/lib/types";
+
 /**
  * Pure gate decision for /:locale/admin/*. Since the switch to password-gated
  * auth there is no per-user allowlist — a valid session cookie implies admin,
@@ -17,7 +19,8 @@ export type GateInput = {
 export function decideAdminGate(input: GateInput): AdminGateDecision {
   const match = input.pathname.match(ADMIN_PATH_PATTERN);
   if (!match) return { action: "allow" };
-  const locale = match[1] as "zh" | "en";
+  const routeLocale = match[1] ?? "";
+  const locale = isAppLocale(routeLocale) ? routeLocale : DEFAULT_APP_LOCALE;
   if (input.hasSession) return { action: "allow" };
   const next = encodeURIComponent(input.pathname);
   return { action: "redirect", to: `/${locale}/login?next=${next}` };

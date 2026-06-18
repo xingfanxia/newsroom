@@ -10,6 +10,7 @@
  * row).
  */
 import { z } from "zod";
+import type { AppLocale } from "@/lib/types";
 
 export const MIN_FEEDBACK_TO_ITERATE = 5;
 
@@ -92,7 +93,7 @@ Output structure:
 type UserPromptInput = {
   currentContent: string;
   feedback: AgentFeedbackItem[];
-  locale?: "zh" | "en";
+  locale?: AppLocale;
 };
 
 export function agentUserPrompt(input: UserPromptInput): string {

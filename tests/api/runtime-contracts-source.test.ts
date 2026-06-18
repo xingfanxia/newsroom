@@ -39,6 +39,14 @@ const newsletterRssFeed = read("lib/rss/newsletter-feed.ts");
 const sitemap = read("app/sitemap.ts");
 const liveItems = read("lib/items/live.ts");
 const itemDetail = read("lib/items/detail.ts");
+const publicItems = read("lib/api/public-items.ts");
+const v1Items = read("lib/api/v1-items.ts");
+const storyItemFields = read("lib/api/story-item-fields.ts");
+const relativeTime = read("lib/time/relative.ts");
+const ticker = read("lib/shell/ticker.ts");
+const agentPrompt = read("workers/agent/prompt.ts");
+const adminGate = read("lib/auth/admin-gate.ts");
+const usageDisplay = read("lib/llm/usage-display.ts");
 const fetcher = read("workers/fetcher/index.ts");
 const homePage = read("app/[locale]/page.tsx");
 const allPage = read("app/[locale]/all/page.tsx");
@@ -117,8 +125,26 @@ describe("runtime contract source wiring", () => {
       expect(source).not.toContain('locale === "zh" ? "zh-CN" : "en-US"');
     }
 
-    expect(liveItems).toContain("type Locale = AppLocale");
-    expect(itemDetail).toContain("type Locale = AppLocale");
+    for (const source of [
+      liveItems,
+      itemDetail,
+      savedItems,
+      publicItems,
+      v1Items,
+      storyItemFields,
+      relativeTime,
+      feedbackMetrics,
+      ticker,
+      agentPrompt,
+      usageDisplay,
+    ]) {
+      expect(source).toContain("AppLocale");
+      expect(source).not.toContain('"zh" | "en"');
+      expect(source).not.toContain('"en" | "zh"');
+      expect(source).not.toContain("type Locale = AppLocale");
+    }
+    expect(adminGate).toContain("isAppLocale");
+    expect(adminGate).not.toContain('as "zh" | "en"');
   });
 
   test("reader route pages normalize locale params through the shared helper", () => {

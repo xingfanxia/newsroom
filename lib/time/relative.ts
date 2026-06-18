@@ -1,3 +1,5 @@
+import type { AppLocale } from "@/lib/types";
+
 export type DateLike = Date | string | null | undefined;
 
 type TimeOptions = {
@@ -6,7 +8,7 @@ type TimeOptions = {
 };
 
 type LocaleTimeOptions = TimeOptions & {
-  locale: "en" | "zh";
+  locale: AppLocale;
 };
 
 type CoarseTimeOptions = TimeOptions & {

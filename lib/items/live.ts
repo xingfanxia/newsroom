@@ -16,11 +16,9 @@ import {
   type VisibleItemTier,
 } from "@/lib/types";
 
-type Locale = AppLocale;
-
 export type FeedQuery = {
   tier?: VisibleItemTier;
-  locale?: Locale;
+  locale?: AppLocale;
   limit?: number;
   /** Skip the first N items — for pagination. Defaults to 0. */
   offset?: number;
@@ -345,7 +343,7 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
  */
 export async function getEventMembers(
   clusterId: number,
-  locale: Locale = "zh",
+  locale: AppLocale = "zh",
 ): Promise<NonNullable<Story["members"]>> {
   const client = db();
   const rows = await client

@@ -1,4 +1,4 @@
-import type { SourceGroup, SourceKind, Story } from "@/lib/types";
+import type { AppLocale, SourceGroup, SourceKind, Story } from "@/lib/types";
 
 export type PublicHkr = { h: boolean; k: boolean; r: boolean };
 
@@ -58,7 +58,7 @@ export function toApiItemCommonFields<Hkr>(
 
 export function toApiItemEventFields(
   story: Story,
-  locale: "zh" | "en",
+  locale: AppLocale,
 ): ApiItemEventFields {
   const isEvent = (story.coverage ?? 0) > 1 && story.clusterId != null;
   const canonicalTitle = isEvent

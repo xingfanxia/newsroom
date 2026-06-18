@@ -1,4 +1,4 @@
-import type { Story } from "@/lib/types";
+import type { AppLocale, Story } from "@/lib/types";
 import {
   toApiItemCommonFields,
   toApiItemEventFields,
@@ -22,7 +22,7 @@ export type SavedAgentApiItem = AgentApiItem & {
  */
 export function toAgentApiItem(
   story: Story,
-  locale: "zh" | "en",
+  locale: AppLocale,
 ): AgentApiItem {
   return {
     ...toApiItemCommonFields(story, story.hkr ?? null),
@@ -34,7 +34,7 @@ export function toAgentApiItem(
 
 export function toSavedAgentApiItem(
   story: Story & { savedAt: string; collectionId: number | null },
-  locale: "zh" | "en",
+  locale: AppLocale,
 ): SavedAgentApiItem {
   return {
     ...toAgentApiItem(story, locale),

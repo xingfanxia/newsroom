@@ -5,8 +5,6 @@ import { storySelectFields } from "@/lib/items/story-select";
 import { toStory } from "@/lib/items/story-mapper";
 import type { AppLocale, Story } from "@/lib/types";
 
-type Locale = AppLocale;
-
 /**
  * Full detail for a single item — same locale-resolved surface as the list
  * queries, but additionally returns `bodyMd` (raw article / transcript text)
@@ -24,7 +22,7 @@ export type ItemDetail = {
 
 export async function getItemDetail(
   id: number,
-  locale: Locale,
+  locale: AppLocale,
 ): Promise<ItemDetail | null> {
   if (!Number.isInteger(id) || id <= 0) return null;
 

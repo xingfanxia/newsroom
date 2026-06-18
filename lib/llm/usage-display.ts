@@ -1,7 +1,8 @@
 import type { WindowKey } from "@/lib/llm/stats";
 import { isLLMTask, type LLMTask } from "@/lib/llm/types";
+import type { AppLocale } from "@/lib/types";
 
-export type UsageLocale = "en" | "zh";
+export type UsageLocale = AppLocale;
 export type UsageTaskTone = "g" | "b" | "o" | "r" | "";
 
 export const USAGE_RANGE_LABELS = {
