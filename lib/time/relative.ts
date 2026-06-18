@@ -22,6 +22,12 @@ export type FeedItemTimeParts = {
   ago: string;
 };
 
+export type RelativeTimeToken =
+  | { kind: "justNow" }
+  | { kind: "minutes"; value: number }
+  | { kind: "hours"; value: number }
+  | { kind: "days"; value: number };
+
 const SECOND_MS = 1_000;
 const MINUTE_MS = 60 * SECOND_MS;
 const HOUR_MS = 60 * MINUTE_MS;
@@ -112,6 +118,22 @@ export function formatLocalizedRelativeTime(
   if (hrs < 24) return zh ? `${hrs}小时前` : `${hrs}h ago`;
   const days = Math.floor(hrs / 24);
   return zh ? `${days}天前` : `${days}d ago`;
+}
+
+export function relativeTimeToken(
+  value: DateLike,
+  options: TimeOptions = {},
+): RelativeTimeToken {
+  const date = coerceDate(value);
+  if (!date) return { kind: "justNow" };
+
+  const seconds = Math.floor(elapsedMs(date, options.now) / SECOND_MS);
+  if (seconds < 60) return { kind: "justNow" };
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return { kind: "minutes", value: minutes };
+  const hours = Math.floor(seconds / 3600);
+  if (hours < 24) return { kind: "hours", value: hours };
+  return { kind: "days", value: Math.floor(seconds / 86400) };
 }
 
 export function formatElapsedSince(

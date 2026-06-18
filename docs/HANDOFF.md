@@ -48,6 +48,9 @@ Shipped cleanup:
 - Shared feed time display helpers through `lib/time/relative.ts`; feed rows
   and event-member drawers no longer carry untested local relative-time
   formatters.
+- Kept translated relative-time tokens in `lib/time/relative.ts`; admin
+  feedback rows no longer import a time helper from the generic `lib/utils.ts`
+  class-name utility module.
 - Shared admin mono blocks through `components/admin/mono-block.tsx`; policy
   error states and policy body previews no longer duplicate preformatted
   terminal panel styling.

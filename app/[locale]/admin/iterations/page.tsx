@@ -168,11 +168,7 @@ export default async function IterationsPage({
                 </p>
               ) : (
                 recent.map((f) => (
-                  <FeedbackItem
-                    key={f.id}
-                    entry={f}
-                    locale={locale as "zh" | "en"}
-                  />
+                  <FeedbackItem key={f.id} entry={f} />
                 ))
               )}
             </div>

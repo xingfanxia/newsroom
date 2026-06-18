@@ -1,6 +1,6 @@
 import { useTranslations } from "next-intl";
 import type { FeedbackEntry } from "@/lib/types";
-import { formatRelative } from "@/lib/utils";
+import { relativeTimeToken } from "@/lib/time/relative";
 
 /**
  * Single feedback row — up/down verdict as a colored dot (mirrors the
@@ -8,21 +8,19 @@ import { formatRelative } from "@/lib/utils";
  */
 export function FeedbackItem({
   entry,
-  locale,
 }: {
   entry: FeedbackEntry;
-  locale: "zh" | "en";
 }) {
   const t = useTranslations("common.relativeTime");
-  const rel = formatRelative(new Date(entry.createdAt), locale);
+  const rel = relativeTimeToken(entry.createdAt);
   const relLabel =
     rel.kind === "justNow"
       ? t("justNow")
       : rel.kind === "minutes"
-        ? t("minutesAgo", { count: rel.value! })
+        ? t("minutesAgo", { count: rel.value })
         : rel.kind === "hours"
-          ? t("hoursAgo", { count: rel.value! })
-          : t("daysAgo", { count: rel.value! });
+          ? t("hoursAgo", { count: rel.value })
+          : t("daysAgo", { count: rel.value });
 
   const positive = entry.verdict === "up";
 

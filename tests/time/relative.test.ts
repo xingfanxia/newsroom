@@ -7,6 +7,7 @@ import {
   formatFeedItemTime,
   formatLocalizedRelativeTime,
   latestDate,
+  relativeTimeToken,
   toIsoStringOrNull,
 } from "@/lib/time/relative";
 import { readSource } from "@/tests/helpers/source";
@@ -120,6 +121,24 @@ describe("relative time display helpers", () => {
     ).toBe("2d ago");
   });
 
+  test("returns relative-time tokens for translated admin labels", () => {
+    expect(relativeTimeToken("2026-06-13T11:35:30.000Z", { now: NOW })).toEqual({
+      kind: "justNow",
+    });
+    expect(relativeTimeToken("2026-06-13T11:06:00.000Z", { now: NOW })).toEqual({
+      kind: "minutes",
+      value: 30,
+    });
+    expect(relativeTimeToken("2026-06-13T10:30:00.000Z", { now: NOW })).toEqual({
+      kind: "hours",
+      value: 1,
+    });
+    expect(relativeTimeToken("2026-06-11T10:00:00.000Z", { now: NOW })).toEqual({
+      kind: "days",
+      value: 2,
+    });
+  });
+
   test("supports rounded coarse labels for policy summaries", () => {
     expect(
       formatCoarseRelativeTime("2026-06-13T10:10:00.000Z", {
@@ -163,5 +182,19 @@ describe("relative time display helpers", () => {
     expect(drawer).toContain("formatLocalizedRelativeTime(m.publishedAt");
     expect(drawer).not.toContain("function formatRelative");
     expect(drawer).not.toContain("Date.now() - new Date");
+  });
+
+  test("admin feedback relative-time tokens live in the time module", () => {
+    const feedbackItem = readSource("components/admin/feedback-item.tsx");
+    const utils = readSource("lib/utils.ts");
+
+    expect(feedbackItem).toContain("@/lib/time/relative");
+    expect(feedbackItem).toContain("relativeTimeToken(entry.createdAt)");
+    expect(feedbackItem).not.toContain("@/lib/utils");
+    expect(feedbackItem).not.toContain("locale:");
+
+    expect(utils).toContain("export function cn");
+    expect(utils).not.toContain("formatRelative");
+    expect(utils).not.toContain("RelativeTime");
   });
 });
