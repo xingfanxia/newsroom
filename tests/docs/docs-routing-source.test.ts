@@ -9,6 +9,8 @@ const architectureOverviewDoc = readSource("docs/architecture/overview.md");
 const ingestionDoc = readSource("docs/architecture/ingestion.md");
 const testingStrategyDoc = readSource("docs/testing/strategy.md");
 const aggregationHandoff = readSource("docs/HANDOFF-AGGREGATION.md");
+const aggregationDesign = readSource("docs/aggregation/DESIGN.md");
+const aggregationPlan = readSource("docs/aggregation/PLAN.md");
 const aihotPlan = readSource("docs/aihot-integration/PLAN.md");
 const aggregationHandoffFiles = readdirSync(sourcePath("docs/aggregation"))
   .filter((name) => /^HANDOFF.*\.md$/.test(name))
@@ -63,6 +65,30 @@ describe("docs routing source contracts", () => {
         lead.indexOf("Read order"),
       );
     }
+  });
+
+  test("aggregation design and implementation plan are archived before executable guidance", () => {
+    expect(docsReadme).toContain("[`aggregation/DESIGN.md`](./aggregation/DESIGN.md)");
+    expect(docsReadme).toContain("Original 2026-04-24 event-aggregation design record");
+    expect(docsReadme).toContain("[`aggregation/PLAN.md`](./aggregation/PLAN.md)");
+    expect(docsReadme).toContain("Do not execute its checklist");
+
+    const designLead = aggregationDesign.slice(0, 700);
+    expect(designLead).toContain("Historical archive");
+    expect(designLead).toContain("not current implementation guidance");
+    expect(designLead).toContain("../architecture/ingestion.md");
+    expect(designLead.indexOf("Historical archive")).toBeLessThan(
+      designLead.indexOf("**Status:**"),
+    );
+
+    const planLead = aggregationPlan.slice(0, 700);
+    expect(planLead).toContain("Historical archive");
+    expect(planLead).toContain("not current implementation guidance");
+    expect(planLead).toContain("Do not execute this checklist");
+    expect(planLead).toContain("../architecture/ingestion.md");
+    expect(planLead.indexOf("Historical archive")).toBeLessThan(
+      planLead.indexOf("For agentic workers"),
+    );
   });
 
   test("AI HOT plan is routed as a shipped design record, not the runtime source", () => {

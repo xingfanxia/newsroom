@@ -58,7 +58,9 @@ export type FeedQuery = {
   excludeSourceTags?: string[];
   /** Inverse of excludeSourceTags — only return items whose source tags overlap this list. */
   includeSourceTags?: string[];
-  /** Event-aggregation view semantics (see docs/aggregation/DESIGN.md §7).
+  /** Event-aggregation view semantics. Historical rationale lives in
+   *  docs/aggregation/DESIGN.md §7; current behavior is this module plus
+   *  docs/architecture/ingestion.md.
    *   'today'   = trending: events with firstSeenAt today OR latestMemberAt
    *               within hotWindowHours, plus fresh singletons from today.
    *               Ordered by latestMemberAt DESC then importance DESC.

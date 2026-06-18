@@ -1,5 +1,11 @@
 # Cross-Source Event Aggregation — Implementation Plan
 
+> **Historical archive.** This completed 2026-04-24 implementation plan is not current implementation guidance.
+> Do not execute this checklist as current work.
+> Current clustering, cron, and feed behavior lives in
+> [`../architecture/ingestion.md`](../architecture/ingestion.md); runtime source
+> files remain authoritative.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task. Fresh subagent per task, two-stage review (spec-compliance + quality) between tasks, parallel worktree dispatch in Waves 2 & 4.
 
 **Goal:** Promote `clusters` to first-class editorial events with LLM-arbitrated membership, canonical titles, event-level commentary, coverage-boosted importance, and a two-view reader experience (trending-today + archive) — gated on offline backtest.

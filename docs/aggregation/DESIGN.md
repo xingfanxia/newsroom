@@ -1,5 +1,11 @@
 # Cross-Source Event Aggregation — Design
 
+> **Historical archive.** This document preserves the original 2026-04-24
+> event-aggregation design record. It is not current implementation guidance.
+> Current clustering, cron, and feed behavior lives in
+> [`../architecture/ingestion.md`](../architecture/ingestion.md); runtime source
+> files remain authoritative.
+
 > **Status:** approved 2026-04-24 (autonomous execution green-lit by user)
 > **Seed:** `docs/HANDOFF-AGGREGATION.md` (prior-session design sketch)
 > **Scope:** Tier 4 / big-bang one-PR ship, gated by offline backtest
