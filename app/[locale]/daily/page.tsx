@@ -8,13 +8,14 @@ import {
   listDailyColumnRows,
 } from "@/lib/api/daily-columns";
 import { formatCoarseRelativeTime } from "@/lib/time/relative";
+import { appLocaleFromParam } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 const PAGE_SIZE = 60;
 
 type Props = {
-  params: Promise<{ locale: "zh" | "en" }>;
+  params: Promise<{ locale: string }>;
   searchParams: Promise<{ p?: string }>;
 };
 
@@ -44,11 +45,12 @@ export default async function DailyLandingPage({
   searchParams,
 }: Props) {
   const { locale } = await params;
-  setRequestLocale(locale);
+  const appLocale = appLocaleFromParam(locale);
+  setRequestLocale(appLocale);
   const { p } = await searchParams;
   const page = Math.max(1, Number(p ?? "1"));
   const offset = (page - 1) * PAGE_SIZE;
-  const isZh = locale === "zh";
+  const isZh = appLocale === "zh";
 
   const [rows, chrome] = await Promise.all([
     isZh
@@ -59,7 +61,7 @@ export default async function DailyLandingPage({
 
   return (
     <ViewShell
-      locale={locale as "en" | "zh"}
+      locale={appLocale}
       stats={chrome.topBarStats}
       pulse={chrome.pulse}
       crumb="~/daily"

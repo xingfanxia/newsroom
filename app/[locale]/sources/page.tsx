@@ -5,6 +5,7 @@ import { SOURCE_GROUP_LABELS, SOURCE_GROUPS } from "@/lib/sources/groups";
 import { getLiveSources, liveSourcesByGroup } from "@/lib/sources/live";
 import { getShellChromeData } from "@/lib/shell/chrome-data";
 import { SourcesViewToggle, type SourcesView } from "./_view-toggle";
+import { appLocaleFromParam } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,8 @@ export default async function SourcesPage({
   searchParams: Promise<{ view?: string }>;
 }) {
   const [{ locale }, sp] = await Promise.all([params, searchParams]);
-  setRequestLocale(locale);
+  const appLocale = appLocaleFromParam(locale);
+  setRequestLocale(appLocale);
   const view: SourcesView = sp.view === "cards" ? "cards" : "table";
 
   const [live, chrome] = await Promise.all([
@@ -31,7 +33,7 @@ export default async function SourcesPage({
 
   return (
     <ViewShell
-      locale={locale as "en" | "zh"}
+      locale={appLocale}
       stats={chrome.topBarStats}
       pulse={chrome.pulse}
       crumb="~/sources"
@@ -138,13 +140,13 @@ export default async function SourcesPage({
                           <div
                             style={{
                               fontFamily:
-                                locale === "zh"
+                                appLocale === "zh"
                                   ? "var(--font-sans-cjk)"
                                   : "var(--font-mono)",
                               color: "var(--fg-1)",
                             }}
                           >
-                            {locale === "zh" ? s.name.zh : s.name.en}
+                            {appLocale === "zh" ? s.name.zh : s.name.en}
                           </div>
                           <div style={{ color: "var(--fg-3)", fontSize: 10.5 }}>
                             {s.kind} · {s.locale} · {s.cadence}
@@ -200,12 +202,12 @@ export default async function SourcesPage({
                                   color: "var(--fg-3)",
                                   fontSize: 11,
                                   fontFamily:
-                                    locale === "zh"
+                                    appLocale === "zh"
                                       ? "var(--font-sans-cjk)"
                                       : "var(--font-mono)",
                                 }}
                               >
-                                {locale === "zh" ? s.name.zh : s.name.en}
+                                {appLocale === "zh" ? s.name.zh : s.name.en}
                               </div>
                             </td>
                             <td style={cellStyle}>{s.kind}</td>

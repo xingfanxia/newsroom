@@ -23,6 +23,7 @@ import {
   ITERATION_FAILED_STATUS,
   ITERATION_IDLE_STATUS,
   ITERATION_PROPOSED_STATUS,
+  appLocaleFromParam,
   isIterationStatus,
   type IterationRunnerStatus,
 } from "@/lib/types";
@@ -42,13 +43,14 @@ export default async function IterationsPage({
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
-  setRequestLocale(locale);
+  const appLocale = appLocaleFromParam(locale);
+  setRequestLocale(appLocale);
   const t = await getTranslations("iteration");
   const trm = await getTranslations("iteration.metrics");
 
   const [counts, recent, skill, history, latestRun, chrome] = await Promise.all([
     getFeedbackCounts(),
-    getRecentFeedback(locale === "en" ? "en" : "zh", 10),
+    getRecentFeedback(appLocale, 10),
     getActiveSkill(SKILL_NAME),
     listSkillVersions(SKILL_NAME),
     getLatestIterationRun(SKILL_NAME),
@@ -72,14 +74,14 @@ export default async function IterationsPage({
   const currentVersion = history[0] ?? null;
   const committedDate = currentVersion
     ? new Date(currentVersion.committedAt).toLocaleDateString(
-        locale === "zh" ? "zh-CN" : "en-US",
+        appLocale === "zh" ? "zh-CN" : "en-US",
         { year: "numeric", month: "2-digit", day: "2-digit" },
       )
     : "";
 
   return (
     <ViewShell
-      locale={locale as "en" | "zh"}
+      locale={appLocale}
       stats={chrome.topBarStats}
       crumb="~/admin/iterations"
       cmd="git log --oneline editorial.skill.md"
@@ -203,7 +205,7 @@ export default async function IterationsPage({
             </div>
             <div className="bd" style={{ padding: 18 }}>
               <VersionTimeline
-                locale={locale as "en" | "zh"}
+                locale={appLocale}
                 versions={history.map((v) => ({
                   version: v.version,
                   committedAt: new Date(v.committedAt).toISOString(),

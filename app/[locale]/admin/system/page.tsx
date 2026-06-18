@@ -5,6 +5,7 @@ import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
 import { getShellChromeData } from "@/lib/shell/chrome-data";
 import { getSystemSnapshot } from "@/lib/shell/system-stats";
+import { appLocaleFromParam } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -28,8 +29,9 @@ export default async function SystemPage({
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
-  setRequestLocale(locale);
-  const zh = locale === "zh";
+  const appLocale = appLocaleFromParam(locale);
+  setRequestLocale(appLocale);
+  const zh = appLocale === "zh";
 
   const [snap, chrome] = await Promise.all([
     getSystemSnapshot(),
@@ -45,7 +47,7 @@ export default async function SystemPage({
 
   return (
     <ViewShell
-      locale={locale as "en" | "zh"}
+      locale={appLocale}
       stats={chrome.topBarStats}
       crumb="~/admin/system"
       cmd="htop -u ax-radar && tail -f /var/log/ax/*.log"

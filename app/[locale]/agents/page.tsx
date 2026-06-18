@@ -6,6 +6,7 @@ import { getShellChromeData } from "@/lib/shell/chrome-data";
 import { AgentsTabs } from "./_tabs";
 import { PUBLIC_ENDPOINT_COUNT } from "@/lib/api/public-endpoint-config";
 import { publicUrl } from "@/lib/site";
+import { appLocaleFromParam } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -21,13 +22,14 @@ export default async function AgentsPage({
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
-  setRequestLocale(locale);
+  const appLocale = appLocaleFromParam(locale);
+  setRequestLocale(appLocale);
 
   const chrome = await getShellChromeData({ pulse: true });
 
   return (
     <ViewShell
-      locale={locale as "en" | "zh"}
+      locale={appLocale}
       stats={chrome.topBarStats}
       pulse={chrome.pulse}
       crumb="~/agents"

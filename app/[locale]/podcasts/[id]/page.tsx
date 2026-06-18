@@ -7,6 +7,7 @@ import { YouTubeEmbed, extractYouTubeId } from "@/components/podcasts/youtube-em
 import { ViewShell } from "@/components/shell/view-shell";
 import { getItemDetail } from "@/lib/items/detail";
 import { getShellChromeData } from "@/lib/shell/chrome-data";
+import { appLocaleFromParam } from "@/lib/types";
 
 // Re-render every 5 min — commentary + transcript only change via background
 // jobs, so there's no need to hit the DB on every navigation.
@@ -18,13 +19,14 @@ export default async function PodcastDetailPage({
   params: Promise<{ locale: string; id: string }>;
 }) {
   const { locale, id: idRaw } = await params;
-  setRequestLocale(locale);
+  const appLocale = appLocaleFromParam(locale);
+  setRequestLocale(appLocale);
 
   const id = Number.parseInt(idRaw, 10);
   if (!Number.isInteger(id) || id <= 0) notFound();
 
   const [detail, chrome] = await Promise.all([
-    getItemDetail(id, locale === "en" ? "en" : "zh"),
+    getItemDetail(id, appLocale),
     getShellChromeData(),
   ]);
   if (!detail) notFound();
@@ -35,14 +37,14 @@ export default async function PodcastDetailPage({
 
   return (
     <ViewShell
-      locale={locale as "en" | "zh"}
+      locale={appLocale}
       stats={chrome.topBarStats}
       crumb={`~/podcasts/${id}`}
       cmd={`cat ${id}.transcript.md`}
     >
       <main className="main" style={{ maxWidth: 860 }}>
         <Link
-          href={`/${locale}/podcasts`}
+          href={`/${appLocale}/podcasts`}
           className="nav-it"
           style={{
             width: "fit-content",
@@ -81,7 +83,7 @@ export default async function PodcastDetailPage({
         <h1
           style={{
             fontFamily:
-              locale === "zh" ? "var(--font-sans-cjk)" : "var(--font-mono)",
+              appLocale === "zh" ? "var(--font-sans-cjk)" : "var(--font-mono)",
             fontSize: 28,
             lineHeight: 1.25,
             letterSpacing: "-0.01em",
@@ -139,7 +141,7 @@ export default async function PodcastDetailPage({
                 marginBottom: 6,
               }}
             >
-              {locale === "zh" ? "一句话点评" : "editor take"}
+              {appLocale === "zh" ? "一句话点评" : "editor take"}
             </div>
             <p style={{ fontSize: 14, lineHeight: 1.7, color: "var(--fg-0)" }}>
               {story.editorNote}
@@ -160,7 +162,7 @@ export default async function PodcastDetailPage({
                 borderBottom: "1px dashed var(--border-1)",
               }}
             >
-              {locale === "zh" ? "锐评" : "sharp"}
+              {appLocale === "zh" ? "锐评" : "sharp"}
             </h2>
             <div style={{ color: "var(--fg-1)", fontSize: 14, lineHeight: 1.75 }}>
               <Prose>{story.editorAnalysis}</Prose>

@@ -317,6 +317,10 @@ Shipped cleanup:
   `lib/types.ts`; feed-like locale pages now normalize once and pass
   `AppLocale` through instead of repeating route-local `locale as "zh" | "en"`
   casts.
+- Extended normalized route-locale handling to the remaining locale page
+  leaves: admin, agents, sources, daily, login, and podcast detail pages now
+  call `appLocaleFromParam` once and pass `AppLocale` through local data
+  loading, links, and shell components.
 - Shared item tier, feed view, search mode, and source filter runtime tuples through
   `lib/types.ts`, so REST feed/search schemas, MCP feed/search input schemas,
   item/event commentary workers, score prompt parsing, and source filtering

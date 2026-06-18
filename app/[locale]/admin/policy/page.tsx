@@ -6,6 +6,7 @@ import { PolicyEditor } from "@/components/admin/policy-editor";
 import { getActiveSkill } from "@/lib/policy/skill";
 import { getShellChromeData } from "@/lib/shell/chrome-data";
 import { SKILL_NAME } from "@/workers/agent/iterate";
+import { appLocaleFromParam } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,8 @@ export default async function PolicyPage({
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
-  setRequestLocale(locale);
+  const appLocale = appLocaleFromParam(locale);
+  setRequestLocale(appLocale);
 
   let skill: Awaited<ReturnType<typeof getActiveSkill>> | null = null;
   let error: string | null = null;
@@ -28,7 +30,7 @@ export default async function PolicyPage({
 
   return (
     <ViewShell
-      locale={locale as "en" | "zh"}
+      locale={appLocale}
       stats={chrome.topBarStats}
       crumb="~/admin/policy"
       cmd="vi editorial.skill.md"
@@ -39,7 +41,7 @@ export default async function PolicyPage({
           cjk="精选策略"
           extra={
             <span>
-              {locale === "zh"
+              {appLocale === "zh"
                 ? "直接编辑会作为新版本提交，与 agent 迭代共用版本历史"
                 : "direct edits commit as a new version alongside agent iterations"}
             </span>

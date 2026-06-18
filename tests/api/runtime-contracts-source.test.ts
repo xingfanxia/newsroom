@@ -45,7 +45,18 @@ const allPage = read("app/[locale]/all/page.tsx");
 const curatedPage = read("app/[locale]/curated/page.tsx");
 const savedPage = read("app/[locale]/saved/page.tsx");
 const podcastsPage = read("app/[locale]/podcasts/page.tsx");
+const podcastDetailPage = read("app/[locale]/podcasts/[id]/page.tsx");
 const xMonitorPage = read("app/[locale]/x-monitor/page.tsx");
+const loginPage = read("app/[locale]/login/page.tsx");
+const agentsPage = read("app/[locale]/agents/page.tsx");
+const sourcesPage = read("app/[locale]/sources/page.tsx");
+const dailyPage = read("app/[locale]/daily/page.tsx");
+const dailyDatePage = read("app/[locale]/daily/[date]/page.tsx");
+const adminUsagePage = read("app/[locale]/admin/usage/page.tsx");
+const adminSystemPage = read("app/[locale]/admin/system/page.tsx");
+const adminPolicyPage = read("app/[locale]/admin/policy/page.tsx");
+const adminUsersPage = read("app/[locale]/admin/users/page.tsx");
+const adminIterationsPage = read("app/[locale]/admin/iterations/page.tsx");
 
 describe("runtime contract source wiring", () => {
   test("app locale language tags are centralized", () => {
@@ -105,11 +116,23 @@ describe("runtime contract source wiring", () => {
       curatedPage,
       savedPage,
       podcastsPage,
+      podcastDetailPage,
       xMonitorPage,
+      loginPage,
+      agentsPage,
+      sourcesPage,
+      dailyPage,
+      dailyDatePage,
+      adminUsagePage,
+      adminSystemPage,
+      adminPolicyPage,
+      adminUsersPage,
+      adminIterationsPage,
     ]) {
       expect(source).toContain("appLocaleFromParam");
       expect(source).toContain("const appLocale = appLocaleFromParam(locale)");
       expect(source).toContain("setRequestLocale(appLocale)");
+      expect(source).not.toContain("setRequestLocale(locale)");
       expect(source).not.toContain('locale as "zh" | "en"');
       expect(source).not.toContain('locale as "en" | "zh"');
     }

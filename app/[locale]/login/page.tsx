@@ -2,6 +2,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { LoginForm } from "@/components/auth/login-form";
 import { LocaleSwitcher } from "@/components/layout/locale-switcher";
 import { Logo } from "@/components/layout/logo";
+import { appLocaleFromParam, type AppLocale } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -22,11 +23,12 @@ export default async function LoginPage({
   searchParams: Promise<SearchParams>;
 }) {
   const { locale } = await params;
+  const appLocale = appLocaleFromParam(locale);
   const { next } = await searchParams;
-  setRequestLocale(locale);
+  setRequestLocale(appLocale);
   const t = await getTranslations("login");
 
-  const nextPath = sanitizeNext(Array.isArray(next) ? next[0] : next, locale);
+  const nextPath = sanitizeNext(Array.isArray(next) ? next[0] : next, appLocale);
 
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center px-6 py-10">
@@ -52,7 +54,7 @@ export default async function LoginPage({
 }
 
 /** Restrict `?next=` to same-origin rooted paths; block open-redirects. */
-function sanitizeNext(raw: string | undefined, locale: string): string {
+function sanitizeNext(raw: string | undefined, locale: AppLocale): string {
   if (!raw) return `/${locale}`;
   if (!raw.startsWith("/") || raw.startsWith("//")) return `/${locale}`;
   if (raw.startsWith("/api")) return `/${locale}`;

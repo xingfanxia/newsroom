@@ -17,6 +17,7 @@ import {
   usageRangeLabel,
 } from "@/lib/llm/usage-display";
 import { UsageBreakdownTables } from "./_usage-tables";
+import { appLocaleFromParam } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -38,9 +39,10 @@ export default async function UsagePage({
   searchParams: Promise<{ range?: string }>;
 }) {
   const [{ locale }, sp] = await Promise.all([params, searchParams]);
-  setRequestLocale(locale);
-  const zh = locale === "zh";
-  const usageLocale = zh ? "zh" : "en";
+  const appLocale = appLocaleFromParam(locale);
+  setRequestLocale(appLocale);
+  const zh = appLocale === "zh";
+  const usageLocale = appLocale;
   const range = usageWindowFromParam(sp.range);
 
   const [usage, chrome] = await Promise.all([
@@ -61,7 +63,7 @@ export default async function UsagePage({
 
   return (
     <ViewShell
-      locale={locale as "en" | "zh"}
+      locale={appLocale}
       stats={chrome.topBarStats}
       crumb="~/admin/usage"
       cmd="aws ce get-cost-and-usage --granularity DAILY"
