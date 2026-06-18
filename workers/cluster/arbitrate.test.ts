@@ -145,11 +145,17 @@ describe("runArbitrationBatch — keep verdict", () => {
     const mockDb = buildMockDbKeep();
 
     // Mock generateStructured to return keep verdict
-    const mockGenerateStructured = mock(async () => ({
-      data: { verdict: "keep" as const, reason: "same product launch" },
-      provider: "azure-deepseek" as const,
-      model: "DeepSeek-V4-Flash",
-    }));
+    const mockGenerateStructured = mock(async (args: unknown) => {
+      expect(args).toMatchObject({
+        task: "arbitrate",
+        schemaName: "ArbitrateVerdict",
+      });
+      return {
+        data: { verdict: "keep" as const, reason: "same product launch" },
+        provider: "azure-deepseek" as const,
+        model: "DeepSeek-V4-Flash",
+      };
+    });
 
     // Dynamically import using mocks — since we can't use module mocking directly
     // in bun:test without vi.mock, we test the inner logic by calling the arbitration

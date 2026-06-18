@@ -23,6 +23,7 @@ const collections: SavedCollection[] = [
 ];
 
 const story: SavedExportStory = {
+  id: "42",
   sourceId: "mit-tech-review",
   source: {
     publisher: "MIT Technology Review",

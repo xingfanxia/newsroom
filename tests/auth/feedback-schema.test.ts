@@ -54,13 +54,14 @@ describeOrSkip("feedback schema round-trip (real DB)", () => {
   });
 
   it("inserts up + down + save as three distinct rows for the same item+user", async () => {
-    if (itemId === null) return;
+    const existingItemId = itemId;
+    if (existingItemId === null) return;
     await db()
       .insert(schema.feedback)
       .values([
-        { itemId, userId: TEST_USER_ID, vote: "up" },
-        { itemId, userId: TEST_USER_ID, vote: "down" },
-        { itemId, userId: TEST_USER_ID, vote: "save" },
+        { itemId: existingItemId, userId: TEST_USER_ID, vote: "up" },
+        { itemId: existingItemId, userId: TEST_USER_ID, vote: "down" },
+        { itemId: existingItemId, userId: TEST_USER_ID, vote: "save" },
       ]);
 
     const rows = await db()
@@ -71,13 +72,14 @@ describeOrSkip("feedback schema round-trip (real DB)", () => {
   });
 
   it("rejects duplicate (item, user, vote) on the unique index", async () => {
-    if (itemId === null) return;
+    const existingItemId = itemId;
+    if (existingItemId === null) return;
     // drizzle's insert builder is thenable but not a Promise — wrap in an
     // async arrow so `rejects` sees a real Promise.
     await expect(async () => {
       await db()
         .insert(schema.feedback)
-        .values({ itemId, userId: TEST_USER_ID, vote: "up" });
+        .values({ itemId: existingItemId, userId: TEST_USER_ID, vote: "up" });
     }).toThrow();
   });
 
@@ -95,7 +97,8 @@ describeOrSkip("feedback schema round-trip (real DB)", () => {
   });
 
   it("cascades feedback deletion when the user is removed", async () => {
-    if (itemId === null) return;
+    const existingItemId = itemId;
+    if (existingItemId === null) return;
     // Delete the user; FK cascade should wipe the feedback rows.
     await db().delete(schema.users).where(eq(schema.users.id, TEST_USER_ID));
 
@@ -105,7 +108,7 @@ describeOrSkip("feedback schema round-trip (real DB)", () => {
       .where(
         and(
           eq(schema.feedback.userId, TEST_USER_ID),
-          eq(schema.feedback.itemId, itemId),
+          eq(schema.feedback.itemId, existingItemId),
         ),
       );
     expect(remaining).toHaveLength(0);

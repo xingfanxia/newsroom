@@ -5,6 +5,8 @@
 Current maintenance direction:
 - Start docs navigation from `docs/README.md`; historical plans/handoffs are useful context, not current implementation instructions.
 - `bun run lint` is expected to be clean with zero warnings.
+- `bun run typecheck` is expected to run standalone `tsc --noEmit` cleanly,
+  including tests and Bun runtime APIs.
 - `bun run code:dead` is the low-noise Knip gate for unused files/dependencies/unresolved imports and should exit cleanly. `bun run code:dead:exports` checks value exports and `bun run code:dead:types` checks type exports; both should stay clean.
 - `upsertAppUser(user)` upserts the effective user row, including API-token users, before FK-owned mutations.
 
@@ -13,6 +15,9 @@ Shipped cleanup:
 - Removed unused UI/source-row components, the unused Tavily integration stub, and unused direct package dependencies.
 - Removed/de-exported unused internal value exports across auth, i18n navigation, policy, rate-limit, utility, worker, X API, newsletter, normalizer, and cluster modules.
 - Removed/de-exported unused internal type-only exports in the LLM usage and facade modules.
+- Added a standalone `typecheck` script backed by `tsc --noEmit`, added Bun
+  runtime/test types, and aligned drifting test fixtures so agents can run a
+  TypeScript gate without relying on `next build` as the only type signal.
 - Replaced stale `tsx` operator-script hints with `bun`.
 - Shared resumable operator state-file path/load/save behavior through
   `scripts/ops/state.ts`; backfill scripts keep their own state shape but no
@@ -490,8 +495,10 @@ Verification already run:
 - `bun run build` — passed, route list has no `/papers`.
 - Dry runs after backfill: `backfill-style`, `backfill-chinese`, `backfill-daily-columns`, and `cleanup-paper-sources` all returned zero pending targets.
 
-Known caveat:
-- `bunx tsc --noEmit` still fails because repo test typing does not expose `bun:test` types and an existing `tests/auth/feedback-schema.test.ts` Drizzle nullable fixture issue remains. `next build` type-checking passes.
+Typecheck gate:
+- `bun run typecheck` now passes and covers tests plus Bun runtime APIs. Keep
+  this gate green alongside `next build`; do not reintroduce fixture drift that
+  only `bun test` happens to tolerate at runtime.
 
 ---
 
