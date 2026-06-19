@@ -4,6 +4,7 @@ import {
   NAV_MOBILE_TABS,
   NAV_PRIMARY,
   activeNavId,
+  navHrefForLocale,
 } from "@/lib/shell/nav-data";
 
 describe("activeNavId", () => {
@@ -104,5 +105,11 @@ describe("nav data shape", () => {
     expect(NAV_MOBILE_TABS.find((tab) => tab.id === "xmonitor")?.cjk).toBe(
       "监控",
     );
+  });
+
+  it("builds locale-prefixed nav hrefs in one helper", () => {
+    expect(navHrefForLocale("zh", "/")).toBe("/zh");
+    expect(navHrefForLocale("en", "/saved")).toBe("/en/saved");
+    expect(navHrefForLocale("zh", "#")).toBe("#");
   });
 });

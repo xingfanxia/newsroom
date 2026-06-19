@@ -8,6 +8,7 @@ import {
   NAV_MOBILE_TABS,
   NAV_PRIMARY,
   activeNavId,
+  navHrefForLocale,
 } from "@/lib/shell/nav-data";
 import type { AppLocale } from "@/lib/types";
 
@@ -19,9 +20,6 @@ export function MobileChrome({ locale }: { locale: AppLocale }) {
   const { tweaks, setOpen: setTweakOpen } = useTweaks();
   const lang = tweaks.language;
   const showEn = lang === "en";
-
-  const hrefFor = (href: string) =>
-    href === "#" ? "#" : `/${locale}${href === "/" ? "" : href}`;
 
   return (
     <>
@@ -51,7 +49,7 @@ export function MobileChrome({ locale }: { locale: AppLocale }) {
           return (
             <Link
               key={t.id}
-              href={hrefFor(t.href)}
+              href={navHrefForLocale(locale, t.href)}
               className={`m-tab ${isActive ? "on" : ""}`}
             >
               <span className="ic">
@@ -98,7 +96,7 @@ export function MobileChrome({ locale }: { locale: AppLocale }) {
             {NAV_PRIMARY.map((n) => (
               <Link
                 key={n.id}
-                href={hrefFor(n.href)}
+                href={navHrefForLocale(locale, n.href)}
                 className={`opt ${activeId === n.id ? "on" : ""}`}
                 onClick={() => setOpen(false)}
               >
@@ -114,7 +112,7 @@ export function MobileChrome({ locale }: { locale: AppLocale }) {
             {NAV_ADMIN.map((n) => (
               <Link
                 key={n.id}
-                href={hrefFor(n.href)}
+                href={navHrefForLocale(locale, n.href)}
                 className={`opt ${activeId === n.id ? "on" : ""}`}
                 onClick={() => setOpen(false)}
               >

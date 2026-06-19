@@ -86,6 +86,8 @@ Shipped cleanup:
 - Centralized mobile bottom-tab nav values in `NAV_MOBILE_TABS`, deriving route
   tabs from `NAV_PRIMARY` so desktop rail, mobile drawer, and mobile tab links
   cannot drift on core route hrefs.
+- Shared shell nav href construction through `navHrefForLocale`, so desktop
+  rail and mobile chrome no longer duplicate locale-prefix and `#` handling.
 - Reused `APP_LOCALES` for tweak language options, so browser preferences and
   API tweak validation cannot drift from app route locales.
 - Centralized `AppLocale` to BCP-47 language-tag mapping in

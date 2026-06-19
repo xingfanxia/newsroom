@@ -5,7 +5,12 @@ import { BrandLogo } from "./brand-logo";
 import { PulseBox, type PulsePoint } from "./pulse-box";
 import { SourcePicker } from "./source-picker";
 import { useTweaks } from "@/hooks/use-tweaks";
-import { NAV_ADMIN, NAV_PRIMARY, activeNavId } from "@/lib/shell/nav-data";
+import {
+  NAV_ADMIN,
+  NAV_PRIMARY,
+  activeNavId,
+  navHrefForLocale,
+} from "@/lib/shell/nav-data";
 import type { AppLocale } from "@/lib/types";
 
 /** Left-rail nav. Bilingual, active-aware, with a pulse-chart + site-config entry. */
@@ -22,8 +27,6 @@ export function LeftRail({
   const lang = tweaks.language;
   const showEn = lang === "en";
   const showZh = lang === "zh";
-
-  const hrefFor = (href: string) => `/${locale}${href === "/" ? "" : href}`;
 
   return (
     <aside className="rail-l scroll-dark">
@@ -53,7 +56,7 @@ export function LeftRail({
         return (
           <Link
             key={n.id}
-            href={hrefFor(n.href)}
+            href={navHrefForLocale(locale, n.href)}
             className={`nav-it ${active ? "on" : ""}`}
           >
             <span className="dot-marker" />
@@ -82,7 +85,7 @@ export function LeftRail({
         return (
           <Link
             key={n.id}
-            href={hrefFor(n.href)}
+            href={navHrefForLocale(locale, n.href)}
             className={`nav-it ${active ? "on" : ""}`}
           >
             <span className="dot-marker" />

@@ -11,7 +11,9 @@ describe("mobile chrome nav source wiring", () => {
     expect(navData).toContain('mobileTabFromPrimaryNav("xmonitor")');
     expect(navData).toContain('mobileTabFromPrimaryNav("saved")');
     expect(mobileChrome).toContain("NAV_MOBILE_TABS");
+    expect(mobileChrome).toContain("navHrefForLocale");
     expect(mobileChrome).not.toContain("const TABS");
+    expect(mobileChrome).not.toContain("const hrefFor");
     expect(mobileChrome).not.toContain('href: "/x-monitor"');
     expect(mobileChrome).not.toContain('cn: "监控"');
   });

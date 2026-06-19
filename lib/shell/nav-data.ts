@@ -2,7 +2,7 @@
  * Left-rail + mobile-drawer navigation data. Bilingual labels resolved at
  * render time from the tweaks.language setting (EN or 中文).
  */
-import { stripAppLocalePathPrefix } from "@/lib/types";
+import { stripAppLocalePathPrefix, type AppLocale } from "@/lib/types";
 
 export type NavItem = {
   id: string;
@@ -67,6 +67,10 @@ export const NAV_MOBILE_TABS: NavItem[] = [
   mobileTabFromPrimaryNav("saved"),
   { id: "more", href: "#", label: "more", cjk: "更多" },
 ];
+
+export function navHrefForLocale(locale: AppLocale, href: string): string {
+  return href === "#" ? "#" : `/${locale}${href === "/" ? "" : href}`;
+}
 
 /** Active nav id derivation from the current pathname (locale-stripped). */
 export function activeNavId(pathname: string): string | null {
