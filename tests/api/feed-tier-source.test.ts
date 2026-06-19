@@ -14,6 +14,7 @@ const mcpRoute = readSource("app/api/mcp/route.ts");
 const sourcePresets = readSource("app/[locale]/_source-presets.ts");
 const homeFilterContracts = readSource("lib/feed/home-filters.ts");
 const homeFilters = readSource("app/[locale]/_home-filters.tsx");
+const podcastsPage = readSource("app/[locale]/podcasts/page.tsx");
 const storyItemFields = readSource("lib/api/story-item-fields.ts");
 const leadPick = readSource("workers/cluster/lead-pick.ts");
 const recomputeClusterLeads = readSource(
@@ -161,6 +162,15 @@ describe("feed tier/view source wiring", () => {
     expect(homePage).not.toContain("function coerceTier");
     expect(homePage).not.toContain("function coerceView");
     expect(allPage).toContain("DEFAULT_HOME_TIER");
+  });
+
+  test("podcast tier controls derive from shared contracts", () => {
+    expect(podcastsPage).toContain("@/lib/feed/podcast-filters");
+    expect(podcastsPage).toContain("coercePodcastTier");
+    expect(podcastsPage).toContain("DEFAULT_PODCAST_TIER");
+    expect(podcastsPage).toContain("PODCAST_TIERS.map");
+    expect(podcastsPage).not.toContain('type PodTier = "featured" | "all"');
+    expect(podcastsPage).not.toContain('sp.tier === "all" ? "all" : "featured"');
   });
 
   test("internal feed and commentary contracts use shared tier types", () => {

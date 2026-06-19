@@ -5,6 +5,12 @@ import { Item } from "@/components/feed/item";
 import { FeedEmptyState } from "@/components/feed/empty-state";
 import { DayBreak } from "../_day-break";
 import { groupByDay, sortStoriesNewestFirst } from "@/lib/feed/group-by-day";
+import {
+  coercePodcastTier,
+  DEFAULT_PODCAST_TIER,
+  PODCAST_TIERS,
+  type PodcastTier,
+} from "@/lib/feed/podcast-filters";
 import { PodcastChannelPills } from "./_channel-pills";
 import { getFeaturedStories } from "@/lib/items/live";
 import { getShellChromeData } from "@/lib/shell/chrome-data";
@@ -13,7 +19,15 @@ import { appLocaleFromParam, type AppLocale, type Story } from "@/lib/types";
 
 export const revalidate = 60;
 
-type PodTier = "featured" | "all";
+const PODCAST_TIER_LABELS = {
+  featured: { en: "featured", zh: "精选" },
+  all: { en: "all", zh: "全部" },
+} as const satisfies Record<PodcastTier, { en: string; zh: string }>;
+
+const PODCAST_TIER_NOTES = {
+  featured: { en: "curated only", zh: "仅精选" },
+  all: { en: "includes low-score", zh: "含低分剧集" },
+} as const satisfies Record<PodcastTier, { en: string; zh: string }>;
 
 export default async function PodcastsPage({
   params,
@@ -25,7 +39,7 @@ export default async function PodcastsPage({
   const [{ locale }, sp] = await Promise.all([params, searchParams]);
   const appLocale = appLocaleFromParam(locale);
   setRequestLocale(appLocale);
-  const activeTier: PodTier = sp.tier === "all" ? "all" : "featured";
+  const activeTier: PodcastTier = coercePodcastTier(sp.tier);
 
   const [channels, chrome] = await Promise.all([
     getPodcastChannels().catch(() => []),
@@ -135,15 +149,15 @@ function TierPills({
   activeChannel,
   locale,
 }: {
-  activeTier: PodTier;
+  activeTier: PodcastTier;
   activeChannel: string | null;
   locale: AppLocale;
 }) {
   const zh = locale === "zh";
-  const build = (tier: PodTier) => {
+  const build = (tier: PodcastTier) => {
     const qs = new URLSearchParams();
     if (activeChannel) qs.set("source", activeChannel);
-    if (tier === "all") qs.set("tier", "all");
+    if (tier !== DEFAULT_PODCAST_TIER) qs.set("tier", tier);
     const s = qs.toString();
     return `/${locale}/podcasts${s ? `?${s}` : ""}`;
   };
@@ -167,20 +181,19 @@ function TierPills({
       >
         {zh ? "筛选" : "tier"}
       </span>
-      <a
-        href={build("featured")}
-        className="day-pill"
-        data-active={activeTier === "featured" ? "true" : "false"}
-      >
-        <span className="d">{zh ? "精选" : "featured"}</span>
-      </a>
-      <a
-        href={build("all")}
-        className="day-pill"
-        data-active={activeTier === "all" ? "true" : "false"}
-      >
-        <span className="d">{zh ? "全部" : "all"}</span>
-      </a>
+      {PODCAST_TIERS.map((tier) => {
+        const label = PODCAST_TIER_LABELS[tier];
+        return (
+          <a
+            key={tier}
+            href={build(tier)}
+            className="day-pill"
+            data-active={activeTier === tier ? "true" : "false"}
+          >
+            <span className="d">{zh ? label.zh : label.en}</span>
+          </a>
+        );
+      })}
       <span
         style={{
           marginLeft: 8,
@@ -190,12 +203,8 @@ function TierPills({
         }}
       >
         {zh
-          ? activeTier === "all"
-            ? "含低分剧集"
-            : "仅精选"
-          : activeTier === "all"
-            ? "includes low-score"
-            : "curated only"}
+          ? PODCAST_TIER_NOTES[activeTier].zh
+          : PODCAST_TIER_NOTES[activeTier].en}
       </span>
     </div>
   );

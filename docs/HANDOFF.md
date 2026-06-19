@@ -372,6 +372,9 @@ Shipped cleanup:
 - Shared home feed tier/view defaults through `lib/feed/home-filters.ts`, so
   the server query parser, home filter UI, all-posts source filter reuse, and
   calendar count filter cannot drift on `featured|p1` or `today|daily`.
+- Shared podcast feed tier defaults/coercion through
+  `lib/feed/podcast-filters.ts`, so `/podcasts` no longer carries a local
+  `featured|all` tier union or query parser.
 - Shared public/agent API item source-field types and cluster lead-pick source
   authority types through `SourceGroup` / `SourceKind` from `lib/types.ts`;
   the archived s9 MCP plan is now labeled historical so old enum examples
