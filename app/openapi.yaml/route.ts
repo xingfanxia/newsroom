@@ -18,6 +18,14 @@ import {
   VISIBLE_ITEM_TIERS,
 } from "@/lib/types";
 import { publicRateLimitPerIpLabel } from "@/lib/api/public-endpoint-config";
+import {
+  DEFAULT_API_FEED_LOCALE,
+  DEFAULT_FEED_HOT_WINDOW_HOURS,
+  DEFAULT_FEED_LIMIT,
+  DEFAULT_FEED_OFFSET,
+  DEFAULT_FEED_TIER,
+  DEFAULT_FEED_VIEW,
+} from "@/lib/feed/query-defaults";
 import { PUBLIC_SITE_URL, publicUrl } from "@/lib/site";
 
 function yamlInlineEnum(values: readonly (string | null)[]): string {
@@ -82,12 +90,13 @@ paths:
       description: |
         Returns the importance-sorted feed of curated AI items. Each row is
         a singleton article OR a multi-source EVENT (use \`cluster_id\` +
-        \`/events/{id}/members\` to drill in). Default returns today's hot
-        signal (\`tier=featured\`, \`view=today\`).
+        \`/events/{id}/members\` to drill in). Default returns the featured
+        archive feed (\`tier=${DEFAULT_FEED_TIER}\`, \`view=${DEFAULT_FEED_VIEW}\`).
+        Set \`view=today\` for the hot/recent event window.
       parameters:
-        - { name: tier, in: query, schema: { type: string, enum: ${VISIBLE_ITEM_TIER_ENUM}, default: featured } }
-        - { name: view, in: query, schema: { type: string, enum: ${FEED_VIEW_ENUM}, default: archive } }
-        - { name: hot_window_hours, in: query, schema: { type: integer, minimum: 1, maximum: 168, default: 24 } }
+        - { name: tier, in: query, schema: { type: string, enum: ${VISIBLE_ITEM_TIER_ENUM}, default: ${DEFAULT_FEED_TIER} } }
+        - { name: view, in: query, schema: { type: string, enum: ${FEED_VIEW_ENUM}, default: ${DEFAULT_FEED_VIEW} } }
+        - { name: hot_window_hours, in: query, schema: { type: integer, minimum: 1, maximum: 168, default: ${DEFAULT_FEED_HOT_WINDOW_HOURS} } }
         - { name: date, in: query, schema: { type: string, pattern: '^\\d{4}-\\d{2}-\\d{2}$' } }
         - { name: date_from, in: query, schema: { type: string, format: date-time } }
         - { name: date_to, in: query, schema: { type: string, format: date-time } }
@@ -97,9 +106,9 @@ paths:
         - { name: curated_only, in: query, schema: { type: string, enum: ['true', 'false', '1', '0'] }, description: "Limit to AX 严选 / curated sources only" }
         - { name: include_source_tags, in: query, schema: { type: string }, description: "Comma-separated source tag list" }
         - { name: exclude_source_tags, in: query, schema: { type: string } }
-        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 40 } }
-        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
-        - { name: locale, in: query, schema: { type: string, enum: ${APP_LOCALE_ENUM}, default: en } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: ${DEFAULT_FEED_LIMIT} } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: ${DEFAULT_FEED_OFFSET} } }
+        - { name: locale, in: query, schema: { type: string, enum: ${APP_LOCALE_ENUM}, default: ${DEFAULT_API_FEED_LOCALE} } }
       responses:
         '200':
           description: OK

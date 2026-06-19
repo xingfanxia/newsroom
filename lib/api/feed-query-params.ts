@@ -1,5 +1,13 @@
 import { z } from "zod";
 import { parseQueryParams } from "@/lib/api/query-params";
+import {
+  DEFAULT_API_FEED_LOCALE,
+  DEFAULT_FEED_HOT_WINDOW_HOURS,
+  DEFAULT_FEED_LIMIT,
+  DEFAULT_FEED_OFFSET,
+  DEFAULT_FEED_TIER,
+  DEFAULT_FEED_VIEW,
+} from "@/lib/feed/query-defaults";
 import type { FeedQuery } from "@/lib/items/live";
 import {
   APP_LOCALES,
@@ -30,15 +38,15 @@ function makeFeedQueryParamSchema(options: {
   defaultLimit: number;
 }) {
   return z.object({
-    tier: z.enum(VISIBLE_ITEM_TIERS).optional().default("featured"),
-    view: z.enum(FEED_VIEWS).optional().default("archive"),
+    tier: z.enum(VISIBLE_ITEM_TIERS).optional().default(DEFAULT_FEED_TIER),
+    view: z.enum(FEED_VIEWS).optional().default(DEFAULT_FEED_VIEW),
     hot_window_hours: z.coerce
       .number()
       .int()
       .min(1)
       .max(168)
       .optional()
-      .default(24),
+      .default(DEFAULT_FEED_HOT_WINDOW_HOURS),
     date: ymdSchema,
     date_from: z.string().datetime().optional(),
     date_to: z.string().datetime().optional(),
@@ -49,8 +57,13 @@ function makeFeedQueryParamSchema(options: {
     exclude_source_tags: z.string().min(1).optional(),
     include_source_tags: z.string().min(1).optional(),
     limit: limitParamSchema(options.maxLimit, options.defaultLimit),
-    offset: z.coerce.number().int().min(0).optional().default(0),
-    locale: z.enum(APP_LOCALES).optional().default("en"),
+    offset: z.coerce
+      .number()
+      .int()
+      .min(0)
+      .optional()
+      .default(DEFAULT_FEED_OFFSET),
+    locale: z.enum(APP_LOCALES).optional().default(DEFAULT_API_FEED_LOCALE),
   });
 }
 
@@ -76,12 +89,12 @@ function makeSearchQueryParamSchema(options: {
 
 export const v1FeedQueryParamSchema = makeFeedQueryParamSchema({
   maxLimit: 500,
-  defaultLimit: 40,
+  defaultLimit: DEFAULT_FEED_LIMIT,
 });
 
 export const publicFeedQueryParamSchema = makeFeedQueryParamSchema({
   maxLimit: 100,
-  defaultLimit: 40,
+  defaultLimit: DEFAULT_FEED_LIMIT,
 });
 
 export const v1SearchQueryParamSchema = makeSearchQueryParamSchema({
@@ -225,10 +238,10 @@ export function feedQueryFromParams(q: FeedQueryParams): FeedQuery {
 
 export function feedQueryFromMcpToolArgs(args: McpFeedToolInput): FeedQuery {
   return {
-    tier: args.tier ?? "featured",
-    locale: args.locale ?? "en",
-    limit: args.limit ?? 40,
-    offset: args.offset ?? 0,
+    tier: args.tier ?? DEFAULT_FEED_TIER,
+    locale: args.locale ?? DEFAULT_API_FEED_LOCALE,
+    limit: args.limit ?? DEFAULT_FEED_LIMIT,
+    offset: args.offset ?? DEFAULT_FEED_OFFSET,
     sourceId: args.source_id,
     sourceGroup: args.source_group,
     sourceKind: args.source_kind,
@@ -236,8 +249,8 @@ export function feedQueryFromMcpToolArgs(args: McpFeedToolInput): FeedQuery {
     dateFrom: args.date_from,
     dateTo: args.date_to,
     includeSourceGroup: true,
-    view: args.view ?? "archive",
-    hotWindowHours: args.hot_window_hours ?? 24,
+    view: args.view ?? DEFAULT_FEED_VIEW,
+    hotWindowHours: args.hot_window_hours ?? DEFAULT_FEED_HOT_WINDOW_HOURS,
     curatedOnly: args.curated_only || undefined,
     excludeSourceTags: args.exclude_source_tags,
     includeSourceTags: args.include_source_tags,

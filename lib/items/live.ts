@@ -1,6 +1,14 @@
 import { and, eq, sql, isNotNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items, sources, clusters } from "@/db/schema";
+import {
+  DEFAULT_FEED_HOT_WINDOW_HOURS,
+  DEFAULT_FEED_LIMIT,
+  DEFAULT_FEED_OFFSET,
+  DEFAULT_FEED_TIER,
+  DEFAULT_FEED_VIEW,
+  DEFAULT_STORY_FEED_LOCALE,
+} from "@/lib/feed/query-defaults";
 import { highlightTierInSql } from "@/lib/items/tier-sql";
 import {
   eventStorySelectFields,
@@ -99,9 +107,9 @@ export type FeedQuery = {
  * actually-returned rows.
  */
 function buildFeedWhere(q: FeedQuery) {
-  const tier: VisibleItemTier = q.tier ?? "featured";
-  const view = q.view ?? "archive";
-  const hotH = q.hotWindowHours ?? 24;
+  const tier: VisibleItemTier = q.tier ?? DEFAULT_FEED_TIER;
+  const view = q.view ?? DEFAULT_FEED_VIEW;
+  const hotH = q.hotWindowHours ?? DEFAULT_FEED_HOT_WINDOW_HOURS;
 
   // Event-aware tier filter: prefer cluster.event_tier when the item is part of
   // a cluster (multi-member events get their own tier from coverage boost +
@@ -247,8 +255,8 @@ function buildFeedWhere(q: FeedQuery) {
  * Only one item per cluster (the lead), with memberCount surfaced as crossSourceCount.
  */
 export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
-  const limit = q.limit ?? 40;
-  const offset = q.offset ?? 0;
+  const limit = q.limit ?? DEFAULT_FEED_LIMIT;
+  const offset = q.offset ?? DEFAULT_FEED_OFFSET;
   const client = db();
 
   // Default ordering: lead's published_at first (so old still-developing events
@@ -309,14 +317,15 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
       })()
     : rows;
 
-  const hotWindowMs = (q.hotWindowHours ?? 24) * 3_600_000;
+  const hotWindowMs =
+    (q.hotWindowHours ?? DEFAULT_FEED_HOT_WINDOW_HOURS) * 3_600_000;
   const now = Date.now();
   const startOfTodayMs = (() => {
     const d = new Date();
     d.setUTCHours(0, 0, 0, 0);
     return d.getTime();
   })();
-  const locale = q.locale ?? "zh";
+  const locale = q.locale ?? DEFAULT_STORY_FEED_LOCALE;
 
   return dedupedRows.map((r): Story =>
     toStory(r, {

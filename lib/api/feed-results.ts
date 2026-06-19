@@ -4,6 +4,11 @@ import {
   type FeedQuery,
 } from "@/lib/items/live";
 import {
+  DEFAULT_FEED_LIMIT,
+  DEFAULT_FEED_OFFSET,
+  DEFAULT_FEED_VIEW,
+} from "@/lib/feed/query-defaults";
+import {
   toPublicApiItem,
   type PublicApiItem,
 } from "@/lib/api/public-items";
@@ -51,9 +56,9 @@ export async function runFeedQuery(
   return {
     items,
     total,
-    limit: feedQuery.limit ?? 40,
-    offset: feedQuery.offset ?? 0,
-    view: feedQuery.view ?? "archive",
+    limit: feedQuery.limit ?? DEFAULT_FEED_LIMIT,
+    offset: feedQuery.offset ?? DEFAULT_FEED_OFFSET,
+    view: feedQuery.view ?? DEFAULT_FEED_VIEW,
   };
 }
 
