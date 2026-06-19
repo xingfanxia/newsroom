@@ -26,6 +26,13 @@ import {
   DEFAULT_FEED_TIER,
   DEFAULT_FEED_VIEW,
 } from "@/lib/feed/query-defaults";
+import {
+  DEFAULT_API_SEARCH_LOCALE,
+  DEFAULT_SEARCH_LIMIT,
+  DEFAULT_SEARCH_MODE,
+  DEFAULT_SEARCH_OFFSET,
+  DEFAULT_SEARCH_TIER,
+} from "@/lib/search/query-defaults";
 import { PUBLIC_SITE_URL, publicUrl } from "@/lib/site";
 
 function yamlInlineEnum(values: readonly (string | null)[]): string {
@@ -159,16 +166,16 @@ paths:
         (${SEARCH_RATE_LIMIT_PER_IP}) due to LLM cost.
       parameters:
         - { name: q, in: query, required: true, schema: { type: string, minLength: 1 } }
-        - { name: mode, in: query, schema: { type: string, enum: ${SEARCH_MODE_ENUM}, default: lexical } }
-        - { name: tier, in: query, schema: { type: string, enum: ${VISIBLE_ITEM_TIER_ENUM}, default: all } }
+        - { name: mode, in: query, schema: { type: string, enum: ${SEARCH_MODE_ENUM}, default: ${DEFAULT_SEARCH_MODE} } }
+        - { name: tier, in: query, schema: { type: string, enum: ${VISIBLE_ITEM_TIER_ENUM}, default: ${DEFAULT_SEARCH_TIER} } }
         - { name: date_from, in: query, schema: { type: string, format: date-time } }
         - { name: date_to, in: query, schema: { type: string, format: date-time } }
         - { name: source_id, in: query, schema: { type: string } }
         - { name: source_group, in: query, schema: { type: string, enum: ${SOURCE_GROUP_ENUM} } }
         - { name: source_kind, in: query, schema: { type: string, enum: ${SOURCE_KIND_ENUM} } }
-        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
-        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 }, description: "lexical mode only" }
-        - { name: locale, in: query, schema: { type: string, enum: ${APP_LOCALE_ENUM}, default: en } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: ${DEFAULT_SEARCH_LIMIT} } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: ${DEFAULT_SEARCH_OFFSET} }, description: "lexical mode only" }
+        - { name: locale, in: query, schema: { type: string, enum: ${APP_LOCALE_ENUM}, default: ${DEFAULT_API_SEARCH_LOCALE} } }
       responses:
         '200':
           description: OK

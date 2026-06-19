@@ -314,6 +314,9 @@ Shipped cleanup:
   schemas, MCP feed mapping, feed execution envelopes, item lookup, and the
   generated OpenAPI feed docs no longer carry separate `featured/archive/40/0/24`
   literals.
+- Shared search query defaults through `lib/search/query-defaults.ts`; REST
+  search schemas, MCP search mapping, semantic result offsets, and generated
+  OpenAPI search docs no longer carry separate `lexical/all/20/0/en` literals.
 - Shared item-detail lookup and bearer-agent payload construction through
   `lib/api/item-detail.ts`; public routes keep public cache/error mapping,
   while `/api/v1/items/:id` and MCP `ax_radar_get_item` share

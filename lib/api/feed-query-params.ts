@@ -8,6 +8,14 @@ import {
   DEFAULT_FEED_TIER,
   DEFAULT_FEED_VIEW,
 } from "@/lib/feed/query-defaults";
+import {
+  DEFAULT_API_SEARCH_LOCALE,
+  DEFAULT_SEARCH_LIMIT,
+  DEFAULT_SEARCH_MODE,
+  DEFAULT_SEARCH_OFFSET,
+  DEFAULT_SEARCH_SEMANTIC_INCLUDE_EXCLUDED,
+  DEFAULT_SEARCH_TIER,
+} from "@/lib/search/query-defaults";
 import type { FeedQuery } from "@/lib/items/live";
 import {
   APP_LOCALES,
@@ -73,8 +81,8 @@ function makeSearchQueryParamSchema(options: {
 }) {
   return z.object({
     q: z.string().min(1, "q is required"),
-    mode: z.enum(SEARCH_MODES).optional().default("lexical"),
-    tier: z.enum(VISIBLE_ITEM_TIERS).optional().default("all"),
+    mode: z.enum(SEARCH_MODES).optional().default(DEFAULT_SEARCH_MODE),
+    tier: z.enum(VISIBLE_ITEM_TIERS).optional().default(DEFAULT_SEARCH_TIER),
     date: ymdSchema,
     date_from: z.string().datetime().optional(),
     date_to: z.string().datetime().optional(),
@@ -82,8 +90,13 @@ function makeSearchQueryParamSchema(options: {
     source_group: z.enum(SOURCE_GROUPS).optional(),
     source_kind: z.enum(SOURCE_KINDS).optional(),
     limit: limitParamSchema(options.maxLimit, options.defaultLimit),
-    offset: z.coerce.number().int().min(0).optional().default(0),
-    locale: z.enum(APP_LOCALES).optional().default("en"),
+    offset: z.coerce
+      .number()
+      .int()
+      .min(0)
+      .optional()
+      .default(DEFAULT_SEARCH_OFFSET),
+    locale: z.enum(APP_LOCALES).optional().default(DEFAULT_API_SEARCH_LOCALE),
   });
 }
 
@@ -99,12 +112,12 @@ export const publicFeedQueryParamSchema = makeFeedQueryParamSchema({
 
 export const v1SearchQueryParamSchema = makeSearchQueryParamSchema({
   maxLimit: 100,
-  defaultLimit: 20,
+  defaultLimit: DEFAULT_SEARCH_LIMIT,
 });
 
 export const publicSearchQueryParamSchema = makeSearchQueryParamSchema({
   maxLimit: 50,
-  defaultLimit: 20,
+  defaultLimit: DEFAULT_SEARCH_LIMIT,
 });
 
 export const mcpFeedToolInputShape = {
@@ -279,16 +292,16 @@ export function searchQueryFromMcpToolArgs(
 ): McpSearchExecutionParams {
   return {
     q: args.q,
-    mode: args.mode ?? "lexical",
-    tier: "all",
-    locale: args.locale ?? "en",
-    limit: args.limit ?? 20,
-    offset: 0,
+    mode: args.mode ?? DEFAULT_SEARCH_MODE,
+    tier: DEFAULT_SEARCH_TIER,
+    locale: args.locale ?? DEFAULT_API_SEARCH_LOCALE,
+    limit: args.limit ?? DEFAULT_SEARCH_LIMIT,
+    offset: DEFAULT_SEARCH_OFFSET,
     source_id: args.source_id,
     source_group: args.source_group,
     source_kind: args.source_kind,
     date_from: args.date_from,
     date_to: args.date_to,
-    semanticIncludeExcluded: false,
+    semanticIncludeExcluded: DEFAULT_SEARCH_SEMANTIC_INCLUDE_EXCLUDED,
   };
 }

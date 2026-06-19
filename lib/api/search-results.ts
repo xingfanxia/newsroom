@@ -7,6 +7,7 @@ import {
   searchFeedQueryFromParams,
   type SearchQueryParams,
 } from "@/lib/api/feed-query-params";
+import { DEFAULT_SEARCH_OFFSET } from "@/lib/search/query-defaults";
 import {
   toPublicApiItem,
   type PublicApiItem,
@@ -119,7 +120,7 @@ export async function runSearchQuery(
       items: result.items,
       total: result.total,
       limit: params.limit,
-      offset: 0,
+      offset: DEFAULT_SEARCH_OFFSET,
       embeddingDims: result.embeddingDims,
       latencyMs: Date.now() - started,
     };
