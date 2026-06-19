@@ -4,7 +4,7 @@ import {
   coerceMainRssLocale,
   mainRssFeedMeta,
 } from "@/lib/rss/main-feed-meta";
-import { APP_LOCALES } from "@/lib/types";
+import { APP_LOCALES, appLocaleLanguageTag } from "@/lib/types";
 
 describe("main RSS feed metadata", () => {
   test("keeps the public main-feed paths in one ordered contract", () => {
@@ -35,12 +35,12 @@ describe("main RSS feed metadata", () => {
   test("maps locale metadata for RSS channels and discovery surfaces", () => {
     expect(mainRssFeedMeta("zh")).toMatchObject({
       route: "/zh",
-      language: "zh-CN",
+      language: appLocaleLanguageTag("zh"),
       alternateTitle: "AX 的 AI 雷达 (中文)",
     });
     expect(mainRssFeedMeta("en")).toMatchObject({
       route: "/en",
-      language: "en-US",
+      language: appLocaleLanguageTag("en"),
       alternateTitle: "AX's AI RADAR (English)",
     });
   });

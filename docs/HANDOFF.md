@@ -101,6 +101,9 @@ Shipped cleanup:
   same source allow-list instead of a YouTube suffix heuristic.
 - Derived main RSS feed ordering and locale coercion from `APP_LOCALES`, so RSS
   discovery metadata cannot drift from the app/API locale contract.
+- Derived main RSS feed BCP-47 language tags from `appLocaleLanguageTag`, so
+  channel metadata no longer repeats `zh-CN` / `en-US` next to the locale
+  tuple.
 - Shared admin mono blocks through `components/admin/mono-block.tsx`; policy
   error states and policy body previews no longer duplicate preformatted
   terminal panel styling.

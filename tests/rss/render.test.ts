@@ -5,6 +5,7 @@ import {
   rssResponse,
   type RssItem,
 } from "@/lib/rss/render";
+import { appLocaleLanguageTag, DEFAULT_APP_LOCALE } from "@/lib/types";
 
 describe("renderRssFeed", () => {
   const baseChannel = {
@@ -20,6 +21,9 @@ describe("renderRssFeed", () => {
     expect(xml).toContain('<rss version="2.0"');
     expect(xml).toContain("<channel>");
     expect(xml).toContain('xmlns:content="http://purl.org/rss/1.0/modules/content/"');
+    expect(xml).toContain(
+      `<language>${appLocaleLanguageTag(DEFAULT_APP_LOCALE)}</language>`,
+    );
   });
 
   it("escapes HTML entities in titles + descriptions", () => {

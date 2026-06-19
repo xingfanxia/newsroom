@@ -3,6 +3,8 @@
  * Pure XML helpers plus the shared HTTP response envelope used by RSS routes.
  */
 
+import { appLocaleLanguageTag, DEFAULT_APP_LOCALE } from "@/lib/types";
+
 export type RssItem = {
   title: string;
   link: string;
@@ -92,7 +94,7 @@ export function renderMarkdownishHtml(md: string): string {
 }
 
 export function renderRssFeed(channel: RssChannel): string {
-  const lang = channel.language ?? "zh-CN";
+  const lang = channel.language ?? appLocaleLanguageTag(DEFAULT_APP_LOCALE);
   const selfLink = channel.selfLink ?? channel.link;
   const namespaces = Object.entries(channel.namespaces ?? {})
     .map(([prefix, uri]) => ` xmlns:${assertXmlName(prefix)}="${escapeXml(uri)}"`)
