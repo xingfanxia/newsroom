@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { readSource } from "@/tests/helpers/source";
+import { readSource, sectionBetween } from "@/tests/helpers/source";
 
 describe("search query defaults source contracts", () => {
   test("REST/MCP search parsing and execution share search default constants", () => {
@@ -48,5 +48,34 @@ describe("search query defaults source contracts", () => {
     expect(openApiRoute).not.toContain("default: lexical");
     expect(openApiRoute).not.toContain("default: all");
     expect(openApiRoute).not.toContain("default: 20");
+  });
+
+  test("search query limit bounds have one source of truth", () => {
+    const defaults = readSource("lib/search/query-defaults.ts");
+    const queryParams = readSource("lib/api/feed-query-params.ts");
+    const openApiSearch = sectionBetween(
+      readSource("app/openapi.yaml/route.ts"),
+      "  /api/public/search:",
+      "  /api/public/sources:",
+    );
+
+    for (const name of [
+      "SEARCH_LIMIT_MIN",
+      "V1_SEARCH_LIMIT_MAX",
+      "PUBLIC_SEARCH_LIMIT_MAX",
+      "MCP_SEARCH_LIMIT_MAX",
+    ] as const) {
+      expect(defaults).toContain(`export const ${name}`);
+      expect(queryParams).toContain(name);
+    }
+
+    for (const name of ["PUBLIC_SEARCH_LIMIT_MAX", "SEARCH_LIMIT_MIN"] as const) {
+      expect(openApiSearch).toContain(name);
+    }
+
+    expect(queryParams).not.toContain("maxLimit: 50");
+    expect(queryParams).not.toContain("limit: z.number().int().min(1).max(100)");
+    expect(openApiSearch).not.toContain("maximum: 50");
+    expect(openApiSearch).not.toContain("minimum: 1");
   });
 });

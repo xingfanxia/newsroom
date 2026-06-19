@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { readSource } from "@/tests/helpers/source";
+import { readSource, sectionBetween } from "@/tests/helpers/source";
 
 describe("feed query defaults source contracts", () => {
   test("API query parsing, execution, and item lookup share feed default constants", () => {
@@ -59,5 +59,43 @@ describe("feed query defaults source contracts", () => {
     expect(openApiRoute).not.toContain("default: 24");
     expect(openApiRoute).not.toContain("Default returns today's hot");
     expect(openApiRoute).toContain("Set \\`view=today\\`");
+  });
+
+  test("feed query limit and hot-window bounds have one source of truth", () => {
+    const defaults = readSource("lib/feed/query-defaults.ts");
+    const queryParams = readSource("lib/api/feed-query-params.ts");
+    const openApiFeed = sectionBetween(
+      readSource("app/openapi.yaml/route.ts"),
+      "  /api/public/feed:",
+      "  /api/public/items/{id}:",
+    );
+
+    for (const name of [
+      "FEED_LIMIT_MIN",
+      "V1_FEED_LIMIT_MAX",
+      "PUBLIC_FEED_LIMIT_MAX",
+      "MCP_FEED_LIMIT_MAX",
+      "FEED_HOT_WINDOW_HOURS_MIN",
+      "FEED_HOT_WINDOW_HOURS_MAX",
+    ] as const) {
+      expect(defaults).toContain(`export const ${name}`);
+      expect(queryParams).toContain(name);
+    }
+
+    for (const name of [
+      "PUBLIC_FEED_LIMIT_MAX",
+      "FEED_LIMIT_MIN",
+      "FEED_HOT_WINDOW_HOURS_MIN",
+      "FEED_HOT_WINDOW_HOURS_MAX",
+    ] as const) {
+      expect(openApiFeed).toContain(name);
+    }
+
+    expect(queryParams).not.toContain("maxLimit: 500");
+    expect(queryParams).not.toContain(".max(168)");
+    expect(queryParams).not.toContain(".max(200)");
+    expect(openApiFeed).not.toContain("maximum: 168");
+    expect(openApiFeed).not.toContain("maximum: 100");
+    expect(openApiFeed).not.toContain("minimum: 1");
   });
 });

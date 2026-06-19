@@ -7,6 +7,12 @@ import {
   DEFAULT_FEED_OFFSET,
   DEFAULT_FEED_TIER,
   DEFAULT_FEED_VIEW,
+  FEED_HOT_WINDOW_HOURS_MAX,
+  FEED_HOT_WINDOW_HOURS_MIN,
+  FEED_LIMIT_MIN,
+  MCP_FEED_LIMIT_MAX,
+  PUBLIC_FEED_LIMIT_MAX,
+  V1_FEED_LIMIT_MAX,
 } from "@/lib/feed/query-defaults";
 import {
   DEFAULT_API_SEARCH_LOCALE,
@@ -15,6 +21,10 @@ import {
   DEFAULT_SEARCH_OFFSET,
   DEFAULT_SEARCH_SEMANTIC_INCLUDE_EXCLUDED,
   DEFAULT_SEARCH_TIER,
+  MCP_SEARCH_LIMIT_MAX,
+  PUBLIC_SEARCH_LIMIT_MAX,
+  SEARCH_LIMIT_MIN,
+  V1_SEARCH_LIMIT_MAX,
 } from "@/lib/search/query-defaults";
 import type { FeedQuery } from "@/lib/items/live";
 import {
@@ -37,8 +47,18 @@ const boolParamSchema = z
   .optional()
   .transform((v) => v === "true" || v === "1");
 
-function limitParamSchema(max: number, defaultValue: number) {
-  return z.coerce.number().int().min(1).max(max).optional().default(defaultValue);
+function limitParamSchema(
+  min: number,
+  max: number,
+  defaultValue: number,
+) {
+  return z.coerce
+    .number()
+    .int()
+    .min(min)
+    .max(max)
+    .optional()
+    .default(defaultValue);
 }
 
 function makeFeedQueryParamSchema(options: {
@@ -51,8 +71,8 @@ function makeFeedQueryParamSchema(options: {
     hot_window_hours: z.coerce
       .number()
       .int()
-      .min(1)
-      .max(168)
+      .min(FEED_HOT_WINDOW_HOURS_MIN)
+      .max(FEED_HOT_WINDOW_HOURS_MAX)
       .optional()
       .default(DEFAULT_FEED_HOT_WINDOW_HOURS),
     date: ymdSchema,
@@ -64,7 +84,11 @@ function makeFeedQueryParamSchema(options: {
     curated_only: boolParamSchema,
     exclude_source_tags: z.string().min(1).optional(),
     include_source_tags: z.string().min(1).optional(),
-    limit: limitParamSchema(options.maxLimit, options.defaultLimit),
+    limit: limitParamSchema(
+      FEED_LIMIT_MIN,
+      options.maxLimit,
+      options.defaultLimit,
+    ),
     offset: z.coerce
       .number()
       .int()
@@ -89,7 +113,11 @@ function makeSearchQueryParamSchema(options: {
     source_id: z.string().min(1).optional(),
     source_group: z.enum(SOURCE_GROUPS).optional(),
     source_kind: z.enum(SOURCE_KINDS).optional(),
-    limit: limitParamSchema(options.maxLimit, options.defaultLimit),
+    limit: limitParamSchema(
+      SEARCH_LIMIT_MIN,
+      options.maxLimit,
+      options.defaultLimit,
+    ),
     offset: z.coerce
       .number()
       .int()
@@ -101,29 +129,34 @@ function makeSearchQueryParamSchema(options: {
 }
 
 export const v1FeedQueryParamSchema = makeFeedQueryParamSchema({
-  maxLimit: 500,
+  maxLimit: V1_FEED_LIMIT_MAX,
   defaultLimit: DEFAULT_FEED_LIMIT,
 });
 
 export const publicFeedQueryParamSchema = makeFeedQueryParamSchema({
-  maxLimit: 100,
+  maxLimit: PUBLIC_FEED_LIMIT_MAX,
   defaultLimit: DEFAULT_FEED_LIMIT,
 });
 
 export const v1SearchQueryParamSchema = makeSearchQueryParamSchema({
-  maxLimit: 100,
+  maxLimit: V1_SEARCH_LIMIT_MAX,
   defaultLimit: DEFAULT_SEARCH_LIMIT,
 });
 
 export const publicSearchQueryParamSchema = makeSearchQueryParamSchema({
-  maxLimit: 50,
+  maxLimit: PUBLIC_SEARCH_LIMIT_MAX,
   defaultLimit: DEFAULT_SEARCH_LIMIT,
 });
 
 export const mcpFeedToolInputShape = {
   tier: z.enum(VISIBLE_ITEM_TIERS).optional(),
   view: z.enum(FEED_VIEWS).optional(),
-  hot_window_hours: z.number().int().min(1).max(168).optional(),
+  hot_window_hours: z
+    .number()
+    .int()
+    .min(FEED_HOT_WINDOW_HOURS_MIN)
+    .max(FEED_HOT_WINDOW_HOURS_MAX)
+    .optional(),
   source_id: z.string().optional(),
   source_group: z.enum(SOURCE_GROUPS).optional(),
   source_kind: z.enum(SOURCE_KINDS).optional(),
@@ -133,7 +166,12 @@ export const mcpFeedToolInputShape = {
   date: z.string().optional(),
   date_from: z.string().optional(),
   date_to: z.string().optional(),
-  limit: z.number().int().min(1).max(200).optional(),
+  limit: z
+    .number()
+    .int()
+    .min(FEED_LIMIT_MIN)
+    .max(MCP_FEED_LIMIT_MAX)
+    .optional(),
   offset: z.number().int().min(0).optional(),
   locale: z.enum(APP_LOCALES).optional(),
 } as const;
@@ -146,7 +184,12 @@ export const mcpSearchToolInputShape = {
   source_kind: z.enum(SOURCE_KINDS).optional(),
   date_from: z.string().optional(),
   date_to: z.string().optional(),
-  limit: z.number().int().min(1).max(100).optional(),
+  limit: z
+    .number()
+    .int()
+    .min(SEARCH_LIMIT_MIN)
+    .max(MCP_SEARCH_LIMIT_MAX)
+    .optional(),
   locale: z.enum(APP_LOCALES).optional(),
 } as const;
 

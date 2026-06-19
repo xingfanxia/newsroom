@@ -6,4 +6,9 @@ export const DEFAULT_SEARCH_LIMIT = 20;
 export const DEFAULT_SEARCH_OFFSET = 0 as const;
 export const DEFAULT_SEARCH_SEMANTIC_INCLUDE_EXCLUDED = false;
 
+export const SEARCH_LIMIT_MIN = 1;
+export const V1_SEARCH_LIMIT_MAX = 100;
+export const PUBLIC_SEARCH_LIMIT_MAX = 50;
+export const MCP_SEARCH_LIMIT_MAX = 100;
+
 export const DEFAULT_API_SEARCH_LOCALE = "en" satisfies AppLocale;

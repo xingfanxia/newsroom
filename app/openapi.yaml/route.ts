@@ -25,6 +25,10 @@ import {
   DEFAULT_FEED_OFFSET,
   DEFAULT_FEED_TIER,
   DEFAULT_FEED_VIEW,
+  FEED_HOT_WINDOW_HOURS_MAX,
+  FEED_HOT_WINDOW_HOURS_MIN,
+  FEED_LIMIT_MIN,
+  PUBLIC_FEED_LIMIT_MAX,
 } from "@/lib/feed/query-defaults";
 import {
   DEFAULT_API_SEARCH_LOCALE,
@@ -32,6 +36,8 @@ import {
   DEFAULT_SEARCH_MODE,
   DEFAULT_SEARCH_OFFSET,
   DEFAULT_SEARCH_TIER,
+  PUBLIC_SEARCH_LIMIT_MAX,
+  SEARCH_LIMIT_MIN,
 } from "@/lib/search/query-defaults";
 import { PUBLIC_SITE_URL, publicUrl } from "@/lib/site";
 
@@ -103,7 +109,7 @@ paths:
       parameters:
         - { name: tier, in: query, schema: { type: string, enum: ${VISIBLE_ITEM_TIER_ENUM}, default: ${DEFAULT_FEED_TIER} } }
         - { name: view, in: query, schema: { type: string, enum: ${FEED_VIEW_ENUM}, default: ${DEFAULT_FEED_VIEW} } }
-        - { name: hot_window_hours, in: query, schema: { type: integer, minimum: 1, maximum: 168, default: ${DEFAULT_FEED_HOT_WINDOW_HOURS} } }
+        - { name: hot_window_hours, in: query, schema: { type: integer, minimum: ${FEED_HOT_WINDOW_HOURS_MIN}, maximum: ${FEED_HOT_WINDOW_HOURS_MAX}, default: ${DEFAULT_FEED_HOT_WINDOW_HOURS} } }
         - { name: date, in: query, schema: { type: string, pattern: '^\\d{4}-\\d{2}-\\d{2}$' } }
         - { name: date_from, in: query, schema: { type: string, format: date-time } }
         - { name: date_to, in: query, schema: { type: string, format: date-time } }
@@ -113,7 +119,7 @@ paths:
         - { name: curated_only, in: query, schema: { type: string, enum: ['true', 'false', '1', '0'] }, description: "Limit to AX 严选 / curated sources only" }
         - { name: include_source_tags, in: query, schema: { type: string }, description: "Comma-separated source tag list" }
         - { name: exclude_source_tags, in: query, schema: { type: string } }
-        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: ${DEFAULT_FEED_LIMIT} } }
+        - { name: limit, in: query, schema: { type: integer, minimum: ${FEED_LIMIT_MIN}, maximum: ${PUBLIC_FEED_LIMIT_MAX}, default: ${DEFAULT_FEED_LIMIT} } }
         - { name: offset, in: query, schema: { type: integer, minimum: 0, default: ${DEFAULT_FEED_OFFSET} } }
         - { name: locale, in: query, schema: { type: string, enum: ${APP_LOCALE_ENUM}, default: ${DEFAULT_API_FEED_LOCALE} } }
       responses:
@@ -173,7 +179,7 @@ paths:
         - { name: source_id, in: query, schema: { type: string } }
         - { name: source_group, in: query, schema: { type: string, enum: ${SOURCE_GROUP_ENUM} } }
         - { name: source_kind, in: query, schema: { type: string, enum: ${SOURCE_KIND_ENUM} } }
-        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: ${DEFAULT_SEARCH_LIMIT} } }
+        - { name: limit, in: query, schema: { type: integer, minimum: ${SEARCH_LIMIT_MIN}, maximum: ${PUBLIC_SEARCH_LIMIT_MAX}, default: ${DEFAULT_SEARCH_LIMIT} } }
         - { name: offset, in: query, schema: { type: integer, minimum: 0, default: ${DEFAULT_SEARCH_OFFSET} }, description: "lexical mode only" }
         - { name: locale, in: query, schema: { type: string, enum: ${APP_LOCALE_ENUM}, default: ${DEFAULT_API_SEARCH_LOCALE} } }
       responses:

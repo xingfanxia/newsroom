@@ -310,13 +310,14 @@ Shipped cleanup:
   `lib/api/feed-query-params.ts`; MCP `ax_radar_feed` and
   `ax_radar_search` now use the same source-filter/runtime tuple contracts as
   REST while route handlers stay thin execution/payload adapters.
-- Shared feed query defaults through `lib/feed/query-defaults.ts`; REST query
-  schemas, MCP feed mapping, feed execution envelopes, item lookup, and the
-  generated OpenAPI feed docs no longer carry separate `featured/archive/40/0/24`
-  literals.
-- Shared search query defaults through `lib/search/query-defaults.ts`; REST
-  search schemas, MCP search mapping, semantic result offsets, and generated
-  OpenAPI search docs no longer carry separate `lexical/all/20/0/en` literals.
+- Shared feed query defaults and bounds through `lib/feed/query-defaults.ts`;
+  REST query schemas, MCP feed mapping, feed execution envelopes, item lookup,
+  and the generated OpenAPI feed docs no longer carry separate
+  `featured/archive/40/0/24` defaults or `limit`/hot-window bounds.
+- Shared search query defaults and bounds through `lib/search/query-defaults.ts`;
+  REST search schemas, MCP search mapping, semantic result offsets, and generated
+  OpenAPI search docs no longer carry separate `lexical/all/20/0/en` defaults
+  or `limit` bounds.
 - Shared item-detail lookup and bearer-agent payload construction through
   `lib/api/item-detail.ts`; public routes keep public cache/error mapping,
   while `/api/v1/items/:id` and MCP `ax_radar_get_item` share
