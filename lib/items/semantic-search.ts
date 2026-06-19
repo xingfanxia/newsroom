@@ -25,6 +25,12 @@ import { storySelectFields } from "@/lib/items/story-select";
 import { toStory } from "@/lib/items/story-mapper";
 import { embed } from "@/lib/llm";
 import {
+  DEFAULT_API_SEARCH_LOCALE,
+  DEFAULT_SEARCH_LIMIT,
+  MCP_SEARCH_LIMIT_MAX,
+  SEARCH_LIMIT_MIN,
+} from "@/lib/search/query-defaults";
+import {
   type AppLocale,
   type SourceGroup,
   type SourceKind,
@@ -60,7 +66,10 @@ export async function semanticSearch(
 
   const { embedding } = await embed({ value: trimmed, task: "search" });
   const queryVecText = halfvecToDriver(embedding);
-  const limit = Math.min(Math.max(opts.limit ?? 20, 1), 100);
+  const limit = Math.min(
+    Math.max(opts.limit ?? DEFAULT_SEARCH_LIMIT, SEARCH_LIMIT_MIN),
+    MCP_SEARCH_LIMIT_MAX,
+  );
 
   const sourceIdFilter = opts.sourceId
     ? sql`${items.sourceId} = ${opts.sourceId}`
@@ -113,7 +122,7 @@ export async function semanticSearch(
     .orderBy(sql`${items.embedding} <#> ${queryVecText}::halfvec(3072)`)
     .limit(limit);
 
-  const locale = opts.locale ?? "en";
+  const locale = opts.locale ?? DEFAULT_API_SEARCH_LOCALE;
 
   const mapped = rows.map((r) => {
     return {

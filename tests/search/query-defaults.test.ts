@@ -6,6 +6,7 @@ describe("search query defaults source contracts", () => {
     const defaults = readSource("lib/search/query-defaults.ts");
     const queryParams = readSource("lib/api/feed-query-params.ts");
     const searchResults = readSource("lib/api/search-results.ts");
+    const semanticSearch = readSource("lib/items/semantic-search.ts");
 
     for (const name of [
       "DEFAULT_SEARCH_MODE",
@@ -20,12 +21,19 @@ describe("search query defaults source contracts", () => {
     }
 
     expect(searchResults).toContain("DEFAULT_SEARCH_OFFSET");
+    expect(semanticSearch).toContain("DEFAULT_API_SEARCH_LOCALE");
+    expect(semanticSearch).toContain("DEFAULT_SEARCH_LIMIT");
+    expect(semanticSearch).toContain("SEARCH_LIMIT_MIN");
+    expect(semanticSearch).toContain("MCP_SEARCH_LIMIT_MAX");
     expect(queryParams).not.toContain('.default("lexical")');
     expect(queryParams).not.toContain('.default("all")');
     expect(queryParams).not.toContain(".default(20)");
     expect(queryParams).not.toContain('args.mode ?? "lexical"');
     expect(queryParams).not.toContain('tier: "all"');
     expect(queryParams).not.toContain('args.locale ?? "en"');
+    expect(semanticSearch).not.toContain('opts.locale ?? "en"');
+    expect(semanticSearch).not.toContain("opts.limit ?? 20");
+    expect(semanticSearch).not.toContain("Math.max(opts.limit ?? 20, 1)");
     expect(queryParams).not.toContain("args.limit ?? 20");
     expect(queryParams).not.toContain("offset: 0");
     expect(queryParams).not.toContain("semanticIncludeExcluded: false");
