@@ -31,4 +31,20 @@ describe("LLM model defaults", () => {
     );
     expect(envExampleValue("GEMINI_MODEL")).toBe(LLM_MODEL_DEFAULTS.gemini);
   });
+
+  it("labels the current default prose/scoring provider without stale Azure OpenAI wording", () => {
+    expect(envExample).toContain(
+      "Azure OpenAI — chat compatibility/probe resource",
+    );
+    expect(envExample).toContain(
+      "Active prose/scoring workers use Azure DeepSeek by default",
+    );
+    expect(envExample).toContain(
+      "Azure AI Foundry — DeepSeek primary prose/scoring",
+    );
+    expect(envExample).not.toContain(
+      "Azure OpenAI — CHAT resource (enrich + score via Responses API)",
+    );
+    expect(envExample).not.toContain("DeepSeek for Chinese prose");
+  });
 });

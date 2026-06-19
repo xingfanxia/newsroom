@@ -79,7 +79,8 @@ Shipped cleanup:
   `lib/llm/model-defaults.ts`; provider resolution, pricing fallback, and
   operator backfill cost forecasts no longer repeat the same DeepSeek, GPT,
   and embedding defaults, and `.env.example` is now tested against the same
-  contract.
+  contract while labeling Azure OpenAI chat as compatibility/probe rather than
+  the default enrich/score path.
 - Reused `APP_LOCALES` in `i18n/routing.ts`, so Next locale routing and
   API/OpenAPI/agent locale contracts no longer carry separate hard-coded
   `zh/en` tuples.
