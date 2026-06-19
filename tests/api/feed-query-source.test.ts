@@ -22,13 +22,16 @@ describe("feed/search route query parsing source wiring", () => {
   });
 
   test("routes delegate public vs bearer query parsing to request helpers", () => {
-    expect(read("app/api/v1/feed/route.ts")).toContain(
+    const v1FeedRoute = read("app/api/v1/feed/route.ts");
+    const v1SearchRoute = read("app/api/v1/search/route.ts");
+
+    expect(v1FeedRoute).toContain(
       "parseV1FeedQueryRequest(req)",
     );
     expect(read("app/api/public/feed/route.ts")).toContain(
       "parsePublicFeedQueryRequest(req)",
     );
-    expect(read("app/api/v1/search/route.ts")).toContain(
+    expect(v1SearchRoute).toContain(
       "parseV1SearchQueryRequest(req)",
     );
     expect(read("app/api/public/search/route.ts")).toContain(
@@ -50,6 +53,28 @@ describe("feed/search route query parsing source wiring", () => {
     expect(feedQueryParams).toContain("parseFeedRequestQuery");
     expect(feedQueryParams).toContain("publicFeedQueryParamSchema");
     expect(feedQueryParams).toContain("v1SearchQueryParamSchema");
+  });
+
+  test("v1 route comments do not hand-write query defaults or bounds", () => {
+    const v1FeedRoute = read("app/api/v1/feed/route.ts");
+    const v1SearchRoute = read("app/api/v1/search/route.ts");
+
+    expect(v1FeedRoute).toContain("lib/feed/query-defaults.ts");
+    expect(v1SearchRoute).toContain("lib/search/query-defaults.ts");
+
+    for (const staleCopy of [
+      "featured (default)",
+      "archive (default",
+      "1..168, default 24",
+      "1..500, default 40",
+      "zh | en (default en)",
+      "lexical (default)",
+      "default all",
+      "1..100, default 20",
+    ]) {
+      expect(v1FeedRoute).not.toContain(staleCopy);
+      expect(v1SearchRoute).not.toContain(staleCopy);
+    }
   });
 
   test("search routes share execution so lexical totals and semantic options cannot drift", () => {

@@ -1,7 +1,7 @@
 /**
  * GET /api/v1/search — Bearer-gated search across enriched items.
  *
- *   mode=lexical (default): case-insensitive ILIKE against title + both-locale
+ *   mode=lexical: case-insensitive ILIKE against title + both-locale
  *   title/summary columns. Fast, cheap, exact substring matches only.
  *
  *   mode=semantic: embeds the query via Azure text-embedding-3-large (one call
@@ -13,14 +13,10 @@
  *
  * Response shape matches /api/v1/feed so agents can reuse their item parser.
  *
- * Query params:
- *   q            = free-text (required, non-empty)
- *   mode         = lexical (default) | semantic
- *   tier         = featured | p1 | all (default all — search should span)
- *   date / date_from / date_to / source_id / source_group / source_kind
- *   limit        = 1..100, default 20
- *   offset       = ≥0, default 0 (lexical only — semantic doesn't paginate)
- *   locale       = zh | en (default en)
+ * Query params are parsed by `parseV1SearchQueryRequest`. Bounds/defaults live
+ * in `lib/search/query-defaults.ts`, while shared feed/search filter tuples
+ * live in `lib/types.ts`. Keep this route as the bearer auth +
+ * response-envelope adapter only.
  */
 import {
   runV1Route,

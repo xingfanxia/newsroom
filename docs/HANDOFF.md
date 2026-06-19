@@ -316,11 +316,11 @@ Shipped cleanup:
   REST while route handlers stay thin execution/payload adapters.
 - Shared feed query defaults and bounds through `lib/feed/query-defaults.ts`;
   REST query schemas, MCP feed mapping, feed execution envelopes, item lookup,
-  installable skill markdown, `/agents` integration copy, and the generated OpenAPI feed docs no longer carry separate
+  v1 route comments, installable skill markdown, `/agents` integration copy, and the generated OpenAPI feed docs no longer carry separate
   `featured/archive/40/0/24` defaults or `limit`/hot-window bounds.
 - Shared search query defaults and bounds through `lib/search/query-defaults.ts`;
   REST search schemas, MCP search mapping, semantic search fallback execution,
-  semantic result offsets, installable skill markdown, `/agents` integration copy, and generated OpenAPI search docs no longer carry
+  semantic result offsets, v1 route comments, installable skill markdown, `/agents` integration copy, and generated OpenAPI search docs no longer carry
   separate `lexical/all/20/0/en` defaults or `limit` bounds.
 - Shared item-detail lookup and bearer-agent payload construction through
   `lib/api/item-detail.ts`; public routes keep public cache/error mapping,
