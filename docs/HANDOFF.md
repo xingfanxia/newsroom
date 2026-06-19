@@ -237,6 +237,10 @@ Shipped cleanup:
   cookie-session fallback semantics while the helper owns collection/locale
   parsing, saved item and collection lookup, Markdown shape, deterministic
   filenames, and attachment headers.
+- Saved export collection parsing now reuses
+  `parseSavedCollectionParam` from `lib/items/saved-collection-selection.ts`,
+  so browser export and `/saved` agree on `all`/`inbox`/numeric collection
+  semantics and reject partial numeric strings such as `42abc`.
 - Shared cookie/v1 tweaks persistence through `lib/api/tweak-routes.ts`, so
   user upsert, preferences/watchlist loading, DB patch construction, and
   `empty_body` decisions stay aligned while each route keeps its own auth and

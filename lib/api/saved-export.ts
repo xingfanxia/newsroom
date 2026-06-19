@@ -3,9 +3,13 @@ import {
   listCollections,
   type SavedCollection,
 } from "@/lib/items/collections";
+import {
+  parseSavedCollectionParam,
+  type SavedCollectionViewId,
+} from "@/lib/items/saved-collection-selection";
 import { appLocaleLanguageTag, type AppLocale, type Story } from "@/lib/types";
 
-type SavedExportCollectionFilter = number | "inbox" | null;
+type SavedExportCollectionFilter = SavedCollectionViewId | null;
 export type SavedExportStory = Story & {
   savedAt: string;
   collectionId: number | null;
@@ -29,19 +33,18 @@ const SAVED_EXPORT_LIMIT = 500;
 
 export function parseSavedExportRequest(req: Request): SavedExportRequest {
   const url = new URL(req.url);
-  const raw = url.searchParams.get("collection");
+  const collection = parseSavedCollectionParam(
+    url.searchParams.get("collection") ?? undefined,
+  );
   const locale: AppLocale =
     url.searchParams.get("locale") === "zh" ? "zh" : "en";
 
-  if (raw === "inbox") {
+  if (collection === "inbox") {
     return { locale, collection: "inbox", suffix: "inbox" };
   }
 
-  if (raw && raw !== "all") {
-    const n = Number.parseInt(raw, 10);
-    if (Number.isFinite(n) && n > 0) {
-      return { locale, collection: n, suffix: `coll-${n}` };
-    }
+  if (typeof collection === "number") {
+    return { locale, collection, suffix: `coll-${collection}` };
   }
 
   return { locale, collection: null, suffix: "all" };

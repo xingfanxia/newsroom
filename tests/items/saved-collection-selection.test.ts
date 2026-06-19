@@ -42,4 +42,12 @@ describe("saved collection URL selection", () => {
     expect(source).toContain("redirect(`/${appLocale}/saved`)");
     expect(source).not.toContain("function parseCollection");
   });
+
+  test("saved export uses the shared collection param parser", () => {
+    const source = read("lib/api/saved-export.ts");
+
+    expect(source).toContain("@/lib/items/saved-collection-selection");
+    expect(source).toContain("parseSavedCollectionParam");
+    expect(source).not.toContain("Number.parseInt(raw, 10)");
+  });
 });

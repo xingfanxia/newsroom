@@ -76,6 +76,12 @@ describe("saved export helpers", () => {
         new Request("https://example.test/api/saved/export?collection=0"),
       ),
     ).toEqual({ locale: "en", collection: null, suffix: "all" });
+
+    expect(
+      parseSavedExportRequest(
+        new Request("https://example.test/api/saved/export?collection=42abc"),
+      ),
+    ).toEqual({ locale: "en", collection: null, suffix: "all" });
   });
 
   test("renders saved export markdown with collection title and editor fields", () => {
