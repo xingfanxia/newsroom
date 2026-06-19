@@ -299,4 +299,16 @@ describe("docs routing source contracts", () => {
     expect(testingStrategyDoc).not.toContain("vitest");
     expect(testingStrategyDoc).not.toContain("npm run");
   });
+
+  test("root README avoids hard-coded cron route counts", () => {
+    expect(rootReadme).toContain(
+      "**Vercel Cron** route handlers are declared in `vercel.json`",
+    );
+    expect(rootReadme).toContain(
+      "Vercel Cron（route handlers 由 `vercel.json` 声明）",
+    );
+    expect(rootReadme).not.toMatch(
+      /Vercel Cron[^\n]*(?:\b\d+\b|[一二三四五六七八九十]+)\s*(?:个\s*)?route handlers/,
+    );
+  });
 });

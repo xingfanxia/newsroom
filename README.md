@@ -50,7 +50,7 @@ AX's AI RADAR is a dashboard for editors and analysts who cover the AI industry.
   - Azure AI Foundry DeepSeek V4 Flash for low-value item treatment and cheap arbitration work.
   - Azure OpenAI `text-embedding-3-large` remains the embedding provider; `gpt-5.5-standard` is kept as a compatibility/probe deployment, not the default prose model.
   - Anthropic Claude Opus 4.7 + Google Gemini 3.1 Pro Preview are wired as optional fallbacks.
-- **Vercel Cron** triggers 11 route handlers: fetch hourly/daily/weekly, normalize, article-body, enrich, commentary, score-backfill, cluster, and newsletter daily/monthly.
+- **Vercel Cron** route handlers are declared in `vercel.json`: fetch hourly/daily/weekly, normalize, article-body, enrich, commentary, score-backfill, cluster, and newsletter daily/monthly.
 - **bun** for install / build / dev / tests
 
 ### Design system
@@ -144,7 +144,7 @@ AX 的 AI 雷达是一款面向 AI 行业编辑和分析师的情报工作台，
 
 ### 技术栈
 
-Next.js 16（App Router + Turbopack + Fluid Compute）· React 19 · TypeScript · Tailwind v4 · next-intl v4 · Radix Slot · Lucide · Vercel AI SDK v6（Azure DeepSeek V4 Pro/Flash 负责正文与评分，Azure OpenAI `text-embedding-3-large` 负责嵌入）· Supabase Postgres + drizzle + pgvector 0.8（halfvec + HNSW）· Vercel Cron（11 个 route handlers）· Bun。
+Next.js 16（App Router + Turbopack + Fluid Compute）· React 19 · TypeScript · Tailwind v4 · next-intl v4 · Radix Slot · Lucide · Vercel AI SDK v6（Azure DeepSeek V4 Pro/Flash 负责正文与评分，Azure OpenAI `text-embedding-3-large` 负责嵌入）· Supabase Postgres + drizzle + pgvector 0.8（halfvec + HNSW）· Vercel Cron（route handlers 由 `vercel.json` 声明）· Bun。
 
 ### 设计系统
 
