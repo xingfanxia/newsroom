@@ -38,10 +38,11 @@ import {
   latestDate,
 } from "@/lib/time/relative";
 import { VISIBLE_ITEM_TIERS } from "@/lib/types";
+import { bodyPrefetchPendingSql } from "@/lib/urls/media";
 import {
-  bodyPrefetchPendingSql,
-  enrichBodyPrefetchReadySql,
-} from "@/lib/urls/media";
+  enrichClaimableSql,
+  scoreBackfillPendingSql,
+} from "@/workers/enrich/pending-predicates";
 
 type SystemService = {
   id: string;
@@ -149,8 +150,7 @@ export async function getSystemSnapshot(): Promise<SystemSnapshot> {
     .select({
       bodyPrefetchPending: sql<number>`count(*) filter (where ${bodyPrefetchPendingSql(items.bodyFetchedAt, items.canonicalUrl)})::int`,
       enrichClaimable: sql<number>`count(*) filter (
-        where ${items.enrichedAt} is null
-          and ${enrichBodyPrefetchReadySql(items.bodyFetchedAt, items.canonicalUrl)}
+        where ${enrichClaimableSql(items)}
       )::int`,
       itemCommentaryPending: sql<number>`count(*) filter (
         where ${inArray(items.tier, VISIBLE_ITEM_TIERS)}
@@ -160,7 +160,9 @@ export async function getSystemSnapshot(): Promise<SystemSnapshot> {
             or coalesce(${clusters.memberCount}, 1) < 2
           )
       )::int`,
-      unscored: sql<number>`count(*) filter (where ${items.importance} is null)::int`,
+      scoreBackfillPending: sql<number>`count(*) filter (
+        where ${scoreBackfillPendingSql(items)}
+      )::int`,
       lastBodyFetchedAt: sql<Date | null>`max(${items.bodyFetchedAt})`,
       lastEnrichedAt: sql<Date | null>`max(${items.enrichedAt})`,
       lastItemCommentaryAt: sql<Date | null>`max(${items.commentaryAt})`,
@@ -196,7 +198,7 @@ export async function getSystemSnapshot(): Promise<SystemSnapshot> {
       "event-commentary",
       clustersRow?.eventCommentaryPending ?? 0,
     ),
-    systemQueueSnapshot("score", itemsRow?.unscored ?? 0),
+    systemQueueSnapshot("score", itemsRow?.scoreBackfillPending ?? 0),
   ];
 
   // --- cron from vercel.json --------------------------------------

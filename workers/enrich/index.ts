@@ -10,7 +10,6 @@ import {
   LLMError,
 } from "@/lib/llm";
 import { VISIBLE_ITEM_TIERS } from "@/lib/types";
-import { enrichBodyPrefetchReadySql } from "@/lib/urls/media";
 import {
   enrichSchema,
   scoreSchema,
@@ -33,6 +32,10 @@ import {
   type NeverExcludeSourceIds,
 } from "./source-tier";
 import { treatmentForScore, type EnrichTreatment } from "./treatment";
+import {
+  ENRICH_MAX_ATTEMPTS,
+  enrichClaimableSql,
+} from "./pending-predicates";
 
 // Enrich does stages 1-3 (summary + tags → embed → score). Commentary used
 // to be stage 4 here but was failing silently with Azure's "No object
@@ -45,8 +48,6 @@ import { treatmentForScore, type EnrichTreatment } from "./treatment";
 // thousands of LLM calls in one burst.
 const CONCURRENCY = 10;
 const MAX_PER_RUN = 60;
-const CLAIM_STALE_MINUTES = 45;
-const MAX_ATTEMPTS = 3;
 export type EnrichReport = {
   processed: number;
   enriched: number;
@@ -123,15 +124,9 @@ async function claimPendingEnrichItems(
   opts: EnrichBatchOptions,
 ): Promise<Item[]> {
   const limit = opts.limit ?? MAX_PER_RUN;
-  const maxAttempts = opts.maxAttempts ?? MAX_ATTEMPTS;
+  const maxAttempts = opts.maxAttempts ?? ENRICH_MAX_ATTEMPTS;
   const filters = [
-    sql`${items.enrichedAt} IS NULL`,
-    enrichBodyPrefetchReadySql(items.bodyFetchedAt, items.canonicalUrl),
-    sql`coalesce(${items.enrichAttempts}, 0) < ${maxAttempts}`,
-    sql`(
-      ${items.enrichClaimedAt} IS NULL
-      OR ${items.enrichClaimedAt} < now() - (${CLAIM_STALE_MINUTES} * interval '1 minute')
-    )`,
+    enrichClaimableSql(items, { maxAttempts }),
   ];
   if (opts.windowStart) {
     filters.push(

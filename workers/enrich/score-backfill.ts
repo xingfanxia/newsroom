@@ -8,7 +8,7 @@
  * Cost: ~$0.008/item × ~150 items = ~$1.20 one-time sweep.
  */
 import pLimit from "p-limit";
-import { and, eq, isNotNull, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items } from "@/db/schema";
 import { generateStructured, profiles } from "@/lib/llm";
@@ -25,6 +25,7 @@ import {
   loadNeverExcludeSourceIds,
 } from "./source-tier";
 import { treatmentForScore, type EnrichTreatment } from "./treatment";
+import { scoreBackfillPendingSql } from "./pending-predicates";
 
 const CONCURRENCY = 30;
 const MAX_PER_RUN = 300;
@@ -48,18 +49,7 @@ export async function runScoreBackfill(): Promise<ScoreBackfillReport> {
   const pending = await client
     .select()
     .from(items)
-    .where(
-      and(
-        isNotNull(items.enrichedAt),
-        sql`(
-          ${items.hkr} IS NULL
-          OR ${items.reasoningZh} IS NULL
-          OR ${items.reasoningEn} IS NULL
-          OR ${items.hkr} -> 'reasonsZh' IS NULL
-          OR ${items.hkr} -> 'reasonsEn' IS NULL
-        )`,
-      ),
-    )
+    .where(scoreBackfillPendingSql(items))
     .limit(MAX_PER_RUN);
 
   if (pending.length === 0) {

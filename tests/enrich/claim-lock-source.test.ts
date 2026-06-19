@@ -12,6 +12,7 @@ function readOptional(rel: string): string {
 describe("enrich worker claim lock", () => {
   const schema = readSource("db/schema.ts");
   const worker = readSource("workers/enrich/index.ts");
+  const pendingPredicates = readSource("workers/enrich/pending-predicates.ts");
   const claimState = readOptional("workers/enrich/claim-state.ts");
   const migration = readOptional(
     "db/migrations/manual/2026-06-11-enrich-claim-lock.sql",
@@ -34,20 +35,26 @@ describe("enrich worker claim lock", () => {
   });
 
   it("waits for body prefetch before claiming non-X web items", () => {
-    expect(worker).toContain("@/lib/urls/media");
-    expect(worker).toContain("enrichBodyPrefetchReadySql(");
-    expect(worker).toContain("items.bodyFetchedAt");
-    expect(worker).toContain("items.canonicalUrl");
+    expect(worker).toContain("./pending-predicates");
+    expect(worker).toContain("enrichClaimableSql(items, { maxAttempts })");
+    expect(pendingPredicates).toContain("@/lib/urls/media");
+    expect(pendingPredicates).toContain("enrichBodyPrefetchReadySql(");
+    expect(pendingPredicates).toContain("columns.bodyFetchedAt");
+    expect(pendingPredicates).toContain("columns.canonicalUrl");
     expect(worker).not.toContain("BODY_PREFETCH_READY_SQL");
-    expect(worker).not.toContain("x.com/%/status/%");
-    expect(worker).not.toContain("twitter.com/%/status/%");
+    expect(pendingPredicates).not.toContain("BODY_PREFETCH_READY_SQL");
+    expect(pendingPredicates).not.toContain("x.com/%/status/%");
+    expect(pendingPredicates).not.toContain("twitter.com/%/status/%");
   });
 
   it("backs off failed rows and caps automatic retries", () => {
-    expect(worker).toContain("CLAIM_STALE_MINUTES");
-    expect(worker).toContain("MAX_ATTEMPTS");
+    expect(worker).toContain("ENRICH_MAX_ATTEMPTS");
+    expect(pendingPredicates).toContain("ENRICH_CLAIM_STALE_MINUTES");
+    expect(pendingPredicates).toContain("ENRICH_MAX_ATTEMPTS");
     expect(worker).toContain("markEnrichFailure");
-    expect(worker).toContain("coalesce(${items.enrichAttempts}, 0) <");
+    expect(pendingPredicates).toContain(
+      "coalesce(${columns.enrichAttempts}, 0) <",
+    );
   });
 
   it("clears claim state when reset scripts intentionally requeue items", () => {

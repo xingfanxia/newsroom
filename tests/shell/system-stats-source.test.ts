@@ -2,6 +2,9 @@ import { describe, expect, it } from "bun:test";
 import { readSource } from "@/tests/helpers/source";
 
 const source = readSource("lib/shell/system-stats.ts");
+const enrichWorker = readSource("workers/enrich/index.ts");
+const scoreWorker = readSource("workers/enrich/score-backfill.ts");
+const pendingPredicates = readSource("workers/enrich/pending-predicates.ts");
 
 describe("admin system stats source wiring", () => {
   it("derives cron schedules from vercel.json", () => {
@@ -54,17 +57,34 @@ describe("admin system stats source wiring", () => {
 
   it("keeps body-prefetch and enrich queue predicates shared with workers", () => {
     expect(source).toContain("@/lib/urls/media");
+    expect(source).toContain("@/workers/enrich/pending-predicates");
     expect(source).toContain("bodyPrefetchPendingSql(");
-    expect(source).toContain("enrichBodyPrefetchReadySql(");
+    expect(source).toContain("enrichClaimableSql(items)");
     expect(source).toContain("bodyPrefetchPending");
     expect(source).toContain("enrichClaimable");
     expect(source).toContain('systemQueueSnapshot("article-body"');
     expect(source).toContain(
       'systemQueueSnapshot("enrich", itemsRow?.enrichClaimable',
     );
+    expect(enrichWorker).toContain("enrichClaimableSql(items, { maxAttempts })");
+    expect(pendingPredicates).toContain("ENRICH_MAX_ATTEMPTS");
+    expect(pendingPredicates).toContain("ENRICH_CLAIM_STALE_MINUTES");
+    expect(pendingPredicates).toContain("coalesce(${columns.enrichAttempts}, 0)");
     expect(source).not.toContain("unenriched:");
     expect(source).not.toContain(
       "count(*) filter (where ${items.enrichedAt} is null)::int",
+    );
+  });
+
+  it("keeps score queue aligned with score-backfill candidates", () => {
+    expect(source).toContain("scoreBackfillPendingSql(items)");
+    expect(scoreWorker).toContain("scoreBackfillPendingSql(items)");
+    expect(source).toContain("scoreBackfillPending");
+    expect(source).toContain(
+      'systemQueueSnapshot("score", itemsRow?.scoreBackfillPending',
+    );
+    expect(source).not.toContain(
+      "count(*) filter (where ${items.importance} is null)::int",
     );
   });
 
