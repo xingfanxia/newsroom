@@ -1,4 +1,7 @@
-import { DEFAULT_APP_LOCALE, isAppLocale } from "@/lib/types";
+import {
+  appLocaleFromPathname,
+  stripAppLocalePathPrefix,
+} from "@/lib/types";
 
 /**
  * Pure gate decision for /:locale/admin/*. Since the switch to password-gated
@@ -9,18 +12,18 @@ export type AdminGateDecision =
   | { action: "allow" }
   | { action: "redirect"; to: string };
 
-const ADMIN_PATH_PATTERN = /^\/(zh|en)\/admin(\/|$)/;
-
 export type GateInput = {
   pathname: string;
   hasSession: boolean;
 };
 
 export function decideAdminGate(input: GateInput): AdminGateDecision {
-  const match = input.pathname.match(ADMIN_PATH_PATTERN);
-  if (!match) return { action: "allow" };
-  const routeLocale = match[1] ?? "";
-  const locale = isAppLocale(routeLocale) ? routeLocale : DEFAULT_APP_LOCALE;
+  const locale = appLocaleFromPathname(input.pathname);
+  if (!locale) return { action: "allow" };
+  const rest = stripAppLocalePathPrefix(input.pathname);
+  if (rest !== "/admin" && !rest.startsWith("/admin/")) {
+    return { action: "allow" };
+  }
   if (input.hasSession) return { action: "allow" };
   const next = encodeURIComponent(input.pathname);
   return { action: "redirect", to: `/${locale}/login?next=${next}` };

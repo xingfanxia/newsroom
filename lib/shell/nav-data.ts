@@ -2,6 +2,7 @@
  * Left-rail + mobile-drawer navigation data. Bilingual labels resolved at
  * render time from the tweaks.language setting (EN or 中文).
  */
+import { stripAppLocalePathPrefix } from "@/lib/types";
 
 export type NavItem = {
   id: string;
@@ -34,8 +35,7 @@ export const NAV_ADMIN: NavItem[] = [
 
 /** Active nav id derivation from the current pathname (locale-stripped). */
 export function activeNavId(pathname: string): string | null {
-  // Strip leading /en or /zh
-  const rest = pathname.replace(/^\/(en|zh)(?=\/|$)/, "") || "/";
+  const rest = stripAppLocalePathPrefix(pathname);
   const direct = [...NAV_PRIMARY, ...NAV_ADMIN].find((n) => n.href === rest);
   if (direct) return direct.id;
   // Prefix match (e.g. /podcasts/123 → podcasts)

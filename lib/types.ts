@@ -60,6 +60,23 @@ export function appLocaleFromParam(
   return value && isAppLocale(value) ? value : DEFAULT_APP_LOCALE;
 }
 
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+const APP_LOCALE_PATH_PREFIX_PATTERN = new RegExp(
+  `^/(${APP_LOCALES.map(escapeRegex).join("|")})(?=/|$)`,
+);
+
+export function appLocaleFromPathname(pathname: string): AppLocale | null {
+  const value = pathname.match(APP_LOCALE_PATH_PREFIX_PATTERN)?.[1];
+  return value && isAppLocale(value) ? value : null;
+}
+
+export function stripAppLocalePathPrefix(pathname: string): string {
+  return pathname.replace(APP_LOCALE_PATH_PREFIX_PATTERN, "") || "/";
+}
+
 export const DAILY_NEWSLETTER_KIND = "daily";
 export const MONTHLY_NEWSLETTER_KIND = "monthly";
 export const NEWSLETTER_KINDS = [

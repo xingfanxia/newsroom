@@ -48,6 +48,11 @@ describe("activeNavId", () => {
     // strip behaviour is best-effort. Unknown → 'hot' via the fallback.
     expect(() => activeNavId("/somewhere")).not.toThrow();
   });
+
+  it("does not treat locale-like non-prefixes as locales", () => {
+    expect(activeNavId("/english/saved")).toBe("hot");
+    expect(activeNavId("/zhishiku/saved")).toBe("hot");
+  });
 });
 
 describe("nav data shape", () => {

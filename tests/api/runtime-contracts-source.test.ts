@@ -1,9 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import {
+  appLocaleFromPathname,
   appLocaleFromParam,
   appLocaleLanguageTag,
   DEFAULT_APP_LOCALE,
   isAppLocale,
+  stripAppLocalePathPrefix,
 } from "@/lib/types";
 import { readSource as read } from "@/tests/helpers/source";
 
@@ -49,6 +51,7 @@ const agentPrompt = read("workers/agent/prompt.ts");
 const adminGate = read("lib/auth/admin-gate.ts");
 const usageDisplay = read("lib/llm/usage-display.ts");
 const fetcher = read("workers/fetcher/index.ts");
+const navData = read("lib/shell/nav-data.ts");
 const homePage = read("app/[locale]/page.tsx");
 const allPage = read("app/[locale]/all/page.tsx");
 const curatedPage = read("app/[locale]/curated/page.tsx");
@@ -92,6 +95,12 @@ describe("runtime contract source wiring", () => {
     expect(appLocaleFromParam("zh")).toBe("zh");
     expect(appLocaleFromParam("fr")).toBe(DEFAULT_APP_LOCALE);
     expect(appLocaleFromParam(undefined)).toBe(DEFAULT_APP_LOCALE);
+    expect(appLocaleFromPathname("/zh/admin")).toBe("zh");
+    expect(appLocaleFromPathname("/en/saved")).toBe("en");
+    expect(appLocaleFromPathname("/admin")).toBeNull();
+    expect(stripAppLocalePathPrefix("/zh/admin/users")).toBe("/admin/users");
+    expect(stripAppLocalePathPrefix("/en")).toBe("/");
+    expect(stripAppLocalePathPrefix("/unknown")).toBe("/unknown");
   });
 
   test("locales have shared runtime tuples for app routes and source rows", () => {
@@ -101,6 +110,8 @@ describe("runtime contract source wiring", () => {
     expect(types).toContain("export function appLocaleLanguageTag");
     expect(types).toContain("export function isAppLocale");
     expect(types).toContain("export function appLocaleFromParam");
+    expect(types).toContain("export function appLocaleFromPathname");
+    expect(types).toContain("export function stripAppLocalePathPrefix");
     expect(types).toContain("export const SOURCE_LOCALES");
     expect(types).toContain("export const NEWSLETTER_LOCALES");
     expect(routing).toContain("@/lib/types");
@@ -160,8 +171,13 @@ describe("runtime contract source wiring", () => {
       expect(source).not.toContain('"en" | "zh"');
       expect(source).not.toContain("type Locale = AppLocale");
     }
-    expect(adminGate).toContain("isAppLocale");
+    expect(adminGate).toContain("appLocaleFromPathname");
     expect(adminGate).not.toContain('as "zh" | "en"');
+    for (const source of [adminGate, navData]) {
+      expect(source).toContain("stripAppLocalePathPrefix");
+      expect(source).not.toContain("(zh|en)");
+      expect(source).not.toContain("(en|zh)");
+    }
   });
 
   test("reader route pages normalize locale params through the shared helper", () => {

@@ -26,6 +26,15 @@ describe("decideAdminGate — non-admin paths", () => {
       decideAdminGate({ pathname: "/admin", hasSession: false }),
     ).toEqual({ action: "allow" });
   });
+
+  it("does NOT fire on locale-like non-prefixes", () => {
+    expect(
+      decideAdminGate({ pathname: "/english/admin", hasSession: false }),
+    ).toEqual({ action: "allow" });
+    expect(
+      decideAdminGate({ pathname: "/zhishiku/admin", hasSession: false }),
+    ).toEqual({ action: "allow" });
+  });
 });
 
 describe("decideAdminGate — unauthenticated on admin paths", () => {
