@@ -1,5 +1,13 @@
 # AI·HOT — Screenshot Analysis & Product Blueprint
 
+> **Historical archive.** This 2026-04-16 screenshot-derived product/source
+> blueprint is not current implementation guidance. Current architecture lives in
+> [`../architecture/ingestion.md`](../architecture/ingestion.md), current product
+> surface lives in [`../../README.md`](../../README.md), and the runtime source
+> catalog lives in [`../../lib/sources/catalog.ts`](../../lib/sources/catalog.ts).
+> The source lists below preserve early ideation and include retired paper-feed
+> ideas.
+>
 > Source screenshots: `docs/design/reference-screenshots/01-06.jpg`
 > Generated: 2026-04-16 — informs product scope, design system, and data-source catalog.
 

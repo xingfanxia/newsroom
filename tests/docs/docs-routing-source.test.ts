@@ -15,6 +15,7 @@ const aggregationHandoff = readSource("docs/HANDOFF-AGGREGATION.md");
 const aggregationDesign = readSource("docs/aggregation/DESIGN.md");
 const aggregationPlan = readSource("docs/aggregation/PLAN.md");
 const aihotPlan = readSource("docs/aihot-integration/PLAN.md");
+const screenshotAnalysis = readSource("docs/design/screenshot-analysis.md");
 const agentMcpPlan = readSource("docs/AGENT-MCP-PLAN.md");
 const session8Punchlist = readSource("docs/SESSION8-PUNCHLIST.md");
 const aggregationHandoffFiles = readdirSync(sourcePath("docs/aggregation"))
@@ -237,6 +238,30 @@ describe("docs routing source contracts", () => {
     expect(planLead).toContain("retained as the design record");
     expect(planLead.indexOf("Historical archive")).toBeLessThan(
       planLead.indexOf("**Tier**"),
+    );
+  });
+
+  test("screenshot product blueprint is archived before old source-catalog ideation", () => {
+    expect(docsReadme).toContain(
+      "[`design/screenshot-analysis.md`](./design/screenshot-analysis.md)",
+    );
+    expect(docsReadme).toContain(
+      "Original screenshot-derived product/source blueprint",
+    );
+    expect(docsReadme).toContain(
+      "current source catalog lives in [`../lib/sources/catalog.ts`](../lib/sources/catalog.ts)",
+    );
+
+    const blueprintLead = screenshotAnalysis.slice(0, 800);
+    expect(blueprintLead).toContain("Historical archive");
+    expect(blueprintLead).toContain("not current implementation guidance");
+    expect(blueprintLead).toContain("../architecture/ingestion.md");
+    expect(blueprintLead).toContain("../../README.md");
+    expect(blueprintLead).toContain("../../lib/sources/catalog.ts");
+    expect(blueprintLead).toContain("retired paper-feed");
+    expect(blueprintLead).toContain("ideas");
+    expect(blueprintLead.indexOf("Historical archive")).toBeLessThan(
+      blueprintLead.indexOf("Source screenshots"),
     );
   });
 
