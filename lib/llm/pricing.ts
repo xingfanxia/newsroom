@@ -87,13 +87,13 @@ const FALLBACK: Record<string, ModelPricing> = {
     inputCostPerToken: 0.00000013,
     outputCostPerToken: 0,
   },
-  // Claude Opus 4.7 (Anthropic public pricing)
+  // Anthropic fallback pricing.
   [LLM_MODEL_DEFAULTS.anthropic]: {
     inputCostPerToken: 0.000015,
     outputCostPerToken: 0.000075,
     cachedInputCostPerToken: 0.0000015,
   },
-  // Gemini 3.1 Pro Preview (estimated from Gemini pricing patterns)
+  // Gemini fallback pricing estimate.
   [LLM_MODEL_DEFAULTS.gemini]: {
     inputCostPerToken: 0.00000125,
     outputCostPerToken: 0.00001,

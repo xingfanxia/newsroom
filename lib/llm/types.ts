@@ -59,16 +59,16 @@ export type GenerateTextRequest = {
   provider?: LLMProvider;
   /** Override the default deployment for this provider (mainly for Azure). */
   deployment?: string;
-  /** Reasoning effort. Provider-specific allowed values:
-   *   - gpt-5.5-standard: minimal | low | medium | high
-   *   - azure-openai-pro: medium | high | xhigh
+  /** Reasoning effort. Provider-specific support:
+   *   - azure-openai compatibility deployments: minimal | low | medium | high
+   *   - azure-openai-pro deployments: medium | high | xhigh
    */
   reasoningEffort?: ReasoningEffort;
   system?: string;
   messages: ModelMessage[];
   maxTokens?: number;
-  /** Reasoning-family models (Opus 4.7, Gemini 3 Pro, GPT-5) reject temperature.
-   *  Only pass it when calling non-reasoning models. */
+  /** Reasoning-family models reject temperature. Only pass it when calling
+   *  non-reasoning deployments. */
   temperature?: number;
 } & LLMUsageContext;
 

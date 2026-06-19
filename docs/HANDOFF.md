@@ -80,7 +80,8 @@ Shipped cleanup:
   operator backfill cost forecasts no longer repeat the same DeepSeek, GPT,
   and embedding defaults, and `.env.example` is now tested against the same
   contract while labeling Azure OpenAI chat as compatibility/probe rather than
-  the default enrich/score path.
+  the default enrich/score path. LLM request type comments stay
+  provider-oriented so default deployment labels do not leak into type docs.
 - Reused `APP_LOCALES` in `i18n/routing.ts`, so Next locale routing and
   API/OpenAPI/agent locale contracts no longer carry separate hard-coded
   `zh/en` tuples.

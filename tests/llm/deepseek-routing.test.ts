@@ -81,9 +81,18 @@ describe("Azure DeepSeek routing", () => {
       '"gemini-3.1-pro-preview"',
     ]) {
       expect(llmSrc).not.toContain(literal);
+      expect(typesSrc).not.toContain(literal);
       expect(pricingSrc).not.toContain(literal);
       expect(backfillStyleSrc).not.toContain(literal);
     }
+  });
+
+  it("keeps request type comments provider-oriented instead of deployment-specific", () => {
+    expect(typesSrc).toContain("azure-openai compatibility deployments");
+    expect(typesSrc).toContain("azure-openai-pro deployments");
+    expect(typesSrc).toContain("Reasoning-family models reject temperature");
+    expect(typesSrc).not.toContain("gpt-5.5-standard: minimal");
+    expect(typesSrc).not.toContain("Opus 4.7, Gemini 3 Pro, GPT-5");
   });
 
   it("accepts a /responses endpoint without double-appending /responses", () => {
