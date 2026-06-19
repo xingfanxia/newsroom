@@ -375,6 +375,9 @@ Shipped cleanup:
 - Shared podcast feed tier defaults/coercion through
   `lib/feed/podcast-filters.ts`, so `/podcasts` no longer carries a local
   `featured|all` tier union or query parser.
+- Shared source-catalog view defaults/coercion through `lib/sources/view.ts`,
+  so `/sources` and its view toggle cannot drift on `table|cards` or default
+  URL behavior.
 - Shared public/agent API item source-field types and cluster lead-pick source
   authority types through `SourceGroup` / `SourceKind` from `lib/types.ts`;
   the archived s9 MCP plan is now labeled historical so old enum examples

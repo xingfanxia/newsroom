@@ -15,6 +15,8 @@ const sourcePresets = readSource("app/[locale]/_source-presets.ts");
 const homeFilterContracts = readSource("lib/feed/home-filters.ts");
 const homeFilters = readSource("app/[locale]/_home-filters.tsx");
 const podcastsPage = readSource("app/[locale]/podcasts/page.tsx");
+const sourcesPage = readSource("app/[locale]/sources/page.tsx");
+const sourcesViewToggle = readSource("app/[locale]/sources/_view-toggle.tsx");
 const storyItemFields = readSource("lib/api/story-item-fields.ts");
 const leadPick = readSource("workers/cluster/lead-pick.ts");
 const recomputeClusterLeads = readSource(
@@ -171,6 +173,18 @@ describe("feed tier/view source wiring", () => {
     expect(podcastsPage).toContain("PODCAST_TIERS.map");
     expect(podcastsPage).not.toContain('type PodTier = "featured" | "all"');
     expect(podcastsPage).not.toContain('sp.tier === "all" ? "all" : "featured"');
+  });
+
+  test("source catalog view controls derive from shared contracts", () => {
+    expect(sourcesPage).toContain("@/lib/sources/view");
+    expect(sourcesPage).toContain("coerceSourcesView");
+    expect(sourcesPage).not.toContain('sp.view === "cards" ? "cards" : "table"');
+
+    expect(sourcesViewToggle).toContain("@/lib/sources/view");
+    expect(sourcesViewToggle).toContain("SOURCES_VIEWS.map");
+    expect(sourcesViewToggle).toContain("DEFAULT_SOURCES_VIEW");
+    expect(sourcesViewToggle).not.toContain('export type SourcesView = "table" | "cards"');
+    expect(sourcesViewToggle).not.toContain('href={`${pathname}?view=cards`}');
   });
 
   test("internal feed and commentary contracts use shared tier types", () => {

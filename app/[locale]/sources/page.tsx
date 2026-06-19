@@ -3,8 +3,9 @@ import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
 import { SOURCE_GROUP_LABELS, SOURCE_GROUPS } from "@/lib/sources/groups";
 import { getLiveSources, liveSourcesByGroup } from "@/lib/sources/live";
+import { coerceSourcesView } from "@/lib/sources/view";
 import { getShellChromeData } from "@/lib/shell/chrome-data";
-import { SourcesViewToggle, type SourcesView } from "./_view-toggle";
+import { SourcesViewToggle } from "./_view-toggle";
 import { appLocaleFromParam } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +20,7 @@ export default async function SourcesPage({
   const [{ locale }, sp] = await Promise.all([params, searchParams]);
   const appLocale = appLocaleFromParam(locale);
   setRequestLocale(appLocale);
-  const view: SourcesView = sp.view === "cards" ? "cards" : "table";
+  const view = coerceSourcesView(sp.view);
 
   const [live, chrome] = await Promise.all([
     getLiveSources(),
