@@ -75,12 +75,12 @@ describe("daily-highlights mode (minImportance + maxPerDay)", () => {
   it("daily-highlights only kicks in for the unfiltered home (preserves drill-ins)", () => {
     // Tab/source/date drill-ins must keep returning the full chronological
     // feed for their slice. The home page guards with:
-    //   !activeDate && !sourceId && sourcePreset === 'all' && tier === 'featured'
+    //   !activeDate && !sourceId && sourcePreset === 'all' && tier === DEFAULT_HOME_TIER
     // so opening /zh?source=media or /zh?date=2026-04-21 stays unfiltered.
     const homeSrc = readSource("app/[locale]/page.tsx");
     expect(homeSrc).toContain("dailyHighlights");
     expect(homeSrc).toMatch(
-      /!activeDate\s*&&\s*!sourceId\s*&&\s*sourcePreset === "all"\s*&&\s*tier === "featured"/,
+      /!activeDate\s*&&\s*!sourceId\s*&&\s*sourcePreset === "all"\s*&&\s*tier === DEFAULT_HOME_TIER/,
     );
     expect(homeSrc).toContain("minImportance: 80");
     expect(homeSrc).toContain("maxPerDay: 3");

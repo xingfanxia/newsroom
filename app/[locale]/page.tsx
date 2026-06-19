@@ -13,6 +13,11 @@ import {
   coerceSourcePreset,
   sourcePresetToFeedFilter,
 } from "./_source-presets";
+import {
+  coerceHomeTier,
+  coerceHomeView,
+  DEFAULT_HOME_TIER,
+} from "@/lib/feed/home-filters";
 import { groupByDay } from "@/lib/feed/group-by-day";
 import { coerceFeedDateKey, feedPageLimitForDate } from "@/lib/feed/page-query";
 import { getFeaturedStories } from "@/lib/items/live";
@@ -27,15 +32,6 @@ import { mockStories } from "@/lib/mock/stories";
 import { appLocaleFromParam, type Story } from "@/lib/types";
 
 export const revalidate = 60;
-
-function coerceTier(v: string | undefined): HomeTier {
-  return v === "p1" ? "p1" : "featured";
-}
-function coerceView(v: string | undefined): HomeView {
-  // Default flipped 2026-05-08: today's hot events, not the multi-day digest.
-  // Old behavior is reachable via ?view=daily — preserved for power users.
-  return v === "daily" ? "daily" : "today";
-}
 
 const FALLBACK_TICKER = [
   { lab: "OPUS 4.7", val: "score engine online", kind: "up" as const, extra: "live" },
@@ -72,7 +68,7 @@ export default async function HotNewsPage({
     redirect(`/${appLocale}/all${search ? `?${search}` : ""}`);
   }
   setRequestLocale(appLocale);
-  const tier = coerceTier(sp.tier);
+  const tier: HomeTier = coerceHomeTier(sp.tier);
   // source_id pins a specific publisher and overrides any preset bucket.
   const sourceId = sp.source_id?.trim() || undefined;
   const sourcePreset = coerceSourcePreset(sp.source);
@@ -83,7 +79,7 @@ export default async function HotNewsPage({
   // Default `today` (importance-sorted hot events). `daily` opts back into
   // the multi-day 3-per-day digest. Calendar drill-in (activeDate) overrides
   // both — that always shows the full archive for the picked day.
-  const homeView = coerceView(sp.view);
+  const homeView: HomeView = coerceHomeView(sp.view);
   // Day picked → show everything curated that day. Unfiltered top-featured
   // view bumps to 120 (was 40 and people kept asking where the rest went).
   const limit = feedPageLimitForDate(activeDate, 120);
@@ -97,7 +93,7 @@ export default async function HotNewsPage({
     !activeDate &&
     !sourceId &&
     sourcePreset === "all" &&
-    tier === "featured" &&
+    tier === DEFAULT_HOME_TIER &&
     homeView === "daily";
 
   let stories: Story[] = [];
@@ -139,7 +135,7 @@ export default async function HotNewsPage({
 
   // Cold-start fallback: if there's literally no enriched content, show mock
   // so the shell renders something sensible.
-  if (stories.length === 0 && tier === "featured" && sourcePreset === "all" && !sourceId && !activeDate) {
+  if (stories.length === 0 && tier === DEFAULT_HOME_TIER && sourcePreset === "all" && !sourceId && !activeDate) {
     try {
       const probe = await getFeaturedStories({
         tier: "all",
@@ -160,7 +156,7 @@ export default async function HotNewsPage({
     // Calendar must apply the SAME filters as the feed — otherwise the cell
     // count can over-promise items that will not render after filtering.
     getDayCounts(60, {
-      tier: "featured",
+      tier: DEFAULT_HOME_TIER,
     }).catch(() => []),
   ]);
   const ticker = tickerItems.length > 0 ? tickerItems : FALLBACK_TICKER;

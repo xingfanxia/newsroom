@@ -2,21 +2,35 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
 import { useTweaks } from "@/hooks/use-tweaks";
+import {
+  DEFAULT_HOME_TIER,
+  DEFAULT_HOME_VIEW,
+  HOME_TIERS,
+  type HomeTier,
+  type HomeView,
+} from "@/lib/feed/home-filters";
 import { mainRssFeedMeta } from "@/lib/rss/main-feed-meta";
 import type { SourcePreset } from "./_source-presets";
 
-export type HomeTier = "featured" | "p1";
-export type HomeView = "today" | "daily";
+export type { HomeTier, HomeView } from "@/lib/feed/home-filters";
 
 const VIEW_OPTS: Array<{ v: HomeView; en: string; zh: string }> = [
   { v: "today", en: "today",  zh: "今日热点" },
   { v: "daily", en: "digest", zh: "每日精选" },
 ];
 
-const TIER_OPTS: Array<{ v: HomeTier; en: string; zh: string; count?: string }> = [
-  { v: "featured", en: "featured", zh: "精选" },
-  { v: "p1",       en: "P1",       zh: "P1" },
-];
+const TIER_LABELS = {
+  featured: { en: "featured", zh: "精选" },
+  p1: { en: "P1", zh: "P1" },
+} as const satisfies Record<HomeTier, { en: string; zh: string }>;
+
+const TIER_OPTS: Array<{ v: HomeTier; en: string; zh: string }> = HOME_TIERS.map(
+  (v) => ({ v, ...TIER_LABELS[v] }),
+);
+
+const TIER_CLASS: Partial<Record<HomeTier, string>> = {
+  p1: "p1",
+};
 
 const SOURCE_OPTS: Array<{ v: SourcePreset; en: string; zh: string }> = [
   { v: "all",        en: "all",         zh: "全部" },
@@ -59,8 +73,8 @@ export function HomeFilters({
         v == null ||
         v === "" ||
         v === "all" ||
-        v === "featured" ||
-        (k === "view" && v === "today")
+        v === DEFAULT_HOME_TIER ||
+        (k === "view" && v === DEFAULT_HOME_VIEW)
       ) {
         next.delete(k);
       } else {
@@ -112,7 +126,7 @@ export function HomeFilters({
           <button
             key={o.v}
             type="button"
-            className={`fil ${tier === o.v ? "on" : ""} ${o.v === "p1" ? "p1" : ""}`}
+            className={`fil ${tier === o.v ? "on" : ""} ${TIER_CLASS[o.v] ?? ""}`}
             onClick={() => push({ tier: o.v })}
           >
             {zh ? o.zh : o.en}

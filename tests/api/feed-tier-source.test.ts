@@ -12,6 +12,8 @@ const tierSql = readSource("lib/items/tier-sql.ts");
 const feedParams = readSource("lib/api/feed-query-params.ts");
 const mcpRoute = readSource("app/api/mcp/route.ts");
 const sourcePresets = readSource("app/[locale]/_source-presets.ts");
+const homeFilterContracts = readSource("lib/feed/home-filters.ts");
+const homeFilters = readSource("app/[locale]/_home-filters.tsx");
 const storyItemFields = readSource("lib/api/story-item-fields.ts");
 const leadPick = readSource("workers/cluster/lead-pick.ts");
 const recomputeClusterLeads = readSource(
@@ -134,6 +136,31 @@ describe("feed tier/view source wiring", () => {
         "): { sourceGroup?: string; sourceKind?: string }",
       );
     }
+  });
+
+  test("home filter tier and view controls derive from shared contracts", () => {
+    expect(homeFilterContracts).toContain("HIGHLIGHT_ITEM_TIERS");
+    expect(homeFilterContracts).toContain("HOME_TIERS");
+    expect(homeFilterContracts).toContain("DEFAULT_HOME_TIER");
+    expect(homeFilterContracts).toContain("const HOME_VIEWS");
+    expect(homeFilterContracts).not.toContain("export const HOME_VIEWS");
+    expect(homeFilterContracts).toContain("DEFAULT_HOME_VIEW");
+    expect(homeFilterContracts).toContain("coerceHomeTier");
+    expect(homeFilterContracts).toContain("coerceHomeView");
+
+    expect(homeFilters).toContain("@/lib/feed/home-filters");
+    expect(homeFilters).toContain("HOME_TIERS.map");
+    expect(homeFilters).toContain("DEFAULT_HOME_TIER");
+    expect(homeFilters).toContain("DEFAULT_HOME_VIEW");
+    expect(homeFilters).not.toContain('export type HomeTier = "featured" | "p1"');
+    expect(homeFilters).not.toContain('{ v: "featured", en: "featured", zh: "精选" }');
+    expect(homeFilters).not.toContain('{ v: "p1",       en: "P1",       zh: "P1" }');
+    expect(homePage).toContain("coerceHomeTier");
+    expect(homePage).toContain("coerceHomeView");
+    expect(homePage).toContain("DEFAULT_HOME_TIER");
+    expect(homePage).not.toContain("function coerceTier");
+    expect(homePage).not.toContain("function coerceView");
+    expect(allPage).toContain("DEFAULT_HOME_TIER");
   });
 
   test("internal feed and commentary contracts use shared tier types", () => {

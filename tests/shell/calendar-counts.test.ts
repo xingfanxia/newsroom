@@ -71,9 +71,10 @@ describe("page calendars pass the same filters as their feed", () => {
   // [\s\S]*? is the cross-target-compatible substitute for `.` with the `s`
   // (dotAll) flag — the project targets ES2017 and `s` is ES2018+. Lazy
   // quantifier so the match doesn't stretch past the closing brace.
-  it("home /zh — getDayCounts passes tier='featured'", () => {
+  it("home /zh — getDayCounts passes the default home highlight tier", () => {
+    expect(homeSrc).toContain("DEFAULT_HOME_TIER");
     expect(homeSrc).toMatch(
-      /getDayCounts\(\s*60\s*,\s*\{[\s\S]*?tier:\s*"featured"[\s\S]*?\}/,
+      /getDayCounts\(\s*60\s*,\s*\{[\s\S]*?tier:\s*DEFAULT_HOME_TIER[\s\S]*?\}/,
     );
   });
 

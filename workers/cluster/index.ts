@@ -1,6 +1,8 @@
-import { sql, and, isNull, isNotNull } from "drizzle-orm";
+import { sql, and, inArray, isNull, isNotNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items, clusters } from "@/db/schema";
+import { visibleTierInSql } from "@/lib/items/tier-sql";
+import { VISIBLE_ITEM_TIERS } from "@/lib/types";
 import { hasReachedSplitRejectionCap } from "./split-audit";
 
 const MAX_PER_RUN = 200;
@@ -40,6 +42,7 @@ export async function runClusterBatch(): Promise<ClusterReport> {
         isNull(items.clusteredAt),
         isNotNull(items.embedding),
         isNotNull(items.enrichedAt),
+        inArray(items.tier, VISIBLE_ITEM_TIERS),
       ),
     )
     .limit(MAX_PER_RUN);
@@ -137,6 +140,7 @@ async function assignOneToCluster(itemId: number): Promise<AssignOutcome> {
     WHERE i.id <> ${itemId}
       AND i.embedding IS NOT NULL
       AND i.enriched_at IS NOT NULL
+      AND ${visibleTierInSql(sql`i.tier`)}
       AND i.cluster_id IS NOT NULL
       AND NOT EXISTS (
         SELECT 1
@@ -179,6 +183,7 @@ async function assignOneToCluster(itemId: number): Promise<AssignOutcome> {
           WHERE i.id <> ${itemId}
             AND i.embedding IS NOT NULL
             AND i.enriched_at IS NOT NULL
+            AND ${visibleTierInSql(sql`i.tier`)}
             AND i.cluster_id IS NULL
             AND i.published_at BETWEEN
                 (SELECT published_at FROM target) - make_interval(hours => ${WINDOW_HOURS})

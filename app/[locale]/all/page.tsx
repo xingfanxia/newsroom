@@ -12,6 +12,7 @@ import {
   sourcePresetToFeedFilter,
 } from "../_source-presets";
 import { groupByDay, sortStoriesNewestFirst } from "@/lib/feed/group-by-day";
+import { DEFAULT_HOME_TIER } from "@/lib/feed/home-filters";
 import {
   coerceFeedDateKey,
   coerceFeedOffset,
@@ -100,7 +101,7 @@ export default async function AllPostsPage({
         {/* Reuse home filters but force tier=featured to hide the pill group visually
             — users get here via /all which itself IS tier=all on the server. We still
             want the source-filter pills. */}
-        <HomeFilters tier="featured" source={sourcePreset} />
+        <HomeFilters tier={DEFAULT_HOME_TIER} source={sourcePreset} />
         <CalendarGrid
           days={days}
           active={activeDate}

@@ -1,7 +1,7 @@
 # AI·HOT — Data Ingestion & AI Pipeline Architecture
 
 > Blueprint for how raw feeds become curated, scored, summarized, tagged stories — and how editor feedback rewrites the curation policy.
-> **Status as of 2026-06-10**: ingestion, enrich/score/cluster, feedback, editorial agent, public API/MCP, AI HOT daily columns, DeepSeek treatment routing, and paper-source retirement have shipped. See Section 6 for milestone progress and deviations from the original blueprint.
+> **Status as of 2026-06-19**: ingestion, enrich/score/cluster, feedback, editorial agent, public API/MCP, AI HOT daily columns, DeepSeek treatment routing, and paper-source retirement have shipped. See Section 6 for milestone progress and deviations from the original blueprint.
 
 ---
 
@@ -188,7 +188,11 @@ historical rows just because the policy file changed.
 **Dedup**: hash title + canonical-url shortly after normalize. Drop exact duplicates.
 
 **Near-dup clustering** (runs async, not on critical path):
-- `/api/cron/cluster` processes enriched unclustered items.
+- `/api/cron/cluster` processes enriched unclustered visible-tier items
+  (`featured` / `p1` / `all`). Rows scored as `excluded` are terminal for
+  feed purposes and do not enter Stage A clustering or singleton-recluster
+  repair, which prevents low-value recurring items from triggering
+  arbitration/canonical-title spend.
 - Stage A compares against a bidirectional ±72h window anchored to the target
   item's `published_at`.
 - If cosine similarity is at least `0.75` (`halfvec` distance `<= 0.25`),
@@ -197,10 +201,12 @@ historical rows just because the policy file changed.
   writes event-level commentary for multi-member events.
 - Stage B split verdicts are recorded in `cluster_splits`; Stage A and the
   singleton-recluster repair pass treat those rows as negative edges so a
-  rejected item is not rejoined to the same cluster every cron tick. After
-  three distinct rejected clusters, Stage A explicitly settles the item as a
-  singleton before nearest-neighbor probes to cap arbitration spend on
-  topical-near but event-different stories.
+  rejected item is not rejoined to the same cluster every cron tick. Neighbor
+  queries use the shared visible-tier SQL helper, so `excluded` neighbors do
+  not pull visible items into noise clusters. After three distinct rejected
+  clusters, Stage A explicitly settles the item as a singleton before
+  nearest-neighbor probes to cap arbitration spend on topical-near but
+  event-different stories.
 
 ### 2.7 Store
 Postgres (Vercel Postgres / Neon / Supabase) with schema:
@@ -215,7 +221,7 @@ items            (id, source_id, raw_item_id, title, body, body_md, canonical_ur
                   cluster_id, commentary_at, enrich_claimed_at, enrich_attempts, enrich_error, ...)
 clusters         (id, lead_item_id, member_count, first_seen_at, latest_member_at, coverage,
                   canonical_title_zh/en, event_tier, importance, hkr, commentary_at, verified_at, ...)
-cluster_splits   (id, item_id, from_cluster_id, reason, created_at)
+cluster_splits   (id, item_id, from_cluster_id, reason, split_at)
 feedback         (id, user_id, item_id, vote from FEEDBACK_VOTES: up | down | save, note, created_at)
 policy_versions  (id, skill_name, version, content, reasoning, feedback_sample, feedback_count, committed_by, committed_at)
 iteration_runs   (id, skill_name, status from ITERATION_STATUSES, base_version, proposed_content,
@@ -325,7 +331,7 @@ A curated set of enabled X handles stored as normal `sources` rows.
 
 ### Deviations from original blueprint (what actually shipped vs. what Section 2 specified)
 
-- **Clustering path (§2.6)**: implemented as its own cron (`/api/cron/cluster`) not baked into enrich. The current Stage A threshold is 0.75 similarity with a 72h bidirectional published-at window. Widened neighbor search (§2.6 said "lead_item_id only"; we search all enriched) so same-batch siblings merge without a two-pass fix. Atomic row claim via `WHERE clustered_at IS NULL RETURNING` prevents double-counting. Stage A also excludes `cluster_splits` matches and settles an item as a singleton after three distinct rejected clusters, so Stage B's rejected joins do not become an every-tick arbitration loop.
+- **Clustering path (§2.6)**: implemented as its own cron (`/api/cron/cluster`) not baked into enrich. The current Stage A threshold is 0.75 similarity with a 72h bidirectional published-at window. Widened neighbor search (§2.6 said "lead_item_id only"; we search all enriched visible-tier items) so same-batch siblings merge without a two-pass fix. Atomic row claim via `WHERE clustered_at IS NULL RETURNING` prevents double-counting. Stage A and singleton-recluster also exclude `tier='excluded'` rows through the shared visible-tier SQL helper, exclude `cluster_splits` matches, and settle an item as a singleton after three distinct rejected clusters, so Stage B's rejected/noise joins do not become an every-tick arbitration loop.
 - **Embeddings (§2.4)**: `voyage-3 / text-embedding-3-large` — we picked **text-embedding-3-large native 3072 dims** stored as `halfvec(3072)` (not truncated to 1536 via Matryoshka). Same storage as `vector(1536)`, full quality, fits pgvector HNSW's 4000-dim cap.
 - **Scoring model (§2.5)**: "Sonnet 4.6" placeholder → shipped first as Azure GPT, then moved on 2026-06-10 to **Azure AI Foundry DeepSeek V4 Pro/Flash**. High-value items use Pro; lower-value items use Flash to avoid spending heavy tokens on throwaway content.
 - **LLM SDK choice**: original plan assumed direct vendor SDKs — migrated to **Vercel AI SDK v6** + `@ai-sdk/{anthropic,google,azure,openai}` for unified `generateText` / `generateObject` / `embed` across providers.

@@ -13,6 +13,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clusters, items } from "@/db/schema";
+import { visibleTierInSql } from "@/lib/items/tier-sql";
 import { MAX_DISTINCT_SPLIT_RETRIES_PER_ITEM } from "./split-audit";
 
 export const SINGLETON_RECLUSTER_SIMILARITY_THRESHOLD = 0.75;
@@ -131,6 +132,7 @@ export async function runSingletonReclusterBatch(
       AND ${windowFilter}
       AND i.embedding IS NOT NULL
       AND i.enriched_at IS NOT NULL
+      AND ${visibleTierInSql(sql`i.tier`)}
     ORDER BY i.published_at ASC
     ${limitClause}
   `)) as unknown as SingletonRow[];
@@ -172,6 +174,7 @@ export async function runSingletonReclusterBatch(
           AND i.cluster_id IS NOT NULL
           AND i.embedding IS NOT NULL
           AND i.enriched_at IS NOT NULL
+          AND ${visibleTierInSql(sql`i.tier`)}
           AND (SELECT rejected_cluster_count FROM target) < ${MAX_DISTINCT_SPLIT_RETRIES_PER_ITEM}
           AND NOT EXISTS (
             SELECT 1

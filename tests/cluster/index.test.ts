@@ -158,6 +158,23 @@ describe("Neighbor SQL — split audit exclusions", () => {
   });
 });
 
+// ── SQL: excluded items do not enter event clustering ───────────────────────
+
+describe("Neighbor SQL — visible tier gate", () => {
+  it("derives Stage A candidate eligibility from VISIBLE_ITEM_TIERS", () => {
+    expect(workerSrc).toContain("VISIBLE_ITEM_TIERS");
+    expect(workerSrc).toContain("inArray(items.tier, VISIBLE_ITEM_TIERS)");
+  });
+
+  it("filters both clustered and unclustered neighbor queries to visible tiers", () => {
+    const visibleNeighborFilters =
+      workerSrc.match(/visibleTierInSql\(sql`i\.tier`\)/g) ?? [];
+
+    expect(workerSrc).toContain("visibleTierInSql");
+    expect(visibleNeighborFilters).toHaveLength(2);
+  });
+});
+
 // ── Cluster member-add: latest_member_at + coverage sync ─────────────────────
 
 describe("Cluster UPDATE on member join", () => {

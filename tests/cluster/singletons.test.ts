@@ -8,6 +8,8 @@ import {
 import { readSource } from "@/tests/helpers/source";
 
 const pipelineSrc = readSource("workers/cluster/pipeline.ts");
+const singletonSrc = readSource("workers/cluster/singletons.ts");
+const tierSqlSrc = readSource("lib/items/tier-sql.ts");
 
 describe("singleton recluster decision", () => {
   it("moves a singleton into a different cluster when the nearest neighbor is within the Stage A threshold", () => {
@@ -63,7 +65,6 @@ describe("cron singleton recluster wiring", () => {
   it("respects Stage B split audit when choosing a target cluster", () => {
     expect(pipelineSrc).toContain("runSingletonReclusterBatch(");
 
-    const singletonSrc = readSource("workers/cluster/singletons.ts");
     expect(singletonSrc).toContain("FROM cluster_splits split_audit");
     expect(singletonSrc).toContain("split_audit.item_id = ${s.item_id}");
     expect(singletonSrc).toContain(
@@ -73,5 +74,15 @@ describe("cron singleton recluster wiring", () => {
     expect(singletonSrc).toContain(
       "count(DISTINCT split_audit.from_cluster_id)::int",
     );
+  });
+
+  it("derives singleton candidate and neighbor eligibility from the visible tier helper", () => {
+    const visibleTierFilters =
+      singletonSrc.match(/visibleTierInSql\(sql`i\.tier`\)/g) ?? [];
+
+    expect(tierSqlSrc).toContain("VISIBLE_ITEM_TIERS");
+    expect(tierSqlSrc).toContain("visibleTierInSql");
+    expect(singletonSrc).toContain("visibleTierInSql");
+    expect(visibleTierFilters).toHaveLength(2);
   });
 });

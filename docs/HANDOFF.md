@@ -369,6 +369,9 @@ Shipped cleanup:
   feed/calendar counts, ticker selection, diagnostics, and feedback fixtures
   reuse the same `HIGHLIGHT_ITEM_TIERS` tuple instead of hand-writing
   equivalent two-value `IN` or `OR` clauses.
+- Shared home feed tier/view defaults through `lib/feed/home-filters.ts`, so
+  the server query parser, home filter UI, all-posts source filter reuse, and
+  calendar count filter cannot drift on `featured|p1` or `today|daily`.
 - Shared public/agent API item source-field types and cluster lead-pick source
   authority types through `SourceGroup` / `SourceKind` from `lib/types.ts`;
   the archived s9 MCP plan is now labeled historical so old enum examples
@@ -511,6 +514,12 @@ Shipped cleanup:
   the same fuzzy join from being re-added and re-split every tick; after three
   distinct rejected clusters, Stage A explicitly settles the item as a
   singleton before running nearest-neighbor probes.
+- Added the shared visible-tier SQL gate to cluster Stage A and
+  singleton-recluster: `tier='excluded'` rows are no longer clustering
+  candidates or neighbors, so recurring low-value items cannot trigger
+  arbitration/canonical-title/event-commentary spend. A production preflight
+  on 2026-06-19 showed the live Stage A queue would drop from 2 old candidates
+  to 0 under the new predicate.
 - Moved render-local helper components out of `components/shell/tweaks.tsx`.
 - Reworked effect async loading in `SignalDrawer` and `TweaksProvider` to satisfy React lint rules without disabling them.
 - Replaced an internal raw `<a>` with locale-aware `next/link`.
