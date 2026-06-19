@@ -4,6 +4,12 @@
  */
 
 import { appLocaleLanguageTag, DEFAULT_APP_LOCALE } from "@/lib/types";
+import {
+  RSS_CONTENT_TYPE,
+  RSS_DEFAULT_CACHE,
+  rssCacheControl,
+  type RssCacheConfig,
+} from "@/lib/rss/http-contract";
 
 export type RssItem = {
   title: string;
@@ -34,20 +40,6 @@ export type RssChannel = {
   generator?: string;
   namespaces?: Record<string, string>;
 };
-
-type RssCacheConfig = {
-  maxAge: number;
-  sMaxAge?: number;
-  staleWhileRevalidate?: number;
-};
-
-const RSS_DEFAULT_CACHE: RssCacheConfig = {
-  maxAge: 600,
-  sMaxAge: 600,
-  staleWhileRevalidate: 3600,
-};
-
-const RSS_CONTENT_TYPE = "application/rss+xml; charset=utf-8";
 
 export function escapeXml(s: string): string {
   return s
@@ -157,13 +149,4 @@ export function rssResponse(
       "cache-control": rssCacheControl(cache),
     },
   });
-}
-
-function rssCacheControl(cache: RssCacheConfig): string {
-  const parts = ["public", `max-age=${cache.maxAge}`];
-  if (cache.sMaxAge !== undefined) parts.push(`s-maxage=${cache.sMaxAge}`);
-  if (cache.staleWhileRevalidate !== undefined) {
-    parts.push(`stale-while-revalidate=${cache.staleWhileRevalidate}`);
-  }
-  return parts.join(", ");
 }

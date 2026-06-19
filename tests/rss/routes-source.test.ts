@@ -11,6 +11,8 @@ const agentsTabs = read("app/[locale]/agents/_tabs.tsx");
 const homeFilters = read("app/[locale]/_home-filters.tsx");
 const mainFeed = read("lib/rss/main-feed.ts");
 const mainFeedMeta = read("lib/rss/main-feed-meta.ts");
+const rssHttpContract = read("lib/rss/http-contract.ts");
+const rssRateLimit = read("lib/rate-limit/rss.ts");
 const rssRenderer = read("lib/rss/render.ts");
 const legacyFeedMeta = read("lib/rss/legacy-feed-meta.ts");
 const legacyFeeds = read("lib/rss/legacy-feeds.ts");
@@ -24,10 +26,14 @@ describe("RSS route source contracts", () => {
       expect(route).not.toContain("new NextResponse(xml");
       expect(route).not.toContain("new Response(xml");
       expect(route).not.toContain("application/rss+xml; charset=utf-8");
+      expect(route).not.toContain("maxAge:");
+      expect(route).not.toContain("sMaxAge:");
+      expect(route).not.toContain("staleWhileRevalidate:");
     }
   });
 
   test("RSS feed helpers share the XML renderer", () => {
+    expect(rssRenderer).toContain("@/lib/rss/http-contract");
     expect(rssRenderer).toContain("appLocaleLanguageTag(DEFAULT_APP_LOCALE)");
     expect(rssRenderer).not.toContain('?? "zh-CN"');
 
@@ -147,5 +153,26 @@ describe("RSS route source contracts", () => {
     expect(newsletterFeed).toContain("renderRssFeed");
     expect(newsletterFeed).toContain("structuredNewsletterRssItem");
     expect(newsletterFeed).toContain("headline} IS NOT NULL");
+  });
+
+  test("agents RSS technical notes derive HTTP labels from shared runtime contracts", () => {
+    expect(rssHttpContract).toContain("RSS_CONTENT_TYPE");
+    expect(rssHttpContract).toContain("RSS_DEFAULT_CACHE");
+    expect(rssHttpContract).toContain("RSS_RATE_LIMIT_MAX");
+    expect(rssHttpContract).toContain("rssCacheControl");
+    expect(rssHttpContract).toContain("rssRateLimitReqLabel");
+    expect(rssRateLimit).toContain("@/lib/rss/http-contract");
+
+    expect(agentsTabs).toContain("@/lib/rss/http-contract");
+    expect(agentsTabs).toContain("RSS_CONTENT_TYPE");
+    expect(agentsTabs).toContain("rssCacheControl");
+    expect(agentsTabs).toContain("rssRateLimitReqLabel");
+
+    expect(agentsTabs).not.toContain("@/lib/rss/render");
+    expect(agentsTabs).not.toContain("@/lib/rate-limit/rss");
+    expect(agentsTabs).not.toContain("application/rss+xml");
+    expect(agentsTabs).not.toContain("s-maxage=600");
+    expect(agentsTabs).not.toContain("stale-while-revalidate=3600");
+    expect(agentsTabs).not.toContain("60 req/h");
   });
 });

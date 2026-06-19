@@ -23,5 +23,5 @@ export async function GET(
 
   const xml = await renderLegacyRssFeed(slug);
 
-  return rssResponse(xml, { maxAge: 900 });
+  return rssResponse(xml);
 }

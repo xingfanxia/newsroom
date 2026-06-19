@@ -9,6 +9,11 @@ import {
 import { PUBLIC_FEED_LIMIT_MAX } from "@/lib/feed/query-defaults";
 import { LEGACY_RSS_FEEDS } from "@/lib/rss/legacy-feed-meta";
 import { MAIN_RSS_FEEDS } from "@/lib/rss/main-feed-meta";
+import {
+  RSS_CONTENT_TYPE,
+  rssCacheControl,
+  rssRateLimitReqLabel,
+} from "@/lib/rss/http-contract";
 import { PUBLIC_SEARCH_LIMIT_MAX } from "@/lib/search/query-defaults";
 import { PUBLIC_SITE_URL } from "@/lib/site";
 import type { AppLocale } from "@/lib/types";
@@ -21,6 +26,8 @@ const publicPaginationGotcha = {
   zh: `limit 上限因端点不同: feed ${PUBLIC_FEED_LIMIT_MAX}, search ${PUBLIC_SEARCH_LIMIT_MAX}; 要更多用 offset 翻页`,
   en: `limit caps vary by endpoint: feed ${PUBLIC_FEED_LIMIT_MAX}, search ${PUBLIC_SEARCH_LIMIT_MAX}; paginate with offset for more`,
 } satisfies Record<Lang, string>;
+const RSS_CACHE_CONTROL = rssCacheControl();
+const RSS_RATE_LIMIT = rssRateLimitReqLabel();
 
 export function AgentsTabs() {
   const { tweaks } = useTweaks();
@@ -431,18 +438,18 @@ function RssPane({ lang }: { lang: Lang }) {
         </li>
         <li>
           {lang === "zh"
-            ? "编码: UTF-8,Content-Type: application/rss+xml"
-            : "Encoding: UTF-8, Content-Type: application/rss+xml"}
+            ? `编码: UTF-8,Content-Type: ${RSS_CONTENT_TYPE}`
+            : `Encoding: UTF-8, Content-Type: ${RSS_CONTENT_TYPE}`}
         </li>
         <li>
           {lang === "zh"
-            ? "缓存: 响应带 Cache-Control / s-maxage=600 / stale-while-revalidate=3600"
-            : "Cache: Cache-Control: public, s-maxage=600, stale-while-revalidate=3600"}
+            ? `缓存: 响应带 Cache-Control / ${RSS_CACHE_CONTROL}`
+            : `Cache: Cache-Control: ${RSS_CACHE_CONTROL}`}
         </li>
         <li>
           {lang === "zh"
-            ? "Per-IP 限流: 60 req/h (RSS reader 正常轮询足够)"
-            : "Per-IP limit: 60 req/h (more than enough for any reader's default polling)"}
+            ? `Per-IP 限流: ${RSS_RATE_LIMIT} (RSS reader 正常轮询足够)`
+            : `Per-IP limit: ${RSS_RATE_LIMIT} (more than enough for any reader's default polling)`}
         </li>
         <li>
           {lang === "zh"

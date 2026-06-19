@@ -81,6 +81,10 @@ Shipped cleanup:
 - Kept the public agent endpoint inventory in `docs/agent-access/README.md`
   as the current source of truth; README and ingestion architecture summaries
   now link there instead of repeating endpoint counts or path lists.
+- Shared RSS content-type/cache and rate-limit labels through
+  `lib/rss/http-contract.ts`; `/agents` no longer hand-writes RSS HTTP header
+  facts or imports server-side RSS rendering/rate-limit modules, and legacy RSS
+  feeds use the same default cache contract as main/newsletter RSS routes.
 - Derived the login locale switcher options from `APP_LOCALES`, keeping the
   compact label mapping local while removing another route-locale enum copy.
 - Shared locale pathname-prefix parsing through `appLocaleFromPathname` and
