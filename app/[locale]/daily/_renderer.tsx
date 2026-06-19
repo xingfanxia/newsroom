@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Prose } from "@/components/markdown/prose";
+import { appLocaleLanguageTag, DAILY_COLUMN_LOCALE } from "@/lib/types";
 
 export type ColumnRow = {
   id: number;
@@ -15,12 +16,15 @@ export type ColumnRow = {
   aihotDailyDate: string | null;
 };
 
+const DAILY_COLUMN_BASE_ROUTE = `/${DAILY_COLUMN_LOCALE}`;
+const DAILY_COLUMN_INDEX_ROUTE = `${DAILY_COLUMN_BASE_ROUTE}/daily`;
+
 function dateKey(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
 function formatDate(d: Date): string {
-  return new Intl.DateTimeFormat("zh-CN", {
+  return new Intl.DateTimeFormat(appLocaleLanguageTag(DAILY_COLUMN_LOCALE), {
     year: "numeric",
     month: "long",
     day: "numeric",
@@ -33,7 +37,10 @@ function formatDate(d: Date): string {
  * we just inject the URL inline.
  */
 function linkifyItemRefs(md: string): string {
-  return md.replace(/\[#(\d+)\]/g, (_, id) => `[#${id}](/zh/items/${id})`);
+  return md.replace(
+    /\[#(\d+)\]/g,
+    (_, id) => `[#${id}](${DAILY_COLUMN_BASE_ROUTE}/items/${id})`,
+  );
 }
 
 export function DailyColumnRenderer({ column }: { column: ColumnRow }) {
@@ -67,7 +74,7 @@ export function DailyColumnRenderer({ column }: { column: ColumnRow }) {
 
       <footer className="daily-foot">
         <Link
-          href="/zh/daily"
+          href={DAILY_COLUMN_INDEX_ROUTE}
           className="text-[var(--color-cyan,var(--accent-blue))] underline underline-offset-4 decoration-[currentColor]/40 hover:decoration-[currentColor]"
         >
           ← 全部日报

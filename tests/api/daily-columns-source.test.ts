@@ -10,6 +10,7 @@ const dailyUiPaths = [
   "app/[locale]/daily/page.tsx",
   "app/[locale]/daily/[date]/page.tsx",
 ] as const;
+const dailyRenderer = readSource("app/[locale]/daily/_renderer.tsx");
 const legacyRssFeeds = readSource("lib/rss/legacy-feeds.ts");
 
 const mcpRoute = readSource("app/api/mcp/route.ts");
@@ -72,6 +73,13 @@ describe("daily-column API source wiring", () => {
     expect(readSource("app/[locale]/daily/[date]/page.tsx")).toContain(
       "getDailyColumnRowByDate",
     );
+    expect(dailyRenderer).toContain("DAILY_COLUMN_LOCALE");
+    expect(dailyRenderer).toContain("appLocaleLanguageTag");
+    expect(dailyRenderer).toContain("DAILY_COLUMN_BASE_ROUTE");
+    expect(dailyRenderer).toContain("DAILY_COLUMN_INDEX_ROUTE");
+    expect(dailyRenderer).not.toContain('"zh-CN"');
+    expect(dailyRenderer).not.toContain('href="/zh/daily"');
+    expect(dailyRenderer).not.toContain("](/zh/items/");
     expect(legacyRssFeeds).toContain("@/lib/api/daily-columns");
     expect(legacyRssFeeds).toContain("listDailyColumnRows");
     expect(legacyRssFeeds).not.toContain("from(newsletters)");

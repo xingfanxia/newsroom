@@ -266,6 +266,9 @@ Shipped cleanup:
 - Shared the daily-column writer locale through `DAILY_COLUMN_LOCALE`, so the
   daily writer, daily-column backfill, and AI HOT history importer cannot drift
   on which newsletter locale receives generated columns and payloads.
+- Reused `DAILY_COLUMN_LOCALE` in the daily-column renderer, so detail-page
+  date formatting, item links, and index links no longer hand-code the Chinese
+  route locale.
 - Shared AI HOT history placeholder windowing through
   `dailyColumnWindowForDate`, so imported daily payload rows use the same 05:00Z
   period boundaries as the daily-column writer instead of creating midnight
