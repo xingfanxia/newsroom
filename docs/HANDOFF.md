@@ -376,6 +376,10 @@ Shipped cleanup:
 - Shared home feed tier/view defaults through `lib/feed/home-filters.ts`, so
   the server query parser, home filter UI, all-posts source filter reuse, and
   calendar count filter cannot drift on `featured|p1` or `today|daily`.
+- Shared home/all source preset defaults, labels, coercion, and feed-query
+  mapping through `lib/feed/source-presets.ts`, so page parsers and
+  `HomeFilters` no longer carry app-local `all|official|newsletter|media|x|research`
+  lists.
 - Shared podcast feed tier defaults/coercion through
   `lib/feed/podcast-filters.ts`, so `/podcasts` no longer carries a local
   `featured|all` tier union or query parser.

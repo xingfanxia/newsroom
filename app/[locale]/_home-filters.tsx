@@ -9,8 +9,12 @@ import {
   type HomeTier,
   type HomeView,
 } from "@/lib/feed/home-filters";
+import {
+  SOURCE_PRESET_LABELS,
+  SOURCE_PRESETS,
+  type SourcePreset,
+} from "@/lib/feed/source-presets";
 import { mainRssFeedMeta } from "@/lib/rss/main-feed-meta";
-import type { SourcePreset } from "./_source-presets";
 
 export type { HomeTier, HomeView } from "@/lib/feed/home-filters";
 
@@ -31,15 +35,6 @@ const TIER_OPTS: Array<{ v: HomeTier; en: string; zh: string }> = HOME_TIERS.map
 const TIER_CLASS: Partial<Record<HomeTier, string>> = {
   p1: "p1",
 };
-
-const SOURCE_OPTS: Array<{ v: SourcePreset; en: string; zh: string }> = [
-  { v: "all",        en: "all",         zh: "全部" },
-  { v: "official",   en: "official",    zh: "官网" },
-  { v: "newsletter", en: "newsletter",  zh: "通讯" },
-  { v: "media",      en: "media",       zh: "媒体" },
-  { v: "x",          en: "X",           zh: "X" },
-  { v: "research",   en: "research",    zh: "研究" },
-];
 
 /**
  * Home page filter bar — combines tier pills + source-type pills into one
@@ -134,16 +129,19 @@ export function HomeFilters({
         ))}
       </div>
       <div className="fil-grp">
-        {SOURCE_OPTS.map((o) => (
-          <button
-            key={o.v}
-            type="button"
-            className={`fil ${source === o.v ? "on" : ""}`}
-            onClick={() => push({ source: o.v })}
-          >
-            {zh ? o.zh : o.en}
-          </button>
-        ))}
+        {SOURCE_PRESETS.map((v) => {
+          const label = SOURCE_PRESET_LABELS[v];
+          return (
+            <button
+              key={v}
+              type="button"
+              className={`fil ${source === v ? "on" : ""}`}
+              onClick={() => push({ source: v })}
+            >
+              {zh ? label.zh : label.en}
+            </button>
+          );
+        })}
       </div>
       <div className="fil-spacer" />
       <div className="fil-right">

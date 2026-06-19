@@ -12,7 +12,7 @@ import { HomeFilters, type HomeTier, type HomeView } from "./_home-filters";
 import {
   coerceSourcePreset,
   sourcePresetToFeedFilter,
-} from "./_source-presets";
+} from "@/lib/feed/source-presets";
 import {
   coerceHomeTier,
   coerceHomeView,

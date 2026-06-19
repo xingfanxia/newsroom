@@ -11,7 +11,7 @@ const types = readSource("lib/types.ts");
 const tierSql = readSource("lib/items/tier-sql.ts");
 const feedParams = readSource("lib/api/feed-query-params.ts");
 const mcpRoute = readSource("app/api/mcp/route.ts");
-const sourcePresets = readSource("app/[locale]/_source-presets.ts");
+const sourcePresets = readSource("lib/feed/source-presets.ts");
 const homeFilterContracts = readSource("lib/feed/home-filters.ts");
 const homeFilters = readSource("app/[locale]/_home-filters.tsx");
 const podcastsPage = readSource("app/[locale]/podcasts/page.tsx");
@@ -128,8 +128,14 @@ describe("feed tier/view source wiring", () => {
 
   test("UI source preset filters map through one typed helper", () => {
     expect(sourcePresets).toContain('Pick<FeedQuery, "sourceGroup" | "sourceKind">');
+    expect(sourcePresets).toContain("SOURCE_PRESETS");
+    expect(sourcePresets).toContain("DEFAULT_SOURCE_PRESET");
+    expect(sourcePresets).toContain("SOURCE_PRESET_LABELS");
     expect(sourcePresets).toContain("sourcePresetToFeedFilter");
 
+    for (const source of [homePage, allPage, homeFilters]) {
+      expect(source).toContain("@/lib/feed/source-presets");
+    }
     for (const source of [homePage, allPage]) {
       expect(source).toContain("coerceSourcePreset");
       expect(source).toContain("sourcePresetToFeedFilter");
@@ -139,6 +145,9 @@ describe("feed tier/view source wiring", () => {
         "): { sourceGroup?: string; sourceKind?: string }",
       );
     }
+    expect(homeFilters).toContain("SOURCE_PRESETS.map");
+    expect(homeFilters).toContain("SOURCE_PRESET_LABELS");
+    expect(homeFilters).not.toContain("const SOURCE_OPTS");
   });
 
   test("home filter tier and view controls derive from shared contracts", () => {

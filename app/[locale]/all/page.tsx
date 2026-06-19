@@ -10,7 +10,7 @@ import { HomeFilters } from "../_home-filters";
 import {
   coerceSourcePreset,
   sourcePresetToFeedFilter,
-} from "../_source-presets";
+} from "@/lib/feed/source-presets";
 import { groupByDay, sortStoriesNewestFirst } from "@/lib/feed/group-by-day";
 import { DEFAULT_HOME_TIER } from "@/lib/feed/home-filters";
 import {

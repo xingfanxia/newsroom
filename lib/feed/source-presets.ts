@@ -1,6 +1,6 @@
 import type { FeedQuery } from "@/lib/items/live";
 
-const SOURCE_PRESETS = [
+export const SOURCE_PRESETS = [
   "all",
   "official",
   "newsletter",
@@ -10,13 +10,27 @@ const SOURCE_PRESETS = [
 ] as const;
 
 export type SourcePreset = (typeof SOURCE_PRESETS)[number];
+export const DEFAULT_SOURCE_PRESET = SOURCE_PRESETS[0];
+
+export const SOURCE_PRESET_LABELS = {
+  all: { en: "all", zh: "全部" },
+  official: { en: "official", zh: "官网" },
+  newsletter: { en: "newsletter", zh: "通讯" },
+  media: { en: "media", zh: "媒体" },
+  x: { en: "X", zh: "X" },
+  research: { en: "research", zh: "研究" },
+} as const satisfies Record<SourcePreset, { en: string; zh: string }>;
 
 type FeedSourceFilter = Pick<FeedQuery, "sourceGroup" | "sourceKind">;
 
-export function coerceSourcePreset(value: string | undefined): SourcePreset {
-  return SOURCE_PRESETS.includes(value as SourcePreset)
+const SOURCE_PRESET_SET = new Set<string>(SOURCE_PRESETS);
+
+export function coerceSourcePreset(
+  value: string | null | undefined,
+): SourcePreset {
+  return value && SOURCE_PRESET_SET.has(value)
     ? (value as SourcePreset)
-    : "all";
+    : DEFAULT_SOURCE_PRESET;
 }
 
 export function sourcePresetToFeedFilter(
