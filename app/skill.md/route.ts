@@ -30,6 +30,26 @@ import {
   DEFAULT_DAILY_COLUMN_INDEX_TAKE,
 } from "@/lib/daily-column/query-defaults";
 import { DAILY_COLUMN_INDEX_ROUTE } from "@/lib/daily-column/routes";
+import {
+  DEFAULT_API_FEED_LOCALE,
+  DEFAULT_FEED_HOT_WINDOW_HOURS,
+  DEFAULT_FEED_LIMIT,
+  DEFAULT_FEED_OFFSET,
+  DEFAULT_FEED_TIER,
+  DEFAULT_FEED_VIEW,
+  FEED_HOT_WINDOW_HOURS_MAX,
+  FEED_HOT_WINDOW_HOURS_MIN,
+  FEED_LIMIT_MIN,
+  PUBLIC_FEED_LIMIT_MAX,
+} from "@/lib/feed/query-defaults";
+import {
+  DEFAULT_API_SEARCH_LOCALE,
+  DEFAULT_SEARCH_LIMIT,
+  DEFAULT_SEARCH_MODE,
+  DEFAULT_SEARCH_OFFSET,
+  PUBLIC_SEARCH_LIMIT_MAX,
+  SEARCH_LIMIT_MIN,
+} from "@/lib/search/query-defaults";
 import { PUBLIC_SITE_URL, publicUrl } from "@/lib/site";
 
 function markdownCodeUnion(values: readonly string[]): string {
@@ -147,28 +167,33 @@ curl -H 'If-None-Match: W/"public-feed-xxxxxxxxxxxxxxxx"' \\
 
 ## 翻页 / Pagination
 
-\`/api/public/feed\` 和 \`/api/public/search\` 用 \`limit\` + \`offset\` 翻页 (limit ≤ 100, default 40)。\`/api/public/dailies\` 用 \`take\` (${DAILY_COLUMN_INDEX_TAKE_MIN}..${DAILY_COLUMN_INDEX_TAKE_MAX}, default ${DEFAULT_DAILY_COLUMN_INDEX_TAKE})。
+- /api/public/feed: \`limit\` ${FEED_LIMIT_MIN}..${PUBLIC_FEED_LIMIT_MAX}, default ${DEFAULT_FEED_LIMIT}; \`offset\` default ${DEFAULT_FEED_OFFSET}.
+- /api/public/search: \`limit\` ${SEARCH_LIMIT_MIN}..${PUBLIC_SEARCH_LIMIT_MAX}, default ${DEFAULT_SEARCH_LIMIT}; \`offset\` default ${DEFAULT_SEARCH_OFFSET}.
+- /api/public/dailies: \`take\` ${DAILY_COLUMN_INDEX_TAKE_MIN}..${DAILY_COLUMN_INDEX_TAKE_MAX}, default ${DEFAULT_DAILY_COLUMN_INDEX_TAKE}.
 
 ## 关键 query 参数
 
 \`/api/public/feed\` 完整参数:
 
-- \`tier\` = ${VISIBLE_ITEM_TIER_OPTIONS}, default \`featured\`
-- \`view\` = ${FEED_VIEW_OPTIONS}, default \`archive\`
-- \`hot_window_hours\` = 1..168, default 24 (only used for view=today)
+- \`tier\` = ${VISIBLE_ITEM_TIER_OPTIONS}, default \`${DEFAULT_FEED_TIER}\`
+- \`view\` = ${FEED_VIEW_OPTIONS}, default \`${DEFAULT_FEED_VIEW}\`
+- \`hot_window_hours\` = ${FEED_HOT_WINDOW_HOURS_MIN}..${FEED_HOT_WINDOW_HOURS_MAX}, default ${DEFAULT_FEED_HOT_WINDOW_HOURS} (only used for view=today)
 - \`date\` / \`date_from\` / \`date_to\` = filter by published_at
 - \`source_id\` = exact source id (e.g. \`dwarkesh-yt\`)
 - \`source_group\` = ${SOURCE_GROUP_OPTIONS}
 - \`source_kind\` = ${SOURCE_KIND_OPTIONS}
 - \`curated_only\` = true | false (AX 严选 tab)
 - \`include_source_tags\` / \`exclude_source_tags\` = comma list
-- \`limit\` = 1..100, default 40
-- \`offset\` = ≥0, default 0
-- \`locale\` = ${APP_LOCALE_OPTIONS}, default \`en\` (controls which language's title/summary returns)
+- \`limit\` = ${FEED_LIMIT_MIN}..${PUBLIC_FEED_LIMIT_MAX}, default ${DEFAULT_FEED_LIMIT}
+- \`offset\` = ≥0, default ${DEFAULT_FEED_OFFSET}
+- \`locale\` = ${APP_LOCALE_OPTIONS}, default \`${DEFAULT_API_FEED_LOCALE}\` (controls which language's title/summary returns)
 
 \`/api/public/search\` 额外参数:
 
-- \`mode\` = ${SEARCH_MODE_OPTIONS}, default \`lexical\`
+- \`mode\` = ${SEARCH_MODE_OPTIONS}, default \`${DEFAULT_SEARCH_MODE}\`
+- \`limit\` = ${SEARCH_LIMIT_MIN}..${PUBLIC_SEARCH_LIMIT_MAX}, default ${DEFAULT_SEARCH_LIMIT}
+- \`offset\` = ≥0, default ${DEFAULT_SEARCH_OFFSET}
+- \`locale\` = ${APP_LOCALE_OPTIONS}, default \`${DEFAULT_API_SEARCH_LOCALE}\`
 
 ## 响应 shape 关键不变量
 
@@ -202,7 +227,7 @@ curl -H 'If-None-Match: W/"public-feed-xxxxxxxxxxxxxxxx"' \\
 
 1. **不要并发猛拉** — 端点有限流,翻页用串行 + 自然间隔
 2. **\`date_from\` / \`date_to\` 必须是 ISO 8601** — 用 \`2026-05-01T00:00:00Z\`,不是 unix 时间戳
-3. **\`limit\` 上限 100** — 想要 500 条要翻 5 页,不要 \`?limit=500\` (返回 400)
+3. **\`limit\` 上限按端点不同** — feed max ${PUBLIC_FEED_LIMIT_MAX}, search max ${PUBLIC_SEARCH_LIMIT_MAX}; 想要更多用 \`offset\` 翻页,不要 \`?limit=500\` (返回 400)
 4. **拉日报别在 narrative_md 里搜关键词** — 那是长文,语义关键词用 \`/search?mode=semantic\`
 5. **publisher 是显示名,不是 id** — 过滤用 \`source_id\` (e.g. \`dwarkesh-yt\`),不是 \`?publisher=Dwarkesh\`
 6. **cluster_id 来自 feed 响应** — 不要瞎构造,只用 feed 给的值
