@@ -20,6 +20,12 @@ import {
   type DailyColumnIndexRow,
   type DailyColumnRow,
 } from "@/lib/api/daily-columns";
+import {
+  DAILY_COLUMN_INDEX_TAKE_MAX,
+  DAILY_COLUMN_INDEX_TAKE_MIN,
+  DEFAULT_DAILY_COLUMN_INDEX_TAKE,
+  DEFAULT_DAILY_COLUMN_QUERY_LOCALE,
+} from "@/lib/daily-column/query-defaults";
 
 const periodStart = new Date("2026-06-11T05:00:00.000Z");
 const periodEnd = new Date("2026-06-12T05:00:00.000Z");
@@ -56,6 +62,13 @@ function indexRow(overrides: Partial<DailyColumnIndexRow> = {}): DailyColumnInde
 }
 
 describe("daily column public API serialization", () => {
+  test("exposes the public daily-column query defaults", () => {
+    expect(DAILY_COLUMN_INDEX_TAKE_MIN).toBe(1);
+    expect(DAILY_COLUMN_INDEX_TAKE_MAX).toBe(180);
+    expect(DEFAULT_DAILY_COLUMN_INDEX_TAKE).toBe(30);
+    expect(DEFAULT_DAILY_COLUMN_QUERY_LOCALE).toBe("zh");
+  });
+
   test("serializes the full daily column contract", () => {
     expect(toPublicDailyColumn(dailyRow())).toEqual({
       id: 216,
@@ -122,10 +135,10 @@ describe("daily column public API serialization", () => {
     expect(
       publicDailyColumnIndexEtagSignal([indexRow()], {
         locale: "zh",
-        take: 30,
+        take: DEFAULT_DAILY_COLUMN_INDEX_TAKE,
       }),
     ).toBe(
-      "count=1|first_id=216|first_gen=2026-06-12T05:01:00.000Z|locale=zh|take=30",
+      `count=1|first_id=216|first_gen=2026-06-12T05:01:00.000Z|locale=zh|take=${DEFAULT_DAILY_COLUMN_INDEX_TAKE}`,
     );
   });
 
@@ -138,12 +151,12 @@ describe("daily column public API serialization", () => {
     expect(
       toPublicDailyColumnIndexPayload([indexRow()], {
         locale: "zh",
-        take: 30,
+        take: DEFAULT_DAILY_COLUMN_INDEX_TAKE,
       }),
     ).toEqual({
       body: toPublicDailyColumnIndex([indexRow()]),
       etagSignal:
-        "count=1|first_id=216|first_gen=2026-06-12T05:01:00.000Z|locale=zh|take=30",
+        `count=1|first_id=216|first_gen=2026-06-12T05:01:00.000Z|locale=zh|take=${DEFAULT_DAILY_COLUMN_INDEX_TAKE}`,
     });
   });
 });

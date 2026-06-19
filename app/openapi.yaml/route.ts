@@ -19,6 +19,12 @@ import {
 } from "@/lib/types";
 import { publicRateLimitPerIpLabel } from "@/lib/api/public-endpoint-config";
 import {
+  DAILY_COLUMN_INDEX_TAKE_MAX,
+  DAILY_COLUMN_INDEX_TAKE_MIN,
+  DEFAULT_DAILY_COLUMN_INDEX_TAKE,
+  DEFAULT_DAILY_COLUMN_QUERY_LOCALE,
+} from "@/lib/daily-column/query-defaults";
+import {
   DEFAULT_API_FEED_LOCALE,
   DEFAULT_FEED_HOT_WINDOW_HOURS,
   DEFAULT_FEED_LIMIT,
@@ -242,7 +248,7 @@ paths:
         theme tag (≤8 字), summary_md (numbered 1-5 list with backlinks),
         narrative_md (2500-4500 字 narrative).
       parameters:
-        - { name: locale, in: query, schema: { type: string, enum: ${APP_LOCALE_ENUM}, default: zh }, description: "Only zh is generated today" }
+        - { name: locale, in: query, schema: { type: string, enum: ${APP_LOCALE_ENUM}, default: ${DEFAULT_DAILY_COLUMN_QUERY_LOCALE} }, description: "Only ${DEFAULT_DAILY_COLUMN_QUERY_LOCALE} is generated today" }
       responses:
         '200':
           description: OK
@@ -261,7 +267,7 @@ paths:
       summary: Daily AI column for a specific date
       parameters:
         - { name: date, in: path, required: true, schema: { type: string, pattern: '^\\d{4}-\\d{2}-\\d{2}$' } }
-        - { name: locale, in: query, schema: { type: string, enum: ${APP_LOCALE_ENUM}, default: zh } }
+        - { name: locale, in: query, schema: { type: string, enum: ${APP_LOCALE_ENUM}, default: ${DEFAULT_DAILY_COLUMN_QUERY_LOCALE} } }
       responses:
         '200':
           description: OK
@@ -280,8 +286,8 @@ paths:
       summary: Daily column index (discovery)
       description: Recent daily columns in reverse-chronological order — metadata only (no body), useful for "which dates have columns" enumeration.
       parameters:
-        - { name: take, in: query, schema: { type: integer, minimum: 1, maximum: 180, default: 30 } }
-        - { name: locale, in: query, schema: { type: string, enum: ${APP_LOCALE_ENUM}, default: zh } }
+        - { name: take, in: query, schema: { type: integer, minimum: ${DAILY_COLUMN_INDEX_TAKE_MIN}, maximum: ${DAILY_COLUMN_INDEX_TAKE_MAX}, default: ${DEFAULT_DAILY_COLUMN_INDEX_TAKE} } }
+        - { name: locale, in: query, schema: { type: string, enum: ${APP_LOCALE_ENUM}, default: ${DEFAULT_DAILY_COLUMN_QUERY_LOCALE} } }
       responses:
         '200':
           description: OK

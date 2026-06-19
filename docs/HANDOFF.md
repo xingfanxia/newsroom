@@ -330,6 +330,10 @@ Shipped cleanup:
   `lib/api/daily-columns.ts`; public daily route files now own only
   rate-limit/cache/error-envelope mapping, while MCP daily resources own only
   resource envelope mapping.
+- Shared daily-column public query defaults and bounds through
+  `lib/daily-column/query-defaults.ts`; the daily-column API parser,
+  generated OpenAPI spec, installable skill markdown, and public dailies route
+  comments no longer repeat the `take` range/default or locale default.
 - Shared bearer-agent usage summary request parsing and serialization through
   `lib/api/usage-summary.ts`; `/api/v1/usage/summary` and MCP
   `ax_radar_usage` now share the window schema/default plus the same totals,

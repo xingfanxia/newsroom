@@ -8,12 +8,19 @@ import {
   queryParamsRecord,
 } from "@/lib/api/query-params";
 import {
-  DAILY_COLUMN_LOCALE,
+  DAILY_COLUMN_INDEX_TAKE_MAX,
+  DAILY_COLUMN_INDEX_TAKE_MIN,
+  DEFAULT_DAILY_COLUMN_INDEX_TAKE,
+  DEFAULT_DAILY_COLUMN_QUERY_LOCALE,
+} from "@/lib/daily-column/query-defaults";
+import {
   DAILY_NEWSLETTER_KIND,
   NEWSLETTER_LOCALES,
 } from "@/lib/types";
 
-const dailyColumnLocaleSchema = z.enum(NEWSLETTER_LOCALES).default(DAILY_COLUMN_LOCALE);
+const dailyColumnLocaleSchema = z
+  .enum(NEWSLETTER_LOCALES)
+  .default(DEFAULT_DAILY_COLUMN_QUERY_LOCALE);
 export type DailyColumnLocale = z.infer<typeof dailyColumnLocaleSchema>;
 
 export const dailyColumnDateSchema = z
@@ -30,8 +37,16 @@ export const dailyColumnDateSchema = z
   );
 
 const dailyColumnIndexQuerySchema = z.object({
-  take: z.coerce.number().int().min(1).max(180).optional().default(30),
-  locale: dailyColumnLocaleSchema.optional().default(DAILY_COLUMN_LOCALE),
+  take: z.coerce
+    .number()
+    .int()
+    .min(DAILY_COLUMN_INDEX_TAKE_MIN)
+    .max(DAILY_COLUMN_INDEX_TAKE_MAX)
+    .optional()
+    .default(DEFAULT_DAILY_COLUMN_INDEX_TAKE),
+  locale: dailyColumnLocaleSchema
+    .optional()
+    .default(DEFAULT_DAILY_COLUMN_QUERY_LOCALE),
 });
 
 export type DailyColumnIndexQuery = z.infer<
@@ -272,7 +287,9 @@ export function toPublicDailyColumnIndexPayload(
 export async function getLatestPublicDailyColumn(
   rawLocale: string | null,
 ): Promise<PublicDailyColumnResult> {
-  const parsedLocale = dailyColumnLocaleSchema.safeParse(rawLocale ?? "zh");
+  const parsedLocale = dailyColumnLocaleSchema.safeParse(
+    rawLocale ?? DEFAULT_DAILY_COLUMN_QUERY_LOCALE,
+  );
   if (!parsedLocale.success) {
     return { ok: false, error: "invalid_locale", status: 400 };
   }
@@ -304,7 +321,9 @@ export async function getPublicDailyColumnByDate({
     return { ok: false, error: "invalid_date", status: 400 };
   }
 
-  const parsedLocale = dailyColumnLocaleSchema.safeParse(rawLocale ?? "zh");
+  const parsedLocale = dailyColumnLocaleSchema.safeParse(
+    rawLocale ?? DEFAULT_DAILY_COLUMN_QUERY_LOCALE,
+  );
   if (!parsedLocale.success) {
     return { ok: false, error: "invalid_locale", status: 400 };
   }

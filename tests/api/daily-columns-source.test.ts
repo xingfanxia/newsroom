@@ -11,11 +11,15 @@ const dailyUiPaths = [
   "app/[locale]/daily/[date]/page.tsx",
 ] as const;
 const dailyColumnApi = readSource("lib/api/daily-columns.ts");
+const dailyColumnQueryDefaults = readSource("lib/daily-column/query-defaults.ts");
 const dailyColumnRoutes = readSource("lib/daily-column/routes.ts");
 const dailyLandingPage = readSource("app/[locale]/daily/page.tsx");
 const dailyRenderer = readSource("app/[locale]/daily/_renderer.tsx");
 const legacyRssFeeds = readSource("lib/rss/legacy-feeds.ts");
 const legacyRssFeedMeta = readSource("lib/rss/legacy-feed-meta.ts");
+const publicDailiesRoute = readSource("app/api/public/dailies/route.ts");
+const openApiRoute = readSource("app/openapi.yaml/route.ts");
+const skillRoute = readSource("app/skill.md/route.ts");
 
 const mcpRoute = readSource("app/api/mcp/route.ts");
 const mcpDailyResources = sectionBetween(
@@ -25,6 +29,39 @@ const mcpDailyResources = sectionBetween(
 );
 
 describe("daily-column API source wiring", () => {
+  test("daily-column public query defaults have one source of truth", () => {
+    expect(dailyColumnQueryDefaults).toContain("DAILY_COLUMN_INDEX_TAKE_MIN");
+    expect(dailyColumnQueryDefaults).toContain("DAILY_COLUMN_INDEX_TAKE_MAX");
+    expect(dailyColumnQueryDefaults).toContain("DEFAULT_DAILY_COLUMN_INDEX_TAKE");
+    expect(dailyColumnQueryDefaults).toContain("DEFAULT_DAILY_COLUMN_QUERY_LOCALE");
+    expect(dailyColumnQueryDefaults).toContain("DAILY_COLUMN_LOCALE");
+
+    expect(dailyColumnApi).toContain("@/lib/daily-column/query-defaults");
+    expect(dailyColumnApi).toContain(".min(DAILY_COLUMN_INDEX_TAKE_MIN)");
+    expect(dailyColumnApi).toContain(".max(DAILY_COLUMN_INDEX_TAKE_MAX)");
+    expect(dailyColumnApi).toContain(".default(DEFAULT_DAILY_COLUMN_INDEX_TAKE)");
+    expect(dailyColumnApi).toContain("DEFAULT_DAILY_COLUMN_QUERY_LOCALE");
+    expect(dailyColumnApi).not.toContain(".min(1).max(180).optional().default(30)");
+    expect(dailyColumnApi).not.toContain('rawLocale ?? "zh"');
+
+    expect(openApiRoute).toContain("@/lib/daily-column/query-defaults");
+    expect(openApiRoute).toContain("DAILY_COLUMN_INDEX_TAKE_MIN");
+    expect(openApiRoute).toContain("DAILY_COLUMN_INDEX_TAKE_MAX");
+    expect(openApiRoute).toContain("DEFAULT_DAILY_COLUMN_INDEX_TAKE");
+    expect(openApiRoute).toContain("DEFAULT_DAILY_COLUMN_QUERY_LOCALE");
+    expect(openApiRoute).not.toContain("minimum: 1, maximum: 180, default: 30");
+    expect(openApiRoute).not.toContain("default: zh }, description: \"Only zh is generated today\"");
+
+    expect(skillRoute).toContain("@/lib/daily-column/query-defaults");
+    expect(skillRoute).toContain("DEFAULT_DAILY_COLUMN_INDEX_TAKE");
+    expect(skillRoute).toContain("DAILY_COLUMN_INDEX_TAKE_MAX");
+    expect(skillRoute).not.toContain("/api/public/dailies?take=30");
+    expect(skillRoute).not.toContain("take` (≤ 180, default 30)");
+
+    expect(publicDailiesRoute).not.toContain("take: 1..180, default 30");
+    expect(publicDailiesRoute).toContain("query bounds live in");
+  });
+
   test("public daily routes delegate query parsing and serialization", () => {
     for (const path of routePaths) {
       const source = readSource(path);
@@ -82,7 +119,7 @@ describe("daily-column API source wiring", () => {
     expect(readSource("app/[locale]/daily/[date]/page.tsx")).toContain(
       "DAILY_COLUMN_LOCALE",
     );
-    expect(dailyColumnApi).toContain(".default(DAILY_COLUMN_LOCALE)");
+    expect(dailyColumnApi).toContain(".default(DEFAULT_DAILY_COLUMN_QUERY_LOCALE)");
     expect(dailyColumnRoutes).toContain("DAILY_COLUMN_BASE_ROUTE");
     expect(dailyColumnRoutes).toContain("DAILY_COLUMN_INDEX_ROUTE");
     expect(dailyColumnRoutes).toContain("dailyColumnIssueRoute");

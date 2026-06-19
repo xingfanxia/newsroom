@@ -135,7 +135,7 @@ describe("runtime contract source wiring", () => {
     }
     expect(v1SavedRoute).toContain("@/lib/api/saved-requests");
     expect(dailyColumns).toContain("NEWSLETTER_LOCALES");
-    expect(dailyColumns).toContain("z.enum(NEWSLETTER_LOCALES)");
+    expect(dailyColumns).toContain(".enum(NEWSLETTER_LOCALES)");
     for (const source of [savedExport, newsletterRssFeed]) {
       expect(source).toContain("appLocaleLanguageTag");
       expect(source).not.toContain('locale === "zh" ? "zh-CN" : "en-US"');

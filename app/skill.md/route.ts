@@ -24,6 +24,11 @@ import {
   PUBLIC_RATE_LIMIT_DOC_GROUPS,
   publicRateLimitLabel,
 } from "@/lib/api/public-endpoint-config";
+import {
+  DAILY_COLUMN_INDEX_TAKE_MAX,
+  DAILY_COLUMN_INDEX_TAKE_MIN,
+  DEFAULT_DAILY_COLUMN_INDEX_TAKE,
+} from "@/lib/daily-column/query-defaults";
 import { DAILY_COLUMN_INDEX_ROUTE } from "@/lib/daily-column/routes";
 import { PUBLIC_SITE_URL, publicUrl } from "@/lib/site";
 
@@ -81,7 +86,7 @@ Skill 根据用户提问关键词智能分流。默认走 **精选 + view=today*
 | 默认 / 宽问题 ("今天 AI 圈","what's new today") | \`GET /api/public/feed?tier=featured&view=today\` |
 | 明确说"日报" / "daily column" | \`GET /api/public/daily\` |
 | 指定日期日报 ("昨天的日报") | \`GET /api/public/daily/{YYYY-MM-DD}\` |
-| 日报归档 / discovery ("哪些日期有日报") | \`GET /api/public/dailies?take=30\` |
+| 日报归档 / discovery ("哪些日期有日报") | \`GET /api/public/dailies?take=${DEFAULT_DAILY_COLUMN_INDEX_TAKE}\` |
 | "AX 严选 / 严选" / "curated only" | \`GET /api/public/feed?curated_only=true&tier=all\` |
 | "全部 / 完整 / all" | \`GET /api/public/feed?tier=all\` |
 | "最近 N 天" 时间窗 | \`GET /api/public/feed?date_from={ISO}\` |
@@ -142,7 +147,7 @@ curl -H 'If-None-Match: W/"public-feed-xxxxxxxxxxxxxxxx"' \\
 
 ## 翻页 / Pagination
 
-\`/api/public/feed\` 和 \`/api/public/search\` 用 \`limit\` + \`offset\` 翻页 (limit ≤ 100, default 40)。\`/api/public/dailies\` 用 \`take\` (≤ 180, default 30)。
+\`/api/public/feed\` 和 \`/api/public/search\` 用 \`limit\` + \`offset\` 翻页 (limit ≤ 100, default 40)。\`/api/public/dailies\` 用 \`take\` (${DAILY_COLUMN_INDEX_TAKE_MIN}..${DAILY_COLUMN_INDEX_TAKE_MAX}, default ${DEFAULT_DAILY_COLUMN_INDEX_TAKE})。
 
 ## 关键 query 参数
 

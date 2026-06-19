@@ -5,7 +5,8 @@
  * an agent to enumerate "which dates have columns" without downloading every
  * body. Returns only the metadata (date / generated_at / title / theme_tag).
  *
- * take: 1..180, default 30. Strict 400 on out-of-range.
+ * Daily-column public query bounds live in
+ * `lib/daily-column/query-defaults.ts`. Strict 400 on out-of-range.
  */
 import {
   publicCachedRoute,

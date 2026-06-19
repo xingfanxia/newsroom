@@ -60,7 +60,7 @@ describe("newsletter runtime contracts", () => {
     expect(aihotDailyImportSrc).not.toContain('locale: "zh"');
     expect(dailyColumnApiSrc).toContain("DAILY_NEWSLETTER_KIND");
     expect(dailyColumnApiSrc).toContain("NEWSLETTER_LOCALES");
-    expect(dailyColumnApiSrc).toContain("z.enum(NEWSLETTER_LOCALES)");
+    expect(dailyColumnApiSrc).toContain(".enum(NEWSLETTER_LOCALES)");
     expect(newsletterRssFeedSrc).toContain("NEWSLETTER_LOCALES");
     expect(newsletterRssFeedSrc).not.toContain('raw === "en" ? "en" : "zh"');
   });
