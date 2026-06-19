@@ -3,16 +3,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { useTweaks } from "@/hooks/use-tweaks";
-import { NAV_ADMIN, NAV_PRIMARY, activeNavId } from "@/lib/shell/nav-data";
+import {
+  NAV_ADMIN,
+  NAV_MOBILE_TABS,
+  NAV_PRIMARY,
+  activeNavId,
+} from "@/lib/shell/nav-data";
 import type { AppLocale } from "@/lib/types";
-
-const TABS = [
-  { id: "hot",      href: "/",             label: "feed",  cn: "热点" },
-  { id: "xmonitor", href: "/x-monitor",    label: "X",     cn: "监控" },
-  { id: "radar",    href: "#",             label: "radar", cn: "雷达" },
-  { id: "saved",    href: "/saved",        label: "saved", cn: "收藏" },
-  { id: "more",     href: "#",             label: "more",  cn: "更多" },
-];
 
 /** Mobile bottom tab bar + bottom-sheet drawer. Only visible under 720px. */
 export function MobileChrome({ locale }: { locale: AppLocale }) {
@@ -29,9 +26,9 @@ export function MobileChrome({ locale }: { locale: AppLocale }) {
   return (
     <>
       <nav className="m-tabbar">
-        {TABS.map((t) => {
+        {NAV_MOBILE_TABS.map((t) => {
           const isActive = activeId === t.id;
-          const label = showEn ? t.label : t.cn;
+          const label = showEn ? t.label : t.cjk;
           if (t.id === "more") {
             return (
               <button

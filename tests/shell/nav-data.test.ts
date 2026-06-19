@@ -1,5 +1,10 @@
 import { describe, expect, it } from "bun:test";
-import { NAV_ADMIN, NAV_PRIMARY, activeNavId } from "@/lib/shell/nav-data";
+import {
+  NAV_ADMIN,
+  NAV_MOBILE_TABS,
+  NAV_PRIMARY,
+  activeNavId,
+} from "@/lib/shell/nav-data";
 
 describe("activeNavId", () => {
   it("matches the root path as hot", () => {
@@ -79,5 +84,25 @@ describe("nav data shape", () => {
     for (const n of [...NAV_PRIMARY, ...NAV_ADMIN]) {
       expect(n.href.startsWith("/")).toBe(true);
     }
+  });
+
+  it("derives mobile tabs from primary nav where possible", () => {
+    const primaryById = new Map(NAV_PRIMARY.map((navItem) => [navItem.id, navItem]));
+    expect(NAV_MOBILE_TABS.map((tab) => tab.id)).toEqual([
+      "hot",
+      "xmonitor",
+      "radar",
+      "saved",
+      "more",
+    ]);
+    for (const id of ["hot", "xmonitor", "saved"]) {
+      expect(NAV_MOBILE_TABS.find((tab) => tab.id === id)?.href).toBe(
+        primaryById.get(id)?.href,
+      );
+    }
+    expect(NAV_MOBILE_TABS.find((tab) => tab.id === "hot")?.label).toBe("feed");
+    expect(NAV_MOBILE_TABS.find((tab) => tab.id === "xmonitor")?.cjk).toBe(
+      "监控",
+    );
   });
 });

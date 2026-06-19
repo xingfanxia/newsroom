@@ -83,6 +83,9 @@ Shipped cleanup:
 - Shared locale pathname-prefix parsing through `appLocaleFromPathname` and
   `stripAppLocalePathPrefix`, so admin gating and shell nav active-state logic
   no longer carry separate `/zh|/en` regexes.
+- Centralized mobile bottom-tab nav values in `NAV_MOBILE_TABS`, deriving route
+  tabs from `NAV_PRIMARY` so desktop rail, mobile drawer, and mobile tab links
+  cannot drift on core route hrefs.
 - Reused `APP_LOCALES` for tweak language options, so browser preferences and
   API tweak validation cannot drift from app route locales.
 - Centralized `AppLocale` to BCP-47 language-tag mapping in
