@@ -78,6 +78,9 @@ Shipped cleanup:
 - Reused `APP_LOCALES` in `i18n/routing.ts`, so Next locale routing and
   API/OpenAPI/agent locale contracts no longer carry separate hard-coded
   `zh/en` tuples.
+- Kept the public agent endpoint inventory in `docs/agent-access/README.md`
+  as the current source of truth; README and ingestion architecture summaries
+  now link there instead of repeating endpoint counts or path lists.
 - Derived the login locale switcher options from `APP_LOCALES`, keeping the
   compact label mapping local while removing another route-locale enum copy.
 - Shared locale pathname-prefix parsing through `appLocaleFromPathname` and

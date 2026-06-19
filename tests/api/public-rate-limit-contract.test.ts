@@ -181,6 +181,9 @@ describe("public API endpoint contract", () => {
     const doc = readProjectFile("docs/agent-access/README.md");
     const configSource = readProjectFile("lib/api/public-endpoint-config.ts");
 
+    expect(doc).toContain(
+      `${PUBLIC_ENDPOINT_COUNT} anonymous read-only endpoints`,
+    );
     expect(doc).toContain("lib/api/public-endpoint-config.ts");
     expect(doc).toContain('publicCachedRoute(req, { endpoint: "<endpoint-key>"');
     expect(doc).toContain("Cache headers are centralized");
@@ -199,5 +202,23 @@ describe("public API endpoint contract", () => {
     );
     expect(doc).not.toContain('publicEndpointRateLimit(req, "<endpoint-key>")');
     expect(doc).not.toContain('publicCachedJson(req, { endpoint: "<endpoint-key>"');
+  });
+
+  test("current summary docs delegate public endpoint inventory to agent-access docs", () => {
+    const readme = readProjectFile("README.md");
+    const architecture = readProjectFile("docs/architecture/ingestion.md");
+
+    for (const currentSummary of [readme, architecture]) {
+      expect(currentSummary).toContain("docs/agent-access/");
+      expect(currentSummary).not.toContain("8 read-only endpoints");
+      expect(currentSummary).not.toContain("8 个端点");
+      expect(currentSummary).not.toContain("Eight new read-only endpoints");
+      expect(currentSummary).not.toContain(
+        "feed / items / search / sources / events / daily / dailies",
+      );
+      expect(currentSummary).not.toContain(
+        "feed / items / search / sources / events / daily / daily-by-date / dailies",
+      );
+    }
   });
 });
