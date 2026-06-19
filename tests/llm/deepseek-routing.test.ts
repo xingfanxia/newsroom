@@ -13,6 +13,9 @@ import {
 import { readSource } from "@/tests/helpers/source";
 
 const llmSrc = readSource("lib/llm/index.ts");
+const modelDefaultsSrc = readSource("lib/llm/model-defaults.ts");
+const pricingSrc = readSource("lib/llm/pricing.ts");
+const backfillStyleSrc = readSource("scripts/ops/backfill-style.ts");
 const typesSrc = readSource("lib/llm/types.ts");
 const usageSrc = readSource("lib/llm/usage.ts");
 
@@ -49,8 +52,38 @@ describe("Azure DeepSeek routing", () => {
     expect(typesSrc).toContain('"azure-deepseek"');
     expect(llmSrc).toContain("AZURE_DEEPSEEK_DEPLOYMENT");
     expect(llmSrc).toContain("AZURE_DEEPSEEK_FLASH_DEPLOYMENT");
-    expect(llmSrc).toContain("DeepSeek-V4-Pro");
-    expect(llmSrc).toContain("DeepSeek-V4-Flash");
+    expect(modelDefaultsSrc).toContain('azureDeepSeekPro: "DeepSeek-V4-Pro"');
+    expect(modelDefaultsSrc).toContain(
+      'azureDeepSeekFlash: "DeepSeek-V4-Flash"',
+    );
+    expect(llmSrc).toContain("LLM_MODEL_DEFAULTS.azureDeepSeekPro");
+    expect(llmSrc).toContain("LLM_MODEL_DEFAULTS.azureDeepSeekFlash");
+  });
+
+  it("shares current default model labels across runtime, pricing, and ops scripts", () => {
+    expect(modelDefaultsSrc).toContain("export const LLM_MODEL_DEFAULTS");
+    expect(llmSrc).toContain('from "./model-defaults"');
+    expect(pricingSrc).toContain('from "./model-defaults"');
+    expect(backfillStyleSrc).toContain("@/lib/llm/model-defaults");
+    expect(pricingSrc).toContain("[LLM_MODEL_DEFAULTS.azureDeepSeekPro]");
+    expect(pricingSrc).toContain("[LLM_MODEL_DEFAULTS.azureDeepSeekFlash]");
+    expect(pricingSrc).toContain("[LLM_MODEL_DEFAULTS.azureOpenAIChat]");
+    expect(pricingSrc).toContain("[LLM_MODEL_DEFAULTS.embedding]");
+    expect(backfillStyleSrc).toContain(
+      "const MODEL_NAME = LLM_MODEL_DEFAULTS.azureDeepSeekPro",
+    );
+    for (const literal of [
+      '"DeepSeek-V4-Pro"',
+      '"DeepSeek-V4-Flash"',
+      '"gpt-5.5-standard"',
+      '"text-embedding-3-large"',
+      '"claude-opus-4-7"',
+      '"gemini-3.1-pro-preview"',
+    ]) {
+      expect(llmSrc).not.toContain(literal);
+      expect(pricingSrc).not.toContain(literal);
+      expect(backfillStyleSrc).not.toContain(literal);
+    }
   });
 
   it("accepts a /responses endpoint without double-appending /responses", () => {

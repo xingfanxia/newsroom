@@ -24,15 +24,21 @@ describe("enrich model treatment", () => {
 
   it("wires DeepSeek V4 Flash as the low-value deployment", () => {
     const llmSrc = readSource("lib/llm/index.ts");
+    const modelDefaultsSrc = readSource("lib/llm/model-defaults.ts");
     expect(llmSrc).toContain("AZURE_DEEPSEEK_FLASH_DEPLOYMENT");
-    expect(llmSrc).toContain("DeepSeek-V4-Flash");
+    expect(modelDefaultsSrc).toContain(
+      'azureDeepSeekFlash: "DeepSeek-V4-Flash"',
+    );
+    expect(llmSrc).toContain("LLM_MODEL_DEFAULTS.azureDeepSeekFlash");
     expect(llmSrc).toContain("fastText");
   });
 
   it("uses DeepSeek V4 Pro, not gpt-5.5, for high-value text generation", () => {
     const llmSrc = readSource("lib/llm/index.ts");
+    const modelDefaultsSrc = readSource("lib/llm/model-defaults.ts");
     expect(llmSrc).toContain("deployment: deepSeekProDeployment()");
-    expect(llmSrc).toContain("DeepSeek-V4-Pro");
+    expect(modelDefaultsSrc).toContain('azureDeepSeekPro: "DeepSeek-V4-Pro"');
+    expect(llmSrc).toContain("LLM_MODEL_DEFAULTS.azureDeepSeekPro");
     expect(llmSrc).not.toMatch(/enrich:\s*\{[\s\S]*?provider:\s*"azure-openai"/);
     expect(llmSrc).not.toMatch(/score:\s*\{[\s\S]*?provider:\s*"azure-openai"/);
   });

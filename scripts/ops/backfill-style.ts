@@ -64,6 +64,7 @@ import {
   opsStatePath,
   saveOpsState,
 } from "@/scripts/ops/state";
+import { LLM_MODEL_DEFAULTS } from "@/lib/llm/model-defaults";
 
 type Capability = (typeof CAPABILITIES)[number];
 type Topic = (typeof TOPICS)[number];
@@ -78,7 +79,7 @@ const EST_INPUT_TOK = 3000;
 // high so the operator-facing total is conservative.
 const EST_OUTPUT_TOK = 700;
 const SECONDS_PER_CALL = 30;
-const MODEL_NAME = "DeepSeek-V4-Pro";
+const MODEL_NAME = LLM_MODEL_DEFAULTS.azureDeepSeekPro;
 
 // ── CLI ──────────────────────────────────────────────────────────────
 interface Flags {

@@ -34,6 +34,7 @@ import {
   extractCachedTokens,
   extractReasoningTokens,
 } from "./usage";
+import { LLM_MODEL_DEFAULTS } from "./model-defaults";
 
 export type {
   LLMProvider,
@@ -86,7 +87,7 @@ function normalizeAzureApiVersion(raw: string | undefined): string {
 
 function azureClient() {
   // Embeddings-only (legacy chat-completions deployments still resolve here too,
-  // but production chat traffic moved to azureChatClient as of gpt-5.5).
+  // but production chat traffic moved to azureChatClient for Responses API.
   const apiKey = process.env.AZURE_OPENAI_API_KEY;
   const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
   const apiVersion = normalizeAzureApiVersion(
@@ -115,8 +116,8 @@ function normalizeOpenAICompatibleBaseURL(endpoint: string): string {
 
 function azureChatClient() {
   // Standard chat lives on the AI Foundry "project" Responses-API endpoint
-  // (ax-useast-resource as of gpt-5.5). Same shape as PRO (createOpenAI +
-  // baseURL override + api-key header) but a different resource + key.
+  // for the default compatibility deployment. Same shape as PRO (createOpenAI
+  // + baseURL override + api-key header) but a different resource + key.
   const apiKey = process.env.AZURE_OPENAI_CHAT_API_KEY;
   const endpoint = process.env.AZURE_OPENAI_CHAT_ENDPOINT; // ".../openai/v1/"
   if (!apiKey || !endpoint) {
@@ -175,11 +176,17 @@ function azureDeepSeekClient() {
 }
 
 function deepSeekProDeployment(): string {
-  return process.env.AZURE_DEEPSEEK_DEPLOYMENT ?? "DeepSeek-V4-Pro";
+  return (
+    process.env.AZURE_DEEPSEEK_DEPLOYMENT ??
+    LLM_MODEL_DEFAULTS.azureDeepSeekPro
+  );
 }
 
 function deepSeekFlashDeployment(): string {
-  return process.env.AZURE_DEEPSEEK_FLASH_DEPLOYMENT ?? "DeepSeek-V4-Flash";
+  return (
+    process.env.AZURE_DEEPSEEK_FLASH_DEPLOYMENT ??
+    LLM_MODEL_DEFAULTS.azureDeepSeekFlash
+  );
 }
 
 // ── Model resolvers ─────────────────────────────────────────────
@@ -193,22 +200,22 @@ function modelFor(
       return anthropicClient()(
         opts?.deployment ??
           process.env.ANTHROPIC_MODEL ??
-          "claude-opus-4-7",
+          LLM_MODEL_DEFAULTS.anthropic,
       );
     case "gemini":
       return googleClient()(
         opts?.deployment ??
           process.env.GEMINI_MODEL ??
-          "gemini-3.1-pro-preview",
+          LLM_MODEL_DEFAULTS.gemini,
       );
     case "azure-openai":
-      // gpt-5.5-standard is a Responses-API-only deployment on the AI Foundry
-      // project endpoint — no legacy /chat/completions surface, so we route
-      // through azureChatClient().responses() instead of azureClient().chat().
+      // The default compatibility chat deployment is Responses-API-only on the
+      // AI Foundry project endpoint, so we route through
+      // azureChatClient().responses() instead of azureClient().chat().
       return azureChatClient().responses(
         opts?.deployment ??
           process.env.AZURE_OPENAI_CHAT_DEPLOYMENT ??
-          "gpt-5.5-standard",
+          LLM_MODEL_DEFAULTS.azureOpenAIChat,
       );
     case "azure-openai-pro":
       // .responses() uses Azure's Responses API for the optional agent profile.
@@ -267,10 +274,10 @@ function reasoningProviderOptions(provider: LLMProvider, effort?: ReasoningEffor
 }
 
 /**
- * Azure Foundry's Responses-API endpoint (gpt-5.5-standard) rejects requests
- * that pass a top-level `system` field — the AI SDK's `system → instructions`
- * conversion produces an input item with empty `type`, and the API responds
- * with `Invalid value: ''. Supported values are: 'message', 'reasoning', ...`.
+ * Azure Foundry's Responses-API endpoints reject requests that pass a top-level
+ * `system` field — the AI SDK's `system → instructions` conversion produces an
+ * input item with empty `type`, and the API responds with
+ * `Invalid value: ''. Supported values are: 'message', 'reasoning', ...`.
  *
  * Workaround: fold the system prompt into the first user message as a prefix.
  * Every other provider continues to receive `system` as a discrete role.

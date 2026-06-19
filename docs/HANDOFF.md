@@ -75,6 +75,10 @@ Shipped cleanup:
 - Shared `/admin/usage` provider/model label formatting through
   `lib/llm/usage-display.ts`, so task spend summaries and recent-call rows
   both identify the provider instead of showing ambiguous deployment names.
+- Shared current LLM default model/deployment labels through
+  `lib/llm/model-defaults.ts`; provider resolution, pricing fallback, and
+  operator backfill cost forecasts no longer repeat the same DeepSeek, GPT,
+  and embedding defaults.
 - Reused `APP_LOCALES` in `i18n/routing.ts`, so Next locale routing and
   API/OpenAPI/agent locale contracts no longer carry separate hard-coded
   `zh/en` tuples.
