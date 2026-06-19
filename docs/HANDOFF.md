@@ -269,6 +269,11 @@ Shipped cleanup:
 - Reused `DAILY_COLUMN_LOCALE` in the daily-column renderer, so detail-page
   date formatting, item links, and index links no longer hand-code the Chinese
   route locale.
+- Shared daily-column public route construction through
+  `lib/daily-column/routes.ts` exports (`DAILY_COLUMN_INDEX_ROUTE`,
+  `dailyColumnIssueRoute`, and `dailyColumnItemRoute`), so the daily pages,
+  renderer, RSS item links, and installable skill markdown no longer spell
+  `/zh/daily` independently.
 - Shared AI HOT history placeholder windowing through
   `dailyColumnWindowForDate`, so imported daily payload rows use the same 05:00Z
   period boundaries as the daily-column writer instead of creating midnight

@@ -5,6 +5,7 @@ import {
   listDailyColumnRows,
   type DailyColumnRow,
 } from "@/lib/api/daily-columns";
+import { dailyColumnIssueRoute } from "@/lib/daily-column/routes";
 import {
   legacyRssFeedMeta,
   type LegacyLaneRssSlug,
@@ -12,6 +13,7 @@ import {
 } from "@/lib/rss/legacy-feed-meta";
 import { publicUrl } from "@/lib/site";
 import { renderRssFeed, type RssItem } from "@/lib/rss/render";
+import { DAILY_COLUMN_LOCALE } from "@/lib/types";
 
 export { parseLegacyRssSlug } from "@/lib/rss/legacy-feed-meta";
 
@@ -49,7 +51,7 @@ export async function renderLegacyRssFeed(
 
 export function dailyColumnRssItem(row: DailyColumnRssRow): RssItem {
   const date = dailyColumnDateKey(row.periodStart);
-  const link = publicUrl(`/zh/daily/${date}`);
+  const link = publicUrl(dailyColumnIssueRoute(date));
   const issueId = `AX 的 AI 日报 · ${date}`;
   const subtitle = row.columnTitle ?? "";
 
@@ -78,7 +80,7 @@ export function legacyLaneRssItem(row: LegacyLaneRssRow): RssItem {
 }
 
 async function legacyDailyRssItems(): Promise<RssItem[]> {
-  const rows = await listDailyColumnRows({ locale: "zh", take: 50 });
+  const rows = await listDailyColumnRows({ locale: DAILY_COLUMN_LOCALE, take: 50 });
   return rows.map(dailyColumnRssItem);
 }
 

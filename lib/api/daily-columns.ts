@@ -7,9 +7,13 @@ import {
   invalidQueryError,
   queryParamsRecord,
 } from "@/lib/api/query-params";
-import { DAILY_NEWSLETTER_KIND, NEWSLETTER_LOCALES } from "@/lib/types";
+import {
+  DAILY_COLUMN_LOCALE,
+  DAILY_NEWSLETTER_KIND,
+  NEWSLETTER_LOCALES,
+} from "@/lib/types";
 
-const dailyColumnLocaleSchema = z.enum(NEWSLETTER_LOCALES).default("zh");
+const dailyColumnLocaleSchema = z.enum(NEWSLETTER_LOCALES).default(DAILY_COLUMN_LOCALE);
 export type DailyColumnLocale = z.infer<typeof dailyColumnLocaleSchema>;
 
 export const dailyColumnDateSchema = z
@@ -27,7 +31,7 @@ export const dailyColumnDateSchema = z
 
 const dailyColumnIndexQuerySchema = z.object({
   take: z.coerce.number().int().min(1).max(180).optional().default(30),
-  locale: dailyColumnLocaleSchema.optional().default("zh"),
+  locale: dailyColumnLocaleSchema.optional().default(DAILY_COLUMN_LOCALE),
 });
 
 export type DailyColumnIndexQuery = z.infer<

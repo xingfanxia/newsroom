@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { GET as getSkillMarkdown } from "@/app/skill.md/route";
+import { DAILY_COLUMN_INDEX_ROUTE } from "@/lib/daily-column/routes";
 import {
   APP_LOCALES,
   FEED_VIEWS,
@@ -35,6 +36,8 @@ describe("public skill contract source wiring", () => {
     ]) {
       expect(skillRoute).toContain(tupleName);
     }
+    expect(skillRoute).toContain("DAILY_COLUMN_INDEX_ROUTE");
+    expect(skillRoute).not.toContain('publicUrl("/zh/daily")');
 
     for (const duplicatedContract of [
       String.raw`- \`tier\` = \`featured\` (default) | \`p1\` | \`all\``,
@@ -70,6 +73,9 @@ describe("public skill contract source wiring", () => {
     );
     expect(text).toContain(
       `- \`locale\` = ${markdownCodeUnion(APP_LOCALES)}, default \`en\``,
+    );
+    expect(text).toContain(
+      `想看完整长篇日报: https://news.ax0x.ai${DAILY_COLUMN_INDEX_ROUTE}`,
     );
     expect(text).toContain(
       `"source_group": "${compactUnion([...SOURCE_GROUPS, null])}"`,

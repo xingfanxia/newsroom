@@ -7,8 +7,12 @@ import {
   dailyColumnDateKey,
   listDailyColumnRows,
 } from "@/lib/api/daily-columns";
+import {
+  DAILY_COLUMN_INDEX_ROUTE,
+  dailyColumnIssueRoute,
+} from "@/lib/daily-column/routes";
 import { formatCoarseRelativeTime } from "@/lib/time/relative";
-import { appLocaleFromParam } from "@/lib/types";
+import { appLocaleFromParam, DAILY_COLUMN_LOCALE } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -50,11 +54,11 @@ export default async function DailyLandingPage({
   const { p } = await searchParams;
   const page = Math.max(1, Number(p ?? "1"));
   const offset = (page - 1) * PAGE_SIZE;
-  const isZh = appLocale === "zh";
+  const isDailyColumnLocale = appLocale === DAILY_COLUMN_LOCALE;
 
   const [rows, chrome] = await Promise.all([
-    isZh
-      ? listDailyColumnRows({ locale: "zh", take: PAGE_SIZE, offset })
+    isDailyColumnLocale
+      ? listDailyColumnRows({ locale: DAILY_COLUMN_LOCALE, take: PAGE_SIZE, offset })
       : Promise.resolve([]),
     getShellChromeData({ pulse: true }),
   ]);
@@ -72,7 +76,7 @@ export default async function DailyLandingPage({
           en="ax daily"
           cjk="每日 AI 日报"
           count={rows.length}
-          countLabel={isZh ? "篇" : "issues"}
+          countLabel={isDailyColumnLocale ? "篇" : "issues"}
           extra={
             <span>
               每天 9pm PT · 2500-4500 字编辑视角 · 主笔风格参考「数字生命卡兹克」 ·{" "}
@@ -86,7 +90,7 @@ export default async function DailyLandingPage({
           }
         />
 
-        {!isZh ? (
+        {!isDailyColumnLocale ? (
           <p className="my-8 text-[var(--fg-2)]">
             English edition coming soon. The current daily ships in Chinese
             only; subscribe to the RSS or check back when the English voice is
@@ -104,7 +108,7 @@ export default async function DailyLandingPage({
                 const preview = summaryPreview(r.columnSummaryMd ?? "");
                 return (
                   <Link
-                    href={`/zh/daily/${dk}`}
+                    href={dailyColumnIssueRoute(dk)}
                     key={r.id}
                     className="item"
                     style={{
@@ -138,7 +142,11 @@ export default async function DailyLandingPage({
             <nav className="mt-12 flex items-center justify-between text-sm">
               {page > 1 ? (
                 <Link
-                  href={`/zh/daily${page === 2 ? "" : `?p=${page - 1}`}`}
+                  href={
+                    page === 2
+                      ? DAILY_COLUMN_INDEX_ROUTE
+                      : `${DAILY_COLUMN_INDEX_ROUTE}?p=${page - 1}`
+                  }
                   className="text-[var(--color-cyan)] underline underline-offset-4 decoration-[var(--color-cyan)]/40 hover:decoration-[var(--color-cyan)]"
                 >
                   ← 较新
@@ -148,7 +156,7 @@ export default async function DailyLandingPage({
               )}
               {rows.length === PAGE_SIZE ? (
                 <Link
-                  href={`/zh/daily?p=${page + 1}`}
+                  href={`${DAILY_COLUMN_INDEX_ROUTE}?p=${page + 1}`}
                   className="text-[var(--color-cyan)] underline underline-offset-4 decoration-[var(--color-cyan)]/40 hover:decoration-[var(--color-cyan)]"
                 >
                   较旧 →

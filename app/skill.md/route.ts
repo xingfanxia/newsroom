@@ -24,6 +24,7 @@ import {
   PUBLIC_RATE_LIMIT_DOC_GROUPS,
   publicRateLimitLabel,
 } from "@/lib/api/public-endpoint-config";
+import { DAILY_COLUMN_INDEX_ROUTE } from "@/lib/daily-column/routes";
 import { PUBLIC_SITE_URL, publicUrl } from "@/lib/site";
 
 function markdownCodeUnion(values: readonly string[]): string {
@@ -111,7 +112,7 @@ Skill 根据用户提问关键词智能分流。默认走 **精选 + view=today*
 1. **{title}** ({publisher}) — {一句话点评 / 单 source 的话用编辑 note}
 2. ...
 
-想看完整长篇日报: ${publicUrl("/zh/daily")}
+想看完整长篇日报: ${publicUrl(DAILY_COLUMN_INDEX_ROUTE)}
 \`\`\`
 
 ## 鉴权 / Auth

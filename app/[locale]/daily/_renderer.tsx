@@ -1,5 +1,9 @@
 import Link from "next/link";
 import { Prose } from "@/components/markdown/prose";
+import {
+  DAILY_COLUMN_INDEX_ROUTE,
+  dailyColumnItemRoute,
+} from "@/lib/daily-column/routes";
 import { appLocaleLanguageTag, DAILY_COLUMN_LOCALE } from "@/lib/types";
 
 export type ColumnRow = {
@@ -15,9 +19,6 @@ export type ColumnRow = {
    *  pre-AI-HOT-integration). Drives the footer attribution chip. */
   aihotDailyDate: string | null;
 };
-
-const DAILY_COLUMN_BASE_ROUTE = `/${DAILY_COLUMN_LOCALE}`;
-const DAILY_COLUMN_INDEX_ROUTE = `${DAILY_COLUMN_BASE_ROUTE}/daily`;
 
 function dateKey(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -39,7 +40,7 @@ function formatDate(d: Date): string {
 function linkifyItemRefs(md: string): string {
   return md.replace(
     /\[#(\d+)\]/g,
-    (_, id) => `[#${id}](${DAILY_COLUMN_BASE_ROUTE}/items/${id})`,
+    (_, id) => `[#${id}](${dailyColumnItemRoute(id)})`,
   );
 }
 

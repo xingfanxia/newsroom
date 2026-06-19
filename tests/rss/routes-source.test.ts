@@ -121,6 +121,8 @@ describe("RSS route source contracts", () => {
     expect(legacyFeedMeta).toContain("/api/rss/today.xml");
     expect(legacyFeedMeta).toContain("/api/rss/curated.xml");
     expect(legacyFeedMeta).toContain("/api/rss/daily.xml");
+    expect(legacyFeedMeta).toContain("@/lib/daily-column/routes");
+    expect(legacyFeedMeta).not.toContain("@/lib/api/daily-columns");
 
     for (const source of [legacyFeeds, agentsTabs]) {
       expect(source).toContain("@/lib/rss/legacy-feed-meta");

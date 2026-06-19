@@ -7,7 +7,7 @@ import {
   dailyColumnDateSchema,
   getDailyColumnRowByDate,
 } from "@/lib/api/daily-columns";
-import { appLocaleFromParam } from "@/lib/types";
+import { appLocaleFromParam, DAILY_COLUMN_LOCALE } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -19,12 +19,12 @@ export default async function DailyDatePage({ params }: Props) {
   const { locale, date } = await params;
   const appLocale = appLocaleFromParam(locale);
   setRequestLocale(appLocale);
-  if (appLocale !== "zh") notFound();
+  if (appLocale !== DAILY_COLUMN_LOCALE) notFound();
   const parsedDate = dailyColumnDateSchema.safeParse(date);
   if (!parsedDate.success) notFound();
 
   const [row, chrome] = await Promise.all([
-    getDailyColumnRowByDate(parsedDate.data, "zh"),
+    getDailyColumnRowByDate(parsedDate.data, DAILY_COLUMN_LOCALE),
     getShellChromeData({ pulse: true }),
   ]);
 

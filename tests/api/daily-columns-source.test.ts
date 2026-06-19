@@ -10,8 +10,12 @@ const dailyUiPaths = [
   "app/[locale]/daily/page.tsx",
   "app/[locale]/daily/[date]/page.tsx",
 ] as const;
+const dailyColumnApi = readSource("lib/api/daily-columns.ts");
+const dailyColumnRoutes = readSource("lib/daily-column/routes.ts");
+const dailyLandingPage = readSource("app/[locale]/daily/page.tsx");
 const dailyRenderer = readSource("app/[locale]/daily/_renderer.tsx");
 const legacyRssFeeds = readSource("lib/rss/legacy-feeds.ts");
+const legacyRssFeedMeta = readSource("lib/rss/legacy-feed-meta.ts");
 
 const mcpRoute = readSource("app/api/mcp/route.ts");
 const mcpDailyResources = sectionBetween(
@@ -64,24 +68,41 @@ describe("daily-column API source wiring", () => {
     expect(readSource("app/[locale]/daily/page.tsx")).toContain(
       "listDailyColumnRows",
     );
-    expect(readSource("app/[locale]/daily/page.tsx")).toContain(
-      "@/lib/time/relative",
-    );
-    expect(readSource("app/[locale]/daily/page.tsx")).not.toContain(
+    expect(dailyLandingPage).toContain("@/lib/time/relative");
+    expect(dailyLandingPage).toContain("DAILY_COLUMN_LOCALE");
+    expect(dailyLandingPage).toContain("DAILY_COLUMN_INDEX_ROUTE");
+    expect(dailyLandingPage).toContain("dailyColumnIssueRoute");
+    expect(dailyLandingPage).not.toContain(
       "function relativeAgo",
     );
+    expect(dailyLandingPage).not.toContain("`/zh/daily");
     expect(readSource("app/[locale]/daily/[date]/page.tsx")).toContain(
       "getDailyColumnRowByDate",
     );
+    expect(readSource("app/[locale]/daily/[date]/page.tsx")).toContain(
+      "DAILY_COLUMN_LOCALE",
+    );
+    expect(dailyColumnApi).toContain(".default(DAILY_COLUMN_LOCALE)");
+    expect(dailyColumnRoutes).toContain("DAILY_COLUMN_BASE_ROUTE");
+    expect(dailyColumnRoutes).toContain("DAILY_COLUMN_INDEX_ROUTE");
+    expect(dailyColumnRoutes).toContain("dailyColumnIssueRoute");
+    expect(dailyColumnRoutes).toContain("dailyColumnItemRoute");
+    expect(dailyColumnRoutes).not.toContain("@/db/");
     expect(dailyRenderer).toContain("DAILY_COLUMN_LOCALE");
     expect(dailyRenderer).toContain("appLocaleLanguageTag");
-    expect(dailyRenderer).toContain("DAILY_COLUMN_BASE_ROUTE");
     expect(dailyRenderer).toContain("DAILY_COLUMN_INDEX_ROUTE");
+    expect(dailyRenderer).toContain("dailyColumnItemRoute");
     expect(dailyRenderer).not.toContain('"zh-CN"');
     expect(dailyRenderer).not.toContain('href="/zh/daily"');
     expect(dailyRenderer).not.toContain("](/zh/items/");
     expect(legacyRssFeeds).toContain("@/lib/api/daily-columns");
     expect(legacyRssFeeds).toContain("listDailyColumnRows");
+    expect(legacyRssFeeds).toContain("dailyColumnIssueRoute");
+    expect(legacyRssFeeds).toContain("DAILY_COLUMN_LOCALE");
+    expect(legacyRssFeeds).not.toContain("`/zh/daily");
+    expect(legacyRssFeedMeta).toContain("DAILY_COLUMN_INDEX_ROUTE");
+    expect(legacyRssFeedMeta).toContain("@/lib/daily-column/routes");
+    expect(legacyRssFeedMeta).not.toContain("@/lib/api/daily-columns");
     expect(legacyRssFeeds).not.toContain("from(newsletters)");
     expect(readSource("app/api/rss/[slug]/route.ts")).toContain(
       "@/lib/rss/legacy-feeds",

@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import {
+  DAILY_COLUMN_INDEX_ROUTE,
+  dailyColumnIssueRoute,
+} from "@/lib/daily-column/routes";
+import {
   dailyColumnRssItem,
   legacyLaneRssItem,
   parseLegacyRssSlug,
@@ -30,10 +34,12 @@ describe("legacy RSS feed helpers", () => {
       "/api/rss/daily.xml",
     ]);
     expect(legacyRssFeedMeta("today").recommended).toBe(true);
-    expect(legacyRssFeedMeta("daily").route).toBe("/zh/daily");
+    expect(legacyRssFeedMeta("daily").route).toBe(DAILY_COLUMN_INDEX_ROUTE);
   });
 
   test("maps daily-column rows to stable RSS items", () => {
+    const issueUrl = `https://news.ax0x.ai${dailyColumnIssueRoute("2026-06-12")}`;
+
     expect(
       dailyColumnRssItem({
         columnTitle: "今天 AI 圈在拼开源",
@@ -45,10 +51,10 @@ describe("legacy RSS feed helpers", () => {
       }),
     ).toEqual({
       title: "AX 的 AI 日报 · 2026-06-12 · 今天 AI 圈在拼开源",
-      link: "https://news.ax0x.ai/zh/daily/2026-06-12",
+      link: issueUrl,
       description: "1. summary",
       pubDate: new Date("2026-06-13T05:01:32.000Z"),
-      guid: "https://news.ax0x.ai/zh/daily/2026-06-12",
+      guid: issueUrl,
       category: "开源与禁令",
       contentEncoded: "1. summary\n\nlong narrative",
     });

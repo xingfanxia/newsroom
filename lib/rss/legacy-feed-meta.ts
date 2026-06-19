@@ -1,3 +1,5 @@
+import { DAILY_COLUMN_INDEX_ROUTE } from "@/lib/daily-column/routes";
+
 export const LEGACY_RSS_FEEDS = [
   {
     slug: "today",
@@ -34,7 +36,7 @@ export const LEGACY_RSS_FEEDS = [
   {
     slug: "daily",
     apiPath: "/api/rss/daily.xml",
-    route: "/zh/daily",
+    route: DAILY_COLUMN_INDEX_ROUTE,
     channelTitle: "AX Radar — 每日 AI 日报",
     channelDescription:
       "每日 9pm PT 一篇 AI 日报，2500-4500 字编辑视角，作者主笔。",
