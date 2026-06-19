@@ -45,6 +45,7 @@ import {
   PUBLIC_SEARCH_LIMIT_MAX,
   SEARCH_LIMIT_MIN,
 } from "@/lib/search/query-defaults";
+import { DEFAULT_PUBLIC_EVENT_MEMBERS_LOCALE } from "@/lib/event-members/query-defaults";
 import { PUBLIC_SITE_URL, publicUrl } from "@/lib/site";
 
 function yamlInlineEnum(values: readonly (string | null)[]): string {
@@ -226,7 +227,7 @@ paths:
         agents can degrade gracefully without a separate error path.
       parameters:
         - { name: cluster_id, in: path, required: true, schema: { type: integer } }
-        - { name: locale, in: query, schema: { type: string, enum: ${APP_LOCALE_ENUM}, default: en } }
+        - { name: locale, in: query, schema: { type: string, enum: ${APP_LOCALE_ENUM}, default: ${DEFAULT_PUBLIC_EVENT_MEMBERS_LOCALE} } }
       responses:
         '200':
           description: OK

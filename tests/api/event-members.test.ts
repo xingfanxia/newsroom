@@ -9,6 +9,12 @@ import {
   toEventMembersListEnvelope,
   toEventMembersPayload,
 } from "@/lib/api/event-members";
+import {
+  DEFAULT_MCP_EVENT_MEMBERS_LOCALE,
+  DEFAULT_PUBLIC_EVENT_MEMBERS_LOCALE,
+  DEFAULT_UI_EVENT_MEMBERS_LOCALE,
+  DEFAULT_V1_EVENT_MEMBERS_LOCALE,
+} from "@/lib/event-members/query-defaults";
 import type { Story } from "@/lib/types";
 
 const member: NonNullable<Story["members"]>[number] = {
@@ -30,26 +36,33 @@ const expectedKeys = [
 ];
 
 describe("event member API serialization", () => {
+  test("exposes per-surface locale defaults", () => {
+    expect(DEFAULT_UI_EVENT_MEMBERS_LOCALE).toBe("zh");
+    expect(DEFAULT_V1_EVENT_MEMBERS_LOCALE).toBe("zh");
+    expect(DEFAULT_PUBLIC_EVENT_MEMBERS_LOCALE).toBe("en");
+    expect(DEFAULT_MCP_EVENT_MEMBERS_LOCALE).toBe("en");
+  });
+
   test("parses shared route params with per-surface locale defaults", () => {
     expect(
       parseEventMemberRouteParams({
         rawId: "42",
         rawLocale: null,
-        defaultLocale: "zh",
+        defaultLocale: DEFAULT_UI_EVENT_MEMBERS_LOCALE,
       }),
     ).toEqual({ ok: true, clusterId: 42, locale: "zh" });
     expect(
       parseEventMemberRouteParams({
         rawId: "42",
         rawLocale: null,
-        defaultLocale: "en",
+        defaultLocale: DEFAULT_PUBLIC_EVENT_MEMBERS_LOCALE,
       }),
     ).toEqual({ ok: true, clusterId: 42, locale: "en" });
     expect(
       parseEventMemberRouteParams({
         rawId: "42",
         rawLocale: "en",
-        defaultLocale: "zh",
+        defaultLocale: DEFAULT_V1_EVENT_MEMBERS_LOCALE,
       }),
     ).toEqual({ ok: true, clusterId: 42, locale: "en" });
   });
@@ -59,21 +72,21 @@ describe("event member API serialization", () => {
       parseEventMemberRouteParams({
         rawId: "0",
         rawLocale: null,
-        defaultLocale: "zh",
+        defaultLocale: DEFAULT_UI_EVENT_MEMBERS_LOCALE,
       }),
     ).toEqual({ ok: false, error: "invalid_id" });
     expect(
       parseEventMemberRouteParams({
         rawId: "42",
         rawLocale: "",
-        defaultLocale: "zh",
+        defaultLocale: DEFAULT_UI_EVENT_MEMBERS_LOCALE,
       }),
     ).toEqual({ ok: false, error: "invalid_locale" });
     expect(
       parseEventMemberRouteParams({
         rawId: "42",
         rawLocale: "ja",
-        defaultLocale: "zh",
+        defaultLocale: DEFAULT_UI_EVENT_MEMBERS_LOCALE,
       }),
     ).toEqual({ ok: false, error: "invalid_locale" });
   });
@@ -138,7 +151,7 @@ describe("event member API serialization", () => {
       getEventMembersRoutePayload({
         rawId: "0",
         rawLocale: null,
-        defaultLocale: "zh",
+        defaultLocale: DEFAULT_UI_EVENT_MEMBERS_LOCALE,
       }),
     ).resolves.toEqual({ ok: false, error: "invalid_id", status: 400 });
 
@@ -146,7 +159,7 @@ describe("event member API serialization", () => {
       getEventMembersRoutePayload({
         rawId: "42",
         rawLocale: "ja",
-        defaultLocale: "zh",
+        defaultLocale: DEFAULT_UI_EVENT_MEMBERS_LOCALE,
       }),
     ).resolves.toEqual({ ok: false, error: "invalid_locale", status: 400 });
 
@@ -155,7 +168,7 @@ describe("event member API serialization", () => {
         new Request("https://example.test/api/events/42/members?locale=ja"),
         {
           rawId: "42",
-          defaultLocale: "zh",
+          defaultLocale: DEFAULT_UI_EVENT_MEMBERS_LOCALE,
         },
       ),
     ).resolves.toEqual({ ok: false, error: "invalid_locale", status: 400 });

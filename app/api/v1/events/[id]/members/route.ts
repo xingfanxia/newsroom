@@ -6,7 +6,8 @@
  * own API token without hitting the public endpoint's anonymous rate-limits.
  *
  * Path:    /api/v1/events/<cluster_id>/members
- * Query:   ?locale=zh|en   (default zh)
+ * Query:   ?locale=zh|en
+ * Locale default lives in `lib/event-members/query-defaults.ts`.
  *
  * Response:
  *   { members: [{ source_id, source_name, title, url, published_at, importance }],
@@ -25,6 +26,7 @@ import {
   getEventMembersRequestPayload,
   toEventMembersListEnvelope,
 } from "@/lib/api/event-members";
+import { DEFAULT_V1_EVENT_MEMBERS_LOCALE } from "@/lib/event-members/query-defaults";
 
 export async function GET(
   req: Request,
@@ -35,7 +37,7 @@ export async function GET(
 
     const result = await getEventMembersRequestPayload(req, {
       rawId: idRaw,
-      defaultLocale: "zh",
+      defaultLocale: DEFAULT_V1_EVENT_MEMBERS_LOCALE,
     });
     return v1RouteResult(result, (payload) =>
       v1Json(toEventMembersListEnvelope(payload)),

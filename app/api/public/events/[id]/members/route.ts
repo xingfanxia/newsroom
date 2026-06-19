@@ -12,6 +12,7 @@ import {
   eventMembersCacheSignalParts,
   getEventMembersRequestPayload,
 } from "@/lib/api/event-members";
+import { DEFAULT_PUBLIC_EVENT_MEMBERS_LOCALE } from "@/lib/event-members/query-defaults";
 import {
   etagSignal,
   publicCachedRoute,
@@ -33,7 +34,7 @@ export async function GET(
       const { id: idRaw } = await ctx.params;
       const result = await getEventMembersRequestPayload(req, {
         rawId: idRaw,
-        defaultLocale: "en",
+        defaultLocale: DEFAULT_PUBLIC_EVENT_MEMBERS_LOCALE,
       });
       return publicRouteResult(result, (body) => ({
         signal: etagSignal(eventMembersCacheSignalParts(body)),

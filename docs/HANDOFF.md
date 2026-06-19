@@ -330,6 +330,10 @@ Shipped cleanup:
   `getEventMembersRoutePayload` / `getEventMembersPayload` in
   `lib/api/event-members.ts`; UI-internal, public, v1, and MCP adapters now
   own only their auth/rate-limit/cache/envelope mapping.
+- Shared event-member locale defaults through
+  `lib/event-members/query-defaults.ts`; UI-internal, v1, public, MCP, and
+  generated OpenAPI event-member surfaces no longer repeat route-local locale
+  default literals while preserving their existing per-surface defaults.
 - Shared daily-column public lookup payloads and MCP markdown lookups through
   `lib/api/daily-columns.ts`; public daily route files now own only
   rate-limit/cache/error-envelope mapping, while MCP daily resources own only

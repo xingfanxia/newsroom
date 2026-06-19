@@ -7,7 +7,8 @@
  * `cluster_id` field, and the payload fields are exactly what the feed already
  * exposes publicly for each item.
  *
- * Query: ?locale=zh|en  (default zh)
+ * Query: ?locale=zh|en
+ * Locale default lives in `lib/event-members/query-defaults.ts`.
  *
  * Response shape:
  *   { members: [{ source_id, source_name, title, url, published_at, importance }] }
@@ -19,6 +20,7 @@ import {
   getEventMembersRequestPayload,
   toEventMembersListEnvelope,
 } from "@/lib/api/event-members";
+import { DEFAULT_UI_EVENT_MEMBERS_LOCALE } from "@/lib/event-members/query-defaults";
 import {
   plainJson,
   plainRouteResult,
@@ -33,7 +35,7 @@ export async function GET(
     const { id: idRaw } = await ctx.params;
     const result = await getEventMembersRequestPayload(req, {
       rawId: idRaw,
-      defaultLocale: "zh",
+      defaultLocale: DEFAULT_UI_EVENT_MEMBERS_LOCALE,
     });
     return plainRouteResult(result, (payload) =>
       plainJson(toEventMembersListEnvelope(payload)),

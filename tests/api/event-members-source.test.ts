@@ -7,6 +7,7 @@ const routePaths = [
   "app/api/v1/events/[id]/members/route.ts",
 ] as const;
 const mcpRoutePath = "app/api/mcp/route.ts";
+const defaultsPath = "lib/event-members/query-defaults.ts";
 
 describe("event member route source wiring", () => {
   test("all HTTP event-member routes share route payload lookup", () => {
@@ -36,16 +37,36 @@ describe("event member route source wiring", () => {
     expect(source).not.toContain("getEventMembers(");
   });
 
-  test("routes keep their intended locale defaults", () => {
-    expect(read("app/api/events/[id]/members/route.ts")).toContain(
-      'defaultLocale: "zh"',
+  test("event-member locale defaults have one shared source", () => {
+    const defaults = read(defaultsPath);
+    const uiRoute = read("app/api/events/[id]/members/route.ts");
+    const v1Route = read("app/api/v1/events/[id]/members/route.ts");
+    const publicRoute = read("app/api/public/events/[id]/members/route.ts");
+    const mcpRoute = read(mcpRoutePath);
+    const openapi = read("app/openapi.yaml/route.ts");
+
+    expect(defaults).toContain("DEFAULT_UI_EVENT_MEMBERS_LOCALE");
+    expect(defaults).toContain("DEFAULT_V1_EVENT_MEMBERS_LOCALE");
+    expect(defaults).toContain("DEFAULT_PUBLIC_EVENT_MEMBERS_LOCALE");
+    expect(defaults).toContain("DEFAULT_MCP_EVENT_MEMBERS_LOCALE");
+    expect(defaults).toContain("satisfies AppLocale");
+
+    expect(uiRoute).toContain("DEFAULT_UI_EVENT_MEMBERS_LOCALE");
+    expect(v1Route).toContain("DEFAULT_V1_EVENT_MEMBERS_LOCALE");
+    expect(publicRoute).toContain("DEFAULT_PUBLIC_EVENT_MEMBERS_LOCALE");
+    expect(mcpRoute).toContain("DEFAULT_MCP_EVENT_MEMBERS_LOCALE");
+    expect(openapi).toContain("DEFAULT_PUBLIC_EVENT_MEMBERS_LOCALE");
+
+    for (const source of [uiRoute, v1Route, publicRoute, mcpRoute]) {
+      expect(source).not.toContain('defaultLocale: "zh"');
+      expect(source).not.toContain('defaultLocale: "en"');
+      expect(source).not.toContain("(default zh)");
+      expect(source).not.toContain("(default en)");
+    }
+    expect(mcpRoute).not.toContain(
+      'getEventMembersPayload(cluster_id, locale ?? "en")',
     );
-    expect(read("app/api/v1/events/[id]/members/route.ts")).toContain(
-      'defaultLocale: "zh"',
-    );
-    expect(read("app/api/public/events/[id]/members/route.ts")).toContain(
-      'defaultLocale: "en"',
-    );
+    expect(openapi).not.toContain("default: en }");
   });
 
   test("legacy UI event-member route delegates plain JSON envelopes", () => {

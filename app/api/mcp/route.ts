@@ -72,6 +72,7 @@ import {
   getDailyColumnMarkdownByDate,
   getLatestDailyColumnMarkdown,
 } from "@/lib/api/daily-columns";
+import { DEFAULT_MCP_EVENT_MEMBERS_LOCALE } from "@/lib/event-members/query-defaults";
 import {
   getUsageSummary,
   usageSummaryWindowSchema,
@@ -140,7 +141,12 @@ function buildServer(user: SessionUser): McpServer {
       },
     },
     async ({ cluster_id, locale }) => {
-      return text(await getEventMembersPayload(cluster_id, locale ?? "en"));
+      return text(
+        await getEventMembersPayload(
+          cluster_id,
+          locale ?? DEFAULT_MCP_EVENT_MEMBERS_LOCALE,
+        ),
+      );
     },
   );
 
