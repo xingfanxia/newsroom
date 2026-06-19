@@ -143,7 +143,8 @@ reasoning-effort labels are runtime tuples in `lib/llm/types.ts`
 task profiles, and the `llm_usage` ledger cannot drift on free-form strings.
 Current default model/deployment labels live in `lib/llm/model-defaults.ts`;
 provider resolution, pricing fallback, and operator cost forecasts import that
-contract instead of repeating deployment strings.
+contract instead of repeating deployment strings. The `.env.example` template is
+covered by a source contract test against the same defaults.
 The pipeline now chooses a treatment tier before calling the model:
 
 1. **Treatment** — `workers/enrich/treatment.ts` classifies items as `high` or `fast`.
