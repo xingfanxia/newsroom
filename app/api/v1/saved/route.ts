@@ -7,8 +7,7 @@
  *
  * Query params (GET):
  *   collection = <id> | inbox (omitted = all)
- *   limit      = 1..200, default 80
- *   locale     = zh | en (default en)
+ *   limit/locale query bounds live in `lib/saved/query-defaults.ts`
  *
  * Body (POST):
  *   { item_id: number, on: boolean, collection_id?: number, note?: string }

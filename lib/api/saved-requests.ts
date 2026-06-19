@@ -3,6 +3,12 @@ import {
   parseQueryParams,
   type QueryParseResult,
 } from "@/lib/api/query-params";
+import {
+  DEFAULT_SAVED_ITEMS_LIMIT,
+  DEFAULT_SAVED_ITEMS_LOCALE,
+  SAVED_ITEMS_LIMIT_MAX,
+  SAVED_ITEMS_LIMIT_MIN,
+} from "@/lib/saved/query-defaults";
 import { APP_LOCALES } from "@/lib/types";
 
 const savedItemIdSchema = z.number().int().positive();
@@ -12,8 +18,14 @@ export const v1SavedQuerySchema = z.object({
   collection: z
     .union([z.literal("inbox"), z.coerce.number().int().positive()])
     .optional(),
-  limit: z.coerce.number().int().min(1).max(200).optional().default(80),
-  locale: z.enum(APP_LOCALES).optional().default("en"),
+  limit: z.coerce
+    .number()
+    .int()
+    .min(SAVED_ITEMS_LIMIT_MIN)
+    .max(SAVED_ITEMS_LIMIT_MAX)
+    .optional()
+    .default(DEFAULT_SAVED_ITEMS_LIMIT),
+  locale: z.enum(APP_LOCALES).optional().default(DEFAULT_SAVED_ITEMS_LOCALE),
 });
 
 export type V1SavedQueryParams = z.infer<typeof v1SavedQuerySchema>;

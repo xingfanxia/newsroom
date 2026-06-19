@@ -225,6 +225,10 @@ Shipped cleanup:
   `/api/feedback/move` reuse the same positive item id, positive collection id,
   inbox-null, locale, and pagination validation instead of carrying
   route-local Zod/query-parser wiring.
+- Shared saved-item query defaults and bounds through
+  `lib/saved/query-defaults.ts`; `/api/v1/saved` route comments and
+  `lib/api/saved-requests.ts` no longer repeat the saved list limit range,
+  default page size, or default response locale.
 - Shared saved-item route payload semantics through `lib/api/saved-routes.ts`;
   `/api/v1/saved` now delegates saved lookup and agent serialization through
   `listSavedItemsRoutePayload`, `/api/feedback/move` delegates browser saved

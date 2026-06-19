@@ -5,12 +5,25 @@ import {
   v1SavedPostBodySchema,
   v1SavedQuerySchema,
 } from "@/lib/api/saved-requests";
+import {
+  DEFAULT_SAVED_ITEMS_LIMIT,
+  DEFAULT_SAVED_ITEMS_LOCALE,
+  SAVED_ITEMS_LIMIT_MAX,
+  SAVED_ITEMS_LIMIT_MIN,
+} from "@/lib/saved/query-defaults";
 
 describe("saved request schemas", () => {
+  test("exposes the saved query defaults", () => {
+    expect(SAVED_ITEMS_LIMIT_MIN).toBe(1);
+    expect(SAVED_ITEMS_LIMIT_MAX).toBe(200);
+    expect(DEFAULT_SAVED_ITEMS_LIMIT).toBe(80);
+    expect(DEFAULT_SAVED_ITEMS_LOCALE).toBe("en");
+  });
+
   test("normalizes v1 saved query defaults and collection filters", () => {
     expect(v1SavedQuerySchema.parse({})).toEqual({
-      limit: 80,
-      locale: "en",
+      limit: DEFAULT_SAVED_ITEMS_LIMIT,
+      locale: DEFAULT_SAVED_ITEMS_LOCALE,
     });
     expect(
       v1SavedQuerySchema.parse({
@@ -30,7 +43,11 @@ describe("saved request schemas", () => {
     expect(v1SavedQuerySchema.safeParse({ collection: "0" }).success).toBe(
       false,
     );
-    expect(v1SavedQuerySchema.safeParse({ limit: "201" }).success).toBe(false);
+    expect(
+      v1SavedQuerySchema.safeParse({
+        limit: String(SAVED_ITEMS_LIMIT_MAX + 1),
+      }).success,
+    ).toBe(false);
     expect(v1SavedQuerySchema.safeParse({ locale: "fr" }).success).toBe(false);
   });
 
@@ -51,7 +68,9 @@ describe("saved request schemas", () => {
     });
 
     const invalid = parseV1SavedQueryRequest(
-      new Request("https://example.test/api/v1/saved?limit=201"),
+      new Request(
+        `https://example.test/api/v1/saved?limit=${SAVED_ITEMS_LIMIT_MAX + 1}`,
+      ),
     );
 
     expect(invalid.ok).toBe(false);
