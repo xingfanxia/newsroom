@@ -15,6 +15,8 @@ import {
   publicRateLimitPerIpLabel,
   publicRateLimitReqLabel,
 } from "@/lib/api/public-endpoint-config";
+import { PUBLIC_FEED_LIMIT_MAX } from "@/lib/feed/query-defaults";
+import { PUBLIC_SEARCH_LIMIT_MAX } from "@/lib/search/query-defaults";
 import { readSource as readProjectFile } from "@/tests/helpers/source";
 
 const routeContracts = [
@@ -142,6 +144,17 @@ describe("public API endpoint contract", () => {
     expect(skillSource).toContain("publicRateLimitLabel");
     expect(agentsTabsSource).toContain("PUBLIC_RATE_LIMIT_DOC_GROUPS");
     expect(agentsTabsSource).toContain("publicRateLimitReqLabel");
+    expect(agentsTabsSource).toContain("@/lib/feed/query-defaults");
+    expect(agentsTabsSource).toContain("@/lib/search/query-defaults");
+    expect(agentsTabsSource).toContain("PUBLIC_FEED_LIMIT_MAX");
+    expect(agentsTabsSource).toContain("PUBLIC_SEARCH_LIMIT_MAX");
+    expect(PUBLIC_FEED_LIMIT_MAX).toBe(100);
+    expect(PUBLIC_SEARCH_LIMIT_MAX).toBe(50);
+    expect(agentsTabsSource).toContain(
+      "feed ${PUBLIC_FEED_LIMIT_MAX}, search ${PUBLIC_SEARCH_LIMIT_MAX}",
+    );
+    expect(agentsTabsSource).not.toContain("limit 上限 100,要 500 条得翻 5 页");
+    expect(agentsTabsSource).not.toContain("limit cap is 100");
     expect(agentsPageSource).toContain("PUBLIC_ENDPOINT_COUNT");
     expect(agentsPageSource).not.toContain("const ENDPOINT_COUNT = 8");
     expect(openApiSource).toContain("publicRateLimitPerIpLabel");

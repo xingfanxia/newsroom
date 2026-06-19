@@ -6,8 +6,10 @@ import {
   PUBLIC_RATE_LIMIT_DOC_GROUPS,
   publicRateLimitReqLabel,
 } from "@/lib/api/public-endpoint-config";
+import { PUBLIC_FEED_LIMIT_MAX } from "@/lib/feed/query-defaults";
 import { LEGACY_RSS_FEEDS } from "@/lib/rss/legacy-feed-meta";
 import { MAIN_RSS_FEEDS } from "@/lib/rss/main-feed-meta";
+import { PUBLIC_SEARCH_LIMIT_MAX } from "@/lib/search/query-defaults";
 import { PUBLIC_SITE_URL } from "@/lib/site";
 import type { AppLocale } from "@/lib/types";
 
@@ -15,6 +17,10 @@ type Tab = "skill" | "rss" | "api";
 type Lang = AppLocale;
 
 const SITE = PUBLIC_SITE_URL;
+const publicPaginationGotcha = {
+  zh: `limit 上限因端点不同: feed ${PUBLIC_FEED_LIMIT_MAX}, search ${PUBLIC_SEARCH_LIMIT_MAX}; 要更多用 offset 翻页`,
+  en: `limit caps vary by endpoint: feed ${PUBLIC_FEED_LIMIT_MAX}, search ${PUBLIC_SEARCH_LIMIT_MAX}; paginate with offset for more`,
+} satisfies Record<Lang, string>;
 
 export function AgentsTabs() {
   const { tweaks } = useTweaks();
@@ -642,9 +648,7 @@ curl -H 'If-None-Match: W/"public-feed-xxxxxxxxxxxxxxxx"' \\
             : "date_from / date_to must be ISO 8601 (e.g. 2026-05-01T00:00:00Z)"}
         </li>
         <li>
-          {lang === "zh"
-            ? "limit 上限 100,要 500 条得翻 5 页"
-            : "limit cap is 100 — to get 500 results, paginate"}
+          {publicPaginationGotcha[lang]}
         </li>
         <li>
           {lang === "zh"
