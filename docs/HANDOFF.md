@@ -1,5 +1,30 @@
 # AX's AI RADAR — Current Handoff
 
+## 2026-07-12 — Two audits: clustering pipeline + Turso-switch residue
+
+Both audits are complete, findings adversarially verified, nothing applied
+yet. **The remediation charter for the next agent session is
+`docs/FIX-GOAL-2026-07-12.md`** (bounded scope: P0 safety + W1-W3 + quick
+wins; /goal predicate + per-task acceptance criteria included). Reports:
+
+- **Clustering audit** → `docs/reports/cluster-audit-2026-07-12/`
+  (FINDINGS.md + DATA.md). Headlines: the June-12 split-loop fix left the
+  merge-stage reunite vector open (W1); arbitrate can eject a cluster's lead
+  and the feed then renders nothing for it (W2, 11 live cases); singleton
+  twins >72h apart are permanently un-mergeable (W4, real duplicate cards);
+  digests (群聊日报/AI HOT) contaminate 37% of multi clusters (W5); Stage
+  A/A.5 brute-force 3072-dim scans instead of the existing 256-dim DiskANN
+  index (W7). The member_count drift on 6 clusters is a **migration
+  artifact** (clusters table captured before items during the live-pg copy;
+  id-keyed topup never reconciled UPDATEs) — repair SQL in the report.
+  Health check: `bun --env-file=.env.local scripts/ops/cluster-health.ts`.
+- **Turso residue audit** → `docs/reports/turso-residue-audit-2026-07-12/`.
+  P0: `db:push` hardcodes `--force` (one habitual command away from dropping
+  items.embedding + the vector index) and there is **no backup of the only
+  data copy** (delete-protection off, no dumps). Then: two 37-39s unbounded
+  query paths (admin usage stats, semantic-search brute-force fallback), no
+  SQLITE_BUSY retry story, no safe next-schema-change procedure.
+
 ## 2026-07-12 — Feed-path query plans pinned (5s TTFB incident)
 
 Day-2 after the Turso cutover the home page hit 3.5–8.6s TTFB. Root cause:
