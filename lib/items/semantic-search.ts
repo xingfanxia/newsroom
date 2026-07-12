@@ -77,14 +77,26 @@ export async function semanticSearch(
     MCP_SEARCH_LIMIT_MAX,
   );
 
-  // Phase 1 — DiskANN probe for the nearest candidate ids.
-  const topK = await libsqlClient().execute({
-    sql: "SELECT id FROM vector_top_k('items_embedding_idx', vector32(?), ?)",
-    args: [queryVecText, TOP_K_CANDIDATES],
-  });
-  const candidateIds = topK.rows.map((r) => Number(r.id));
-  if (candidateIds.length === 0) {
-    return { items: [], total: 0, embeddingDims: embedding.length };
+  // Phase 1 — DiskANN probe for the nearest candidate ids. The index is an
+  // optimization, not a dependency: if it's missing (still building, or
+  // dropped by a schema push), fall back to exact brute-force ranking in
+  // phase 2 — ~21k rows of vector_distance_cos is a few hundred ms, and
+  // this path is rate-limited upstream.
+  let candidateIds: number[] | null = null;
+  try {
+    const topK = await libsqlClient().execute({
+      sql: "SELECT id FROM vector_top_k('items_embedding_idx', vector32(?), ?)",
+      args: [queryVecText, TOP_K_CANDIDATES],
+    });
+    candidateIds = topK.rows.map((r) => Number(r.id));
+    if (candidateIds.length === 0) {
+      return { items: [], total: 0, embeddingDims: embedding.length };
+    }
+  } catch (err) {
+    console.error(
+      "[semantic-search] vector_top_k unavailable, brute-force fallback:",
+      err instanceof Error ? err.message : err,
+    );
   }
 
   const sourceIdFilter = opts.sourceId
@@ -124,7 +136,7 @@ export async function semanticSearch(
     .leftJoin(clusters, eq(items.clusterId, clusters.id))
     .where(
       and(
-        inArray(items.id, candidateIds),
+        ...(candidateIds ? [inArray(items.id, candidateIds)] : []),
         isNotNull(items.embedding),
         isNotNull(items.enrichedAt),
         exclusionFilter,
