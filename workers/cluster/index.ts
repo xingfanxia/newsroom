@@ -215,36 +215,48 @@ async function assignOneToCluster(itemId: number): Promise<AssignOutcome> {
     //      If a concurrent worker beat us to the neighbor → repurpose this
     //      cluster as a singleton for itemId (lead points at itemId, not the
     //      lost neighbor) so we don't end up with a phantom 2-member count.
-    const [created] = await client
-      .insert(clusters)
-      .values({ leadItemId: nearestUnclustered.id, memberCount: 0 })
-      .returning({ id: clusters.id });
-    clusterId = created.id;
+    // Atomic: create the shared cluster + claim the neighbor as its first
+    // member + bump the count. As separate autocommit statements a crash
+    // between claim and bump would drift member_count; one transaction closes
+    // that window. Adding itemId (the second member) happens in
+    // claimClusterAssignment's own transaction just below — a crash between the
+    // two leaves a consistent single-member cluster, not drift.
+    const promoted = await client.transaction(async (tx) => {
+      const [created] = await tx
+        .insert(clusters)
+        .values({ leadItemId: nearestUnclustered.id, memberCount: 0, coverage: 0 })
+        .returning({ id: clusters.id });
 
-    const neighborClaim = await client
-      .update(items)
-      .set({ clusterId, clusteredAt: new Date() })
-      .where(
-        sql`${items.id} = ${nearestUnclustered.id} AND ${items.clusteredAt} IS NULL`,
-      )
-      .returning({ id: items.id });
+      const neighborClaim = await tx
+        .update(items)
+        .set({ clusterId: created.id, clusteredAt: new Date() })
+        .where(
+          sql`${items.id} = ${nearestUnclustered.id} AND ${items.clusteredAt} IS NULL`,
+        )
+        .returning({ id: items.id });
 
-    if (neighborClaim.length > 0) {
-      await client
-        .update(clusters)
-        .set({ memberCount: sql`${clusters.memberCount} + 1` })
-        .where(sql`${clusters.id} = ${clusterId}`);
-      outcome = "assigned";
-    } else {
+      if (neighborClaim.length > 0) {
+        await tx
+          .update(clusters)
+          .set({
+            memberCount: sql`${clusters.memberCount} + 1`,
+            coverage: sql`${clusters.coverage} + 1`,
+            latestMemberAt: new Date(),
+          })
+          .where(sql`${clusters.id} = ${created.id}`);
+        return { clusterId: created.id, outcome: "assigned" as const };
+      }
       // Neighbor was stolen mid-race. Repoint the cluster's lead to itemId
       // so it becomes a clean singleton when we join below; otherwise the
       // lead would dangle to a row that's now in some other cluster.
-      await client
+      await tx
         .update(clusters)
         .set({ leadItemId: itemId })
-        .where(sql`${clusters.id} = ${clusterId}`);
-      outcome = "created";
-    }
+        .where(sql`${clusters.id} = ${created.id}`);
+      return { clusterId: created.id, outcome: "created" as const };
+    });
+    clusterId = promoted.clusterId;
+    outcome = promoted.outcome;
   } else {
     // No neighbor above threshold — new singleton cluster.
     return createSingletonCluster(client, itemId);
@@ -271,7 +283,7 @@ async function createSingletonCluster(
 ): Promise<AssignOutcome> {
   const [created] = await client
     .insert(clusters)
-    .values({ leadItemId: itemId, memberCount: 0 })
+    .values({ leadItemId: itemId, memberCount: 0, coverage: 0 })
     .returning({ id: clusters.id });
   return claimClusterAssignment(client, itemId, created.id, "created");
 }
@@ -282,38 +294,48 @@ async function claimClusterAssignment(
   clusterId: number,
   outcome: Exclude<AssignOutcome, "already-claimed">,
 ): Promise<AssignOutcome> {
-  // Atomic claim: only increment member_count if we successfully assigned the item.
-  // If another worker beat us to this row, the UPDATE returns 0 rows and we
-  // silently no-op instead of double-counting.
-  const claimed = await client
-    .update(items)
-    .set({ clusterId, clusteredAt: new Date() })
-    .where(sql`${items.id} = ${itemId} AND ${items.clusteredAt} IS NULL`)
-    .returning({ id: items.id });
+  // Claim + count-bump must be ATOMIC. As two autocommit statements, a crash or
+  // timeout landing between them permanently drifts member_count — clusters
+  // have no self-heal path (items self-heal via IS NULL claim predicates;
+  // aggregates don't — see workers/cluster/reconcile.ts). One transaction
+  // closes the window. The claim itself stays race-safe: only bump if the
+  // guarded UPDATE actually assigned the item.
+  return await client.transaction(async (tx) => {
+    const claimed = await tx
+      .update(items)
+      .set({ clusterId, clusteredAt: new Date() })
+      .where(sql`${items.id} = ${itemId} AND ${items.clusteredAt} IS NULL`)
+      .returning({ id: items.id });
 
-  if (claimed.length === 0) {
-    // The cluster row is a zombie if WE created it in this call (created /
-    // promote-neighbor lost-race / no-neighbor singleton paths) — we hold
-    // an empty cluster row that no item will join. Clean it up. The "join
-    // existing cluster" branch sets outcome to "assigned" with an existing
-    // cluster_id, so we leave that alone (it has real members).
-    if (outcome === "created") {
-      await client
-        .delete(clusters)
-        .where(sql`${clusters.id} = ${clusterId} AND ${clusters.memberCount} = 0`);
+    if (claimed.length === 0) {
+      // The cluster row is a zombie if WE created it in this call (created /
+      // promote-neighbor lost-race / no-neighbor singleton paths) — we hold
+      // an empty cluster row that no item will join. Clean it up. The "join
+      // existing cluster" branch sets outcome to "assigned" with an existing
+      // cluster_id, so we leave that alone (it has real members).
+      if (outcome === "created") {
+        await tx
+          .delete(clusters)
+          .where(
+            sql`${clusters.id} = ${clusterId} AND ${clusters.memberCount} = 0`,
+          );
+      }
+      return "already-claimed";
     }
-    return "already-claimed";
-  }
 
-  await client
-    .update(clusters)
-    .set({
-      memberCount: sql`${clusters.memberCount} + 1`,
-      latestMemberAt: new Date(),
-      coverage: sql`${clusters.memberCount} + 1`,
-      updatedAt: new Date(),
-    })
-    .where(sql`${clusters.id} = ${clusterId}`);
+    await tx
+      .update(clusters)
+      .set({
+        memberCount: sql`${clusters.memberCount} + 1`,
+        // coverage moves in lockstep with member_count (they are clones);
+        // increment it too rather than recompute from member_count (the old
+        // `member_count + 1` form non-deterministically half-healed drift).
+        coverage: sql`${clusters.coverage} + 1`,
+        latestMemberAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(sql`${clusters.id} = ${clusterId}`);
 
-  return outcome;
+    return outcome;
+  });
 }

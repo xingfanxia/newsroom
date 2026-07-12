@@ -16,10 +16,12 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import { clusters, items, sources, clusterSplits } from "@/db/schema";
 import { generateStructured, profiles } from "@/lib/llm";
+import type { SourceGroup } from "@/lib/types";
 import {
   recomputeEventImportance,
   approximateTierForImportance,
 } from "./importance";
+import { pickBestLead } from "./lead-pick";
 import { arbitrateSystem, arbitrateUserPrompt } from "./prompt";
 
 /** Drizzle transaction client — same shape as the top-level db() client. */
@@ -64,6 +66,8 @@ type MemberRow = {
   rawTitle: string;
   publishedAt: string;
   sourceName: string;
+  sourceGroup: SourceGroup;
+  sourcePriority: number;
   importance: number | null;
 };
 
@@ -75,6 +79,8 @@ type MemberDbRow = {
   rawTitle: string;
   publishedAt: Date;
   sourceName: string;
+  sourceGroup: SourceGroup;
+  sourcePriority: number;
   importance: number | null;
 };
 
@@ -175,6 +181,8 @@ async function arbitrateOne(
       rawTitle: items.title,
       publishedAt: items.publishedAt,
       sourceName: sources.nameEn,
+      sourceGroup: sources.group,
+      sourcePriority: sources.priority,
       importance: items.importance,
     })
     .from(items)
@@ -237,6 +245,7 @@ async function arbitrateOne(
     const rejectedIds = verdict.rejectedMemberIds ?? [];
     const moved = await applySplitVerdict(
       candidate.id,
+      candidate.leadItemId,
       members,
       rejectedIds,
       verdict.reason,
@@ -274,6 +283,7 @@ async function applyKeepVerdict(
 
 async function applySplitVerdict(
   clusterId: number,
+  leadItemId: number,
   members: MemberRow[],
   rejectedIds: number[],
   reason: string,
@@ -322,23 +332,54 @@ async function applySplitVerdict(
       if (updated.length === 0) continue;
       actuallyUnlinked++;
 
-      // Audit only the rejections that actually fired.
-      await tx.insert(clusterSplits).values({
-        itemId,
-        fromClusterId: clusterId,
-        reason,
-      });
+      // Audit only the rejections that actually fired. The (item_id,
+      // from_cluster_id) pair is unique (cluster_splits_item_cluster_uq) — a
+      // re-rejection of the same pair is a no-op, not an unbounded append, so
+      // the negative edge stays absolute and the rejection cap counts real
+      // distinct clusters.
+      await tx
+        .insert(clusterSplits)
+        .values({ itemId, fromClusterId: clusterId, reason })
+        .onConflictDoNothing();
     }
 
     if (actuallyUnlinked > 0) {
       // Decrement by the count of real unlinks, not the LLM-supplied length.
+      // coverage is a member_count clone — decrement it in lockstep (T4.2) so
+      // the reconciler doesn't later flag a phantom coverage drift.
       await tx
         .update(clusters)
         .set({
           memberCount: sql`${clusters.memberCount} - ${actuallyUnlinked}`,
+          coverage: sql`${clusters.coverage} - ${actuallyUnlinked}`,
           updatedAt: now,
         })
         .where(eq(clusters.id, clusterId));
+
+      // If the arbitrator ejected the item that IS the cluster's lead, the feed
+      // dedup (cluster_id IS NULL OR lead_item_id = items.id) would render
+      // NOTHING for this cluster. Re-pick the lead from the survivors, authority-
+      // aware, inside the same transaction. Works down to a single survivor —
+      // the "rejected every member" case already short-circuited to keep above,
+      // so at least one survivor is guaranteed here.
+      if (rejectedSet.has(leadItemId)) {
+        const survivors = members.filter((m) => !rejectedSet.has(m.itemId));
+        if (survivors.length > 0) {
+          const best = pickBestLead(
+            survivors.map((m) => ({
+              itemId: m.itemId,
+              sourceGroup: m.sourceGroup,
+              sourcePriority: m.sourcePriority,
+              importance: m.importance,
+              publishedAt: m.publishedAt,
+            })),
+          );
+          await tx
+            .update(clusters)
+            .set({ leadItemId: best.itemId })
+            .where(eq(clusters.id, clusterId));
+        }
+      }
     }
 
     // Verify surviving members

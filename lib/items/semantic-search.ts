@@ -49,6 +49,12 @@ import {
  *  pgvector version documented. */
 const TOP_K_CANDIDATES = 500;
 
+/** When the DiskANN probe is unavailable we fall back to an exact scan. It is
+ *  hard-bounded to this recency window so a public request can NEVER scan all
+ *  ~21.5k embedding rows (12KB each). A sustained fallback is an ops alarm —
+ *  rebuild items_embedding_small_idx. */
+const FALLBACK_RECENCY_DAYS = 30;
+
 export type SemanticFilters = {
   locale?: AppLocale;
   limit?: number;
@@ -108,6 +114,25 @@ export async function semanticSearch(
     );
   }
 
+  // If the ANN probe failed, candidateIds is null and phase 2 would otherwise
+  // scan every embedding row. Hard-bound the exact fallback to a recency window
+  // (impossible for a public request to touch all 21.5k rows) and log loudly so
+  // a sustained fallback surfaces as an ops signal to rebuild the index.
+  const fallbackEngaged = candidateIds === null;
+  const fallbackBound = fallbackEngaged
+    ? sql`${items.publishedAt} >= ${Date.now() - FALLBACK_RECENCY_DAYS * 86_400_000}`
+    : sql`TRUE`;
+  if (fallbackEngaged) {
+    console.warn(
+      JSON.stringify({
+        event: "semantic_search_bruteforce_fallback",
+        reason: "vector_top_k unavailable",
+        recencyDays: FALLBACK_RECENCY_DAYS,
+        note: "exact scan bounded to recency window; rebuild items_embedding_small_idx",
+      }),
+    );
+  }
+
   const sourceIdFilter = opts.sourceId
     ? sql`${items.sourceId} = ${opts.sourceId}`
     : sql`TRUE`;
@@ -146,6 +171,7 @@ export async function semanticSearch(
     .where(
       and(
         ...(candidateIds ? [inArray(items.id, candidateIds)] : []),
+        fallbackBound,
         isNotNull(items.embedding),
         isNotNull(items.enrichedAt),
         exclusionFilter,

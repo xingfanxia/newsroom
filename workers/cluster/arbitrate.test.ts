@@ -9,6 +9,10 @@
  */
 
 import { describe, it, expect, mock, beforeEach } from "bun:test";
+import { readSource } from "@/tests/helpers/source";
+import { pickBestLead } from "./lead-pick";
+
+const arbitrateSrc = readSource("workers/cluster/arbitrate.ts");
 
 // ── Shared mock factories ──────────────────────────────────────────────────
 
@@ -533,5 +537,66 @@ describe("ArbitrationReport type contract", () => {
 
     expect(emptyReport.processed).toBe(0);
     expect(emptyReport.errors).toHaveLength(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Test suite: lead re-pick on split (W2 / T3)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("lead integrity on split", () => {
+  it("re-picks the lead from survivors when the ejected set includes the lead", () => {
+    // A split that unlinks the item that IS clusters.lead_item_id would leave a
+    // dangling lead — the feed dedup (cluster_id IS NULL OR lead_item_id =
+    // items.id) then renders NOTHING for the cluster. applySplitVerdict now
+    // re-picks the lead from survivors inside the same transaction.
+    expect(arbitrateSrc).toContain("rejectedSet.has(leadItemId)");
+    expect(arbitrateSrc).toContain("pickBestLead(");
+    expect(arbitrateSrc).toContain("leadItemId: best.itemId");
+  });
+
+  it("threads the current lead id into applySplitVerdict", () => {
+    expect(arbitrateSrc).toContain("candidate.leadItemId");
+    expect(arbitrateSrc).toMatch(/applySplitVerdict\(\s*clusterId: number,\s*leadItemId: number/);
+  });
+
+  it("pure-logic: pickBestLead over survivors returns a surviving member (never the ejected lead)", () => {
+    // Cluster of 3; the arbitrator ejects the vendor-official lead (item 1).
+    // The re-pick must return one of the survivors (2 or 3), authority-ranked.
+    const members = [
+      { itemId: 1, sourceGroup: "vendor-official" as const, sourcePriority: 2, importance: 90, publishedAt: "2026-07-10T00:00:00Z" },
+      { itemId: 2, sourceGroup: "media" as const, sourcePriority: 2, importance: 70, publishedAt: "2026-07-10T01:00:00Z" },
+      { itemId: 3, sourceGroup: "social" as const, sourcePriority: 3, importance: 40, publishedAt: "2026-07-10T02:00:00Z" },
+    ];
+    const ejected = new Set([1]);
+    const survivors = members.filter((m) => !ejected.has(m.itemId));
+    const best = pickBestLead(survivors);
+    expect(ejected.has(best.itemId)).toBe(false);
+    // media (80) outranks social (20) → item 2 wins.
+    expect(best.itemId).toBe(2);
+  });
+
+  it("pure-logic: works down to a single survivor", () => {
+    const survivors = [
+      { itemId: 5, sourceGroup: "media" as const, sourcePriority: 2, importance: 50, publishedAt: "2026-07-10T00:00:00Z" },
+    ];
+    expect(pickBestLead(survivors).itemId).toBe(5);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Test suite: absolute negative edge + lockstep coverage (W1 / T4.2)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("cluster_splits negative edge + bookkeeping", () => {
+  it("inserts cluster_splits with ON CONFLICT DO NOTHING (unique (item, cluster) edge)", () => {
+    // The (item_id, from_cluster_id) pair is unique; a re-rejection is a no-op,
+    // not an unbounded append, so the rejection cap counts real distinct clusters.
+    expect(arbitrateSrc).toContain(".onConflictDoNothing()");
+  });
+
+  it("decrements coverage in lockstep with member_count on split", () => {
+    expect(arbitrateSrc).toContain("coverage: sql`${clusters.coverage} - ${actuallyUnlinked}`");
+    expect(arbitrateSrc).toContain("memberCount: sql`${clusters.memberCount} - ${actuallyUnlinked}`");
   });
 });

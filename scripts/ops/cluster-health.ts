@@ -14,9 +14,13 @@
  *  10. singleton pairs >72h apart that look like the same event (window recall gap)
  *
  * Usage: bun --env-file=.env.local scripts/ops/cluster-health.ts [--days 14]
+ *        add --repair to preview the reconcile pass (dry-run), --repair --apply
+ *        to actually recompute drifted aggregates / re-point dangling leads /
+ *        delete 0-member clusters. Without --repair the script is read-only.
  */
 import { sql } from "drizzle-orm";
 import { db, closeDb } from "@/db/client";
+import { reconcileClusters } from "@/workers/cluster/reconcile";
 
 const daysArg = process.argv.indexOf("--days");
 const DAYS = daysArg >= 0 ? Number(process.argv[daysArg + 1]) : 14;
@@ -203,6 +207,21 @@ for (const p of gapTwins) {
   console.log(`  [${p.a} ~ ${p.b}] d=${p.d.toFixed(3)} gap=${p.gap_h}h`);
   console.log(`     A: ${p.ta}`);
   console.log(`     B: ${p.tb}`);
+}
+
+// 11. Optional reconcile pass. Read-only unless --repair is passed; --repair
+//     alone previews (dry-run), --repair --apply writes. Idempotent: a second
+//     --apply over clean data reports 0 changes.
+if (process.argv.includes("--repair")) {
+  const apply = process.argv.includes("--apply");
+  section(`11. reconcile pass (${apply ? "APPLY" : "dry-run — add --apply to write"})`);
+  const rep = await reconcileClusters({ apply });
+  console.log(`  aggregates ${apply ? "fixed" : "to fix"}:          ${rep.aggregatesFixed}`);
+  console.log(`  zombies ${apply ? "deleted" : "to delete"}:        ${rep.zombiesDeleted}`);
+  console.log(`  dangling leads ${apply ? "repointed" : "to repoint"}: ${rep.leadsRepointed}`);
+  const total = rep.aggregatesFixed + rep.zombiesDeleted + rep.leadsRepointed;
+  if (!apply && total > 0) console.log(`  → re-run with '--repair --apply' to fix.`);
+  if (apply && total > 0) console.log(`  ⚠ ALARM: reconcile applied ${total} fix(es) — drift should not accrue; investigate the source.`);
 }
 
 await closeDb();

@@ -153,7 +153,12 @@ export async function runMergeBatch(opts: MergeOpts): Promise<MergeReport> {
       FROM clusters c
       WHERE c.member_count >= 2
         AND ${recencyFilter}
-        AND NOT ${noContentSkip}
+        -- NULL-guard: an untitled cluster (both canonical titles NULL) makes
+        -- noContentSkip evaluate to NULL, and NOT of NULL is NULL, so the
+        -- row is silently dropped from merge candidates (SQLite three-valued
+        -- logic). Merge runs before Stage C titles, so this starved untitled
+        -- clusters under wave load. COALESCE keeps untitled clusters eligible.
+        AND COALESCE(NOT ${noContentSkip}, 1)
     ),
     pair_distances AS (
       SELECT
@@ -261,13 +266,23 @@ export async function runMergeBatch(opts: MergeOpts): Promise<MergeReport> {
 
 /**
  * Atomically merge `loserId` into `winnerId`:
- *   - Move all loser items → winner cluster_id; null cluster_verified_at.
- *   - Bump winner.member_count + coverage by the count actually moved.
+ *   - Loser items that an arbitrator already REJECTED from the winner
+ *     (a `cluster_splits` row for (item, winner)) are NOT reunited — they are
+ *     unlinked to singletons instead. This is the fix for the historical
+ *     split-loop: without it, a rejected item re-enters the rejecting cluster
+ *     through any twin cluster that later merges in, and — because the Stage A
+ *     rejection cap counts DISTINCT clusters, not repeats — the same (item,
+ *     cluster) pair could ping-pong forever (58k split rows, ~$100 of wasted
+ *     arbitration May–June). The arbitrator's negative edge is the higher-
+ *     authority signal; the merge's "same event" guess loses to it.
+ *   - The remaining loser items move → winner cluster_id; null cluster_verified_at.
+ *   - Bump winner.member_count + coverage by the count ACTUALLY moved.
  *   - Reset winner.{verified_at, titled_at, commentary_at} so Stages B/C/D
- *     regenerate with the new pool.
- *   - Delete loser cluster row.
+ *     regenerate with the new pool (only when something actually moved).
+ *   - Delete the (now-empty) loser cluster row.
  *
- * Returns the number of items moved (0 if loser was already empty).
+ * Returns the number of items moved (0 if the loser was empty or every loser
+ * item was split-guarded against the winner).
  */
 async function mergeClusters(
   winnerId: number,
@@ -277,6 +292,22 @@ async function mergeClusters(
   let movedCount = 0;
 
   await client.transaction(async (tx) => {
+    // 1. Unlink loser items the arbitrator already rejected from the winner.
+    //    Stage A's existing NOT EXISTS(cluster_splits) guard then keeps them
+    //    from rejoining the winner on future ticks.
+    await tx
+      .update(items)
+      .set({ clusterId: null, clusteredAt: null, clusterVerifiedAt: null })
+      .where(
+        sql`${items.clusterId} = ${loserId}
+          AND EXISTS (
+            SELECT 1 FROM cluster_splits cs
+            WHERE cs.item_id = ${items.id}
+              AND cs.from_cluster_id = ${winnerId}
+          )`,
+      );
+
+    // 2. Move whatever loser items remain into the winner.
     const moved = await tx
       .update(items)
       .set({
@@ -286,27 +317,26 @@ async function mergeClusters(
       })
       .where(sql`${items.clusterId} = ${loserId}`)
       .returning({ id: items.id });
-
     movedCount = moved.length;
-    if (movedCount === 0) {
-      // Loser was already empty (concurrent run). Just clean up the row.
-      await tx.delete(clusters).where(sql`${clusters.id} = ${loserId}`);
-      return;
+
+    // 3. Bump winner aggregates only when members actually joined; resetting
+    //    the Stage B/C/D stamps on a no-op move would burn LLM calls for nothing.
+    if (movedCount > 0) {
+      await tx
+        .update(clusters)
+        .set({
+          memberCount: sql`${clusters.memberCount} + ${movedCount}`,
+          coverage: sql`${clusters.coverage} + ${movedCount}`,
+          latestMemberAt: new Date(),
+          verifiedAt: null,
+          titledAt: null,
+          commentaryAt: null,
+          updatedAt: new Date(),
+        })
+        .where(sql`${clusters.id} = ${winnerId}`);
     }
 
-    await tx
-      .update(clusters)
-      .set({
-        memberCount: sql`${clusters.memberCount} + ${movedCount}`,
-        coverage: sql`${clusters.coverage} + ${movedCount}`,
-        latestMemberAt: new Date(),
-        verifiedAt: null,
-        titledAt: null,
-        commentaryAt: null,
-        updatedAt: new Date(),
-      })
-      .where(sql`${clusters.id} = ${winnerId}`);
-
+    // 4. The loser is empty now either way (moved out or unlinked to NULL).
     await tx.delete(clusters).where(sql`${clusters.id} = ${loserId}`);
   });
 

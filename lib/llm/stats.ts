@@ -136,12 +136,23 @@ export async function breakdownByModel(
   w: WindowKey = "week",
 ): Promise<ModelBreakdown[]> {
   const client = db();
+  // T7: for the all-time window there's no created_at range to prune on, so the
+  // GROUP BY would scan the fat table (audit: ~4.1s). Pin the covering index
+  // (provider, model, cost_usd) so the scan stays inside it. Bounded windows
+  // prune via created_at and must NOT pin (that would force a full covering
+  // scan and skip the range prune) — the planner already picks the covering
+  // task index unaided for breakdownByTask, but provider_model_idx competes for
+  // this GROUP BY, so the all-time case needs the explicit pin.
+  const fromClause =
+    w === "all"
+      ? sql`llm_usage INDEXED BY llm_usage_model_cover_idx`
+      : sql`llm_usage`;
   const result = await client.all<Record<string, unknown>>(sql`
     SELECT
       provider, model,
       count(*) AS calls,
       coalesce(sum(cost_usd), 0) AS cost_usd
-    FROM llm_usage WHERE ${windowClause(w)}
+    FROM ${fromClause} WHERE ${windowClause(w)}
     GROUP BY provider, model
     ORDER BY cost_usd DESC
   `);
@@ -174,25 +185,42 @@ export type RecentCall = {
 export type DailySpendPoint = { date: string; spend: number; calls: number };
 export async function dailySpend(days = 30): Promise<DailySpendPoint[]> {
   const client = db();
-  // SQLite has no generate_series by default — build the day list in JS and
-  // unnest it with json_each. Days are UTC-aligned like the old ::date.
+  // SQLite has no generate_series — build the day list in JS and unnest with
+  // json_each. Days are UTC-aligned like the old ::date.
+  //
+  // Perf (T7): the previous version JOINed on
+  // `strftime('%Y-%m-%d', created_at/1000.0, 'unixepoch') = s.value`, a
+  // function on the column that forced a full 364k-row scan every page load
+  // (~39s). Now: (1) each day carries its integer UTC-day index (ms / 86.4M)
+  // so bucketing is plain integer division, and (2) a lower bound on created_at
+  // lets the planner prune via llm_usage_created_at_idx. Turso is stat-less
+  // (rejects ANALYZE — see db-optimize.ts) so the bound is explicit and the
+  // index is pinned. 86400000 is written as a SQL literal (not a bound param)
+  // to keep the division integer.
+  const DAY_MS = 86_400_000;
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
-  const dayList = Array.from({ length: days }, (_, i) =>
-    new Date(today.getTime() - (days - 1 - i) * 86_400_000)
-      .toISOString()
-      .slice(0, 10),
-  );
+  const dayList = Array.from({ length: days }, (_, i) => {
+    const ms = today.getTime() - (days - 1 - i) * DAY_MS;
+    return { d: new Date(ms).toISOString().slice(0, 10), i: Math.floor(ms / DAY_MS) };
+  });
+  const minBoundMs = today.getTime() - (days - 1) * DAY_MS;
   const result = await client.all<Record<string, unknown>>(sql`
     SELECT
-      s.value AS date,
-      coalesce(sum(u.cost_usd), 0) AS spend,
-      coalesce(count(u.id), 0) AS calls
+      json_extract(s.value, '$.d') AS date,
+      coalesce(agg.spend, 0) AS spend,
+      coalesce(agg.calls, 0) AS calls
     FROM json_each(${JSON.stringify(dayList)}) s
-    LEFT JOIN llm_usage u
-      ON strftime('%Y-%m-%d', u.created_at / 1000.0, 'unixepoch') = s.value
-    GROUP BY s.value
-    ORDER BY s.value ASC
+    LEFT JOIN (
+      SELECT
+        created_at / 86400000 AS day_idx,
+        sum(cost_usd) AS spend,
+        count(id) AS calls
+      FROM llm_usage INDEXED BY llm_usage_created_at_idx
+      WHERE created_at >= ${minBoundMs}
+      GROUP BY day_idx
+    ) agg ON agg.day_idx = json_extract(s.value, '$.i')
+    ORDER BY date ASC
   `);
   return result.map((r) => ({
     date: String(r.date),

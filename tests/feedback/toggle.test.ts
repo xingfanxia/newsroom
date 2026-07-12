@@ -57,6 +57,12 @@ describe("feedbackBodySchema", () => {
 
 const hasDb = Boolean(process.env.TURSO_DATABASE_URL);
 const describeOrSkip = hasDb ? describe : describe.skip;
+// Each toggle does several sequential round-trips (upsert user → upsert
+// feedback → clear opposite vote, in an interactive txn). Against a remote
+// Turso primary the default 5s bun timeout is too tight — a transient latency
+// spike or a concurrent cron write (global SQLite write lock) intermittently
+// tripped it. Generous per-test ceiling; the assertions are unchanged.
+const REAL_DB_TIMEOUT_MS = 20_000;
 
 describeOrSkip("applyFeedbackToggle (real DB)", () => {
   const TEST_USER_ID = `m3-toggle-${crypto.randomUUID()}`;
@@ -99,7 +105,7 @@ describeOrSkip("applyFeedbackToggle (real DB)", () => {
       on: true,
     });
     expect(after).toEqual({ up: true, down: false, save: false });
-  });
+  }, REAL_DB_TIMEOUT_MS);
 
   it("save is independent of up/down and persists through them", async () => {
     if (itemId === null) return;
@@ -110,7 +116,7 @@ describeOrSkip("applyFeedbackToggle (real DB)", () => {
     await applyFeedbackToggle(user, { itemId, vote: "up", on: true });
     const state = await currentVotes(TEST_USER_ID, itemId);
     expect(state).toEqual({ up: true, down: false, save: true });
-  });
+  }, REAL_DB_TIMEOUT_MS);
 
   it("setting on=false clears the vote", async () => {
     if (itemId === null) return;
@@ -124,7 +130,7 @@ describeOrSkip("applyFeedbackToggle (real DB)", () => {
       on: false,
     });
     expect(after.up).toBe(false);
-  });
+  }, REAL_DB_TIMEOUT_MS);
 
   it("is idempotent — setting the same vote twice still yields one row", async () => {
     if (itemId === null) return;
@@ -145,7 +151,7 @@ describeOrSkip("applyFeedbackToggle (real DB)", () => {
         ),
       );
     expect(rows).toHaveLength(1);
-  });
+  }, REAL_DB_TIMEOUT_MS);
 
   it("upserts an app user row on first toggle so the FK resolves", async () => {
     if (itemId === null) return;
@@ -160,5 +166,5 @@ describeOrSkip("applyFeedbackToggle (real DB)", () => {
       .from(schema.users)
       .where(eq(schema.users.id, TEST_USER_ID));
     expect(rows[0]?.email).toBe(TEST_EMAIL);
-  });
+  }, REAL_DB_TIMEOUT_MS);
 });

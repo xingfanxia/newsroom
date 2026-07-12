@@ -128,8 +128,49 @@ describe("Atomic merge transaction", () => {
     expect(mergeSrc).toContain("tx.delete(clusters)");
   });
 
-  it("handles the empty-loser race (concurrent run already moved everything)", () => {
-    expect(mergeSrc).toMatch(/movedCount === 0[\s\S]+?tx\.delete\(clusters\)/);
+  it("bumps the winner only when items actually moved (guarded by movedCount > 0)", () => {
+    // The loser is empty either way (moved out or unlinked to NULL), so the
+    // delete is unconditional; resetting the winner's B/C/D stamps on a no-op
+    // move would burn LLM calls for nothing.
+    expect(mergeSrc).toContain("if (movedCount > 0)");
+  });
+});
+
+// ── Split-loop reunite guard (W1) ───────────────────────────────────────────
+
+describe("Merge respects Stage B split negative-edges", () => {
+  it("does NOT reunite a loser item the arbitrator rejected from the winner", () => {
+    // The historical split-loop vector: a rejected item re-enters the rejecting
+    // cluster through any twin cluster that merges in. mergeClusters now unlinks
+    // (cluster_id = NULL) loser items that have a cluster_splits row against the
+    // WINNER instead of moving them in.
+    expect(mergeSrc).toContain("cluster_splits cs");
+    expect(mergeSrc).toContain("cs.from_cluster_id = ${winnerId}");
+    expect(mergeSrc).toMatch(
+      /clusterId: null, clusteredAt: null, clusterVerifiedAt: null[\s\S]+?cluster_splits cs/,
+    );
+  });
+
+  it("unlinks split-guarded items BEFORE moving the rest into the winner", () => {
+    // Order matters: null-out the split-guarded loser items first, then the
+    // `cluster_id = loserId` move only catches the remainder.
+    const unlinkIdx = mergeSrc.indexOf("cluster_splits cs");
+    const moveIdx = mergeSrc.indexOf("Move whatever loser items remain");
+    expect(unlinkIdx).toBeGreaterThan(0);
+    expect(moveIdx).toBeGreaterThan(unlinkIdx);
+  });
+});
+
+// ── NULL-title merge eligibility (W5 / T5) ──────────────────────────────────
+
+describe("noContentSkip NULL-guard", () => {
+  it("keeps untitled clusters merge-eligible via COALESCE(NOT ..., 1)", () => {
+    // An untitled cluster (both canonical titles NULL) makes noContentSkip
+    // evaluate to NULL, and bare `NOT NULL` is NULL → the row was silently
+    // dropped from merge candidates (SQLite three-valued logic). Merge runs
+    // before Stage C titles, so this starved untitled clusters under load.
+    expect(mergeSrc).toContain("COALESCE(NOT ${noContentSkip}, 1)");
+    expect(mergeSrc).not.toContain("AND NOT ${noContentSkip}");
   });
 });
 

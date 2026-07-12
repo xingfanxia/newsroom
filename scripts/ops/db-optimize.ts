@@ -30,6 +30,21 @@ const INDEXES = [
   `CREATE INDEX IF NOT EXISTS clusters_feed_cover_idx
      ON clusters (id, event_tier, lead_item_id, first_seen_at,
                   latest_member_at, importance)`,
+  // Absolute (item, cluster) negative-edge constraint for Stage B rejections.
+  // REQUIRES the 2026-07-12 dedupe migration to have run first — creating this
+  // over duplicate pairs throws "UNIQUE constraint failed". See
+  // scripts/migrations/repair-cluster-drift-20260712.ts.
+  `CREATE UNIQUE INDEX IF NOT EXISTS cluster_splits_item_cluster_uq
+     ON cluster_splits (item_id, from_cluster_id)`,
+  // Covering index for the admin usage "all"-window task breakdown (unbounded
+  // GROUP BY task,provider,model over 364k rows). Leading group keys + summed
+  // columns so the scan stays inside the index (no fat-row lookups). T7.
+  `CREATE INDEX IF NOT EXISTS llm_usage_breakdown_cover_idx
+     ON llm_usage (task, provider, model, cost_usd, input_tokens, output_tokens)`,
+  // Covering index for the "all"-window model breakdown (GROUP BY
+  // provider,model). Separate leading prefix from the task index above. T7.
+  `CREATE INDEX IF NOT EXISTS llm_usage_model_cover_idx
+     ON llm_usage (provider, model, cost_usd)`,
 ];
 
 /** Hot query shapes and the index each one's plan must reference. */
@@ -66,6 +81,27 @@ const PLAN_CHECKS: Array<{ name: string; index: string; sql: string }> = [
     index: "items_topics_cover_idx",
     sql: `SELECT tags FROM items INDEXED BY items_topics_cover_idx
           WHERE created_at >= 0 AND enriched_at IS NOT NULL`,
+  },
+  {
+    name: "usage daily-spend bounded scan (dailySpend)",
+    index: "llm_usage_created_at_idx",
+    sql: `SELECT created_at / 86400000 AS day_idx, sum(cost_usd), count(id)
+          FROM llm_usage INDEXED BY llm_usage_created_at_idx
+          WHERE created_at >= 0 GROUP BY day_idx`,
+  },
+  {
+    name: "usage all-window task breakdown covering (breakdownByTask)",
+    index: "llm_usage_breakdown_cover_idx",
+    sql: `SELECT task, provider, model, count(*),
+                 sum(input_tokens), sum(output_tokens), sum(cost_usd)
+          FROM llm_usage GROUP BY task, provider, model`,
+  },
+  {
+    name: "usage all-window model breakdown covering (breakdownByModel)",
+    index: "llm_usage_model_cover_idx",
+    sql: `SELECT provider, model, count(*), sum(cost_usd)
+          FROM llm_usage INDEXED BY llm_usage_model_cover_idx
+          GROUP BY provider, model`,
   },
 ];
 

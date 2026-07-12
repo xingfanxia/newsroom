@@ -21,7 +21,10 @@ export type NormalizeReport = {
  * Convert newly-fetched raw_items into clean, canonicalized items.
  *
  * Atomicity note: the "insert item → mark raw normalized" pair is NOT wrapped
- * in a DB transaction (Neon HTTP driver doesn't support them). The pair is
+ * in a DB transaction. It doesn't need to be — the pair is idempotent by
+ * design, so replaying it after a crash is safe, and keeping it out of an
+ * interactive transaction keeps the single global libSQL write lock short
+ * (Turso/SQLite serializes all writers on one lock). The pair is
  * idempotent-on-replay because:
  *   - item insert uses ON CONFLICT(content_hash) DO NOTHING
  *   - mark-normalized is a conditional UPDATE (only where normalized_at IS NULL)
