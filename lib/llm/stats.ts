@@ -39,6 +39,10 @@ export async function totalsByWindow(
   w: WindowKey = "today",
 ): Promise<WindowTotals> {
   const client = db();
+  // T7 (2026-07-12 review finding 2c): renders on the same admin usage page as
+  // the breakdowns; the 'all' window would otherwise full-scan the fat table.
+  // Pin the covering index (created_at leading → bounded windows still prune,
+  // 'all' stays inside the index with no fat-row lookups).
   const result = await client.all<Record<string, unknown>>(sql`
     SELECT
       count(*) AS calls,
@@ -47,7 +51,7 @@ export async function totalsByWindow(
       coalesce(sum(output_tokens), 0) AS output_tokens,
       coalesce(sum(reasoning_tokens), 0) AS reasoning_tokens,
       coalesce(sum(cost_usd), 0) AS cost_usd
-    FROM llm_usage WHERE ${windowClause(w)}
+    FROM llm_usage INDEXED BY llm_usage_totals_cover_idx WHERE ${windowClause(w)}
   `);
   const r = result[0] ?? {};
   return {
@@ -81,6 +85,16 @@ export async function breakdownByTask(
   w: WindowKey = "week",
 ): Promise<TaskBreakdown[]> {
   const client = db();
+  // T7 (and the 2026-07-12 review): the two new llm_usage covering indexes are
+  // group-ordered candidates the stat-less Turso planner might now prefer over
+  // the created_at range index for bounded windows — which would drop the
+  // range prune and scan the whole index. Pin explicitly per window: all-time
+  // has no range to prune (covering index); bounded windows must keep the
+  // created_at prune.
+  const fromClause =
+    w === "all"
+      ? sql`llm_usage INDEXED BY llm_usage_breakdown_cover_idx`
+      : sql`llm_usage INDEXED BY llm_usage_created_at_idx`;
   const result = await client.all<Record<string, unknown>>(sql`
     SELECT
       task, provider, model,
@@ -88,7 +102,7 @@ export async function breakdownByTask(
       coalesce(sum(input_tokens), 0) AS input_tokens,
       coalesce(sum(output_tokens), 0) AS output_tokens,
       coalesce(sum(cost_usd), 0) AS cost_usd
-    FROM llm_usage WHERE ${windowClause(w)}
+    FROM ${fromClause} WHERE ${windowClause(w)}
     GROUP BY task, provider, model
     ORDER BY cost_usd DESC
   `);
@@ -139,14 +153,13 @@ export async function breakdownByModel(
   // T7: for the all-time window there's no created_at range to prune on, so the
   // GROUP BY would scan the fat table (audit: ~4.1s). Pin the covering index
   // (provider, model, cost_usd) so the scan stays inside it. Bounded windows
-  // prune via created_at and must NOT pin (that would force a full covering
-  // scan and skip the range prune) — the planner already picks the covering
-  // task index unaided for breakdownByTask, but provider_model_idx competes for
-  // this GROUP BY, so the all-time case needs the explicit pin.
+  // pin created_at instead so the range prune survives (the new covering
+  // indexes are group-ordered candidates the stat-less planner might otherwise
+  // prefer, losing the prune — 2026-07-12 review finding 2a).
   const fromClause =
     w === "all"
       ? sql`llm_usage INDEXED BY llm_usage_model_cover_idx`
-      : sql`llm_usage`;
+      : sql`llm_usage INDEXED BY llm_usage_created_at_idx`;
   const result = await client.all<Record<string, unknown>>(sql`
     SELECT
       provider, model,
@@ -179,9 +192,9 @@ export type RecentCall = {
   createdAt: Date;
 };
 
-/** Daily-spend series for the usage page sparkline. Returns last `days`
- *  buckets newest-first-by-default, each with its ISO date + spend. Zeroes
- *  fill gaps so the bar chart keeps a stable width. */
+/** Daily-spend series for the usage page sparkline. Returns the last `days`
+ *  buckets oldest-first (ORDER BY date ASC), each with its ISO date + spend.
+ *  Zeroes fill gaps so the bar chart keeps a stable width. */
 export type DailySpendPoint = { date: string; spend: number; calls: number };
 export async function dailySpend(days = 30): Promise<DailySpendPoint[]> {
   const client = db();

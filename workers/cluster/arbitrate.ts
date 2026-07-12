@@ -257,8 +257,9 @@ async function arbitrateOne(
 async function applyKeepVerdict(
   clusterId: number,
   members: MemberRow[],
+  dbc: ReturnType<typeof db> = db(),
 ): Promise<void> {
-  const client = db();
+  const client = dbc;
   const now = new Date();
 
   await client.transaction(async (tx: DbTx) => {
@@ -278,19 +279,24 @@ async function applyKeepVerdict(
   });
 
   // Recompute importance outside transaction (read + write, no atomicity needed)
-  await persistImportance(clusterId, members);
+  await persistImportance(clusterId, members, dbc);
 }
 
-async function applySplitVerdict(
+/**
+ * `dbc` is injectable so behavioral tests can drive the split/lead-repick logic
+ * against a local libSQL DB; production callers omit it (shared connection).
+ */
+export async function applySplitVerdict(
   clusterId: number,
   leadItemId: number,
   members: MemberRow[],
   rejectedIds: number[],
   reason: string,
+  dbc: ReturnType<typeof db> = db(),
 ): Promise<number> {
   if (rejectedIds.length === 0) {
     // LLM said split but gave no IDs — treat as keep
-    await applyKeepVerdict(clusterId, members);
+    await applyKeepVerdict(clusterId, members, dbc);
     return 0;
   }
 
@@ -302,11 +308,11 @@ async function applySplitVerdict(
     console.warn(
       `[arbitrate] cluster ${clusterId}: LLM rejected all ${members.length} members; treating as keep`,
     );
-    await applyKeepVerdict(clusterId, members);
+    await applyKeepVerdict(clusterId, members, dbc);
     return 0;
   }
 
-  const client = db();
+  const client = dbc;
   const now = new Date();
   const rejectedSet = new Set(rejectedIds);
 
@@ -400,7 +406,7 @@ async function applySplitVerdict(
   // Recompute importance for surviving members
   const survivors = members.filter((m) => !rejectedSet.has(m.itemId));
   if (survivors.length > 0) {
-    await persistImportance(clusterId, survivors);
+    await persistImportance(clusterId, survivors, dbc);
   }
 
   return actuallyUnlinked;
@@ -409,8 +415,9 @@ async function applySplitVerdict(
 async function persistImportance(
   clusterId: number,
   members: MemberRow[],
+  dbc: ReturnType<typeof db> = db(),
 ): Promise<void> {
-  const client = db();
+  const client = dbc;
 
   const { importance } = recomputeEventImportance(
     members.map((m) => ({ importance: m.importance })),

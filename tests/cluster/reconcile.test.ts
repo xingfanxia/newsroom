@@ -37,11 +37,14 @@ describe("reconcileClusters — the three repairs", () => {
     );
   });
 
-  it("does NOT touch verified_at / titled_at (must not force LLM re-work)", () => {
+  it("does NOT touch the cluster's verified_at / titled_at (must not force LLM re-work)", () => {
     // Forcing re-arbitration/re-titling is the caller's decision (the one-off
     // migration does it for its stuck clusters); the standing reconciler must
-    // not silently spend LLM calls.
-    expect(reconcileSrc).not.toContain("verified_at = NULL");
+    // not silently spend LLM calls. Regex (not substring) so the orphan-item
+    // step's legitimate `cluster_verified_at = NULL` on ITEMS doesn't false-trip
+    // — [^_] excludes the `cluster_` prefix; a bare `verified_at = NULL` (a
+    // cluster verdict clear) would still match.
+    expect(reconcileSrc).not.toMatch(/[^_]verified_at = NULL/);
     expect(reconcileSrc).not.toContain("titled_at = NULL");
   });
 

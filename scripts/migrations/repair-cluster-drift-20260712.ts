@@ -1,7 +1,11 @@
 /**
  * One-off prod-data repair for the 2026-07-12 cluster audit findings.
  *
- * Three cleanups, all idempotent (safe to re-run; recompute-from-truth):
+ * Three cleanups. Steps 1-2 are idempotent (recompute-from-truth / dedupe — a
+ * second run changes nothing). Step 3 is a ONE-TIME unstick, not idempotent:
+ * it force-clears the verdict locks, so re-running it after the pipeline has
+ * re-arbitrated/re-titled those clusters would blank them again and burn
+ * another LLM round. This is a one-shot repair, run once with --apply.
  *   1. Reconcile ALL cluster aggregates — recompute member_count / coverage /
  *      latest_member_at from actual membership, GC zombie (0-member) clusters,
  *      re-point dangling lead_item_id to a real member. This fixes the audit's
@@ -73,6 +77,7 @@ async function main() {
   const rep = await reconcileClusters({ apply: APPLY });
   console.log(
     `\n[reconcile] ${APPLY ? "applied" : "would apply"}: ` +
+      `orphanItemsUnlinked=${rep.orphanItemsUnlinked} ` +
       `aggregatesFixed=${rep.aggregatesFixed} zombiesDeleted=${rep.zombiesDeleted} ` +
       `leadsRepointed=${rep.leadsRepointed}`,
   );

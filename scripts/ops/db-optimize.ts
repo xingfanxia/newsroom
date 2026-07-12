@@ -45,6 +45,12 @@ const INDEXES = [
   // provider,model). Separate leading prefix from the task index above. T7.
   `CREATE INDEX IF NOT EXISTS llm_usage_model_cover_idx
      ON llm_usage (provider, model, cost_usd)`,
+  // Covering index for totalsByWindow (the usage page's headline sums). created_at
+  // leads so bounded windows still prune; 'all' stays inside the index with no
+  // fat-row lookups. 2026-07-12 review finding 2c.
+  `CREATE INDEX IF NOT EXISTS llm_usage_totals_cover_idx
+     ON llm_usage (created_at, input_tokens, cached_input_tokens,
+                   output_tokens, reasoning_tokens, cost_usd)`,
 ];
 
 /** Hot query shapes and the index each one's plan must reference. */
@@ -94,7 +100,8 @@ const PLAN_CHECKS: Array<{ name: string; index: string; sql: string }> = [
     index: "llm_usage_breakdown_cover_idx",
     sql: `SELECT task, provider, model, count(*),
                  sum(input_tokens), sum(output_tokens), sum(cost_usd)
-          FROM llm_usage GROUP BY task, provider, model`,
+          FROM llm_usage INDEXED BY llm_usage_breakdown_cover_idx
+          GROUP BY task, provider, model`,
   },
   {
     name: "usage all-window model breakdown covering (breakdownByModel)",
@@ -103,10 +110,48 @@ const PLAN_CHECKS: Array<{ name: string; index: string; sql: string }> = [
           FROM llm_usage INDEXED BY llm_usage_model_cover_idx
           GROUP BY provider, model`,
   },
+  {
+    name: "usage bounded-window task breakdown prunes created_at (breakdownByTask)",
+    index: "llm_usage_created_at_idx",
+    sql: `SELECT task, provider, model, count(*), sum(cost_usd)
+          FROM llm_usage INDEXED BY llm_usage_created_at_idx
+          WHERE created_at >= 0 GROUP BY task, provider, model`,
+  },
+  {
+    name: "usage bounded-window model breakdown prunes created_at (breakdownByModel)",
+    index: "llm_usage_created_at_idx",
+    sql: `SELECT provider, model, count(*), sum(cost_usd)
+          FROM llm_usage INDEXED BY llm_usage_created_at_idx
+          WHERE created_at >= 0 GROUP BY provider, model`,
+  },
+  {
+    name: "usage totals covering (totalsByWindow)",
+    index: "llm_usage_totals_cover_idx",
+    sql: `SELECT count(*), sum(input_tokens), sum(cached_input_tokens),
+                 sum(output_tokens), sum(reasoning_tokens), sum(cost_usd)
+          FROM llm_usage INDEXED BY llm_usage_totals_cover_idx WHERE created_at >= 0`,
+  },
 ];
 
 async function main() {
   const client = libsqlClient();
+
+  // Defensive dedupe before the cluster_splits UNIQUE index below: it throws on
+  // any duplicate (item_id, from_cluster_id) pair. The 2026-07-12 migration
+  // deduped once, but the cluster pipeline runs continuously — if a re-rejection
+  // appended a dup in the window before the index existed, CREATE UNIQUE INDEX
+  // would abort the whole run. Idempotent (0 rows once clean). Review finding 3a.
+  const dedupe = await client.execute(`
+    DELETE FROM cluster_splits WHERE EXISTS (
+      SELECT 1 FROM cluster_splits cs2
+      WHERE cs2.item_id = cluster_splits.item_id
+        AND cs2.from_cluster_id = cluster_splits.from_cluster_id
+        AND cs2.id < cluster_splits.id)`);
+  if (dedupe.rowsAffected > 0) {
+    console.log(
+      `cluster_splits: deduped ${dedupe.rowsAffected} duplicate pair(s) before unique index`,
+    );
+  }
 
   for (const ddl of INDEXES) {
     const t0 = performance.now();

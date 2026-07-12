@@ -21,6 +21,7 @@
  * 2026-07-12 one-off migration does it for its specific stuck clusters; the
  * weekly reconciler must not).
  */
+import type { Client } from "@libsql/client";
 import { libsqlClient } from "@/db/client";
 
 export type ReconcileReport = {
@@ -28,6 +29,7 @@ export type ReconcileReport = {
   aggregatesFixed: number;
   zombiesDeleted: number;
   leadsRepointed: number;
+  orphanItemsUnlinked: number;
 };
 
 export type ReconcileOpts = {
@@ -41,6 +43,8 @@ export type ReconcileOpts = {
    * between creating a cluster and claiming its first item.
    */
   zombieMinAgeMs?: number;
+  /** Injectable libSQL client (behavioral tests); defaults to the shared one. */
+  client?: Client;
 };
 
 /** Build a `<col> IN (?, ?, …)` scope fragment (or "1=1" for all). */
@@ -56,10 +60,40 @@ function scope(clusterIds: number[] | undefined, col = "clusters.id"): {
 export async function reconcileClusters(
   opts: ReconcileOpts,
 ): Promise<ReconcileReport> {
-  const client = libsqlClient();
+  const client = opts.client ?? libsqlClient();
   const now = Date.now();
   const minAge = opts.zombieMinAgeMs ?? 5 * 60_000;
   const s = scope(opts.clusterIds);
+
+  // ── 0. Orphaned items: cluster_id points at a cluster row that no longer
+  //     exists. A concurrent merge/delete can race the out-of-transaction
+  //     "join existing cluster" claim in index.ts, and because FK enforcement
+  //     is off (no PRAGMA foreign_keys=ON), items.cluster_id's ON DELETE SET
+  //     NULL never fires — the item is left pointing at a dead id and the feed
+  //     dedup (cluster_id IS NULL OR lead_item_id = items.id) hides it forever.
+  //     Null the dangling pointer so it self-heals back into Stage A. Scoped on
+  //     items.cluster_id (not clusters.id) since the referenced cluster is gone.
+  const os = scope(opts.clusterIds, "items.cluster_id");
+  const orphanWhere = `${os.clause}
+    AND items.cluster_id IS NOT NULL
+    AND NOT EXISTS (SELECT 1 FROM clusters c WHERE c.id = items.cluster_id)`;
+
+  let orphanItemsUnlinked: number;
+  if (opts.apply) {
+    const r = await client.execute({
+      sql: `UPDATE items
+              SET cluster_id = NULL, clustered_at = NULL, cluster_verified_at = NULL
+            WHERE ${orphanWhere}`,
+      args: os.args,
+    });
+    orphanItemsUnlinked = r.rowsAffected;
+  } else {
+    const r = await client.execute({
+      sql: `SELECT count(*) AS n FROM items WHERE ${orphanWhere}`,
+      args: os.args,
+    });
+    orphanItemsUnlinked = Number(r.rows[0].n);
+  }
 
   // ── 1. Zombie clusters: no members at all → GC the row. Age-guarded so we
   //     don't delete an in-flight Stage-A cluster mid-creation. cluster_splits
@@ -88,11 +122,20 @@ export async function reconcileClusters(
   // ── 2. Aggregate drift: member_count / coverage / latest_member_at != truth.
   //     Recompute all three from actual membership in one set-based UPDATE.
   //     (Runs after the zombie delete so it only touches surviving clusters.)
+  //     The `EXISTS(members)` guard excludes 0-member clusters entirely: an old
+  //     one is a zombie (deleted in step 1 under apply; counted there, not here,
+  //     under dry-run — so the two modes agree), and a young one is an in-flight
+  //     Stage-A row we must not race by forcing its count to 0. `IS NOT` gives
+  //     null-safe latest_member_at drift detection (NULL vs a real max).
   const actual = `(SELECT count(*) FROM items i WHERE i.cluster_id = clusters.id)`;
-  const driftWhere = `${s.clause} AND (
-       clusters.member_count <> ${actual}
-    OR clusters.coverage <> ${actual}
-  )`;
+  const actualLatest = `(SELECT max(i.clustered_at) FROM items i WHERE i.cluster_id = clusters.id)`;
+  const driftWhere = `${s.clause}
+    AND EXISTS (SELECT 1 FROM items i WHERE i.cluster_id = clusters.id)
+    AND (
+         clusters.member_count <> ${actual}
+      OR clusters.coverage <> ${actual}
+      OR clusters.latest_member_at IS NOT ${actualLatest}
+    )`;
 
   let aggregatesFixed: number;
   if (opts.apply) {
@@ -147,5 +190,11 @@ export async function reconcileClusters(
     leadsRepointed = Number(r.rows[0].n);
   }
 
-  return { apply: opts.apply, aggregatesFixed, zombiesDeleted, leadsRepointed };
+  return {
+    apply: opts.apply,
+    aggregatesFixed,
+    zombiesDeleted,
+    leadsRepointed,
+    orphanItemsUnlinked,
+  };
 }

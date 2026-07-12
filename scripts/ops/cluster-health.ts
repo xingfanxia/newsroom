@@ -216,10 +216,15 @@ if (process.argv.includes("--repair")) {
   const apply = process.argv.includes("--apply");
   section(`11. reconcile pass (${apply ? "APPLY" : "dry-run — add --apply to write"})`);
   const rep = await reconcileClusters({ apply });
+  console.log(`  orphan items ${apply ? "unlinked" : "to unlink"}:   ${rep.orphanItemsUnlinked}`);
   console.log(`  aggregates ${apply ? "fixed" : "to fix"}:          ${rep.aggregatesFixed}`);
   console.log(`  zombies ${apply ? "deleted" : "to delete"}:        ${rep.zombiesDeleted}`);
   console.log(`  dangling leads ${apply ? "repointed" : "to repoint"}: ${rep.leadsRepointed}`);
-  const total = rep.aggregatesFixed + rep.zombiesDeleted + rep.leadsRepointed;
+  const total =
+    rep.orphanItemsUnlinked +
+    rep.aggregatesFixed +
+    rep.zombiesDeleted +
+    rep.leadsRepointed;
   if (!apply && total > 0) console.log(`  → re-run with '--repair --apply' to fix.`);
   if (apply && total > 0) console.log(`  ⚠ ALARM: reconcile applied ${total} fix(es) — drift should not accrue; investigate the source.`);
 }

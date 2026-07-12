@@ -283,15 +283,18 @@ export async function runMergeBatch(opts: MergeOpts): Promise<MergeReport> {
  *
  * Returns the number of items moved (0 if the loser was empty or every loser
  * item was split-guarded against the winner).
+ *
+ * `dbc` is injectable so behavioral tests can run this against a local libSQL
+ * DB; production callers omit it and get the shared connection.
  */
-async function mergeClusters(
+export async function mergeClusters(
   winnerId: number,
   loserId: number,
+  dbc: ReturnType<typeof db> = db(),
 ): Promise<number> {
-  const client = db();
   let movedCount = 0;
 
-  await client.transaction(async (tx) => {
+  await dbc.transaction(async (tx) => {
     // 1. Unlink loser items the arbitrator already rejected from the winner.
     //    Stage A's existing NOT EXISTS(cluster_splits) guard then keeps them
     //    from rejoining the winner on future ticks.
@@ -336,7 +339,23 @@ async function mergeClusters(
         .where(sql`${clusters.id} = ${winnerId}`);
     }
 
-    // 4. The loser is empty now either way (moved out or unlinked to NULL).
+    // 4. Transfer the loser's negative edges to the winner. A rejection is
+    //    keyed on the (ephemeral) cluster id; when the loser is absorbed, its
+    //    rejections must carry to the winner — otherwise a later twin merge
+    //    could relaunder an item that was rejected from the loser back into the
+    //    winner (the transitive reunite vector). INSERT OR IGNORE dedupes
+    //    against edges the winner already holds (cluster_splits_item_cluster_uq);
+    //    then drop the loser's now-dead rows.
+    await tx.run(sql`
+      INSERT OR IGNORE INTO cluster_splits (item_id, from_cluster_id, reason, split_at)
+      SELECT item_id, ${winnerId}, reason, split_at
+      FROM cluster_splits WHERE from_cluster_id = ${loserId}
+    `);
+    await tx.run(
+      sql`DELETE FROM cluster_splits WHERE from_cluster_id = ${loserId}`,
+    );
+
+    // 5. The loser is empty now either way (moved out or unlinked to NULL).
     await tx.delete(clusters).where(sql`${clusters.id} = ${loserId}`);
   });
 
