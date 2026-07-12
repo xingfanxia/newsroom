@@ -9,8 +9,8 @@ describe("runEnrichBatch backfill options", () => {
     expect(worker).toContain("export type EnrichBatchOptions");
     expect(worker).toContain("windowStart?: Date");
     expect(worker).toContain("windowEnd?: Date");
-    expect(worker).toContain("opts.windowStart.toISOString()");
-    expect(worker).toContain("opts.windowEnd.toISOString()");
+    expect(worker).toContain("opts.windowStart.getTime()");
+    expect(worker).toContain("opts.windowEnd.getTime()");
   });
 
   it("keeps cron on the default full-queue behavior", () => {

@@ -11,7 +11,7 @@
  * only store sha256(token) in the DB.
  */
 import { randomBytes } from "node:crypto";
-import { desc, eq, sql } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { apiTokens } from "@/db/schema";
 import { ADMIN_USER_ID, upsertAppUser } from "@/lib/auth/session";
@@ -78,7 +78,7 @@ async function revoke(idRaw: string | undefined) {
   const client = db();
   const result = await client
     .update(apiTokens)
-    .set({ revokedAt: sql`now()` })
+    .set({ revokedAt: new Date() })
     .where(eq(apiTokens.id, id))
     .returning({ id: apiTokens.id, label: apiTokens.label });
   if (result.length === 0) {

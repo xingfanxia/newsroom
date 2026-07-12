@@ -27,7 +27,7 @@ export function enrichClaimableSql(
     AND coalesce(${columns.enrichAttempts}, 0) < ${maxAttempts}
     AND (
       ${columns.enrichClaimedAt} IS NULL
-      OR ${columns.enrichClaimedAt} < now() - (${ENRICH_CLAIM_STALE_MINUTES} * interval '1 minute')
+      OR ${columns.enrichClaimedAt} < ${Date.now() - ENRICH_CLAIM_STALE_MINUTES * 60_000}
     )
   )`;
 }
@@ -48,8 +48,8 @@ export function scoreBackfillPendingSql(
       ${columns.hkr} IS NULL
       OR ${columns.reasoningZh} IS NULL
       OR ${columns.reasoningEn} IS NULL
-      OR ${columns.hkr} -> 'reasonsZh' IS NULL
-      OR ${columns.hkr} -> 'reasonsEn' IS NULL
+      OR json_extract(${columns.hkr}, '$.reasonsZh') IS NULL
+      OR json_extract(${columns.hkr}, '$.reasonsEn') IS NULL
     )
   )`;
 }

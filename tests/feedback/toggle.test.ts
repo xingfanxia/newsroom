@@ -55,11 +55,7 @@ describe("feedbackBodySchema", () => {
   });
 });
 
-const hasDb = Boolean(
-  process.env.POSTGRES_URL ||
-    process.env.DATABASE_URL ||
-    process.env.POSTGRES_PRISMA_URL,
-);
+const hasDb = Boolean(process.env.TURSO_DATABASE_URL);
 const describeOrSkip = hasDb ? describe : describe.skip;
 
 describeOrSkip("applyFeedbackToggle (real DB)", () => {

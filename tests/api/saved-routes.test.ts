@@ -8,11 +8,7 @@ import {
 } from "@/lib/api/saved-routes";
 import type { SessionUser } from "@/lib/auth/session";
 
-const hasDb = Boolean(
-  process.env.POSTGRES_URL ||
-    process.env.DATABASE_URL ||
-    process.env.POSTGRES_PRISMA_URL,
-);
+const hasDb = Boolean(process.env.TURSO_DATABASE_URL);
 const describeOrSkip = hasDb ? describe : describe.skip;
 
 describeOrSkip("saveItemRoutePayload (real DB)", () => {
@@ -68,7 +64,7 @@ describeOrSkip("saveItemRoutePayload (real DB)", () => {
 
     const [maxItem] = await db()
       .select({
-        maxId: sql<number>`coalesce(max(${schema.items.id}), 0)::int`,
+        maxId: sql<number>`coalesce(max(${schema.items.id}), 0)`,
       })
       .from(schema.items);
     missingItemId = (maxItem?.maxId ?? 0) + 1_000_000;

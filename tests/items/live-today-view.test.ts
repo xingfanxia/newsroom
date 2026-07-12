@@ -19,17 +19,19 @@ const liveSrc = readSource("lib/items/live.ts");
 
 describe("view=today filter — fresh-but-cold rescue clause", () => {
   it("includes a day-aligned rescue clause for items published since start of yesterday", () => {
-    // The clause must be `>= date_trunc('day', now() - interval '1 day')`.
+    // The clause must be `>= start-of-today-ms - 86_400_000` (day-aligned).
     // A relative `> now() - 24h` window would drop yesterday-morning items
     // when checked yesterday-afternoon+24h = today-afternoon.
     expect(liveSrc).toMatch(
-      /items\.publishedAt\}\s+>=\s+date_trunc\('day',\s+now\(\)\s+-\s+interval\s+'1 day'\)/,
+      /items\.publishedAt\}\s+>=\s+\$\{startOfTodayMs\s+-\s+86_400_000\}/,
     );
   });
 
   it("preserves the cluster-heat clauses (firstSeenAt today / latestMemberAt within hotWindow)", () => {
-    expect(liveSrc).toContain("clusters.firstSeenAt} >= date_trunc('day', now())");
-    expect(liveSrc).toContain("clusters.latestMemberAt} > now() - make_interval(hours =>");
+    expect(liveSrc).toContain("clusters.firstSeenAt} >= ${startOfTodayMs}");
+    expect(liveSrc).toContain(
+      "clusters.latestMemberAt} > ${Date.now() - hotH * 3_600_000}",
+    );
   });
 
   it("documents WHY the day-aligned rescue is needed (so future maintainers don't revert)", () => {
@@ -60,9 +62,9 @@ describe("daily-highlights mode (minImportance + maxPerDay)", () => {
     // Default sort is publishedAt-DESC, importance-DESC tiebreaker — which
     // picks the LATEST published item per day, not the highest-importance.
     // For daily highlights we need the day's strongest events first, so the
-    // primary sort changes to to_char(...,'YYYY-MM-DD') DESC.
+    // primary sort changes to UTC-day (ms floor-division) DESC.
     expect(liveSrc).toContain(
-      "to_char(${items.publishedAt} AT TIME ZONE 'UTC', 'YYYY-MM-DD') DESC",
+      "CAST(${items.publishedAt} / 86400000 AS INTEGER) DESC",
     );
   });
 
@@ -100,10 +102,11 @@ describe("recent-day rescue (recentDayRescueDays)", () => {
   });
 
   it("buildFeedWhere ORs in a day-aligned recent-window bypass when rescue is set", () => {
-    // Day-aligned via date_trunc so the rescue covers calendar days, not a
-    // rolling 24h window — same convention as the today-view rescue clause.
+    // Day-aligned (start-of-today minus whole days) so the rescue covers
+    // calendar days, not a rolling 24h window — same convention as the
+    // today-view rescue clause.
     expect(liveSrc).toMatch(
-      /OR\s+\$\{items\.publishedAt\}\s+>=\s+date_trunc\('day',\s+now\(\)\s+-\s+make_interval\(days\s*=>/,
+      /OR\s+\$\{items\.publishedAt\}\s+>=\s+\$\{startOfTodayMs\s+-\s+\(q\.recentDayRescueDays\s+-\s+1\)\s+\*\s+86_400_000\}/,
     );
   });
 

@@ -241,7 +241,7 @@ async function main(): Promise<void> {
   // Sanity check: count newsletters rows with payload now (skip in dry-run).
   if (!flags.dryRun) {
     const [withPayload] = await client
-      .select({ n: sql<number>`count(*)::int` })
+      .select({ n: sql<number>`count(*)` })
       .from(newsletters)
       .where(
         and(

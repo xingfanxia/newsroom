@@ -1,5 +1,13 @@
 # RLS Hardening — All Public Tables (newsroom-db)
 
+> **SUPERSEDED (2026-07-11, Turso migration):** the database moved from
+> Supabase Postgres to Turso libSQL. RLS existed to blunt Supabase's
+> auto-exposed PostgREST REST endpoint; Turso has no such surface (access is
+> token-only via the libSQL protocol), so this control no longer exists and is
+> no longer needed. Kept as a historical record. The migration SQL it
+> references (`db/migrations/manual/`) was removed with the Postgres era.
+
+
 - **Date:** 2026-04-28
 - **Project ID:** `lnpczearxstbepydqxth` (newsroom-db)
 - **Scope:** All 15 tables in the `public` schema

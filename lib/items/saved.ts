@@ -70,9 +70,9 @@ export async function getSavedTotals(userId: string): Promise<{
 }> {
   const [row] = await db()
     .select({
-      total: sql<number>`count(*)::int`,
-      week: sql<number>`count(*) filter (where ${feedback.createdAt} > now() - interval '7 days')::int`,
-      month: sql<number>`count(*) filter (where ${feedback.createdAt} > now() - interval '30 days')::int`,
+      total: sql<number>`count(*)`,
+      week: sql<number>`count(*) filter (where ${feedback.createdAt} > ${Date.now() - 7 * 86_400_000})`,
+      month: sql<number>`count(*) filter (where ${feedback.createdAt} > ${Date.now() - 30 * 86_400_000})`,
     })
     .from(feedback)
     .where(
@@ -98,19 +98,37 @@ export async function getSavedTags(
         ? sql`AND ${feedback.collectionId} = ${opts.collection}`
         : sql``;
 
-  const rows = await db().execute(sql`
-    SELECT t AS tag, count(*)::int AS n
-    FROM ${feedback}
-    INNER JOIN ${items} ON ${items.id} = ${feedback.itemId},
-      LATERAL jsonb_array_elements_text(
-        coalesce(${items.tags}->'capabilities', '[]'::jsonb)
-        || coalesce(${items.tags}->'entities',     '[]'::jsonb)
-        || coalesce(${items.tags}->'topics',       '[]'::jsonb)
-      ) AS t
-    WHERE ${feedback.userId} = ${userId}
-      AND ${feedback.vote} = ${FEEDBACK_SAVE_VOTE}
-      ${collectionCond}
-    GROUP BY t
+  // items.tags is JSON text with three array keys; SQLite has no jsonb `||`
+  // concat, so unnest each key as a UNION ALL branch of json_each.
+  const rows = await db().all<{ tag: string; n: number }>(sql`
+    WITH tag_values AS (
+      SELECT je.value AS tag
+      FROM ${feedback}
+      INNER JOIN ${items} ON ${items.id} = ${feedback.itemId},
+        json_each(coalesce(json_extract(${items.tags}, '$.capabilities'), '[]')) je
+      WHERE ${feedback.userId} = ${userId}
+        AND ${feedback.vote} = ${FEEDBACK_SAVE_VOTE}
+        ${collectionCond}
+      UNION ALL
+      SELECT je.value AS tag
+      FROM ${feedback}
+      INNER JOIN ${items} ON ${items.id} = ${feedback.itemId},
+        json_each(coalesce(json_extract(${items.tags}, '$.entities'), '[]')) je
+      WHERE ${feedback.userId} = ${userId}
+        AND ${feedback.vote} = ${FEEDBACK_SAVE_VOTE}
+        ${collectionCond}
+      UNION ALL
+      SELECT je.value AS tag
+      FROM ${feedback}
+      INNER JOIN ${items} ON ${items.id} = ${feedback.itemId},
+        json_each(coalesce(json_extract(${items.tags}, '$.topics'), '[]')) je
+      WHERE ${feedback.userId} = ${userId}
+        AND ${feedback.vote} = ${FEEDBACK_SAVE_VOTE}
+        ${collectionCond}
+    )
+    SELECT tag, count(*) AS n
+    FROM tag_values
+    GROUP BY tag
     ORDER BY n DESC
     LIMIT ${limit}
   `);

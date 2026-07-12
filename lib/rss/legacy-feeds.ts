@@ -34,7 +34,8 @@ type LegacyLaneRssRow = {
   title: string;
   summary_zh: string | null;
   summary_en: string | null;
-  published_at: Date | string;
+  // Raw-SQL selected timestamp: libSQL returns the INTEGER ms-epoch as a number.
+  published_at: number;
   url: string;
 };
 
@@ -71,10 +72,7 @@ export function legacyLaneRssItem(row: LegacyLaneRssRow): RssItem {
     title: row.title_zh ?? row.title_en ?? row.title,
     link: publicUrl(`/zh/items/${row.id}`),
     description: row.summary_zh ?? row.summary_en ?? "",
-    pubDate:
-      row.published_at instanceof Date
-        ? row.published_at
-        : new Date(row.published_at),
+    pubDate: new Date(row.published_at),
     guid: row.url,
   };
 }
@@ -95,7 +93,7 @@ async function listLegacyLaneRows(
   const filterSql =
     slug === "curated" ? sql`s.curated = true` : sql`TRUE`;
 
-  return (await db().execute(sql`
+  return await db().all<LegacyLaneRssRow>(sql`
     SELECT i.id, i.title_zh, i.title_en, i.title, i.summary_zh, i.summary_en,
            i.published_at, i.url
     FROM items i
@@ -104,7 +102,7 @@ async function listLegacyLaneRows(
       AND ${filterSql}
     ORDER BY i.published_at DESC NULLS LAST
     LIMIT 50
-  `)) as unknown as LegacyLaneRssRow[];
+  `);
 }
 
 function renderLegacyRssChannel(

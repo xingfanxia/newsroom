@@ -344,7 +344,7 @@ describe("event commentary cron recency guardrail", () => {
   it("filters candidates by latest_member_at with first_seen_at fallback when recency is set", () => {
     expect(workerSource).toContain("commentaryRecencyFilter");
     expect(workerSource).toContain("COALESCE(${clusters.latestMemberAt}, ${clusters.firstSeenAt})");
-    expect(workerSource).toContain("make_interval(hours => ${opts.recencyHours})");
+    expect(workerSource).toContain("${Date.now()} - ${opts.recencyHours * 3_600_000}");
   });
 });
 

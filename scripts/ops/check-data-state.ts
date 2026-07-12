@@ -13,41 +13,54 @@ import { getSystemSnapshot } from "@/lib/shell/system-stats";
 async function main() {
   const client = db();
 
-  const totals = await client.execute(sql`
+  const now = new Date();
+  // date_trunc('month', now()) - interval '17 months' → first day of the
+  // month 17 months ago (UTC) as ms epoch. Date.UTC handles month rollover.
+  const monthWindowStartMs = Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth() - 17,
+    1,
+  );
+  // date_trunc('year', now()) and + interval '1 year' → current UTC year bounds.
+  const yearStartMs = Date.UTC(now.getUTCFullYear(), 0, 1);
+  const nextYearStartMs = Date.UTC(now.getUTCFullYear() + 1, 0, 1);
+
+  const totals = await client.all(sql`
     SELECT
-      count(*)::int AS total,
-      count(*) FILTER (WHERE enriched_at IS NOT NULL)::int AS enriched,
-      count(*) FILTER (WHERE body_md IS NOT NULL AND body_md != '')::int AS with_body_md,
-      count(*) FILTER (WHERE editor_note_zh IS NOT NULL AND editor_note_zh != '')::int AS with_editor_note,
-      count(*) FILTER (WHERE editor_analysis_zh IS NOT NULL AND editor_analysis_zh != '')::int AS with_editor_analysis,
-      count(*) FILTER (WHERE ${highlightTierInSql(sql`tier`)})::int AS curated
+      count(*) AS total,
+      count(*) FILTER (WHERE enriched_at IS NOT NULL) AS enriched,
+      count(*) FILTER (WHERE body_md IS NOT NULL AND body_md != '') AS with_body_md,
+      count(*) FILTER (WHERE editor_note_zh IS NOT NULL AND editor_note_zh != '') AS with_editor_note,
+      count(*) FILTER (WHERE editor_analysis_zh IS NOT NULL AND editor_analysis_zh != '') AS with_editor_analysis,
+      count(*) FILTER (WHERE ${highlightTierInSql(sql`tier`)}) AS curated
     FROM items
   `);
 
-  const rawState = await client.execute(sql`
+  const rawState = await client.all(sql`
     SELECT
-      count(*)::int AS raw_total
+      count(*) AS raw_total
     FROM raw_items
   `);
 
-  const srcs = await client.execute(sql`
-    SELECT count(*) FILTER (WHERE enabled)::int AS enabled,
-           count(*) FILTER (WHERE NOT enabled)::int AS disabled
+  const srcs = await client.all(sql`
+    SELECT count(*) FILTER (WHERE enabled) AS enabled,
+           count(*) FILTER (WHERE NOT enabled) AS disabled
     FROM sources
   `);
 
-  const byMonth = await client.execute(sql`
-    SELECT to_char(published_at, 'YYYY-MM') AS month, count(*)::int AS n
+  const byMonth = await client.all<{ month: string; n: number }>(sql`
+    SELECT strftime('%Y-%m', published_at / 1000.0, 'unixepoch') AS month,
+           count(*) AS n
     FROM items
-    WHERE published_at >= date_trunc('month', now()) - interval '17 months'
+    WHERE published_at >= ${monthWindowStartMs}
     GROUP BY month ORDER BY month DESC
   `);
 
-  const bySource = await client.execute(sql`
-    SELECT source_id, count(*)::int AS n
+  const bySource = await client.all<{ source_id: string; n: number }>(sql`
+    SELECT source_id, count(*) AS n
     FROM items
-    WHERE published_at >= date_trunc('year', now())
-      AND published_at < date_trunc('year', now()) + interval '1 year'
+    WHERE published_at >= ${yearStartMs}
+      AND published_at < ${nextYearStartMs}
     GROUP BY source_id
     ORDER BY n DESC
     LIMIT 20

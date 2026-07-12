@@ -17,7 +17,7 @@
                                                                                              ▼
  ┌─────────────┐     ┌──────────────┐     ┌──────────────┐     ┌───────────────┐     ┌──────────────┐
  │  EDITORIAL  │ ←←← │   CLUSTER    │ ←←← │    STORE     │ ←←← │   DEDUPE      │ ←←← │   FILTER     │
- │  (feedback) │     │ (embeddings) │     │  (Postgres   │     │  (hash + sim) │     │ (threshold)  │
+ │  (feedback) │     │ (embeddings) │     │  (Turso      │     │  (hash + sim) │     │ (threshold)  │
  │             │     │              │     │   + vector)  │     │               │     │              │
  └─────────────┘     └──────────────┘     └──────────────┘     └───────────────┘     └──────────────┘
        │
@@ -128,7 +128,7 @@ Converts `raw_items` → `items`:
   it does not follow redirects.
 
 ### 2.4 Enricher (LLM)
-Before spending LLM tokens, each worker atomically claims pending rows in Postgres (`FOR UPDATE SKIP LOCKED`) and records `enrich_claimed_at`, `enrich_attempts`, and `enrich_error`. Claims become retryable after the stale window, but rows stop after the max-attempt cap until an operator reset clears those fields. This prevents overlapping cron ticks or manual backfills from repeatedly charging the same stuck item.
+Before spending LLM tokens, each worker atomically claims pending rows with a single `UPDATE ... WHERE id IN (SELECT ... LIMIT n) RETURNING` (SQLite is single-writer, so the claim statement is serialized) and records `enrich_claimed_at`, `enrich_attempts`, and `enrich_error`. Claims become retryable after the stale window, but rows stop after the max-attempt cap until an operator reset clears those fields. This prevents overlapping cron ticks or manual backfills from repeatedly charging the same stuck item.
 
 The enrich claim query also waits for body prefetch to finish before spending
 LLM tokens on normal web articles: non-X/Twitter rows require
@@ -159,7 +159,7 @@ The pipeline now chooses a treatment tier before calling the model:
    - Entity axis: `Anthropic`, `OpenAI`, `Google`, `小米`, `字节`, `Nvidia`, ...
    - Topic axis: `产品更新`, `发表成果`, `融资`, `合作`, `政策`, `开源`, `事故`, ...
 4. **Source-kind** — e.g., `官网动态 (RSS·排除企业/客户案例)`, `深度报告 (独立博客/研究报告)` — classified once per source, cached.
-5. **Embedding** — Azure OpenAI `text-embedding-3-large`; store as pgvector column for later clustering.
+5. **Embedding** — Azure OpenAI `text-embedding-3-large`; store as a libSQL `F32_BLOB(3072)` vector column for later clustering.
 
 Successful enrich writes persist directly on `items`, including the current
 policy hash in `items.policy_version`. Cron only picks rows whose
@@ -213,7 +213,7 @@ historical rows just because the policy file changed.
   event-different stories.
 
 ### 2.7 Store
-Postgres (Vercel Postgres / Neon / Supabase) with schema:
+Turso libSQL (SQLite; was Supabase Postgres until 2026-07-11) with schema:
 
 ```
 sources          (id, name_en, name_zh, url, kind, group, locale, cadence, priority, enabled, never_exclude, curated, ...)
@@ -336,12 +336,12 @@ A curated set of enabled X handles stored as normal `sources` rows.
 ### Deviations from original blueprint (what actually shipped vs. what Section 2 specified)
 
 - **Clustering path (§2.6)**: implemented as its own cron (`/api/cron/cluster`) not baked into enrich. The current Stage A threshold is 0.75 similarity with a 72h bidirectional published-at window. Widened neighbor search (§2.6 said "lead_item_id only"; we search all enriched visible-tier items) so same-batch siblings merge without a two-pass fix. Atomic row claim via `WHERE clustered_at IS NULL RETURNING` prevents double-counting. Stage A and singleton-recluster also exclude `tier='excluded'` rows through the shared visible-tier SQL helper, exclude `cluster_splits` matches, and settle an item as a singleton after three distinct rejected clusters, so Stage B's rejected/noise joins do not become an every-tick arbitration loop.
-- **Embeddings (§2.4)**: `voyage-3 / text-embedding-3-large` — we picked **text-embedding-3-large native 3072 dims** stored as `halfvec(3072)` (not truncated to 1536 via Matryoshka). Same storage as `vector(1536)`, full quality, fits pgvector HNSW's 4000-dim cap.
+- **Embeddings (§2.4)**: `voyage-3 / text-embedding-3-large` — we picked **text-embedding-3-large native 3072 dims**, stored since the Turso migration as `F32_BLOB(3072)` (libSQL native vectors) with a DiskANN cosine index (`items_embedding_idx`, compress_neighbors=float8) — originally pgvector `halfvec(3072)` + HNSW.
 - **Scoring model (§2.5)**: "Sonnet 4.6" placeholder → shipped first as Azure GPT, then moved on 2026-06-10 to **Azure AI Foundry DeepSeek V4 Pro/Flash**. High-value items use Pro; lower-value items use Flash to avoid spending heavy tokens on throwaway content.
 - **LLM SDK choice**: original plan assumed direct vendor SDKs — migrated to **Vercel AI SDK v6** + `@ai-sdk/{anthropic,google,azure,openai}` for unified `generateText` / `generateObject` / `embed` across providers.
 - **Prompt injection defense** (not in original §2): XML-fence untrusted content + system-prompt framing + control-sequence neutralization (added per security review).
 - **Cron timing**: `vercel.json` owns the schedule. Current production routes are fetch-hourly, fetch-daily, fetch-weekly, normalize, article-body, enrich, commentary, score-backfill, cluster, newsletter-daily, and newsletter-monthly. Article-body, enrich, commentary, score-backfill, and cluster are split so one slow/spendy stage cannot starve the others. Local operator cron commands mirror every production cron slug and reuse the same worker helpers instead of reassembling production steps by hand; legacy short aliases stay as wrappers only. Newsletter and daily-column workers share snapped UTC window helpers in `workers/newsletter/windows.ts` so cron runs, replay/backfill scripts, and AI HOT history placeholders agree on period boundaries. Inside the cluster pipeline, scheduled Stage D event commentary is limited to `EVENT_COMMENTARY_CRON_RECENCY_HOURS` (24h) using `latest_member_at` with `first_seen_at` fallback; wider historical commentary sweeps belong in cost-bounded operator backfill scripts.
-- **Enrich claim/backoff guardrail (2026-06-11)**: the enrich cron now claims work in Postgres before LLM calls and stores retry state on `items`. This closes the gap where overlapping cron/manual backfill runs could all select the same `enriched_at IS NULL` rows and waste spend even if the final write was idempotent.
+- **Enrich claim/backoff guardrail (2026-06-11)**: the enrich cron now claims work in the DB before LLM calls and stores retry state on `items`. This closes the gap where overlapping cron/manual backfill runs could all select the same `enriched_at IS NULL` rows and waste spend even if the final write was idempotent.
 - **AI HOT integration (2026-05-08, voice refreshed 2026-06-10)**: added pre-curated source `aihot-selected` (kind `aihot-api`) ingesting hourly from https://aihot.virxact.com; merge their structured `/api/public/daily` report into our daily column generator as a must-cover baseline (`newsletters.aihot_daily_payload` + `aihot_daily_date`). Voice prompts now target a friend-sharing style: plain, useful, accurate, and low on AI/memo flavor. Historical design record: [`docs/aihot-integration/PLAN.md`](../aihot-integration/PLAN.md); this section is the current runtime summary. New env vars: `AIHOT_API_BASE_URL` + `AIHOT_API_USER_AGENT` (both with safe defaults). Operator scripts: `scripts/ops/backfill-style.ts` (cost-bounded re-enrich), `scripts/ops/import-aihot-daily-history.ts` (180-day daily history import), and `scripts/ops/repair-aihot-daily-windows.ts` (dry-run-first cleanup for legacy placeholder rows whose period windows predate the shared 05:00Z helper).
 - **Tier-gated commentary (2026-05-08, PR #34)**: Stage-4 commentary now branches by tier instead of running the full schema for every non-excluded item. `editor_note_*` (一句话点评) runs for every non-excluded item / event; `editor_analysis_*` **only** runs for the `HIGHLIGHT_ITEM_TIERS` subset (`featured` / `p1`). Tier `all` items take the lighter `commentaryNoteSchema` LLM call (`COMMENTARY_NOTE_ONLY_SYSTEM`, ~85% smaller output). Cluster commentary path also extended to cover `event_tier='all'`. Worker dispatch in `workers/enrich/commentary.ts` + `workers/cluster/commentary.ts`; backfill mirror in `scripts/ops/backfill-style.ts`.
 - **Editorial taxonomy rebrand + home default flip (2026-05-08, PR #35)**: `editor_analysis_*` rebranded `深度解读` → `锐评` with 200 字 hard cap (was 300-500 字 / 800 ceiling); `summary_*` tightened from 120-220 字 multi-sentence to 50-90 字 一句话总结; UI label `编辑点评` → `一句话点评`. Three layered editorial outputs now have crisp role separation — see policy spec `modules/feed/runtime/policy/skills/editorial.skill.md` § "Editorial taxonomy". Concurrently the homepage default flipped from multi-day "3 stories per day" digest to today's hot events (importance-sorted hot-window); daily digest reachable via `?view=daily` toggle in HomeFilters. `maxTokens` dropped 6144 → 3072 in commentary workers (200-字 fits comfortably). DB columns unchanged — only prompts, UI labels, and worker token budgets shifted. Editorial policy bumped to v2 in `policy_versions` table to make the new commentary_at threshold actionable for backfills.

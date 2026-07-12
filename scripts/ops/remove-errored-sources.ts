@@ -43,7 +43,7 @@ async function main() {
   const itemCounts = await client
     .select({
       sourceId: items.sourceId,
-      n: sql<number>`count(*)::int`,
+      n: sql<number>`count(*)`,
     })
     .from(items)
     .where(inArray(items.sourceId, [...DELETE_IDS, ...DISABLE_IDS]))
@@ -72,7 +72,7 @@ async function main() {
   }
 
   // 1) Delete health rows first (FK has ON DELETE CASCADE so this is defensive
-  //    — makes the log cleaner if anyone tails postgres during the migration).
+  //    — makes the log cleaner if anyone tails the DB during the migration).
   await client
     .delete(sourceHealth)
     .where(inArray(sourceHealth.sourceId, DELETE_IDS));
@@ -104,10 +104,10 @@ async function main() {
 
   // Summary
   const [remaining] = await client
-    .select({ n: sql<number>`count(*)::int` })
+    .select({ n: sql<number>`count(*)` })
     .from(sources);
   const [enabled] = await client
-    .select({ n: sql<number>`count(*)::int` })
+    .select({ n: sql<number>`count(*)` })
     .from(sources)
     .where(eq(sources.enabled, true));
   console.log(

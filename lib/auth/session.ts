@@ -9,7 +9,6 @@
  * mutating user-owned data.
  */
 import { cookies } from "next/headers";
-import { sql } from "drizzle-orm";
 import { db, schema } from "@/db/client";
 import {
   ADMIN_SESSION_COOKIE,
@@ -88,7 +87,7 @@ export async function upsertAppUser(
       set: {
         email: user.email,
         role: user.isAdmin ? USER_ADMIN_ROLE : USER_READER_ROLE,
-        updatedAt: sql`now()`,
+        updatedAt: new Date(),
       },
     });
 }

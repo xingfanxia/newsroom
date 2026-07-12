@@ -31,7 +31,7 @@ export async function listCollections(userId: string): Promise<SavedCollection[]
       pinned: savedCollections.pinned,
       sortOrder: savedCollections.sortOrder,
       createdAt: savedCollections.createdAt,
-      count: sql<number>`count(${feedback.id})::int`,
+      count: sql<number>`count(${feedback.id})`,
     })
     .from(savedCollections)
     .leftJoin(
@@ -71,7 +71,7 @@ export async function listCollections(userId: string): Promise<SavedCollection[]
 /** Count of uncategorized (inbox) saves for a user. */
 export async function getInboxCount(userId: string): Promise<number> {
   const [row] = await db()
-    .select({ n: sql<number>`count(*)::int` })
+    .select({ n: sql<number>`count(*)` })
     .from(feedback)
     .where(
       and(

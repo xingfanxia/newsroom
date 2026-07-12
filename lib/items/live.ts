@@ -52,7 +52,7 @@ export type FeedQuery = {
   includeSourceGroup?: boolean;
   /** Case-insensitive substring match against title + both-locale
    *  title/summary columns. Used by /api/v1/search lexical mode. Raw
-   *  input is passed to ILIKE without escaping, so callers who need
+   *  input is passed to LIKE without escaping, so callers who need
    *  literal `%` or `_` should pre-escape (v1 behavior; ok for keyword
    *  search, revisit if power-user wildcards cause surprises). */
   searchText?: string;
@@ -60,7 +60,7 @@ export type FeedQuery = {
    *  nav tab — operator hand-picks publishers worth surfacing even if the
    *  scorer's tier is low. */
   curatedOnly?: boolean;
-  /** Drop any source whose tags overlap this list. Postgres `&&` overlap operator. */
+  /** Drop any source whose tags overlap this list (JSON-array containment). */
   excludeSourceTags?: string[];
   /** Inverse of excludeSourceTags — only return items whose source tags overlap this list. */
   includeSourceTags?: string[];
@@ -167,27 +167,32 @@ function buildFeedWhere(q: FeedQuery) {
   //            (a relative `> now() - 24h` window would drop it after lunch).
   //            Same tier filter still gates quality.
   //   explicit date filter (q.date / q.dateFrom/dateTo) overrides view.
+  // Timestamps are integer ms epoch (Turso migration) — day boundaries are
+  // computed in JS (UTC-aligned) and bound as numbers.
+  const startOfTodayMs = Date.now() - (Date.now() % 86_400_000);
   const dateFilter = q.date
-    ? sql`${items.publishedAt} >= ${`${q.date}T00:00:00Z`}::timestamptz AND ${items.publishedAt} < ${`${q.date}T00:00:00Z`}::timestamptz + interval '1 day'`
+    ? sql`${items.publishedAt} >= ${Date.parse(`${q.date}T00:00:00Z`)} AND ${items.publishedAt} < ${Date.parse(`${q.date}T00:00:00Z`) + 86_400_000}`
     : q.dateFrom || q.dateTo
-      ? sql`${items.publishedAt} >= ${q.dateFrom ?? "1970-01-01"}::timestamptz AND ${items.publishedAt} < ${q.dateTo ?? "2999-01-01"}::timestamptz`
+      ? sql`${items.publishedAt} >= ${Date.parse(q.dateFrom ?? "1970-01-01")} AND ${items.publishedAt} < ${Date.parse(q.dateTo ?? "2999-01-01")}`
       : view === "today"
         ? sql`(
-            ${clusters.firstSeenAt} >= date_trunc('day', now())
-            OR ${clusters.latestMemberAt} > now() - make_interval(hours => ${hotH})
-            OR ${items.publishedAt} >= date_trunc('day', now() - interval '1 day')
+            ${clusters.firstSeenAt} >= ${startOfTodayMs}
+            OR ${clusters.latestMemberAt} > ${Date.now() - hotH * 3_600_000}
+            OR ${items.publishedAt} >= ${startOfTodayMs - 86_400_000}
           )`
         : sql`TRUE`;
 
+  // SQLite LIKE is ASCII-case-insensitive by default (matches the old pg
+  // ILIKE behavior for en; CJK has no case so zh is unaffected).
   const searchFilter = q.searchText
     ? sql`(
-        ${items.title} ILIKE ${`%${q.searchText}%`} OR
-        ${items.titleZh} ILIKE ${`%${q.searchText}%`} OR
-        ${items.titleEn} ILIKE ${`%${q.searchText}%`} OR
-        ${items.summaryZh} ILIKE ${`%${q.searchText}%`} OR
-        ${items.summaryEn} ILIKE ${`%${q.searchText}%`} OR
-        ${clusters.canonicalTitleZh} ILIKE ${`%${q.searchText}%`} OR
-        ${clusters.canonicalTitleEn} ILIKE ${`%${q.searchText}%`}
+        ${items.title} LIKE ${`%${q.searchText}%`} OR
+        ${items.titleZh} LIKE ${`%${q.searchText}%`} OR
+        ${items.titleEn} LIKE ${`%${q.searchText}%`} OR
+        ${items.summaryZh} LIKE ${`%${q.searchText}%`} OR
+        ${items.summaryEn} LIKE ${`%${q.searchText}%`} OR
+        ${clusters.canonicalTitleZh} LIKE ${`%${q.searchText}%`} OR
+        ${clusters.canonicalTitleEn} LIKE ${`%${q.searchText}%`}
       )`
     : sql`TRUE`;
 
@@ -195,23 +200,28 @@ function buildFeedWhere(q: FeedQuery) {
     ? sql`${sources.curated} = TRUE`
     : sql`TRUE`;
 
-  // Drizzle binds a JS array via `${arr}` as a tuple `($1, $2)`, not a Postgres
-  // ARRAY literal — that produces `ARRAY['x'] && ($1, $2)::text[]` which the
-  // planner rejects. Build the array explicitly with sql.join.
+  // sources.tags is a JSON-text array (Turso migration) — overlap tests run
+  // through json_each instead of the old Postgres `&&` operator.
   const excludeTagsFilter =
     q.excludeSourceTags && q.excludeSourceTags.length > 0
-      ? sql`NOT (${sources.tags} && ARRAY[${sql.join(
-          q.excludeSourceTags.map((t) => sql`${t}`),
-          sql`, `,
-        )}]::text[])`
+      ? sql`NOT EXISTS (
+          SELECT 1 FROM json_each(${sources.tags})
+          WHERE json_each.value IN (${sql.join(
+            q.excludeSourceTags.map((t) => sql`${t}`),
+            sql`, `,
+          )})
+        )`
       : sql`TRUE`;
 
   const includeTagsFilter =
     q.includeSourceTags && q.includeSourceTags.length > 0
-      ? sql`${sources.tags} && ARRAY[${sql.join(
-          q.includeSourceTags.map((t) => sql`${t}`),
-          sql`, `,
-        )}]::text[]`
+      ? sql`EXISTS (
+          SELECT 1 FROM json_each(${sources.tags})
+          WHERE json_each.value IN (${sql.join(
+            q.includeSourceTags.map((t) => sql`${t}`),
+            sql`, `,
+          )})
+        )`
       : sql`TRUE`;
 
   // Effective-importance threshold. Cluster importance (Stage D) wins when
@@ -227,7 +237,7 @@ function buildFeedWhere(q: FeedQuery) {
       ? q.recentDayRescueDays != null && q.recentDayRescueDays > 0
         ? sql`(
             COALESCE(${clusters.importance}, ${items.importance}) >= ${q.minImportance}
-            OR ${items.publishedAt} >= date_trunc('day', now() - make_interval(days => ${q.recentDayRescueDays - 1}))
+            OR ${items.publishedAt} >= ${startOfTodayMs - (q.recentDayRescueDays - 1) * 86_400_000}
           )`
         : sql`COALESCE(${clusters.importance}, ${items.importance}) >= ${q.minImportance}`
       : sql`TRUE`;
@@ -269,8 +279,10 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
   // a few important stories per day instead of multiple mid-tier items
   // competing for attention.
   const useDayCap = q.maxPerDay != null && q.maxPerDay > 0;
+  // Day bucketing: publishedAt is integer ms epoch, so UTC-day = floor
+  // division by 86,400,000 — replaces to_char(... AT TIME ZONE 'UTC').
   const orderExpr = useDayCap
-    ? sql`to_char(${items.publishedAt} AT TIME ZONE 'UTC', 'YYYY-MM-DD') DESC,
+    ? sql`CAST(${items.publishedAt} / 86400000 AS INTEGER) DESC,
           COALESCE(${clusters.importance}, ${items.importance}) DESC,
           ${items.publishedAt} DESC`
     : sql`${items.publishedAt} DESC, COALESCE(${clusters.importance}, ${items.importance}) DESC`;
@@ -393,7 +405,7 @@ export async function getEventMembers(
 export async function countFeaturedStories(q: FeedQuery = {}): Promise<number> {
   const client = db();
   const [row] = await client
-    .select({ c: sql<number>`count(*)::int` })
+    .select({ c: sql<number>`count(*)` })
     .from(items)
     .innerJoin(sources, eq(items.sourceId, sources.id))
     .leftJoin(clusters, eq(items.clusterId, clusters.id))

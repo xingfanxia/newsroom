@@ -136,7 +136,9 @@ export async function runEventCommentaryBatch(
 
 function commentaryRecencyFilter(opts: EventCommentaryBatchOptions) {
   if (opts.recencyHours == null) return sql`true`;
-  return sql`COALESCE(${clusters.latestMemberAt}, ${clusters.firstSeenAt}) >= now() - make_interval(hours => ${opts.recencyHours})`;
+  // ms-epoch INTEGER columns: compare against Date.now() minus the window in ms
+  // (was now() - make_interval(hours => N) under Postgres).
+  return sql`COALESCE(${clusters.latestMemberAt}, ${clusters.firstSeenAt}) >= ${Date.now()} - ${opts.recencyHours * 3_600_000}`;
 }
 
 interface ClusterCandidate {

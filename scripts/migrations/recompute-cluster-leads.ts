@@ -54,7 +54,23 @@ async function main() {
 
   // Pull all multi-member clusters + their members + source group/priority +
   // canonical titles. One round-trip — fast enough for ~500 clusters.
-  const rows = (await client.execute(sql`
+  // titled_at / published_at are INTEGER ms epoch columns; raw SQL returns
+  // them as numbers (drizzle's timestamp_ms Date mapping only applies to the
+  // ORM select surface, not client.all).
+  const rows = await client.all<{
+    cluster_id: number;
+    current_lead: number;
+    canonical_title_zh: string | null;
+    canonical_title_en: string | null;
+    titled_at: number | null;
+    item_id: number;
+    importance: number | null;
+    published_at: number;
+    source_group: string;
+    source_priority: number;
+    source_id: string;
+    source_name: string;
+  }>(sql`
     SELECT
       c.id AS cluster_id,
       c.lead_item_id AS current_lead,
@@ -73,20 +89,7 @@ async function main() {
     JOIN sources s ON s.id = i.source_id
     WHERE c.member_count >= 2
     ORDER BY c.id, i.id
-  `)) as unknown as Array<{
-    cluster_id: number;
-    current_lead: number;
-    canonical_title_zh: string | null;
-    canonical_title_en: string | null;
-    titled_at: string | null;
-    item_id: number;
-    importance: number | null;
-    published_at: string;
-    source_group: string;
-    source_priority: number;
-    source_id: string;
-    source_name: string;
-  }>;
+  `);
 
   // Group rows into clusters.
   type Cluster = {
@@ -94,13 +97,13 @@ async function main() {
     currentLead: number;
     titleZh: string | null;
     titleEn: string | null;
-    titledAt: string | null;
+    titledAt: number | null;
     members: Array<{
       itemId: number;
       sourceGroup: SourceGroup;
       sourcePriority: number;
       importance: number | null;
-      publishedAt: string;
+      publishedAt: Date;
       sourceId: string;
       sourceName: string;
     }>;
@@ -124,7 +127,8 @@ async function main() {
       sourceGroup: r.source_group as SourceGroup,
       sourcePriority: r.source_priority,
       importance: r.importance,
-      publishedAt: r.published_at,
+      // ms epoch → Date; pickBestLead accepts Date | string.
+      publishedAt: new Date(r.published_at),
       sourceId: r.source_id,
       sourceName: r.source_name,
     });

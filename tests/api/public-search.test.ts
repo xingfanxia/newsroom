@@ -27,5 +27,7 @@ describe("/api/public/search", () => {
     expect(widerBody.items.length).toBe(2);
     expect(firstBody.total).toBe(widerBody.total);
     expect(firstBody.total).toBeGreaterThan(firstBody.items.length);
-  });
+    // 20s: two sequential remote lexical scans (LIKE %…% is unindexable);
+    // fine at prod's co-located RTT, tight from a dev machine.
+  }, 20_000);
 });

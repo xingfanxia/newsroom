@@ -1,18 +1,13 @@
 import { sql } from "drizzle-orm";
 import {
-  pgTable,
+  sqliteTable,
   text,
-  timestamp,
   integer,
-  jsonb,
-  boolean,
-  pgEnum,
+  real,
   uniqueIndex,
   index,
-  serial,
   customType,
-  numeric,
-} from "drizzle-orm/pg-core";
+} from "drizzle-orm/sqlite-core";
 import {
   CADENCES,
   FEEDBACK_VOTES,
@@ -29,129 +24,140 @@ import type {
   Cadence as TCadence,
 } from "@/lib/types";
 
-// ── Custom pgvector halfvec type ────────────────────────────────
-// pgvector 0.8+ supports halfvec (fp16) with HNSW indexes up to 4000 dims,
-// which lets us store text-embedding-3-large's native 3072-dim output
-// without Matryoshka truncation. Same storage as vector(1536) at 6144 bytes.
+// ── Storage conventions (Turso libSQL / SQLite — NEWSROOM-TURSO 2026-07-11) ──
+// Replaced Supabase Postgres. Mappings from the old pg-core schema:
+//   timestamptz  → INTEGER ms epoch (drizzle `timestamp_ms` mode ⇄ JS Date)
+//   jsonb        → TEXT JSON (drizzle `json` mode)
+//   boolean      → INTEGER 0/1 (drizzle `boolean` mode)
+//   serial       → INTEGER PRIMARY KEY AUTOINCREMENT
+//   numeric      → REAL
+//   text[]       → TEXT JSON array
+//   pg enums     → TEXT with drizzle enum typing (no DB-level CHECK)
+//   halfvec(3072)→ F32_BLOB(3072) — libSQL native vector (see below)
 
-/** Encode number[] into pgvector text format. Rejects non-finite cells. */
-export function halfvecToDriver(value: number[]): string {
+/** DB-side default: current time as integer ms epoch (sub-second precision). */
+const nowMs = sql`(CAST(unixepoch('subsec') * 1000 AS INTEGER))`;
+
+// ── Custom libSQL vector type ───────────────────────────────────
+// libSQL native vector search replaces pgvector. F32_BLOB(3072) stores
+// text-embedding-3-large's native 3072-dim output as little-endian float32
+// (12,288 bytes/row). We bind raw Float32Array buffers on write — a raw
+// F32 blob IS a valid vector literal, and this sidesteps the drizzle
+// customType + vector32() template bug (drizzle-orm #3899). The DiskANN
+// index (`items_embedding_idx`) can't be expressed by drizzle-kit; it is
+// created by scripts/ops/db-create-vector-index.ts — rerun it after any
+// schema push (drizzle-kit also false-diffs custom-typed columns, #3047:
+// NEVER let a push drop/recreate the embedding column).
+
+/** Encode number[] as a raw little-endian F32 blob. Rejects non-finite cells. */
+export function embeddingToDriver(value: number[]): Buffer {
   for (const n of value) {
     if (!Number.isFinite(n)) {
-      throw new Error("halfvec: non-finite cell in input");
+      throw new Error("embedding: non-finite cell in input");
+    }
+  }
+  return Buffer.from(new Float32Array(value).buffer);
+}
+
+/** Decode an F32 blob (Buffer/ArrayBuffer/Uint8Array) back to number[]. */
+export function embeddingFromDriver(value: unknown): number[] {
+  if (value instanceof ArrayBuffer) {
+    return Array.from(new Float32Array(value));
+  }
+  if (ArrayBuffer.isView(value)) {
+    // Node Buffers can be views into a pooled ArrayBuffer — slice by
+    // byteOffset/byteLength or we'd read neighboring allocations.
+    const v = value as Uint8Array;
+    return Array.from(
+      new Float32Array(v.buffer, v.byteOffset, v.byteLength / 4),
+    );
+  }
+  return value as number[];
+}
+
+/** JSON-array text form — what vector32(?) / vector_top_k(?) params expect. */
+export function embeddingToVectorText(value: number[]): string {
+  for (const n of value) {
+    if (!Number.isFinite(n)) {
+      throw new Error("embedding: non-finite cell in input");
     }
   }
   return `[${value.join(",")}]`;
 }
 
-/** Decode pgvector text format to number[]. Rejects any non-finite cell. */
-export function halfvecFromDriver(value: unknown): number[] {
-  if (typeof value !== "string") return value as unknown as number[];
-  const trimmed =
-    value.startsWith("[") && value.endsWith("]") ? value.slice(1, -1) : value;
-  if (trimmed.length === 0) return [];
-  return trimmed.split(",").map((raw) => {
-    const cell = raw.trim();
-    if (cell === "") {
-      throw new Error("halfvec: empty cell in embedding");
-    }
-    const n = Number(cell);
-    if (!Number.isFinite(n)) {
-      throw new Error(
-        `halfvec: non-finite cell in embedding (input="${cell.slice(0, 40)}")`,
-      );
-    }
-    return n;
-  });
-}
-
-export const halfvec = customType<{
+export const float32Vector = customType<{
   data: number[];
-  driverData: string;
+  driverData: Buffer;
   config: { dimensions: number };
 }>({
   dataType(config) {
     if (!config?.dimensions) {
-      throw new Error("halfvec requires `dimensions`");
+      throw new Error("float32Vector requires `dimensions`");
     }
-    return `halfvec(${config.dimensions})`;
+    return `F32_BLOB(${config.dimensions})`;
   },
   fromDriver(value): number[] {
-    return halfvecFromDriver(value);
+    return embeddingFromDriver(value);
   },
-  toDriver(value: number[]): string {
-    return halfvecToDriver(value);
+  toDriver(value: number[]): Buffer {
+    return embeddingToDriver(value);
   },
 });
 
-// ── Enums ───────────────────────────────────────────────────────
-export const sourceKindEnum = pgEnum("source_kind", SOURCE_KINDS);
-
-export const sourceGroupEnum = pgEnum("source_group", SOURCE_GROUPS);
-
-export const localeEnum = pgEnum("locale_kind", SOURCE_LOCALES);
-
-export const cadenceEnum = pgEnum("cadence", CADENCES);
-
-export const healthStatusEnum = pgEnum("health_status", SOURCE_HEALTH_STATUSES);
-
-/** App-level role. `admin` sees /admin/*, `editor` reserved for future authoring
- *  tools, `reader` is the default for anyone who signs in. */
-export const userRoleEnum = pgEnum("user_role", USER_ROLES);
-
-/** Feedback vote kind. `up` / `down` are mutually exclusive per (item, user);
- *  `save` is an independent bookmark slot that can coexist with either. */
-export const feedbackVoteEnum = pgEnum("feedback_vote", FEEDBACK_VOTES);
-
-export const iterationStatusEnum = pgEnum("iteration_status", ITERATION_STATUSES);
-
 // ── Tables ──────────────────────────────────────────────────────
 
-export const sources = pgTable(
+export const sources = sqliteTable(
   "sources",
   {
     id: text("id").primaryKey(),
     nameEn: text("name_en").notNull(),
     nameZh: text("name_zh").notNull(),
     url: text("url").notNull(),
-    kind: sourceKindEnum("kind").notNull(),
-    group: sourceGroupEnum("group").notNull(),
-    locale: localeEnum("locale").notNull(),
-    cadence: cadenceEnum("cadence").notNull(),
+    kind: text("kind", { enum: SOURCE_KINDS }).notNull(),
+    group: text("group", { enum: SOURCE_GROUPS }).notNull(),
+    locale: text("locale", { enum: SOURCE_LOCALES }).notNull(),
+    cadence: text("cadence", { enum: CADENCES }).notNull(),
     priority: integer("priority").notNull().default(2),
-    tags: text("tags").array().notNull().default(sql`ARRAY[]::text[]`),
-    enabled: boolean("enabled").notNull().default(true),
+    tags: text("tags", { mode: "json" })
+      .$type<string[]>()
+      .notNull()
+      .default(sql`'[]'`),
+    enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
     /** Operator-opted-in sources (community digests, hand-picked YouTube
      *  channels, etc.) get a tier floor of "all" regardless of scorer verdict.
      *  Scorer still runs for importance/HKR, but never forces "excluded".
      *  Replaces the previous hardcoded `*-yt` check in workers/enrich. */
-    neverExclude: boolean("never_exclude").notNull().default(false),
+    neverExclude: integer("never_exclude", { mode: "boolean" })
+      .notNull()
+      .default(false),
     /** Hand-picked sources surfaced on the "AX 严选 / curated" nav tab.
      *  Distinct from `never_exclude` on purpose: never_exclude is a pipeline
      *  behavior (tier floor at scorer), curated is a UI-level opt-in for the
      *  editorial picks tab. YouTube channels stay on /podcasts so they don't
      *  need this flag; newsletters/digests worth surfacing do. */
-    curated: boolean("curated").notNull().default(false),
+    curated: integer("curated", { mode: "boolean" }).notNull().default(false),
     notes: text("notes"),
-    createdAt: timestamp("created_at", { withTimezone: true })
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
-      .defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .default(nowMs),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
       .notNull()
-      .defaultNow(),
+      .default(nowMs),
   },
   (t) => ({
     cadenceIdx: index("sources_cadence_idx").on(t.cadence, t.enabled),
   }),
 );
 
-export const sourceHealth = pgTable("source_health", {
+export const sourceHealth = sqliteTable("source_health", {
   sourceId: text("source_id")
     .primaryKey()
     .references(() => sources.id, { onDelete: "cascade" }),
-  status: healthStatusEnum("status").notNull().default("pending"),
-  lastFetchedAt: timestamp("last_fetched_at", { withTimezone: true }),
-  lastSuccessAt: timestamp("last_success_at", { withTimezone: true }),
+  status: text("status", { enum: SOURCE_HEALTH_STATUSES })
+    .notNull()
+    .default("pending"),
+  lastFetchedAt: integer("last_fetched_at", { mode: "timestamp_ms" }),
+  lastSuccessAt: integer("last_success_at", { mode: "timestamp_ms" }),
   lastError: text("last_error"),
   consecutiveFailures: integer("consecutive_failures").notNull().default(0),
   lastItemsCount: integer("last_items_count").notNull().default(0),
@@ -161,27 +167,28 @@ export const sourceHealth = pgTable("source_health", {
    *  tweets. Other adapters (RSS/atom/scrape) ignore this — their dedup runs
    *  via raw_items unique(source, external). */
   lastExternalId: text("last_external_id"),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
     .notNull()
-    .defaultNow(),
+    .default(nowMs),
 });
 
-export const rawItems = pgTable(
+export const rawItems = sqliteTable(
   "raw_items",
   {
-    id: serial("id").primaryKey(),
+    id: integer("id").primaryKey({ autoIncrement: true }),
     sourceId: text("source_id")
       .notNull()
       .references(() => sources.id, { onDelete: "cascade" }),
     externalId: text("external_id").notNull(),
     url: text("url"),
     title: text("title"),
-    rawPayload: jsonb("raw_payload").notNull(),
-    publishedAt: timestamp("published_at", { withTimezone: true }),
-    fetchedAt: timestamp("fetched_at", { withTimezone: true })
+    publishedAt: integer("published_at", { mode: "timestamp_ms" }),
+    fetchedAt: integer("fetched_at", { mode: "timestamp_ms" })
       .notNull()
-      .defaultNow(),
-    normalizedAt: timestamp("normalized_at", { withTimezone: true }),
+      .default(nowMs),
+    normalizedAt: integer("normalized_at", { mode: "timestamp_ms" }),
+    /** Large JSON payload — stays LAST (see items note on SQLite row layout). */
+    rawPayload: text("raw_payload", { mode: "json" }).notNull(),
   },
   (t) => ({
     uniqExternal: uniqueIndex("raw_items_source_external_idx").on(
@@ -207,19 +214,19 @@ export const rawItems = pgTable(
  * name stays `clusters` to preserve the existing `items.cluster_id` FK
  * without a rename migration.
  */
-export const clusters = pgTable(
+export const clusters = sqliteTable(
   "clusters",
   {
-    id: serial("id").primaryKey(),
+    id: integer("id").primaryKey({ autoIncrement: true }),
     /** Canonical lead item shown in the timeline. No FK constraint (circular dep). */
     leadItemId: integer("lead_item_id").notNull(),
     memberCount: integer("member_count").notNull().default(1),
     /** Inception — day the event broke. Archive anchor. */
-    firstSeenAt: timestamp("first_seen_at", { withTimezone: true })
+    firstSeenAt: integer("first_seen_at", { mode: "timestamp_ms" })
       .notNull()
-      .defaultNow(),
+      .default(nowMs),
     /** Last time a new member joined or Stage B rearbitrated. Trending-now anchor. */
-    latestMemberAt: timestamp("latest_member_at", { withTimezone: true }),
+    latestMemberAt: integer("latest_member_at", { mode: "timestamp_ms" }),
     /** Cached coverage count — mirrors member_count for now but kept
      *  distinct to leave room for future weighting (e.g. corroborating
      *  vs primary, if we ever add role annotation). */
@@ -229,7 +236,7 @@ export const clusters = pgTable(
     canonicalTitleEn: text("canonical_title_en"),
     /** Last time canonical_title_* was regenerated. Used to throttle
      *  regen when membership grows slowly. */
-    titledAt: timestamp("titled_at", { withTimezone: true }),
+    titledAt: integer("titled_at", { mode: "timestamp_ms" }),
     // ── Event-level summaries (copied from lead on migration; regenerated on multi-member change) ──
     summaryZh: text("summary_zh"),
     summaryEn: text("summary_en"),
@@ -238,17 +245,17 @@ export const clusters = pgTable(
     editorNoteEn: text("editor_note_en"),
     editorAnalysisZh: text("editor_analysis_zh"),
     editorAnalysisEn: text("editor_analysis_en"),
-    commentaryAt: timestamp("commentary_at", { withTimezone: true }),
+    commentaryAt: integer("commentary_at", { mode: "timestamp_ms" }),
     // ── Event importance + tier (computed from members + coverage boost) ──
     importance: integer("importance"),
     /** featured | p1 | all | excluded — matches items.tier semantics but event-level. */
     eventTier: text("event_tier"),
-    hkr: jsonb("hkr"),
+    hkr: text("hkr", { mode: "json" }),
     // ── Stage B verdict lock — prevents Stage A from reshuffling LLM-confirmed membership. ──
-    verifiedAt: timestamp("verified_at", { withTimezone: true }),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
+    verifiedAt: integer("verified_at", { mode: "timestamp_ms" }),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
       .notNull()
-      .defaultNow(),
+      .default(nowMs),
   },
   (t) => ({
     firstSeenIdx: index("clusters_first_seen_at_idx").on(t.firstSeenAt),
@@ -260,10 +267,10 @@ export const clusters = pgTable(
   }),
 );
 
-export const items = pgTable(
+export const items = sqliteTable(
   "items",
   {
-    id: serial("id").primaryKey(),
+    id: integer("id").primaryKey({ autoIncrement: true }),
     sourceId: text("source_id")
       .notNull()
       .references(() => sources.id, { onDelete: "cascade" }),
@@ -271,24 +278,17 @@ export const items = pgTable(
       .notNull()
       .references(() => rawItems.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
-    /** RSS-derived body — often just the description snippet. Kept as the
-     *  fallback when full-article fetch fails or is paywalled. */
-    body: text("body").notNull(),
-    /** Full article markdown from Jina Reader (r.jina.ai). Populated after
-     *  normalize, before enrich. Null while pending fetch or if fetch failed.
-     *  Truncate reads to ~8K chars before passing to the LLM. */
-    bodyMd: text("body_md"),
     /** Last time we attempted to fetch bodyMd (success or failure).
      *  Used to avoid re-fetching in a tight loop. */
-    bodyFetchedAt: timestamp("body_fetched_at", { withTimezone: true }),
+    bodyFetchedAt: integer("body_fetched_at", { mode: "timestamp_ms" }),
     url: text("url").notNull(),
     canonicalUrl: text("canonical_url").notNull(),
     contentHash: text("content_hash").notNull(),
     author: text("author"),
-    publishedAt: timestamp("published_at", { withTimezone: true }).notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true })
+    publishedAt: integer("published_at", { mode: "timestamp_ms" }).notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
-      .defaultNow(),
+      .default(nowMs),
     // ── Enrichment (M2) ──
     /** Bilingual titles — LLM-translated during enrichment. Old rows may be null,
      *  UI falls back to the raw `title` field when missing. */
@@ -300,19 +300,19 @@ export const items = pgTable(
     /** featured | all | p1 | excluded */
     tier: text("tier"),
     /** { capabilities: string[], entities: string[], topics: string[] } */
-    tags: jsonb("tags"),
+    tags: text("tags", { mode: "json" }),
     /** HKR rubric: { h: boolean, k: boolean, r: boolean }. Stored per-item so
      *  the UI can render per-axis chips and the agent can trend it over time. */
-    hkr: jsonb("hkr"),
+    hkr: text("hkr", { mode: "json" }),
     /** Legacy single-lang reasoning (pre-bilingual). Kept as a fallback for
      *  older rows that haven't been re-scored yet. */
     reasoning: text("reasoning"),
     reasoningZh: text("reasoning_zh"),
     reasoningEn: text("reasoning_en"),
-    enrichedAt: timestamp("enriched_at", { withTimezone: true }),
+    enrichedAt: integer("enriched_at", { mode: "timestamp_ms" }),
     /** Claim/backoff guard for the enrich worker. Prevents overlapping cron
      * invocations from spending LLM calls on the same unenriched row. */
-    enrichClaimedAt: timestamp("enrich_claimed_at", { withTimezone: true }),
+    enrichClaimedAt: integer("enrich_claimed_at", { mode: "timestamp_ms" }),
     enrichAttempts: integer("enrich_attempts").notNull().default(0),
     enrichError: text("enrich_error"),
     policyVersion: text("policy_version"),
@@ -323,17 +323,28 @@ export const items = pgTable(
     /** 3-5 paragraph markdown analysis (≤900 words). */
     editorAnalysisZh: text("editor_analysis_zh"),
     editorAnalysisEn: text("editor_analysis_en"),
-    commentaryAt: timestamp("commentary_at", { withTimezone: true }),
+    commentaryAt: integer("commentary_at", { mode: "timestamp_ms" }),
     // ── Clustering (M2) ──
-    embedding: halfvec("embedding", { dimensions: 3072 }),
     clusterId: integer("cluster_id").references(() => clusters.id, {
       onDelete: "set null",
     }),
-    clusteredAt: timestamp("clustered_at", { withTimezone: true }),
+    clusteredAt: integer("clustered_at", { mode: "timestamp_ms" }),
     /** Stage B (LLM arbitration) verdict lock. When set, Stage A
      *  embedding-based clustering will skip this item as a neighbor
      *  candidate — its cluster assignment has been LLM-confirmed. */
-    clusterVerifiedAt: timestamp("cluster_verified_at", { withTimezone: true }),
+    clusterVerifiedAt: integer("cluster_verified_at", { mode: "timestamp_ms" }),
+    // ── Large payloads — MUST STAY LAST (SQLite inlines them in the row;
+    // reading any column stored AFTER a big value walks its overflow pages,
+    // so a filter on e.g. cluster_id placed after these would drag ~45KB per
+    // row through the page cache — measured 29s vs ~ms for a 21k-row scan).
+    /** RSS-derived body — often just the description snippet. Kept as the
+     *  fallback when full-article fetch fails or is paywalled. */
+    body: text("body").notNull(),
+    /** Full article markdown from Jina Reader (r.jina.ai). Populated after
+     *  normalize, before enrich. Null while pending fetch or if fetch failed.
+     *  Truncate reads to ~8K chars before passing to the LLM. */
+    bodyMd: text("body_md"),
+    embedding: float32Vector("embedding", { dimensions: 3072 }),
   },
   (t) => ({
     contentHashIdx: uniqueIndex("items_content_hash_idx").on(t.contentHash),
@@ -354,6 +365,18 @@ export const items = pgTable(
       .on(t.clusteredAt)
       .where(sql`${t.clusteredAt} IS NULL AND ${t.embedding} IS NOT NULL`),
     clusterIdx: index("items_cluster_idx").on(t.clusterId, t.publishedAt),
+    /** Covering index for the feed WHERE shape (buildFeedWhere +
+     *  countFeaturedStories): lets SQLite scan the index instead of the
+     *  fat table rows. Column set must cover every items column those
+     *  queries filter/join on. */
+    feedCoverIdx: index("items_feed_cover_idx").on(
+      t.enrichedAt,
+      t.importance,
+      t.tier,
+      t.clusterId,
+      t.sourceId,
+      t.publishedAt,
+    ),
     /** Pending Stage B — items the arbitrator hasn't seen yet. */
     clusterVerifiedIdx: index("items_cluster_verified_idx")
       .on(t.clusterVerifiedAt)
@@ -366,16 +389,16 @@ export const items = pgTable(
  * period_start). Generated by a Pro-grade agent reading all items from the
  * window; surfaced via /api/feed/newsletter/rss.xml and the /newsletter page.
  */
-export const newsletters = pgTable(
+export const newsletters = sqliteTable(
   "newsletters",
   {
-    id: serial("id").primaryKey(),
+    id: integer("id").primaryKey({ autoIncrement: true }),
     /** 'daily' | 'monthly' */
     kind: text("kind").notNull(),
     /** 'zh' | 'en' */
     locale: text("locale").notNull(),
-    periodStart: timestamp("period_start", { withTimezone: true }).notNull(),
-    periodEnd: timestamp("period_end", { withTimezone: true }).notNull(),
+    periodStart: integer("period_start", { mode: "timestamp_ms" }).notNull(),
+    periodEnd: integer("period_end", { mode: "timestamp_ms" }).notNull(),
     /** Legacy structured-digest fields — populated for monthly newsletter
      *  format. New daily-column rows leave these NULL and write column_*
      *  instead. Nullable so daily writer can omit. */
@@ -396,21 +419,23 @@ export const newsletters = pgTable(
      *  subheadings, references summary entries as 第 N 件. */
     columnNarrativeMd: text("column_narrative_md"),
     /** Daily column — 1-3 item IDs given deep treatment in narrative_md. */
-    columnFeaturedItemIds: jsonb("column_featured_item_ids").$type<number[]>(),
+    columnFeaturedItemIds: text("column_featured_item_ids", {
+      mode: "json",
+    }).$type<number[]>(),
     /** Daily column — ≤8 字 day theme tag (e.g., "模型大战白热化"). */
     columnThemeTag: text("column_theme_tag"),
     /** AI HOT daily payload — full /api/public/daily response merged in as
      *  must-cover input for the column generator. NULL when AI HOT was
      *  unavailable that day or for legacy rows. See docs/aihot-integration/PLAN.md. */
-    aihotDailyPayload: jsonb("aihot_daily_payload"),
+    aihotDailyPayload: text("aihot_daily_payload", { mode: "json" }),
     /** Which AI HOT date got merged in (YYYY-MM-DD UTC). NULL when no payload. */
     aihotDailyDate: text("aihot_daily_date"),
     /** List of referenced item IDs (for backlinks + crediting). */
-    itemIds: jsonb("item_ids").$type<number[]>(),
+    itemIds: text("item_ids", { mode: "json" }).$type<number[]>(),
     storyCount: integer("story_count").notNull().default(0),
-    publishedAt: timestamp("published_at", { withTimezone: true })
+    publishedAt: integer("published_at", { mode: "timestamp_ms" })
       .notNull()
-      .defaultNow(),
+      .default(nowMs),
   },
   (t) => ({
     uniq: uniqueIndex("newsletters_kind_locale_period_idx").on(
@@ -428,10 +453,10 @@ export const newsletters = pgTable(
  * at insert time using LiteLLM pricing (see lib/llm/pricing.ts); rows with
  * null cost_usd indicate a model that wasn't in the pricing table at call time.
  */
-export const llmUsage = pgTable(
+export const llmUsage = sqliteTable(
   "llm_usage",
   {
-    id: serial("id").primaryKey(),
+    id: integer("id").primaryKey({ autoIncrement: true }),
     provider: text("provider").notNull(),
     /** The fully-qualified model/deployment string as seen by the provider. */
     model: text("model").notNull(),
@@ -441,14 +466,15 @@ export const llmUsage = pgTable(
     cachedInputTokens: integer("cached_input_tokens").notNull().default(0),
     outputTokens: integer("output_tokens").notNull().default(0),
     reasoningTokens: integer("reasoning_tokens").notNull().default(0),
-    /** USD. 6 decimal places so sub-cent totals stay accurate across many rows. */
-    costUsd: numeric("cost_usd", { precision: 12, scale: 6 }),
+    /** USD. REAL (float64) keeps ~15 significant digits — plenty for
+     *  sub-cent per-call costs (was numeric(12,6) on Postgres). */
+    costUsd: real("cost_usd"),
     /** Optional FK to items — set when the call enriched a specific story. */
     itemId: integer("item_id"),
     durationMs: integer("duration_ms"),
-    createdAt: timestamp("created_at", { withTimezone: true })
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
-      .defaultNow(),
+      .default(nowMs),
   },
   (t) => ({
     createdAtIdx: index("llm_usage_created_at_idx").on(t.createdAt),
@@ -462,31 +488,29 @@ export const llmUsage = pgTable(
 );
 
 /**
- * users — mirrors Supabase `auth.users` on (id, email). Populated lazily on
- * first authenticated request (upsert on id from JWT `sub`). `role` drives
- * in-app authorization; admin gate additionally checks ALLOWED_ADMIN_EMAILS.
- *
- * No FK to auth.users because that lives in a different Postgres schema that
- * drizzle doesn't model. The upsert-on-sign-in keeps these two in sync.
+ * users — app-level user rows. The browser UI runs on the shared
+ * password-gate admin session (see lib/auth/session.ts, ADMIN_USER_ID);
+ * API tokens can carry their own user IDs. Rows are upserted lazily before
+ * FK-owned mutations. `role` drives in-app authorization.
  */
-export const users = pgTable(
+export const users = sqliteTable(
   "users",
   {
     id: text("id").primaryKey(),
     email: text("email").notNull(),
-    role: userRoleEnum("role").notNull().default("reader"),
+    role: text("role", { enum: USER_ROLES }).notNull().default("reader"),
     /** User-side display preferences (theme/accent/density/language/etc). Shape
      *  mirrors `Tweaks` in lib/tweaks.ts. Null = not yet saved server-side,
      *  falls back to localStorage then to TWEAK_DEFAULTS. */
-    tweaks: jsonb("tweaks"),
+    tweaks: text("tweaks", { mode: "json" }),
     /** User-configurable watchlist terms (["gpt-6", "agentic IDE", ...]). */
-    watchlist: jsonb("watchlist"),
-    createdAt: timestamp("created_at", { withTimezone: true })
+    watchlist: text("watchlist", { mode: "json" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
-      .defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .default(nowMs),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
       .notNull()
-      .defaultNow(),
+      .default(nowMs),
   },
   (t) => ({
     emailIdx: uniqueIndex("users_email_idx").on(t.email),
@@ -500,17 +524,17 @@ export const users = pgTable(
  * clears any existing 'up' for the same item+user). `save` is independent
  * of the up/down axis so a user can upvote AND bookmark the same story.
  */
-export const feedback = pgTable(
+export const feedback = sqliteTable(
   "feedback",
   {
-    id: serial("id").primaryKey(),
+    id: integer("id").primaryKey({ autoIncrement: true }),
     itemId: integer("item_id")
       .notNull()
       .references(() => items.id, { onDelete: "cascade" }),
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    vote: feedbackVoteEnum("vote").notNull(),
+    vote: text("vote", { enum: FEEDBACK_VOTES }).notNull(),
     note: text("note"),
     /** Present only on vote='save' rows. Null = uncategorized (the default
      *  "inbox" collection). FK is intentionally nullable + on-delete-set-null
@@ -519,9 +543,9 @@ export const feedback = pgTable(
       () => savedCollections.id,
       { onDelete: "set null" },
     ),
-    createdAt: timestamp("created_at", { withTimezone: true })
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
-      .defaultNow(),
+      .default(nowMs),
   },
   (t) => ({
     uniqVote: uniqueIndex("feedback_item_user_vote_idx").on(
@@ -546,23 +570,23 @@ export const feedback = pgTable(
  * `pinned` controls render ordering in the left sidebar. `sortOrder` is a
  * dense float so client-side reorders don't need to renumber the whole list.
  */
-export const savedCollections = pgTable(
+export const savedCollections = sqliteTable(
   "saved_collections",
   {
-    id: serial("id").primaryKey(),
+    id: integer("id").primaryKey({ autoIncrement: true }),
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     nameCjk: text("name_cjk"),
-    pinned: boolean("pinned").notNull().default(false),
+    pinned: integer("pinned", { mode: "boolean" }).notNull().default(false),
     sortOrder: integer("sort_order").notNull().default(1000),
-    createdAt: timestamp("created_at", { withTimezone: true })
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
-      .defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .default(nowMs),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
       .notNull()
-      .defaultNow(),
+      .default(nowMs),
   },
   (t) => ({
     userIdx: index("saved_collections_user_idx").on(t.userId),
@@ -582,23 +606,23 @@ export const savedCollections = pgTable(
  *
  * Runtime reads the latest row via lib/policy/skill.ts.
  */
-export const policyVersions = pgTable(
+export const policyVersions = sqliteTable(
   "policy_versions",
   {
-    id: serial("id").primaryKey(),
+    id: integer("id").primaryKey({ autoIncrement: true }),
     skillName: text("skill_name").notNull(),
     version: integer("version").notNull(),
     content: text("content").notNull(),
     /** Agent's reasoning summary for this revision; null for the v1 seed. */
     reasoning: text("reasoning"),
     /** Array of {id, verdict, title, note, createdAt} the agent saw. */
-    feedbackSample: jsonb("feedback_sample"),
+    feedbackSample: text("feedback_sample", { mode: "json" }),
     feedbackCount: integer("feedback_count").notNull().default(0),
     /** Admin email, or 'system' for the v1 seed. */
     committedBy: text("committed_by"),
-    committedAt: timestamp("committed_at", { withTimezone: true })
+    committedAt: integer("committed_at", { mode: "timestamp_ms" })
       .notNull()
-      .defaultNow(),
+      .default(nowMs),
   },
   (t) => ({
     uniqVersion: uniqueIndex("policy_versions_skill_version_idx").on(
@@ -621,12 +645,12 @@ export const policyVersions = pgTable(
  * this at the API layer; no DB constraint because retries/historical
  * rejects also sit here).
  */
-export const iterationRuns = pgTable(
+export const iterationRuns = sqliteTable(
   "iteration_runs",
   {
-    id: serial("id").primaryKey(),
+    id: integer("id").primaryKey({ autoIncrement: true }),
     skillName: text("skill_name").notNull(),
-    status: iterationStatusEnum("status").notNull(),
+    status: text("status", { enum: ITERATION_STATUSES }).notNull(),
     /** Version this iteration was based on (the one in production when
      *  the agent started). Null means no prior version existed. */
     baseVersion: integer("base_version"),
@@ -635,16 +659,16 @@ export const iterationRuns = pgTable(
     /** Short ≤2000-char summary of what the agent changed and why. */
     reasoningSummary: text("reasoning_summary"),
     /** Raw structured agent output (full reasoning, didNotChange notes). */
-    agentOutput: jsonb("agent_output"),
-    feedbackSample: jsonb("feedback_sample"),
+    agentOutput: text("agent_output", { mode: "json" }),
+    feedbackSample: text("feedback_sample", { mode: "json" }),
     feedbackCount: integer("feedback_count").notNull().default(0),
     error: text("error"),
     /** Admin email that kicked this off. */
     requestedBy: text("requested_by").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true })
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
-      .defaultNow(),
-    completedAt: timestamp("completed_at", { withTimezone: true }),
+      .default(nowMs),
+    completedAt: integer("completed_at", { mode: "timestamp_ms" }),
   },
   (t) => ({
     statusIdx: index("iteration_runs_status_idx").on(t.skillName, t.status),
@@ -663,10 +687,10 @@ export const iterationRuns = pgTable(
  * prompt tuning. No FK to from_cluster_id because clusters can be GC'd
  * and the audit should survive.
  */
-export const clusterSplits = pgTable(
+export const clusterSplits = sqliteTable(
   "cluster_splits",
   {
-    id: serial("id").primaryKey(),
+    id: integer("id").primaryKey({ autoIncrement: true }),
     itemId: integer("item_id")
       .notNull()
       .references(() => items.id, { onDelete: "cascade" }),
@@ -674,9 +698,9 @@ export const clusterSplits = pgTable(
     fromClusterId: integer("from_cluster_id").notNull(),
     /** Arbitrator's reason, ≤280 chars. */
     reason: text("reason").notNull(),
-    splitAt: timestamp("split_at", { withTimezone: true })
+    splitAt: integer("split_at", { mode: "timestamp_ms" })
       .notNull()
-      .defaultNow(),
+      .default(nowMs),
   },
   (t) => ({
     recentIdx: index("cluster_splits_recent_idx").on(t.splitAt),
@@ -696,12 +720,12 @@ export const clusterSplits = pgTable(
  *
  * v1 = single-user, single-scope (token grants full read+write over the
  * admin user's data). If we reintroduce multi-user in v2, add a
- * `scopes text[]` column rather than splitting the table.
+ * `scopes` JSON column rather than splitting the table.
  */
-export const apiTokens = pgTable(
+export const apiTokens = sqliteTable(
   "api_tokens",
   {
-    id: serial("id").primaryKey(),
+    id: integer("id").primaryKey({ autoIncrement: true }),
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
@@ -710,12 +734,12 @@ export const apiTokens = pgTable(
     /** Human-readable identifier (e.g. "claude-desktop", "cursor-laptop")
      *  so the operator can recognize + revoke individual tokens. */
     label: text("label").notNull(),
-    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
-    createdAt: timestamp("created_at", { withTimezone: true })
+    lastUsedAt: integer("last_used_at", { mode: "timestamp_ms" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
-      .defaultNow(),
+      .default(nowMs),
     /** Non-null = revoked; auth middleware treats these as not-found. */
-    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    revokedAt: integer("revoked_at", { mode: "timestamp_ms" }),
   },
   (t) => ({
     hashIdx: uniqueIndex("api_tokens_token_hash_idx").on(t.tokenHash),
@@ -729,17 +753,17 @@ export const apiTokens = pgTable(
  * queryable record of recurring voice-rule violations. One row per cron run
  * that flagged ≥1 hit. Cleaned up alongside the parent newsletter row.
  */
-export const columnQcLog = pgTable("column_qc_log", {
-  id: serial("id").primaryKey(),
+export const columnQcLog = sqliteTable("column_qc_log", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   newsletterId: integer("newsletter_id").references(() => newsletters.id, {
     onDelete: "cascade",
   }),
-  generatedAt: timestamp("generated_at", { withTimezone: true })
+  generatedAt: integer("generated_at", { mode: "timestamp_ms" })
     .notNull()
-    .defaultNow(),
-  l1Pass: boolean("l1_pass").notNull(),
-  l2Pass: boolean("l2_pass").notNull(),
-  hits: jsonb("hits").$type<
+    .default(nowMs),
+  l1Pass: integer("l1_pass", { mode: "boolean" }).notNull(),
+  l2Pass: integer("l2_pass", { mode: "boolean" }).notNull(),
+  hits: text("hits", { mode: "json" }).$type<
     { layer: "l1" | "l2"; rule: string; snippet: string }[]
   >(),
 });

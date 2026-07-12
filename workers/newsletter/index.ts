@@ -128,7 +128,7 @@ export async function runNewsletterBatch(
           and(
             sql`${newsletters.kind} = ${kind}`,
             sql`${newsletters.locale} = ${locale}`,
-            sql`${newsletters.periodStart} = ${start.toISOString()}::timestamptz`,
+            sql`${newsletters.periodStart} = ${start.getTime()}`,
           ),
         )
         .limit(1);

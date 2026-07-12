@@ -74,11 +74,11 @@ function sourceIdList() {
   );
 }
 
-function sourceTagArray() {
-  return sql`ARRAY[${sql.join(
+function sourceTagInList() {
+  return sql.join(
     PAPER_SOURCE_TAGS.map((tag) => sql`${tag}`),
     sql`, `,
-  )}]::text[]`;
+  );
 }
 
 function mixedPaperSourceIdList() {
@@ -88,34 +88,45 @@ function mixedPaperSourceIdList() {
   );
 }
 
+// tags is TEXT JSON in SQLite; the pg `tags && ARRAY[...]::text[]` overlap test
+// becomes an EXISTS over json_each(tags).
 function targetSourceWhere() {
-  return sql`(s.id IN (${sourceIdList()}) OR s.tags && ${sourceTagArray()})`;
+  return sql`(
+    s.id IN (${sourceIdList()})
+    OR EXISTS (
+      SELECT 1 FROM json_each(s.tags)
+      WHERE json_each.value IN (${sourceTagInList()})
+    )
+  )`;
 }
 
 async function listTargetSources(): Promise<SourceRow[]> {
-  return (await db().execute(sql`
+  // s.tags comes back as JSON text (not a parsed array) from raw SQL — parse
+  // it at the boundary so consumers still get string[].
+  const rows = await db().all<Omit<SourceRow, "tags"> & { tags: string }>(sql`
     SELECT
       s.id,
       s.name_en,
       s.tags,
       (
-        SELECT count(*)::int
+        SELECT count(*)
         FROM raw_items r
         WHERE r.source_id = s.id
       ) AS raw_items,
       (
-        SELECT count(*)::int
+        SELECT count(*)
         FROM items i
         WHERE i.source_id = s.id
       ) AS items
     FROM sources s
     WHERE ${targetSourceWhere()}
     ORDER BY s.id
-  `)) as unknown as SourceRow[];
+  `);
+  return rows.map((r) => ({ ...r, tags: JSON.parse(r.tags) as string[] }));
 }
 
 async function getPreflightCounts(): Promise<CountsRow> {
-  const rows = (await db().execute(sql`
+  const rows = await db().all<CountsRow>(sql`
     WITH target_sources AS (
       SELECT s.id
       FROM sources s
@@ -127,7 +138,7 @@ async function getPreflightCounts(): Promise<CountsRow> {
       WHERE r.source_id IN (SELECT id FROM target_sources)
          OR (
            r.source_id IN (${mixedPaperSourceIdList()})
-           AND r.raw_payload->>'category' = 'paper'
+           AND json_extract(r.raw_payload, '$.category') = 'paper'
          )
     ),
     target_items AS (
@@ -143,21 +154,21 @@ async function getPreflightCounts(): Promise<CountsRow> {
     cluster_counts AS (
       SELECT
         ac.id,
-        count(i.id) FILTER (WHERE ti.id IS NOT NULL)::int AS paper_items,
-        count(i.id) FILTER (WHERE ti.id IS NULL)::int AS kept_items
+        count(i.id) FILTER (WHERE ti.id IS NOT NULL) AS paper_items,
+        count(i.id) FILTER (WHERE ti.id IS NULL) AS kept_items
       FROM affected_clusters ac
       JOIN items i ON i.cluster_id = ac.id
       LEFT JOIN target_items ti ON ti.id = i.id
       GROUP BY ac.id
     )
     SELECT
-      (SELECT count(*)::int FROM target_sources) AS sources,
-      (SELECT count(*)::int FROM target_raw_items) AS raw_items,
-      (SELECT count(*)::int FROM target_items) AS items,
-      (SELECT count(*)::int FROM affected_clusters) AS affected_clusters,
-      (SELECT count(*)::int FROM cluster_counts WHERE kept_items = 0) AS paper_only_clusters,
-      (SELECT count(*)::int FROM cluster_counts WHERE kept_items > 0) AS mixed_clusters
-  `)) as unknown as CountsRow[];
+      (SELECT count(*) FROM target_sources) AS sources,
+      (SELECT count(*) FROM target_raw_items) AS raw_items,
+      (SELECT count(*) FROM target_items) AS items,
+      (SELECT count(*) FROM affected_clusters) AS affected_clusters,
+      (SELECT count(*) FROM cluster_counts WHERE kept_items = 0) AS paper_only_clusters,
+      (SELECT count(*) FROM cluster_counts WHERE kept_items > 0) AS mixed_clusters
+  `);
   return rows[0] ?? {
     sources: 0,
     raw_items: 0,
@@ -169,7 +180,7 @@ async function getPreflightCounts(): Promise<CountsRow> {
 }
 
 async function getPostCounts(): Promise<PostRow> {
-  const rows = (await db().execute(sql`
+  const rows = await db().all<PostRow>(sql`
     WITH target_sources AS (
       SELECT s.id
       FROM sources s
@@ -181,17 +192,17 @@ async function getPostCounts(): Promise<PostRow> {
       WHERE r.source_id IN (SELECT id FROM target_sources)
          OR (
            r.source_id IN (${mixedPaperSourceIdList()})
-           AND r.raw_payload->>'category' = 'paper'
+           AND json_extract(r.raw_payload, '$.category') = 'paper'
          )
     )
     SELECT
-      (SELECT count(*)::int FROM target_sources) AS remaining_sources,
-      (SELECT count(*)::int FROM target_raw_items) AS remaining_raw_items,
-      (SELECT count(*)::int FROM items i JOIN target_raw_items tri ON tri.id = i.raw_item_id) AS remaining_items,
-      (SELECT count(*)::int FROM clusters c WHERE NOT EXISTS (
+      (SELECT count(*) FROM target_sources) AS remaining_sources,
+      (SELECT count(*) FROM target_raw_items) AS remaining_raw_items,
+      (SELECT count(*) FROM items i JOIN target_raw_items tri ON tri.id = i.raw_item_id) AS remaining_items,
+      (SELECT count(*) FROM clusters c WHERE NOT EXISTS (
         SELECT 1 FROM items i WHERE i.cluster_id = c.id
       )) AS remaining_clusters
-  `)) as unknown as PostRow[];
+  `);
   return rows[0] ?? {
     remaining_sources: 0,
     remaining_raw_items: 0,
@@ -203,60 +214,60 @@ async function getPostCounts(): Promise<PostRow> {
 async function applyCleanup(): Promise<void> {
   const client = db();
   await client.transaction(async (tx) => {
-    await tx.execute(sql`SET LOCAL statement_timeout = '600s'`);
-
-    await tx.execute(sql`
-      CREATE TEMP TABLE cleanup_paper_sources ON COMMIT DROP AS
+    // SQLite TEMP tables are connection-scoped (no ON COMMIT DROP); this
+    // one-shot script drops them by closing the connection on exit.
+    await tx.run(sql`
+      CREATE TEMP TABLE cleanup_paper_sources AS
       SELECT s.id
       FROM sources s
       WHERE ${targetSourceWhere()}
     `);
 
-    await tx.execute(sql`
-      CREATE TEMP TABLE cleanup_paper_raw_items ON COMMIT DROP AS
+    await tx.run(sql`
+      CREATE TEMP TABLE cleanup_paper_raw_items AS
       SELECT r.id
       FROM raw_items r
       WHERE r.source_id IN (SELECT id FROM cleanup_paper_sources)
          OR (
            r.source_id IN (${mixedPaperSourceIdList()})
-           AND r.raw_payload->>'category' = 'paper'
+           AND json_extract(r.raw_payload, '$.category') = 'paper'
          )
     `);
 
-    await tx.execute(sql`
-      CREATE TEMP TABLE affected_clusters ON COMMIT DROP AS
+    await tx.run(sql`
+      CREATE TEMP TABLE affected_clusters AS
       SELECT DISTINCT i.cluster_id AS id
       FROM items i
       JOIN cleanup_paper_raw_items pri ON pri.id = i.raw_item_id
       WHERE i.cluster_id IS NOT NULL
     `);
 
-    await tx.execute(sql`
+    await tx.run(sql`
       DELETE FROM raw_items
       WHERE id IN (SELECT id FROM cleanup_paper_raw_items)
     `);
 
-    await tx.execute(sql`
+    await tx.run(sql`
       DELETE FROM sources
       WHERE id IN (SELECT id FROM cleanup_paper_sources)
     `);
 
-    await tx.execute(sql`
-      DELETE FROM clusters c
-      USING affected_clusters ac
-      WHERE c.id = ac.id
+    // SQLite has no DELETE ... USING; filter the target by subquery instead.
+    await tx.run(sql`
+      DELETE FROM clusters
+      WHERE id IN (SELECT id FROM affected_clusters)
         AND NOT EXISTS (
           SELECT 1
           FROM items i
-          WHERE i.cluster_id = c.id
+          WHERE i.cluster_id = clusters.id
         )
     `);
 
-    await tx.execute(sql`
+    await tx.run(sql`
       WITH remaining AS (
         SELECT
           i.cluster_id AS id,
-          count(*)::int AS member_count,
+          count(*) AS member_count,
           min(i.published_at) AS first_seen_at,
           max(i.published_at) AS latest_member_at
         FROM items i
@@ -278,7 +289,7 @@ async function applyCleanup(): Promise<void> {
         ) ranked
         WHERE rn = 1
       )
-      UPDATE clusters c
+      UPDATE clusters
       SET
         lead_item_id = lead.item_id,
         member_count = remaining.member_count,
@@ -299,17 +310,17 @@ async function applyCleanup(): Promise<void> {
         event_tier = NULL,
         hkr = NULL,
         verified_at = NULL,
-        updated_at = now()
+        updated_at = ${Date.now()}
       FROM remaining
       JOIN lead ON lead.cluster_id = remaining.id
-      WHERE c.id = remaining.id
+      WHERE clusters.id = remaining.id
     `);
 
-    await tx.execute(sql`
-      UPDATE items i
+    await tx.run(sql`
+      UPDATE items
       SET cluster_verified_at = NULL
       FROM affected_clusters ac
-      WHERE i.cluster_id = ac.id
+      WHERE items.cluster_id = ac.id
     `);
   });
 }

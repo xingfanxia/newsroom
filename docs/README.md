@@ -15,7 +15,7 @@ Read these first for current architecture and operational behavior:
 | Ingestion, enrich, scoring, clustering, cron behavior, AI HOT runtime behavior | [`architecture/ingestion.md`](./architecture/ingestion.md) |
 | Agent/API/MCP surface | [`agent-access/README.md`](./agent-access/README.md) |
 | Testing and local verification strategy | [`testing/strategy.md`](./testing/strategy.md) |
-| Security/RLS hardening notes | [`security/2026-04-28-rls-hardening.md`](./security/2026-04-28-rls-hardening.md) |
+| Security notes (RLS doc is superseded — DB is Turso token-only since 2026-07-11) | [`security/2026-04-28-rls-hardening.md`](./security/2026-04-28-rls-hardening.md) |
 
 Runtime source files still outrank docs. If a doc conflicts with current code,
 trust code and update the doc in the same change.

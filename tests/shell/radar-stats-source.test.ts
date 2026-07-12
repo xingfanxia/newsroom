@@ -161,19 +161,19 @@ describe("radar stats shell contract", () => {
     const stats = readSource("lib/shell/dashboard-stats.ts");
 
     expect(stats).toContain(
-      "today: sql<number>`count(*) filter (where ${items.createdAt} >= ${oneDayAgoIso}::timestamptz)::int`",
+      "today: sql<number>`count(*) filter (where ${items.createdAt} >= ${oneDayAgoMs})`",
     );
     expect(stats).toContain(
-      "p1: sql<number>`count(*) filter (where ${items.createdAt} >= ${oneDayAgoIso}::timestamptz AND ${items.tier} = 'p1')::int`",
+      "p1: sql<number>`count(*) filter (where ${items.createdAt} >= ${oneDayAgoMs} AND ${items.tier} = 'p1')`",
     );
     expect(stats).toContain(
-      "featured: sql<number>`count(*) filter (where ${items.createdAt} >= ${oneDayAgoIso}::timestamptz AND ${items.tier} = 'featured')::int`",
+      "featured: sql<number>`count(*) filter (where ${items.createdAt} >= ${oneDayAgoMs} AND ${items.tier} = 'featured')`",
     );
     expect(stats).not.toContain(
-      "p1: sql<number>`count(*) filter (where ${items.tier} = 'p1')::int`",
+      "p1: sql<number>`count(*) filter (where ${items.tier} = 'p1')`",
     );
     expect(stats).not.toContain(
-      "featured: sql<number>`count(*) filter (where ${items.tier} = 'featured')::int`",
+      "featured: sql<number>`count(*) filter (where ${items.tier} = 'featured')`",
     );
   });
 

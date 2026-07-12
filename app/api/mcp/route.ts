@@ -177,7 +177,7 @@ function buildServer(user: SessionUser): McpServer {
     {
       title: "Search the radar by keyword or concept",
       description:
-        "Lexical mode (default) does case-insensitive substring match against title + summary. Semantic mode embeds your query and ranks items by pgvector cosine distance — better for conceptual queries where the exact phrase isn't in the text (e.g. 'autonomous coding agent' surfaces pieces about IDE automation). Semantic returns a `distance` field per hit (smaller = closer; ~-1 for near-identical vectors).",
+        "Lexical mode (default) does case-insensitive substring match against title + summary. Semantic mode embeds your query and ranks items by libSQL vector cosine distance — better for conceptual queries where the exact phrase isn't in the text (e.g. 'autonomous coding agent' surfaces pieces about IDE automation). Semantic returns a `distance` field per hit (cosine distance, 0 = identical, smaller = closer).",
       inputSchema: mcpSearchToolInputShape,
     },
     async (args) => {

@@ -63,7 +63,7 @@ describe("Candidate-pair query", () => {
     expect(mergeSrc).toContain("min_distance <=");
     expect(mergeSrc).toContain("mean_distance <=");
     expect(mergeSrc).toContain(
-      "(pairs_within::float8 / total_pairs::float8) >=",
+      "(CAST(pairs_within AS REAL) / total_pairs) >=",
     );
   });
 

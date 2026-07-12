@@ -31,7 +31,7 @@ import { isNotNull, sql } from "drizzle-orm";
 async function main() {
   const c = db();
 
-  const totalItems = await c.select({ n: sql<number>`count(*)::int` }).from(items);
+  const totalItems = await c.select({ n: sql<number>`count(*)` }).from(items);
   console.log("total items in DB:", totalItems[0]?.n ?? 0);
 
   // 1. body fetch reset — includes NULL rows too (redundant but cheap)

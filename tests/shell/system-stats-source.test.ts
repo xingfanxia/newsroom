@@ -52,7 +52,9 @@ describe("admin system stats source wiring", () => {
     expect(source).toContain("eventCommentaryPending");
     expect(source).toContain("EVENT_COMMENTARY_CRON_RECENCY_HOURS");
     expect(source).toContain("COALESCE(${clusters.latestMemberAt}, ${clusters.firstSeenAt})");
-    expect(source).toContain("make_interval(hours => ${EVENT_COMMENTARY_CRON_RECENCY_HOURS})");
+    expect(source).toContain(
+      "${Date.now()} - ${EVENT_COMMENTARY_CRON_RECENCY_HOURS * 3_600_000}",
+    );
   });
 
   it("keeps body-prefetch and enrich queue predicates shared with workers", () => {

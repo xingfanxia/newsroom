@@ -8,12 +8,17 @@ import type { ChannelPill } from "@/app/[locale]/podcasts/_channel-pills";
  * drives the channel-filter pill row on /podcasts.
  */
 export async function getPodcastChannels(): Promise<ChannelPill[]> {
-  const rows = await db().execute(sql`
+  const rows = await db().all<{
+    id: string;
+    name_en: string | null;
+    name_zh: string | null;
+    total: number;
+  }>(sql`
     SELECT
       ${sources.id} AS id,
       ${sources.nameEn} AS name_en,
       ${sources.nameZh} AS name_zh,
-      (SELECT count(*)::int FROM ${items}
+      (SELECT count(*) FROM ${items}
          WHERE ${items.sourceId} = ${sources.id}) AS total
     FROM ${sources}
     WHERE ${sources.group} = 'podcast'

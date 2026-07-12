@@ -24,7 +24,7 @@ export async function getFeedbackCounts(): Promise<FeedbackCounts> {
   const rows = await db()
     .select({
       vote: schema.feedback.vote,
-      n: sql<number>`count(*)::int`,
+      n: sql<number>`count(*)`,
     })
     .from(schema.feedback)
     .groupBy(schema.feedback.vote);

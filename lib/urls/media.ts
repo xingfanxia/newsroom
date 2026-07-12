@@ -39,17 +39,17 @@ export function isYouTubeVideoUrl(url: string): boolean {
 
 export function youtubeVideoUrlSql(urlColumn: SQLWrapper): SQL {
   return sql`(
-    ${urlColumn} ILIKE '%youtube.com/watch%'
-    OR ${urlColumn} ILIKE '%youtu.be/%'
-    OR ${urlColumn} ILIKE '%youtube.com/shorts/%'
-    OR ${urlColumn} ILIKE '%youtube.com/embed/%'
+    ${urlColumn} LIKE '%youtube.com/watch%'
+    OR ${urlColumn} LIKE '%youtu.be/%'
+    OR ${urlColumn} LIKE '%youtube.com/shorts/%'
+    OR ${urlColumn} LIKE '%youtube.com/embed/%'
   )`;
 }
 
 function xStatusUrlSql(urlColumn: SQLWrapper): SQL {
   return sql`(
-    ${urlColumn} ILIKE '%x.com/%/status/%'
-    OR ${urlColumn} ILIKE '%twitter.com/%/status/%'
+    ${urlColumn} LIKE '%x.com/%/status/%'
+    OR ${urlColumn} LIKE '%twitter.com/%/status/%'
   )`;
 }
 

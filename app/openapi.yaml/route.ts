@@ -173,9 +173,9 @@ paths:
       tags: [search]
       summary: Keyword (lexical) or semantic search
       description: |
-        \`mode=lexical\` (default) does ILIKE substring against title/summary;
+        \`mode=lexical\` (default) does LIKE substring against title/summary;
         \`mode=semantic\` embeds q via Azure text-embedding-3-large and ranks by
-        pgvector cosine distance. Semantic mode is rate-limited tighter
+        libSQL vector cosine distance. Semantic mode is rate-limited tighter
         (${SEARCH_RATE_LIMIT_PER_IP}) due to LLM cost.
       parameters:
         - { name: q, in: query, required: true, schema: { type: string, minLength: 1 } }
@@ -447,7 +447,7 @@ components:
               - $ref: '#/components/schemas/FeedItem'
               - type: object
                 properties:
-                  distance: { type: number, description: "Cosine distance — semantic mode only. Smaller = closer." }
+                  distance: { type: number, description: "Cosine distance — semantic mode only. 0 = identical, smaller = closer." }
         total: { type: integer, description: "Total matches for the filtered query; lexical mode keeps this stable across limit/offset pages." }
         limit: { type: integer }
         offset: { type: integer }

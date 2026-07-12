@@ -51,9 +51,12 @@ type PreFlightRow = {
   missing_importance: number;
 };
 
+type MemberRow = { importance: number | null; hkr: HkrLike | null };
+
 type ClusterMembersRow = {
   id: number;
-  members: Array<{ importance: number | null; hkr: HkrLike | null }>;
+  /** JSON text from json_group_array(...) — parsed to MemberRow[] below. */
+  members: string;
 };
 
 async function main() {
@@ -62,16 +65,16 @@ async function main() {
 
   console.log(args.dryRun ? "🔍 DRY RUN — no writes" : "🚀 LIVE MIGRATION");
 
-  const preRows = (await client.execute(sql`
+  const preRows = await client.all<PreFlightRow>(sql`
     SELECT
-      count(*)::int AS total_clusters,
-      count(*) FILTER (WHERE member_count >= 2)::int AS multi_member,
-      count(*) FILTER (WHERE first_seen_at IS NULL)::int AS missing_first_seen,
-      count(*) FILTER (WHERE latest_member_at IS NULL)::int AS missing_latest_member,
-      count(*) FILTER (WHERE editor_note_zh IS NULL)::int AS missing_event_commentary,
-      count(*) FILTER (WHERE importance IS NULL)::int AS missing_importance
+      count(*) AS total_clusters,
+      count(*) FILTER (WHERE member_count >= 2) AS multi_member,
+      count(*) FILTER (WHERE first_seen_at IS NULL) AS missing_first_seen,
+      count(*) FILTER (WHERE latest_member_at IS NULL) AS missing_latest_member,
+      count(*) FILTER (WHERE editor_note_zh IS NULL) AS missing_event_commentary,
+      count(*) FILTER (WHERE importance IS NULL) AS missing_importance
     FROM clusters
-  `)) as unknown as PreFlightRow[];
+  `);
   const pre = preRows[0];
 
   console.log("\n=== Pre-flight ===");
@@ -91,30 +94,30 @@ async function main() {
   console.log("\n=== Migration ===");
 
   // Step 1 — backfill latest_member_at.
-  await client.execute(sql`
-    UPDATE clusters c
+  await client.run(sql`
+    UPDATE clusters AS c
     SET latest_member_at = sub.max_pub
     FROM (
       SELECT cluster_id, MAX(published_at) AS max_pub
       FROM items
       WHERE cluster_id IS NOT NULL
       GROUP BY cluster_id
-    ) sub
+    ) AS sub
     WHERE c.id = sub.cluster_id
       AND (c.latest_member_at IS NULL OR c.latest_member_at < sub.max_pub)
   `);
   console.log("  [1] latest_member_at backfilled");
 
   // Step 2 — backfill first_seen_at where unset.
-  await client.execute(sql`
-    UPDATE clusters c
+  await client.run(sql`
+    UPDATE clusters AS c
     SET first_seen_at = sub.min_pub
     FROM (
       SELECT cluster_id, MIN(published_at) AS min_pub
       FROM items
       WHERE cluster_id IS NOT NULL
       GROUP BY cluster_id
-    ) sub
+    ) AS sub
     WHERE c.id = sub.cluster_id
       AND c.first_seen_at IS NULL
   `);
@@ -122,8 +125,8 @@ async function main() {
 
   // Step 3 — copy lead-item editorial fields. Only fills empty cluster fields,
   // so re-running won't trample fresh Stage D output.
-  await client.execute(sql`
-    UPDATE clusters c
+  await client.run(sql`
+    UPDATE clusters AS c
     SET
       editor_note_zh     = i.editor_note_zh,
       editor_note_en     = i.editor_note_en,
@@ -143,7 +146,7 @@ async function main() {
 
   // Step 4 — null commentary_at on multi-member clusters so Stage D can
   // regenerate with cross-source context. Editorial text stays as fallback.
-  await client.execute(sql`
+  await client.run(sql`
     UPDATE clusters
     SET commentary_at = NULL
     WHERE member_count >= 2
@@ -152,7 +155,7 @@ async function main() {
   console.log("  [4] multi-member commentary_at nulled (Stage D will regenerate)");
 
   // Step 5 — sync coverage with member_count.
-  await client.execute(sql`
+  await client.run(sql`
     UPDATE clusters
     SET coverage = member_count
     WHERE coverage IS DISTINCT FROM member_count
@@ -164,16 +167,16 @@ async function main() {
   await recomputeAllImportanceAndHkr(client);
 
   console.log("\n=== Post-flight ===");
-  const postRows = (await client.execute(sql`
+  const postRows = await client.all<PreFlightRow>(sql`
     SELECT
-      count(*)::int AS total_clusters,
-      count(*) FILTER (WHERE member_count >= 2)::int AS multi_member,
-      count(*) FILTER (WHERE first_seen_at IS NULL)::int AS missing_first_seen,
-      count(*) FILTER (WHERE latest_member_at IS NULL)::int AS missing_latest_member,
-      count(*) FILTER (WHERE editor_note_zh IS NULL)::int AS missing_event_commentary,
-      count(*) FILTER (WHERE importance IS NULL)::int AS missing_importance
+      count(*) AS total_clusters,
+      count(*) FILTER (WHERE member_count >= 2) AS multi_member,
+      count(*) FILTER (WHERE first_seen_at IS NULL) AS missing_first_seen,
+      count(*) FILTER (WHERE latest_member_at IS NULL) AS missing_latest_member,
+      count(*) FILTER (WHERE editor_note_zh IS NULL) AS missing_event_commentary,
+      count(*) FILTER (WHERE importance IS NULL) AS missing_importance
     FROM clusters
-  `)) as unknown as PreFlightRow[];
+  `);
   const post = postRows[0];
 
   console.log(`  total clusters:           ${post.total_clusters}`);
@@ -190,38 +193,45 @@ async function main() {
  * Pull all clusters with their member importance + hkr in one round trip,
  * then recompute event importance, tier, and union-hkr in TS using the
  * canonical pure functions. One UPDATE per cluster keeps individual writes
- * small enough that postgres-js doesn't choke.
+ * small (libSQL serializes concurrent writers server-side, so there's no
+ * connection-pool pressure to batch around).
+ *
+ * `members` arrives as a JSON-text array from json_group_array(...): each
+ * element is json_object('importance', i.importance, 'hkr', json(i.hkr)).
+ * Wrapping i.hkr in json() embeds it as a nested object instead of an
+ * escaped string; a NULL hkr yields "hkr":null. We JSON.parse it per row.
  */
 async function recomputeAllImportanceAndHkr(
   client: ReturnType<typeof db>,
 ): Promise<void> {
-  const rows = (await client.execute(sql`
+  const rows = await client.all<ClusterMembersRow>(sql`
     SELECT
       c.id,
-      json_agg(json_build_object(
+      json_group_array(json_object(
         'importance', i.importance,
-        'hkr', i.hkr
+        'hkr', json(i.hkr)
       )) AS members
     FROM clusters c
     JOIN items i ON i.cluster_id = c.id
     GROUP BY c.id
-  `)) as unknown as ClusterMembersRow[];
+  `);
 
   let importanceUpdated = 0;
   let hkrUnioned = 0;
 
   for (const row of rows) {
-    if (!row.members || row.members.length === 0) continue;
+    const members = JSON.parse(row.members) as MemberRow[];
+    if (!members || members.length === 0) continue;
 
-    const { importance } = recomputeEventImportance(row.members);
+    const { importance } = recomputeEventImportance(members);
     const eventTier = approximateTierForImportance(importance);
 
     // Union HKR only for multi-member clusters; singletons keep their item-level hkr.
-    const memberHkr = row.members
+    const memberHkr = members
       .map((m) => m.hkr)
       .filter((h): h is HkrLike => h != null);
     const unionedHkr =
-      row.members.length >= 2 && memberHkr.length > 0
+      members.length >= 2 && memberHkr.length > 0
         ? unionHkr(memberHkr)
         : null;
 

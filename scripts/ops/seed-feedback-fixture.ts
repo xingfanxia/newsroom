@@ -48,7 +48,7 @@ await client
   })
   .onConflictDoUpdate({
     target: schema.users.id,
-    set: { updatedAt: sql`now()` },
+    set: { updatedAt: new Date() },
   });
 console.log(`[seed] user ${FIXTURE_EMAIL} ok`);
 
