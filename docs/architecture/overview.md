@@ -21,7 +21,7 @@ OpenAPI, and public skill surfaces.
 | `lib/api/*` | Route-neutral request parsing, domain-result helpers, serializers, and shared payload contracts for public REST, bearer v1, MCP, site pages, and RSS consumers. | Surface-specific auth policy that belongs in the route adapter. |
 | `lib/rss/*` | RSS metadata, feed construction, XML rendering, headers, and shared feed-family contracts. | Per-page UI decisions or one-off route-local XML string assembly. |
 | `lib/types.ts` | Runtime tuples for app/source locales, source kinds/groups/cadences/health, item tiers, feed views, search modes, feedback votes, user roles, iteration statuses, and newsletter labels. | Database-only or route-local enum copies. |
-| `db/schema.ts` | Drizzle tables and Postgres enum wiring, reusing runtime tuples where the value set is a cross-surface contract. | Independent literals that should be shared through `lib/types.ts`. |
+| `db/schema.ts` | Drizzle tables (Turso libSQL / sqlite-core) with typed TEXT enums, reusing runtime tuples where the value set is a cross-surface contract. | Independent literals that should be shared through `lib/types.ts`. |
 | `workers/*` | Durable ingestion, normalization, article-body prefetch, enrichment, scoring, clustering, newsletter, and editorial-agent processes. | HTTP envelope behavior or browser UI concerns. |
 | `scripts/ops/*` | Local operator mirrors for production cron, backfills, diagnostics, and resumable state. | Divergent copies of worker predicates, cron slugs, or pending-queue rules. |
 | `tests/**/*-source.test.ts` | Source-contract checks that keep architectural routing, delegation, and single-source-of-truth invariants from drifting. | Behavioral assertions that need runtime fixtures or DB-backed tests. |

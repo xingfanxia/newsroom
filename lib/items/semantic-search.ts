@@ -9,9 +9,9 @@
  * shortcut has no libSQL equivalent, so scores changed scale in the Turso
  * migration (they remain "smaller = closer").
  *
- * The DiskANN index is created by scripts/ops/db-create-vector-index.ts and
- * must be re-created after any `bun run db:push` (same gotcha as the old
- * HNSW index — see docs/HANDOFF.md gotcha #2).
+ * The DiskANN index lives on the 256-dim column and is fed incrementally by
+ * scripts/ops/backfill-embedding-small.ts (also the rebuild path after any
+ * `bun run db:push` — never bulk-build a vector index on Turso).
  *
  * Two-phase shape (candidates → filter) is deliberate: `vector_top_k` can't
  * see WHERE clauses, so we over-fetch candidates and filter after. If every

@@ -19,13 +19,13 @@ async function main() {
     console.log(JSON.stringify(rows.rows[0], null, 2));
 
     const vec = await client.execute(
-      "SELECT name FROM sqlite_master WHERE name = 'items_embedding_idx'",
+      "SELECT name FROM sqlite_master WHERE name = 'items_embedding_small_idx'",
     );
     console.log(
       "vector index:",
       vec.rows.length > 0
-        ? "items_embedding_idx ✓"
-        : "MISSING — run db:vector-index",
+        ? "items_embedding_small_idx ✓"
+        : "MISSING — run scripts/ops/backfill-embedding-small.ts",
     );
   } catch (err) {
     console.error("✗ failed:", err instanceof Error ? err.message : err);
