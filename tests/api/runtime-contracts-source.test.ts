@@ -122,7 +122,7 @@ describe("runtime contract source wiring", () => {
     expect(localeSwitcher).toContain("APP_LOCALES");
     expect(localeSwitcher).not.toContain('{ value: "zh"');
     expect(localeSwitcher).not.toContain('{ value: "en"');
-    expect(schema).toContain('pgEnum("locale_kind", SOURCE_LOCALES)');
+    expect(schema).toContain('text("locale", { enum: SOURCE_LOCALES })');
 
     for (const source of [
       feedParams,
@@ -243,7 +243,7 @@ describe("runtime contract source wiring", () => {
     expect(types).toContain("export const FEEDBACK_VOTES");
     expect(types).toContain("export const FEEDBACK_SIGNAL_VOTES");
     expect(types).toContain("export const FEEDBACK_SAVE_VOTE");
-    expect(schema).toContain('pgEnum("feedback_vote", FEEDBACK_VOTES)');
+    expect(schema).toContain('text("vote", { enum: FEEDBACK_VOTES })');
     expect(feedbackToggle).toContain("z.enum(FEEDBACK_VOTES)");
     expect(feedbackMetrics).toContain("FEEDBACK_SIGNAL_VOTES");
     expect(feedbackMetrics).toContain("FeedbackVote");
@@ -290,8 +290,8 @@ describe("runtime contract source wiring", () => {
     expect(types).toContain("export const ITERATION_STATUSES");
     expect(types).toContain("export const ITERATION_IDLE_STATUS");
     expect(types).toContain("export const ITERATION_RUNNER_TERMINAL_STATUSES");
-    expect(schema).toContain('pgEnum("user_role", USER_ROLES)');
-    expect(schema).toContain('pgEnum("iteration_status", ITERATION_STATUSES)');
+    expect(schema).toContain('text("role", { enum: USER_ROLES })');
+    expect(schema).toContain('text("status", { enum: ITERATION_STATUSES })');
     expect(authSession).toContain("USER_ADMIN_ROLE");
     expect(authSession).toContain("USER_READER_ROLE");
     expect(iterationRunner).toContain("IterationRunnerStatus");

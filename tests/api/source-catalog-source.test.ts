@@ -51,7 +51,7 @@ describe("source catalog source wiring", () => {
 
   test("OpenAPI documents the runtime source health enum", () => {
     expect(types).toContain("export const SOURCE_HEALTH_STATUSES");
-    expect(schema).toContain('pgEnum("health_status", SOURCE_HEALTH_STATUSES)');
+    expect(schema).toContain('text("status", { enum: SOURCE_HEALTH_STATUSES })');
     expect(openapiRoute).toContain("SOURCE_HEALTH_STATUSES");
     expect(sourceCatalog).toContain("SourceHealthStatus");
     expect(sourceCatalog).toContain("DEFAULT_SOURCE_HEALTH_STATUS");
@@ -70,9 +70,9 @@ describe("source catalog source wiring", () => {
     expect(types).toContain("export const SOURCE_KINDS");
     expect(types).toContain("export const SOURCE_GROUPS");
     expect(types).toContain("export const CADENCES");
-    expect(schema).toContain('pgEnum("source_kind", SOURCE_KINDS)');
-    expect(schema).toContain('pgEnum("source_group", SOURCE_GROUPS)');
-    expect(schema).toContain('pgEnum("cadence", CADENCES)');
+    expect(schema).toContain('text("kind", { enum: SOURCE_KINDS })');
+    expect(schema).toContain('text("group", { enum: SOURCE_GROUPS })');
+    expect(schema).toContain('text("cadence", { enum: CADENCES })');
   });
 
   test("OpenAPI derives shared public contract enums from runtime tuples", () => {

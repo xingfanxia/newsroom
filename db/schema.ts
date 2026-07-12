@@ -182,12 +182,13 @@ export const rawItems = sqliteTable(
     externalId: text("external_id").notNull(),
     url: text("url"),
     title: text("title"),
-    rawPayload: text("raw_payload", { mode: "json" }).notNull(),
     publishedAt: integer("published_at", { mode: "timestamp_ms" }),
     fetchedAt: integer("fetched_at", { mode: "timestamp_ms" })
       .notNull()
       .default(nowMs),
     normalizedAt: integer("normalized_at", { mode: "timestamp_ms" }),
+    /** Large JSON payload — stays LAST (see items note on SQLite row layout). */
+    rawPayload: text("raw_payload", { mode: "json" }).notNull(),
   },
   (t) => ({
     uniqExternal: uniqueIndex("raw_items_source_external_idx").on(
@@ -277,13 +278,6 @@ export const items = sqliteTable(
       .notNull()
       .references(() => rawItems.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
-    /** RSS-derived body — often just the description snippet. Kept as the
-     *  fallback when full-article fetch fails or is paywalled. */
-    body: text("body").notNull(),
-    /** Full article markdown from Jina Reader (r.jina.ai). Populated after
-     *  normalize, before enrich. Null while pending fetch or if fetch failed.
-     *  Truncate reads to ~8K chars before passing to the LLM. */
-    bodyMd: text("body_md"),
     /** Last time we attempted to fetch bodyMd (success or failure).
      *  Used to avoid re-fetching in a tight loop. */
     bodyFetchedAt: integer("body_fetched_at", { mode: "timestamp_ms" }),
@@ -331,7 +325,6 @@ export const items = sqliteTable(
     editorAnalysisEn: text("editor_analysis_en"),
     commentaryAt: integer("commentary_at", { mode: "timestamp_ms" }),
     // ── Clustering (M2) ──
-    embedding: float32Vector("embedding", { dimensions: 3072 }),
     clusterId: integer("cluster_id").references(() => clusters.id, {
       onDelete: "set null",
     }),
@@ -340,6 +333,18 @@ export const items = sqliteTable(
      *  embedding-based clustering will skip this item as a neighbor
      *  candidate — its cluster assignment has been LLM-confirmed. */
     clusterVerifiedAt: integer("cluster_verified_at", { mode: "timestamp_ms" }),
+    // ── Large payloads — MUST STAY LAST (SQLite inlines them in the row;
+    // reading any column stored AFTER a big value walks its overflow pages,
+    // so a filter on e.g. cluster_id placed after these would drag ~45KB per
+    // row through the page cache — measured 29s vs ~ms for a 21k-row scan).
+    /** RSS-derived body — often just the description snippet. Kept as the
+     *  fallback when full-article fetch fails or is paywalled. */
+    body: text("body").notNull(),
+    /** Full article markdown from Jina Reader (r.jina.ai). Populated after
+     *  normalize, before enrich. Null while pending fetch or if fetch failed.
+     *  Truncate reads to ~8K chars before passing to the LLM. */
+    bodyMd: text("body_md"),
+    embedding: float32Vector("embedding", { dimensions: 3072 }),
   },
   (t) => ({
     contentHashIdx: uniqueIndex("items_content_hash_idx").on(t.contentHash),
@@ -360,6 +365,18 @@ export const items = sqliteTable(
       .on(t.clusteredAt)
       .where(sql`${t.clusteredAt} IS NULL AND ${t.embedding} IS NOT NULL`),
     clusterIdx: index("items_cluster_idx").on(t.clusterId, t.publishedAt),
+    /** Covering index for the feed WHERE shape (buildFeedWhere +
+     *  countFeaturedStories): lets SQLite scan the index instead of the
+     *  fat table rows. Column set must cover every items column those
+     *  queries filter/join on. */
+    feedCoverIdx: index("items_feed_cover_idx").on(
+      t.enrichedAt,
+      t.importance,
+      t.tier,
+      t.clusterId,
+      t.sourceId,
+      t.publishedAt,
+    ),
     /** Pending Stage B — items the arbitrator hasn't seen yet. */
     clusterVerifiedIdx: index("items_cluster_verified_idx")
       .on(t.clusterVerifiedAt)

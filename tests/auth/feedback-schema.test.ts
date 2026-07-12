@@ -82,7 +82,7 @@ describeOrSkip("feedback schema round-trip (real DB)", () => {
   it("counts feedback by vote for the test user", async () => {
     if (itemId === null) return;
     const rows = await db()
-      .select({ vote: schema.feedback.vote, n: sql<number>`count(*)::int` })
+      .select({ vote: schema.feedback.vote, n: sql<number>`count(*)` })
       .from(schema.feedback)
       .where(eq(schema.feedback.userId, TEST_USER_ID))
       .groupBy(schema.feedback.vote);

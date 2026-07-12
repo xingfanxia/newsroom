@@ -64,7 +64,7 @@ describeOrSkip("saveItemRoutePayload (real DB)", () => {
 
     const [maxItem] = await db()
       .select({
-        maxId: sql<number>`coalesce(max(${schema.items.id}), 0)::int`,
+        maxId: sql<number>`coalesce(max(${schema.items.id}), 0)`,
       })
       .from(schema.items);
     missingItemId = (maxItem?.maxId ?? 0) + 1_000_000;
