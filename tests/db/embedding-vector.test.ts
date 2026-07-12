@@ -56,3 +56,28 @@ describe("embedding NaN guard", () => {
     expect(() => embeddingToDriver([1, Infinity, 3])).toThrow(/non-finite/);
   });
 });
+
+describe("embeddingToSmall (Matryoshka truncation)", () => {
+  it("truncates to 256 dims and L2-renormalizes", async () => {
+    const { embeddingToSmall, EMBEDDING_SMALL_DIMS } = await import(
+      "@/db/schema"
+    );
+    const full = Array.from({ length: 3072 }, (_, i) => (i < 256 ? 0.1 : 0.9));
+    const small = embeddingToSmall(full);
+    expect(small.length).toBe(EMBEDDING_SMALL_DIMS);
+    const norm = Math.sqrt(small.reduce((a, n) => a + n * n, 0));
+    expect(Math.abs(norm - 1)).toBeLessThan(1e-9);
+  });
+  it("preserves direction (cosine of truncated prefix)", async () => {
+    const { embeddingToSmall } = await import("@/db/schema");
+    const a = embeddingToSmall([3, 4, ...Array(254).fill(0), ...Array(2816).fill(9)]);
+    expect(a[0]).toBeCloseTo(0.6, 9);
+    expect(a[1]).toBeCloseTo(0.8, 9);
+  });
+  it("throws on non-finite cells inside the prefix", async () => {
+    const { embeddingToSmall } = await import("@/db/schema");
+    expect(() => embeddingToSmall([1, NaN, ...Array(254).fill(0)])).toThrow(
+      /non-finite/,
+    );
+  });
+});

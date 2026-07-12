@@ -21,7 +21,13 @@
  */
 import { and, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { db, libsqlClient } from "@/db/client";
-import { items, sources, clusters, embeddingToVectorText } from "@/db/schema";
+import {
+  items,
+  sources,
+  clusters,
+  embeddingToSmall,
+  embeddingToVectorText,
+} from "@/db/schema";
 import { storySelectFields } from "@/lib/items/story-select";
 import { toStory } from "@/lib/items/story-mapper";
 import { embed } from "@/lib/llm";
@@ -77,16 +83,19 @@ export async function semanticSearch(
     MCP_SEARCH_LIMIT_MAX,
   );
 
-  // Phase 1 — DiskANN probe for the nearest candidate ids. The index is an
-  // optimization, not a dependency: if it's missing (still building, or
-  // dropped by a schema push), fall back to exact brute-force ranking in
-  // phase 2 — ~21k rows of vector_distance_cos is a few hundred ms, and
-  // this path is rate-limited upstream.
+  // Phase 1 — DiskANN probe on the SMALL (Matryoshka 256-dim) index for
+  // candidate ids. 3072-dim indexes are unbuildable on Turso (~6s/row), so
+  // the ANN column is a truncated+renormalized copy; ranking quality comes
+  // from phase 2's exact re-rank over the FULL vectors. The index is an
+  // optimization, not a dependency: if it's missing (backfill in flight,
+  // or dropped by a schema push), fall back to exact brute-force ranking
+  // in phase 2 — slower (full-table blob scan) but 100%-recall.
+  const querySmallText = embeddingToVectorText(embeddingToSmall(embedding));
   let candidateIds: number[] | null = null;
   try {
     const topK = await libsqlClient().execute({
-      sql: "SELECT id FROM vector_top_k('items_embedding_idx', vector32(?), ?)",
-      args: [queryVecText, TOP_K_CANDIDATES],
+      sql: "SELECT id FROM vector_top_k('items_embedding_small_idx', vector32(?), ?)",
+      args: [querySmallText, TOP_K_CANDIDATES],
     });
     candidateIds = topK.rows.map((r) => Number(r.id));
     if (candidateIds.length === 0) {
