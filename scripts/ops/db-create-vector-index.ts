@@ -1,34 +1,35 @@
 /**
- * Create the DiskANN vector index on items.embedding for fast cosine
- * nearest-neighbor search (libSQL native vectors — replaced pgvector HNSW).
+ * Create the DiskANN candidate index on items.embedding_small (Matryoshka
+ * 256-dim) for fast cosine nearest-neighbor candidate generation.
  *
- * Why separate from schema push: drizzle-kit can't emit
- * `libsql_vector_idx(...)` syntax. Run this idempotently after any db:push
- * (mirror of the old db-create-hnsw.ts flow).
+ * NOT on the full 3072-dim column: DiskANN insert cost scales with dims and
+ * measured ~6s/row on Turso — a bulk build wedges the DB write path for
+ * hours (killed the first newsroom DB). The 256-dim partial index is cheap
+ * and final ranking re-scores candidates with the FULL vector anyway
+ * (lib/items/semantic-search.ts).
  *
- * Settings (see turso.tech vector docs; 3072-dim vectors make the DEFAULT
- * index enormous — every node stores ~3·√D ≈ 166 neighbor copies):
- *   compress_neighbors=float8 — 4× smaller neighbor copies, negligible recall
- *   max_neighbors=40          — plenty for a ~20k-row corpus
- *   partial WHERE             — only rows that actually have embeddings
+ * Idempotent. Rerun after any `db:push` (drizzle-kit can't express it).
+ * If the index was dropped with data present, prefer running
+ * scripts/ops/backfill-embedding-small.ts instead — it recreates the index
+ * empty and feeds it incrementally, avoiding a bulk build.
  */
 import { closeDb, libsqlClient } from "@/db/client";
 
 async function main() {
   const client = libsqlClient();
   await client.execute(`
-    CREATE INDEX IF NOT EXISTS items_embedding_idx
+    CREATE INDEX IF NOT EXISTS items_embedding_small_idx
     ON items (
       libsql_vector_idx(
-        embedding,
+        embedding_small,
         'metric=cosine',
         'compress_neighbors=float8',
-        'max_neighbors=40'
+        'max_neighbors=20'
       )
     )
-    WHERE embedding IS NOT NULL
+    WHERE embedding_small IS NOT NULL
   `);
-  console.log("✓ DiskANN index created / verified on items.embedding");
+  console.log("✓ DiskANN index created / verified on items.embedding_small");
   await closeDb();
 }
 

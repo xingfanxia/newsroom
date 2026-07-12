@@ -85,6 +85,30 @@ export function embeddingToVectorText(value: number[]): string {
   return `[${value.join(",")}]`;
 }
 
+/** Matryoshka truncation for the small ANN column: first N dims of the
+ *  3072-dim text-embedding-3-large vector, L2-renormalized. OpenAI trains
+ *  3-large with Matryoshka representation learning, so a 256-dim prefix
+ *  retains ~96% of retrieval quality — plenty for candidate generation
+ *  (final ranking re-scores candidates with the FULL vector). */
+export const EMBEDDING_SMALL_DIMS = 256;
+
+export function embeddingToSmall(
+  value: number[],
+  dims: number = EMBEDDING_SMALL_DIMS,
+): number[] {
+  const head = value.slice(0, dims);
+  let norm = 0;
+  for (const n of head) {
+    if (!Number.isFinite(n)) {
+      throw new Error("embedding: non-finite cell in input");
+    }
+    norm += n * n;
+  }
+  norm = Math.sqrt(norm);
+  if (norm === 0) return head;
+  return head.map((n) => n / norm);
+}
+
 export const float32Vector = customType<{
   data: number[];
   driverData: Buffer;
@@ -345,6 +369,15 @@ export const items = sqliteTable(
      *  Truncate reads to ~8K chars before passing to the LLM. */
     bodyMd: text("body_md"),
     embedding: float32Vector("embedding", { dimensions: 3072 }),
+    /** Matryoshka-truncated (256-dim, renormalized) copy of `embedding` for
+     *  the DiskANN candidate index — 3072-dim indexes are unbuildable on
+     *  Turso (~6s/row). Written by enrich alongside `embedding`; backfilled
+     *  by scripts/ops/backfill-embedding-small.ts. Physically appended after
+     *  `embedding` via ALTER (SQLite appends), which is fine: only the
+     *  vector index and the backfill ever read it from the row. */
+    embeddingSmall: float32Vector("embedding_small", {
+      dimensions: EMBEDDING_SMALL_DIMS,
+    }),
   },
   (t) => ({
     contentHashIdx: uniqueIndex("items_content_hash_idx").on(t.contentHash),

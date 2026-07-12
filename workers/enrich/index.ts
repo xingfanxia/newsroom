@@ -1,7 +1,7 @@
 import pLimit from "p-limit";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { items } from "@/db/schema";
+import { embeddingToSmall, items } from "@/db/schema";
 import type { Item } from "@/db/schema";
 import {
   generateStructured,
@@ -255,6 +255,7 @@ async function enrichOne(
       reasoningZh: scored.reasoningZh,
       reasoningEn: scored.reasoningEn,
       embedding,
+      embeddingSmall: embeddingToSmall(embedding),
       enrichedAt: new Date(),
       ...ENRICH_CLAIM_RESET_VALUES,
       policyVersion: policy.version,
