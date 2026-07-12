@@ -80,7 +80,7 @@ bun run dev
 
 See [`.env.example`](./.env.example) for the complete template. Run `vercel env pull .env.local --yes` to sync locally. Key groups:
 
-- **Turso** (`TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`) — libSQL DB `newsroom` (aws-us-west-2, co-located with the `sfo1` Vercel pin). Replaced Supabase Postgres 2026-07-11.
+- **Turso** (`TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`) — libSQL DB `newsroom-v2` (aws-us-west-2, co-located with the `sfo1` Vercel pin). Replaced Supabase Postgres 2026-07-11.
 - **Azure OpenAI embeddings** (`AZURE_OPENAI_API_KEY` / `_ENDPOINT` / `_EMBEDDING_DEPLOYMENT`) — handles `text-embedding-3-large` only.
 - **Azure OpenAI chat compatibility** (`AZURE_OPENAI_CHAT_*`) — points at the Responses API deployment `gpt-5.5-standard`; retained for compatibility/probes.
 - **Azure DeepSeek** (`AZURE_DEEPSEEK_*`) — primary prose/scoring provider, with `DeepSeek-V4-Pro` and `DeepSeek-V4-Flash` deployments.

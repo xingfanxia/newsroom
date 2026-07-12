@@ -2,9 +2,10 @@
 
 ## 2026-07-11 — Database migrated: Supabase Postgres → Turso libSQL (SQLite)
 
-The entire DB layer moved to **Turso libSQL** (DB `newsroom`, org `xingfanxia`,
-`aws-us-west-2` — co-located with the `sfo1` Vercel region pin). Supabase is
-decommissioned. What changed:
+The entire DB layer moved to **Turso libSQL** (DB **`newsroom-v2`**, org
+`xingfanxia`, `aws-us-west-2` — co-located with the `sfo1` Vercel region pin;
+the first `newsroom` DB was abandoned after a runaway index build wedged its
+write path, then deleted). Supabase is decommissioned. What changed:
 
 - **Client**: `db/client.ts` is `@libsql/client` (HTTP hrana) + `drizzle-orm/libsql`.
   Env: `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN` (all Vercel envs + `.env.local`).
@@ -13,11 +14,20 @@ decommissioned. What changed:
   epoch (drizzle `timestamp_ms` mode — app code still sees JS `Date`), jsonb →
   JSON text, booleans → 0/1, `serial` → INTEGER PK AUTOINCREMENT, `numeric` →
   REAL, `text[]` → JSON text array, pg enums → typed TEXT.
-- **Vectors**: pgvector `halfvec(3072)`+HNSW → libSQL native `F32_BLOB(3072)` +
-  DiskANN cosine index `items_embedding_idx` (created by
-  `bun run db:vector-index` — rerun after any `db:push`, drizzle-kit can't
-  express it). `<=>`/`<#>` → `vector_distance_cos()`; semantic search probes
-  `vector_top_k` then filters. Distances are now cosine (0 = identical).
+- **Vectors**: pgvector `halfvec(3072)`+HNSW → libSQL native `F32_BLOB(3072)`.
+  **No ANN index in production**: building DiskANN over 3072-dim vectors on
+  Turso measured ~6s/row (~36h total) and wedges the DB's write path — the
+  first `newsroom` DB died this way. Semantic search runs EXACT brute-force
+  `vector_distance_cos` (100% recall, ~2-10s, agent/API-only path); the
+  `vector_top_k` fast path auto-activates if `items_embedding_idx` ever
+  exists (`bun run db:vector-index` — expect it to be impractical at 3072
+  dims; the planned fix is a Matryoshka-truncated 256-dim side column).
+  Distances are cosine (0 = identical).
+- **Row layout invariant (SQLite)**: big payloads (`items.body`, `body_md`,
+  `embedding`; `raw_items.raw_payload`) MUST stay the LAST columns — SQLite
+  inlines them in the row and reading any later column walks their overflow
+  pages (measured 29s vs 182ms on the joined feed count). Covering index
+  `items_feed_cover_idx` keeps feed/count scans off the fat rows entirely.
 - **Claims**: enrich's `FOR UPDATE SKIP LOCKED` CTE became a single atomic
   `UPDATE ... WHERE id IN (SELECT ... LIMIT n) RETURNING` (SQLite single-writer).
 - **FK enforcement**: Turso enables `foreign_keys` server-side by default —
