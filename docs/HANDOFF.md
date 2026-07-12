@@ -14,15 +14,19 @@ write path, then deleted). Supabase is decommissioned. What changed:
   epoch (drizzle `timestamp_ms` mode — app code still sees JS `Date`), jsonb →
   JSON text, booleans → 0/1, `serial` → INTEGER PK AUTOINCREMENT, `numeric` →
   REAL, `text[]` → JSON text array, pg enums → typed TEXT.
-- **Vectors**: pgvector `halfvec(3072)`+HNSW → libSQL native `F32_BLOB(3072)`.
-  **No ANN index in production**: building DiskANN over 3072-dim vectors on
-  Turso measured ~6s/row (~36h total) and wedges the DB's write path — the
-  first `newsroom` DB died this way. Semantic search runs EXACT brute-force
-  `vector_distance_cos` (100% recall, ~2-10s, agent/API-only path); the
-  `vector_top_k` fast path auto-activates if `items_embedding_idx` ever
-  exists (`bun run db:vector-index` — expect it to be impractical at 3072
-  dims; the planned fix is a Matryoshka-truncated 256-dim side column).
-  Distances are cosine (0 = identical).
+- **Vectors**: pgvector `halfvec(3072)`+HNSW → libSQL native `F32_BLOB(3072)`
+  plus a **Matryoshka 256-dim candidate column** (`embedding_small`, truncated
+  + L2-renormalized; `embeddingToSmall` in db/schema.ts). 3072-dim DiskANN is
+  unbuildable on Turso (~6s/row; a bulk CREATE INDEX wedges the write path —
+  killed the first `newsroom` DB). The partial DiskANN index
+  `items_embedding_small_idx` lives on the SMALL column and was fed
+  incrementally by `scripts/ops/backfill-embedding-small.ts` (rerun any time;
+  idempotent — also the right way to REBUILD the index: create empty, feed by
+  batched UPDATEs, never bulk-build). Semantic search: small-index top-500 →
+  exact re-rank on FULL vectors (results measured identical to brute-force;
+  prod ~0.2-0.4s warm vs 2-10s). Brute-force fallback auto-engages if the
+  index is missing. Enrich writes both columns. Distances are cosine
+  (0 = identical).
 - **Row layout invariant (SQLite)**: big payloads (`items.body`, `body_md`,
   `embedding`; `raw_items.raw_payload`) MUST stay the LAST columns — SQLite
   inlines them in the row and reading any later column walks their overflow
