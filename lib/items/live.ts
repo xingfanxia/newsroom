@@ -281,11 +281,19 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
   const useDayCap = q.maxPerDay != null && q.maxPerDay > 0;
   // Day bucketing: publishedAt is integer ms epoch, so UTC-day = floor
   // division by 86,400,000 — replaces to_char(... AT TIME ZONE 'UTC').
+  //
+  // Unary `+` on published_at disqualifies items_published_at_idx from
+  // serving the ORDER BY. Without it the stat-less planner (Turso forbids
+  // ANALYZE) is tempted to walk that index hoping the LIMIT saturates —
+  // but sparse filters mean it never does, degenerating into a fetch of
+  // every enriched row (~10s cold). With the index ruled out, the outer
+  // query drives from the id-subquery's IN list and just sorts the
+  // survivors.
   const orderExpr = useDayCap
     ? sql`CAST(${items.publishedAt} / 86400000 AS INTEGER) DESC,
           COALESCE(${clusters.importance}, ${items.importance}) DESC,
-          ${items.publishedAt} DESC`
-    : sql`${items.publishedAt} DESC, COALESCE(${clusters.importance}, ${items.importance}) DESC`;
+          +${items.publishedAt} DESC`
+    : sql`+${items.publishedAt} DESC, COALESCE(${clusters.importance}, ${items.importance}) DESC`;
 
   // maxPerDay needs a wider fetch window than `limit` because we may discard
   // many rows per day above the cap. Heuristic: 5x typical-discard headroom
@@ -296,6 +304,31 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
     ? Math.min(Math.max(limit * 5, 200), 500)
     : limit;
 
+  // Two-phase fetch. The filter/order/limit phase runs as an id-subquery
+  // pinned to items_feed_cover_idx: sparse filters (the today view often
+  // matches only a few dozen rows) mean a LIMIT never saturates, and
+  // SQLite's default plan — walk items_published_at_idx hoping to stop
+  // early — degrades to fetching every enriched row from the payload-heavy
+  // table pages (~10s cold, 2026-07-12 incident). The covering index
+  // carries every filtered items column, so phase 1 touches only slim
+  // index pages + clusters PK lookups; the outer query then fetches full
+  // rows for just the surviving ids. INDEXED BY is deliberate: it fails
+  // loudly if the index is dropped rather than silently reverting to the
+  // scan plan.
+  // clusters is probed once per enriched item for the tier/dedup/today
+  // predicates — clusters_feed_cover_idx keeps that probe off the
+  // payload-heavy cluster rows (canonical titles/summaries).
+  const idFilter = sql`${items.id} IN (
+    SELECT ${items.id}
+    FROM ${items} INDEXED BY items_feed_cover_idx
+    INNER JOIN ${sources} ON ${items.sourceId} = ${sources.id}
+    LEFT JOIN ${clusters} INDEXED BY clusters_feed_cover_idx
+      ON ${items.clusterId} = ${clusters.id}
+    WHERE ${buildFeedWhere(q)}
+    ORDER BY ${orderExpr}
+    LIMIT ${fetchLimit} OFFSET ${offset}
+  )`;
+
   const rows = await client
     .select({
       ...storySelectFields,
@@ -304,10 +337,9 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
     .from(items)
     .innerJoin(sources, eq(items.sourceId, sources.id))
     .leftJoin(clusters, eq(items.clusterId, clusters.id))
-    .where(buildFeedWhere(q))
+    .where(idFilter)
     .orderBy(orderExpr)
-    .limit(fetchLimit)
-    .offset(offset);
+    .limit(fetchLimit);
 
   // maxPerDay: SQL is sorted day-DESC then importance-DESC, so the first N
   // rows we encounter for each calendar day are that day's strongest leads.
@@ -404,11 +436,15 @@ export async function getEventMembers(
  */
 export async function countFeaturedStories(q: FeedQuery = {}): Promise<number> {
   const client = db();
-  const [row] = await client
-    .select({ c: sql<number>`count(*)` })
-    .from(items)
-    .innerJoin(sources, eq(items.sourceId, sources.id))
-    .leftJoin(clusters, eq(items.clusterId, clusters.id))
-    .where(buildFeedWhere(q));
-  return row?.c ?? 0;
+  // Raw shape so the FROM can pin items_feed_cover_idx — same sparse-filter
+  // rationale as getFeaturedStories' id-subquery above.
+  const rows = await client.all<{ c: number }>(sql`
+    SELECT count(*) AS c
+    FROM ${items} INDEXED BY items_feed_cover_idx
+    INNER JOIN ${sources} ON ${items.sourceId} = ${sources.id}
+    LEFT JOIN ${clusters} INDEXED BY clusters_feed_cover_idx
+      ON ${items.clusterId} = ${clusters.id}
+    WHERE ${buildFeedWhere(q)}
+  `);
+  return Number(rows[0]?.c ?? 0);
 }

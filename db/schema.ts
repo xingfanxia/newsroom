@@ -288,6 +288,20 @@ export const clusters = sqliteTable(
       t.eventTier,
       t.latestMemberAt,
     ),
+    /** Covering index for the feed queries' per-item cluster probe (tier
+     *  COALESCE + lead-dedup + today-window + importance): the id-subquery
+     *  in lib/items/live.ts probes clusters once per enriched item, and PK
+     *  lookups would drag in the payload-heavy table rows (canonical
+     *  titles/summaries). This slim index keeps the whole probe set a few
+     *  hundred KB. */
+    feedCoverIdx: index("clusters_feed_cover_idx").on(
+      t.id,
+      t.eventTier,
+      t.leadItemId,
+      t.firstSeenAt,
+      t.latestMemberAt,
+      t.importance,
+    ),
   }),
 );
 
@@ -414,6 +428,16 @@ export const items = sqliteTable(
     clusterVerifiedIdx: index("items_cluster_verified_idx")
       .on(t.clusterVerifiedAt)
       .where(sql`${t.clusterVerifiedAt} IS NULL`),
+    /** Covering index for the shell-chrome stats (getRadarStats last-24h
+     *  tier counts + getPulseData hourly buckets): range-scan on created_at
+     *  without touching the fat table rows. */
+    createdTierIdx: index("items_created_tier_idx").on(t.createdAt, t.tier),
+    /** Covering partial index for getTopTopics' 7-day tag scan — tags is
+     *  JSON text (~hundreds of bytes/row) so carrying it in the index keeps
+     *  the scan off the payload-heavy table pages entirely. */
+    topicsCoverIdx: index("items_topics_cover_idx")
+      .on(t.createdAt, t.tags)
+      .where(sql`${t.enrichedAt} IS NOT NULL`),
   }),
 );
 

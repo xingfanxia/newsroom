@@ -1,5 +1,37 @@
 # AX's AI RADAR — Current Handoff
 
+## 2026-07-12 — Feed-path query plans pinned (5s TTFB incident)
+
+Day-2 after the Turso cutover the home page hit 3.5–8.6s TTFB. Root cause:
+**Turso's sqld rejects `ANALYZE`** ("SQL not allowed statement"), so
+`sqlite_stat1` can never exist and the query planner runs on default guesses
+forever. For the home feed it walked `items_published_at_idx` expecting the
+LIMIT to saturate early — but the today-view filters match only a few dozen
+rows, so it fetched every enriched row from the payload-heavy table pages
+(~10s cold; 41–150ms via the covering index).
+
+Standing rule this creates: **every latency-sensitive query over `items` or
+`clusters` must pin its index with `INDEXED BY`** — the stat-less planner
+cannot be trusted with sparse filters, and pinning fails loudly if the index
+is ever dropped. Current pins:
+
+- `getFeaturedStories` (lib/items/live.ts): two-phase id-subquery pinned to
+  `items_feed_cover_idx` + `clusters_feed_cover_idx`; the outer query's
+  ORDER BY uses unary `+published_at` so the planner can't fall back to the
+  published_at scan. `countFeaturedStories` and `getDayCounts` pin the same
+  pair.
+- `getRadarStats`/`getPulseData`: shared 24h bound moved into the outer WHERE
+  so `items_created_tier_idx` serves the counts (was a full-table aggregate).
+- `getTopTopics`: single materialized 7-day scan (was 3×) pinned to the
+  covering partial `items_topics_cover_idx`.
+- `getRecentTickerItems`: pinned to `items_created_tier_idx`.
+
+`bun run db:optimize` (scripts/ops/db-optimize.ts) creates the non-vector
+perf indexes (raw SQL — remember `db:push` is unsafe against the live DB, see
+the caveat below) and asserts each hot query still plans onto its pinned
+index; rerun it after touching feed-path queries or indexes. Result:
+home-page data functions now 0.5s cold / ~0.15s warm total (was ~9.4s + 3s).
+
 ## 2026-07-11 — Database migrated: Supabase Postgres → Turso libSQL (SQLite)
 
 The entire DB layer moved to **Turso libSQL** (DB **`newsroom-v2`**, org

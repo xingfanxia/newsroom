@@ -1,4 +1,4 @@
-import { desc, gte, and, isNotNull, eq } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items, sources } from "@/db/schema";
 import { highlightTierInSql } from "@/lib/items/tier-sql";
@@ -15,28 +15,35 @@ export async function getRecentTickerItems(
   locale: AppLocale,
   limit = 12,
 ): Promise<TickerItem[]> {
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  const rows = await db()
-    .select({
-      title: items.title,
-      titleEn: items.titleEn,
-      titleZh: items.titleZh,
-      importance: items.importance,
-      tier: items.tier,
-      sourceNameEn: sources.nameEn,
-      sourceNameZh: sources.nameZh,
-    })
-    .from(items)
-    .innerJoin(sources, eq(items.sourceId, sources.id))
-    .where(
-      and(
-        gte(items.createdAt, since),
-        isNotNull(items.importance),
-        highlightTierInSql(items.tier),
-      ),
-    )
-    .orderBy(desc(items.importance))
-    .limit(limit);
+  const sinceMs = Date.now() - 24 * 60 * 60 * 1000;
+  // Pinned to items_created_tier_idx: created_at bounds the range and tier
+  // is filtered inside the index, so only the few matching rows are fetched
+  // from the payload-heavy table pages. Turso can't run ANALYZE, so hot
+  // queries never trust the stat-less planner (see scripts/ops/db-optimize.ts).
+  const rows = await db().all<{
+    title: string;
+    titleEn: string | null;
+    titleZh: string | null;
+    importance: number | null;
+    tier: string;
+    sourceNameEn: string;
+    sourceNameZh: string;
+  }>(sql`
+    SELECT ${items.title} AS title,
+           ${items.titleEn} AS titleEn,
+           ${items.titleZh} AS titleZh,
+           ${items.importance} AS importance,
+           ${items.tier} AS tier,
+           ${sources.nameEn} AS sourceNameEn,
+           ${sources.nameZh} AS sourceNameZh
+    FROM ${items} INDEXED BY items_created_tier_idx
+    INNER JOIN ${sources} ON ${items.sourceId} = ${sources.id}
+    WHERE ${items.createdAt} >= ${sinceMs}
+      AND ${items.importance} IS NOT NULL
+      AND ${highlightTierInSql(items.tier)}
+    ORDER BY ${items.importance} DESC
+    LIMIT ${limit}
+  `);
 
   return rows.map((r) => {
     const rawTitle =
