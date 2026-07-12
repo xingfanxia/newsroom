@@ -13,13 +13,18 @@ export async function getRadarStats(): Promise<RadarStats> {
   // Timestamps are integer ms epoch (Turso migration) — bind plain numbers.
   const oneDayAgoMs = Date.now() - 24 * 60 * 60 * 1000;
 
+  // Outer WHERE repeats the shared created_at bound (every FILTER already
+  // implies it) so the query is a pure range scan on items_created_tier_idx
+  // instead of a full-table aggregate over the payload-heavy rows
+  // (3s → ms, 2026-07-12).
   const [itemsRow] = await client
     .select({
-      today: sql<number>`count(*) filter (where ${items.createdAt} >= ${oneDayAgoMs})`,
-      p1: sql<number>`count(*) filter (where ${items.createdAt} >= ${oneDayAgoMs} AND ${items.tier} = 'p1')`,
-      featured: sql<number>`count(*) filter (where ${items.createdAt} >= ${oneDayAgoMs} AND ${items.tier} = 'featured')`,
+      today: sql<number>`count(*)`,
+      p1: sql<number>`count(*) filter (where ${items.tier} = 'p1')`,
+      featured: sql<number>`count(*) filter (where ${items.tier} = 'featured')`,
     })
-    .from(items);
+    .from(items)
+    .where(sql`${items.createdAt} >= ${oneDayAgoMs}`);
 
   const [srcRow] = await client
     .select({
@@ -61,19 +66,25 @@ export async function getTopTopics(limit = 16): Promise<TopicEntry[]> {
   // items.tags is JSON text with three array keys; SQLite has no jsonb `||`
   // array concat, so the three keys are unnested as UNION ALL branches of
   // json_each (table-valued function — no LATERAL keyword needed).
+  //
+  // The 7-day slice is materialized ONCE (was three separate scans) and the
+  // scan is answered entirely by items_topics_cover_idx (created_at, tags —
+  // partial on enriched), so it never touches the payload-heavy table pages.
   const rows = await client.all<{ tag: string; n: number }>(sql`
-    WITH tag_values AS (
-      SELECT je.value AS tag
-      FROM ${items}, json_each(coalesce(json_extract(${items.tags}, '$.capabilities'), '[]')) je
+    WITH recent AS MATERIALIZED (
+      SELECT ${items.tags} AS tags
+      FROM ${items} INDEXED BY items_topics_cover_idx
       WHERE ${items.createdAt} >= ${cutoffMs} AND ${items.enrichedAt} IS NOT NULL
+    ),
+    tag_values AS (
+      SELECT je.value AS tag
+      FROM recent, json_each(coalesce(json_extract(recent.tags, '$.capabilities'), '[]')) je
       UNION ALL
       SELECT je.value AS tag
-      FROM ${items}, json_each(coalesce(json_extract(${items.tags}, '$.entities'), '[]')) je
-      WHERE ${items.createdAt} >= ${cutoffMs} AND ${items.enrichedAt} IS NOT NULL
+      FROM recent, json_each(coalesce(json_extract(recent.tags, '$.entities'), '[]')) je
       UNION ALL
       SELECT je.value AS tag
-      FROM ${items}, json_each(coalesce(json_extract(${items.tags}, '$.topics'), '[]')) je
-      WHERE ${items.createdAt} >= ${cutoffMs} AND ${items.enrichedAt} IS NOT NULL
+      FROM recent, json_each(coalesce(json_extract(recent.tags, '$.topics'), '[]')) je
     )
     SELECT tag, count(*) AS n
     FROM tag_values
@@ -173,12 +184,17 @@ export async function getDayCounts(
     ? sql`AND s.curated = TRUE`
     : sql``;
 
+  // INDEXED BY: same sparse-filter trap as getFeaturedStories — the default
+  // published_at-index plan fetches every row in the 60-day range from the
+  // payload-heavy table pages; the covering index answers the filter phase
+  // from slim index pages (2.2s → 30ms, 2026-07-12).
   const rows = await client.all<{ d: string; n: number }>(sql`
     SELECT strftime('%Y-%m-%d', i.published_at / 1000.0, 'unixepoch') AS d,
            count(*) AS n
-    FROM items i
+    FROM items i INDEXED BY items_feed_cover_idx
     JOIN sources s ON s.id = i.source_id
-    LEFT JOIN clusters c ON c.id = i.cluster_id
+    LEFT JOIN clusters c INDEXED BY clusters_feed_cover_idx
+      ON c.id = i.cluster_id
     WHERE i.enriched_at IS NOT NULL
       AND i.importance IS NOT NULL
       AND ${tierFilter}

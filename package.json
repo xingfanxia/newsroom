@@ -20,6 +20,7 @@
     "db:seed": "bun scripts/ops/seed-sources.ts",
     "db:ping": "bun scripts/ops/ping-db.ts",
     "db:vector-index": "bun scripts/ops/db-create-vector-index.ts",
+    "db:optimize": "bun scripts/ops/db-optimize.ts",
     "cron:fetch-hourly": "bun scripts/ops/run-cron.ts fetch-hourly",
     "cron:fetch-daily": "bun scripts/ops/run-cron.ts fetch-daily",
     "cron:fetch-weekly": "bun scripts/ops/run-cron.ts fetch-weekly",

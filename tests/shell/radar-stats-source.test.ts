@@ -160,20 +160,23 @@ describe("radar stats shell contract", () => {
   it("keeps radar top-bar numerator counts in the same 24h window as items_today", () => {
     const stats = readSource("lib/shell/dashboard-stats.ts");
 
+    // The shared 24h bound lives in the outer WHERE (one window for all
+    // three counts — and it keeps the query on items_created_tier_idx
+    // instead of a full-table scan, 2026-07-12 perf fix).
     expect(stats).toContain(
-      "today: sql<number>`count(*) filter (where ${items.createdAt} >= ${oneDayAgoMs})`",
+      ".where(sql`${items.createdAt} >= ${oneDayAgoMs}`)",
     );
+    expect(stats).toContain("today: sql<number>`count(*)`");
     expect(stats).toContain(
-      "p1: sql<number>`count(*) filter (where ${items.createdAt} >= ${oneDayAgoMs} AND ${items.tier} = 'p1')`",
-    );
-    expect(stats).toContain(
-      "featured: sql<number>`count(*) filter (where ${items.createdAt} >= ${oneDayAgoMs} AND ${items.tier} = 'featured')`",
-    );
-    expect(stats).not.toContain(
       "p1: sql<number>`count(*) filter (where ${items.tier} = 'p1')`",
     );
-    expect(stats).not.toContain(
+    expect(stats).toContain(
       "featured: sql<number>`count(*) filter (where ${items.tier} = 'featured')`",
+    );
+    // No per-FILTER createdAt bound — that shape allowed the three counts'
+    // windows to drift apart (and forced the full-table aggregate).
+    expect(stats).not.toContain(
+      "filter (where ${items.createdAt} >= ${oneDayAgoMs}",
     );
   });
 
