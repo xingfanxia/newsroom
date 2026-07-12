@@ -10,22 +10,20 @@ import type { TopicEntry } from "@/components/feed/right-rail";
 /** Items-today / P1 / featured / tracked-source counts for the radar widget. */
 export async function getRadarStats(): Promise<RadarStats> {
   const client = db();
-  // Cast the Date param inline to `::timestamptz`: drizzle otherwise drops the
-  // `items.` table prefix when mixing column refs with typed params and the
-  // postgres driver rejects the resulting ambiguous statement.
-  const oneDayAgoIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  // Timestamps are integer ms epoch (Turso migration) — bind plain numbers.
+  const oneDayAgoMs = Date.now() - 24 * 60 * 60 * 1000;
 
   const [itemsRow] = await client
     .select({
-      today: sql<number>`count(*) filter (where ${items.createdAt} >= ${oneDayAgoIso}::timestamptz)::int`,
-      p1: sql<number>`count(*) filter (where ${items.createdAt} >= ${oneDayAgoIso}::timestamptz AND ${items.tier} = 'p1')::int`,
-      featured: sql<number>`count(*) filter (where ${items.createdAt} >= ${oneDayAgoIso}::timestamptz AND ${items.tier} = 'featured')::int`,
+      today: sql<number>`count(*) filter (where ${items.createdAt} >= ${oneDayAgoMs})`,
+      p1: sql<number>`count(*) filter (where ${items.createdAt} >= ${oneDayAgoMs} AND ${items.tier} = 'p1')`,
+      featured: sql<number>`count(*) filter (where ${items.createdAt} >= ${oneDayAgoMs} AND ${items.tier} = 'featured')`,
     })
     .from(items);
 
   const [srcRow] = await client
     .select({
-      n: sql<number>`count(*) filter (where ${sources.enabled})::int`,
+      n: sql<number>`count(*) filter (where ${sources.enabled})`,
     })
     .from(sources);
 
@@ -45,12 +43,12 @@ export async function getPulseData(): Promise<PulsePoint[]> {
   // WHERE clause, avoiding the same ambiguous-param issue as getRadarStats.
   const rows = await client
     .select({
-      hour: sql<number>`extract(hour from ${items.createdAt})::int`,
-      n: sql<number>`count(*)::int`,
+      hour: sql<number>`CAST(strftime('%H', ${items.createdAt} / 1000.0, 'unixepoch') AS INTEGER)`,
+      n: sql<number>`count(*)`,
     })
     .from(items)
     .where(gte(items.createdAt, oneDayAgo))
-    .groupBy(sql`extract(hour from ${items.createdAt})`);
+    .groupBy(sql`strftime('%H', ${items.createdAt} / 1000.0, 'unixepoch')`);
 
   const byHour = Object.fromEntries(rows.map((r) => [r.hour, r.n]));
   return Array.from({ length: 24 }, (_, h) => ({ h, c: byHour[h] ?? 0 }));
@@ -59,21 +57,27 @@ export async function getPulseData(): Promise<PulsePoint[]> {
 /** Top tags across enriched items over the last 7 days. */
 export async function getTopTopics(limit = 16): Promise<TopicEntry[]> {
   const client = db();
-  const cutoffIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  // `::timestamptz` cast is load-bearing: postgres driver rejects ambiguous
-  // statements when a Date param mixes with qualified column refs. Same fix
-  // as getRadarStats.
-  const rows = await client.execute(sql`
-    SELECT t AS tag, count(*)::int AS n
-    FROM ${items},
-      LATERAL jsonb_array_elements_text(
-        coalesce(${items.tags}->'capabilities', '[]'::jsonb)
-        || coalesce(${items.tags}->'entities',     '[]'::jsonb)
-        || coalesce(${items.tags}->'topics',       '[]'::jsonb)
-      ) AS t
-    WHERE ${items.createdAt} >= ${cutoffIso}::timestamptz
-      AND ${items.enrichedAt} IS NOT NULL
-    GROUP BY t
+  const cutoffMs = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  // items.tags is JSON text with three array keys; SQLite has no jsonb `||`
+  // array concat, so the three keys are unnested as UNION ALL branches of
+  // json_each (table-valued function — no LATERAL keyword needed).
+  const rows = await client.all<{ tag: string; n: number }>(sql`
+    WITH tag_values AS (
+      SELECT je.value AS tag
+      FROM ${items}, json_each(coalesce(json_extract(${items.tags}, '$.capabilities'), '[]')) je
+      WHERE ${items.createdAt} >= ${cutoffMs} AND ${items.enrichedAt} IS NOT NULL
+      UNION ALL
+      SELECT je.value AS tag
+      FROM ${items}, json_each(coalesce(json_extract(${items.tags}, '$.entities'), '[]')) je
+      WHERE ${items.createdAt} >= ${cutoffMs} AND ${items.enrichedAt} IS NOT NULL
+      UNION ALL
+      SELECT je.value AS tag
+      FROM ${items}, json_each(coalesce(json_extract(${items.tags}, '$.topics'), '[]')) je
+      WHERE ${items.createdAt} >= ${cutoffMs} AND ${items.enrichedAt} IS NOT NULL
+    )
+    SELECT tag, count(*) AS n
+    FROM tag_values
+    GROUP BY tag
     ORDER BY n DESC
     LIMIT ${limit}
   `);
@@ -141,31 +145,37 @@ export async function getDayCounts(
         ? highlightTierInSql(sql`coalesce(c.event_tier, i.tier)`)
         : sql`coalesce(c.event_tier, i.tier, 'all') <> 'excluded'`;
 
-  // Drizzle binds JS arrays as tuples ($1,$2) which the planner rejects for
-  // `&&` / `@>`. Build the array via sql.join — same shape as buildFeedWhere.
+  // s.tags is a JSON-text array — overlap tests go through json_each, same
+  // shape as buildFeedWhere in lib/items/live.ts.
   const excludeTagsFilter =
     opts?.excludeSourceTags && opts.excludeSourceTags.length > 0
-      ? sql`AND NOT (s.tags && ARRAY[${sql.join(
-          opts.excludeSourceTags.map((t) => sql`${t}`),
-          sql`, `,
-        )}]::text[])`
+      ? sql`AND NOT EXISTS (
+          SELECT 1 FROM json_each(s.tags)
+          WHERE json_each.value IN (${sql.join(
+            opts.excludeSourceTags.map((t) => sql`${t}`),
+            sql`, `,
+          )})
+        )`
       : sql``;
 
   const includeTagsFilter =
     opts?.includeSourceTags && opts.includeSourceTags.length > 0
-      ? sql`AND s.tags && ARRAY[${sql.join(
-          opts.includeSourceTags.map((t) => sql`${t}`),
-          sql`, `,
-        )}]::text[]`
+      ? sql`AND EXISTS (
+          SELECT 1 FROM json_each(s.tags)
+          WHERE json_each.value IN (${sql.join(
+            opts.includeSourceTags.map((t) => sql`${t}`),
+            sql`, `,
+          )})
+        )`
       : sql``;
 
   const curatedFilter = opts?.curatedOnly
     ? sql`AND s.curated = TRUE`
     : sql``;
 
-  const rows = await client.execute(sql`
-    SELECT to_char(date_trunc('day', i.published_at), 'YYYY-MM-DD') AS d,
-           count(*)::int AS n
+  const rows = await client.all<{ d: string; n: number }>(sql`
+    SELECT strftime('%Y-%m-%d', i.published_at / 1000.0, 'unixepoch') AS d,
+           count(*) AS n
     FROM items i
     JOIN sources s ON s.id = i.source_id
     LEFT JOIN clusters c ON c.id = i.cluster_id
@@ -173,7 +183,7 @@ export async function getDayCounts(
       AND i.importance IS NOT NULL
       AND ${tierFilter}
       AND (i.cluster_id IS NULL OR c.lead_item_id = i.id)
-      AND i.published_at >= now() - (${days} * interval '1 day')
+      AND i.published_at >= ${Date.now() - days * 86_400_000}
       ${excludeTagsFilter}
       ${includeTagsFilter}
       ${curatedFilter}

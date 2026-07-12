@@ -31,15 +31,14 @@ describe("getDayCounts — filter contract with feed", () => {
     expect(statsSrc).toMatch(/JOIN\s+sources\s+s/i);
   });
 
-  it("composes excludeSourceTags via NOT (s.tags && ARRAY[...]::text[])", () => {
-    // Drizzle binds JS arrays as tuples ($1,$2) which the planner rejects
-    // for `&&`. Build the array via sql.join — same shape as
-    // buildFeedWhere's excludeTagsFilter.
-    expect(statsSrc).toMatch(/NOT\s*\(\s*s\.tags\s*&&\s*ARRAY\[/);
+  it("composes excludeSourceTags via NOT EXISTS json_each(s.tags)", () => {
+    // s.tags is a JSON-text array — overlap goes through json_each, same
+    // shape as buildFeedWhere's excludeTagsFilter.
+    expect(statsSrc).toMatch(/AND NOT EXISTS \(\s*SELECT 1 FROM json_each\(s\.tags\)/);
   });
 
-  it("composes includeSourceTags via s.tags && ARRAY[...]::text[]", () => {
-    expect(statsSrc).toMatch(/s\.tags\s*&&\s*ARRAY\[/);
+  it("composes includeSourceTags via EXISTS json_each(s.tags)", () => {
+    expect(statsSrc).toMatch(/AND EXISTS \(\s*SELECT 1 FROM json_each\(s\.tags\)/);
   });
 
   it("composes curatedOnly via s.curated = TRUE", () => {

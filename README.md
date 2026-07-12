@@ -44,7 +44,7 @@ AX's AI RADAR is a dashboard for editors and analysts who cover the AI industry.
 - **Tailwind v4** (CSS-first design tokens in `globals.css`)
 - **next-intl** v4 for `zh` / `en` routing and messages
 - **Radix Slot** for polymorphic buttons + `lucide-react` icons
-- **Supabase Postgres** + **drizzle-orm** + **pgvector 0.8** (`halfvec(3072)` + HNSW)
+- **Turso libSQL (SQLite)** + **drizzle-orm** + native vector search (`F32_BLOB(3072)` + DiskANN cosine index)
 - **Vercel AI SDK v6** unifies LLM + embedding access across providers:
   - Azure AI Foundry DeepSeek V4 Pro for high-value bilingual enrich, score, commentary, cluster summaries, and daily columns.
   - Azure AI Foundry DeepSeek V4 Flash for low-value item treatment and cheap arbitration work.
@@ -59,7 +59,7 @@ Terminal-forward command-center aesthetic — green/orange/blue accents on a nea
 
 ### Data ingestion & AI pipeline
 
-Blueprint in [`docs/architecture/ingestion.md`](./docs/architecture/ingestion.md). Source catalog in [`lib/sources/catalog.ts`](./lib/sources/catalog.ts). Editorial policy lives at [`modules/feed/runtime/policy/skills/editorial.skill.md`](./modules/feed/runtime/policy/skills/editorial.skill.md). Enrichment workers claim rows in Postgres before spending LLM tokens, wait for body prefetch on normal web articles, and cap retry attempts, so overlapping cron/backfill runs do not repeatedly process the same stuck item or title-only page. Local operator cron triggers mirror the `vercel.json` route slugs, for example `bun run cron:fetch-hourly`, `bun run cron:article-body`, `bun run cron:score-backfill`, and `bun run cron:newsletter-daily`; short aliases such as `cron:hourly`, `cron:body`, `cron:score`, and `cron:yt` remain available.
+Blueprint in [`docs/architecture/ingestion.md`](./docs/architecture/ingestion.md). Source catalog in [`lib/sources/catalog.ts`](./lib/sources/catalog.ts). Editorial policy lives at [`modules/feed/runtime/policy/skills/editorial.skill.md`](./modules/feed/runtime/policy/skills/editorial.skill.md). Enrichment workers claim rows in the DB before spending LLM tokens, wait for body prefetch on normal web articles, and cap retry attempts, so overlapping cron/backfill runs do not repeatedly process the same stuck item or title-only page. Local operator cron triggers mirror the `vercel.json` route slugs, for example `bun run cron:fetch-hourly`, `bun run cron:article-body`, `bun run cron:score-backfill`, and `bun run cron:newsletter-daily`; short aliases such as `cron:hourly`, `cron:body`, `cron:score`, and `cron:yt` remain available.
 
 ### Local setup
 
@@ -78,9 +78,9 @@ bun run dev
 
 ### Environment variables
 
-See [`.env.example`](./.env.example) for the complete template. On Vercel, most values are auto-provisioned by the Supabase Marketplace integration + the initial deploy — run `vercel env pull .env.local --yes` to sync locally. Key groups:
+See [`.env.example`](./.env.example) for the complete template. Run `vercel env pull .env.local --yes` to sync locally. Key groups:
 
-- **Supabase** (`POSTGRES_URL`, `POSTGRES_URL_NON_POOLING`, `SUPABASE_*`) — auto-wired by Marketplace.
+- **Turso** (`TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`) — libSQL DB `newsroom` (aws-us-west-2, co-located with the `sfo1` Vercel pin). Replaced Supabase Postgres 2026-07-11.
 - **Azure OpenAI embeddings** (`AZURE_OPENAI_API_KEY` / `_ENDPOINT` / `_EMBEDDING_DEPLOYMENT`) — handles `text-embedding-3-large` only.
 - **Azure OpenAI chat compatibility** (`AZURE_OPENAI_CHAT_*`) — points at the Responses API deployment `gpt-5.5-standard`; retained for compatibility/probes.
 - **Azure DeepSeek** (`AZURE_DEEPSEEK_*`) — primary prose/scoring provider, with `DeepSeek-V4-Pro` and `DeepSeek-V4-Flash` deployments.
@@ -94,7 +94,7 @@ See [`.env.example`](./.env.example) for the complete template. On Vercel, most 
 |---|---|---|
 | **M0 — Shell** | Next.js i18n app + UI from screenshots + mock data | ✅ shipped |
 | **M1 — Read-only ingestion** | Typed source catalog + fetcher + normalizer + live Sources page | ✅ shipped |
-| **M2 — Enrich + Score + Cluster** | LLM summary + tags + 0-100 score + halfvec embeddings + pgvector dedup + live Hot News feed | ✅ shipped |
+| **M2 — Enrich + Score + Cluster** | LLM summary + tags + 0-100 score + 3072-dim embeddings + vector-similarity dedup + live Hot News feed | ✅ shipped |
 | **M3 — Feedback + Auth** | `feedback` table + admin gate + real metrics on 策略迭代 page (Supabase Auth → password gate in s6) | ✅ shipped |
 | **M4 — Editorial agent** | Policy agent reads feedback, diffs `editorial.skill.md`, streams to console | ✅ shipped |
 | **X ingestion** | 7 watched X accounts via API v2 pay-per-tweet, since_id cursor, retweets/replies filtered | ✅ shipped (s6) |
@@ -144,7 +144,7 @@ AX 的 AI 雷达是一款面向 AI 行业编辑和分析师的情报工作台，
 
 ### 技术栈
 
-Next.js 16（App Router + Turbopack + Fluid Compute）· React 19 · TypeScript · Tailwind v4 · next-intl v4 · Radix Slot · Lucide · Vercel AI SDK v6（Azure DeepSeek V4 Pro/Flash 负责正文与评分，Azure OpenAI `text-embedding-3-large` 负责嵌入）· Supabase Postgres + drizzle + pgvector 0.8（halfvec + HNSW）· Vercel Cron（route handlers 由 `vercel.json` 声明）· Bun。
+Next.js 16（App Router + Turbopack + Fluid Compute）· React 19 · TypeScript · Tailwind v4 · next-intl v4 · Radix Slot · Lucide · Vercel AI SDK v6（Azure DeepSeek V4 Pro/Flash 负责正文与评分，Azure OpenAI `text-embedding-3-large` 负责嵌入）· Turso libSQL + drizzle + 原生向量检索（F32_BLOB + DiskANN）· Vercel Cron（route handlers 由 `vercel.json` 声明）· Bun。
 
 ### 设计系统
 
@@ -178,7 +178,7 @@ bun run dev
 | **AI HOT 接入 + 日报文风重写** | 新增 `aihot-api` 信源类型（hourly 拉取卡兹克 https://aihot.virxact.com 精选池）+ 把他们的结构化日报作为 must-cover 基线 merge 进我们的 column generator + 日报/点评改成朋友分享口吻 + 带成本上限的 backfill 脚本 | ✅ 已上线 (2026-05-08，文风 2026-06-10 刷新) |
 | **分级评论 (tier-gated commentary)** | `editor_note_*` (一句话点评) 对每条非 excluded 都生成；`editor_analysis_*` 只对 tier ∈ (featured, p1) 生成 — tier='all' 走 note-only LLM 调用 (`commentaryNoteSchema`，输出量减少约 85%) | ✅ 已上线 (2026-05-08) |
 | **DeepSeek 分层处理 + 论文源退役** | DeepSeek V4 Pro/Flash 按重要度分层处理，中英文都改成朋友分享口吻；中文内容、分数理由、点评、聚类、51 期日报已回填；论文源、论文路由、RSS/MCP/API 暴露和 DB 历史行已清理 | ✅ 已上线 (2026-06-10) |
-| **LLM 用量护栏 + 可观测性** | enrich worker 先在 Postgres claim 再花 token，并带退避/重试上限；event-commentary cron 只消费 24h 活跃事件，历史扫尾交给显式 operator backfill；用量后台/API/MCP 增加全量总计、任务/模型拆分、最近调用模型标签 | ✅ 已上线 (2026-06-11；event-commentary 限流 2026-06-12) |
+| **LLM 用量护栏 + 可观测性** | enrich worker 先在 DB claim 再花 token，并带退避/重试上限；event-commentary cron 只消费 24h 活跃事件，历史扫尾交给显式 operator backfill；用量后台/API/MCP 增加全量总计、任务/模型拆分、最近调用模型标签 | ✅ 已上线 (2026-06-11；event-commentary 限流 2026-06-12) |
 | **编辑分层重命名** | 深度解读 → 锐评 (200 字硬上限, 原 300-500 字 / 800 字顶); summary 收紧到 50-90 字 一句话总结; UI 标签重命名 (编辑点评 → 一句话点评). 主页默认从多日"每日精选"切换到今日热点; 每日精选可通过 `?view=daily` toggle 找回 | ✅ 已上线 (2026-05-08) |
 | **Agent 接入 — 公开镜像** | 匿名 `/api/public/*` 只读镜像 + IP 限流 + 弱 ETag + CORS；完整端点清单和限流口径统一见 [`docs/agent-access/`](./docs/agent-access/)。发现层：托管 `/skill.md` (SKILL.md 标准) + `/openapi.yaml` (OpenAPI 3.1) + `/robots.txt` + `/sitemap.xml`。双语 `/{locale}/agents` 三 tab 页面 (Skill / RSS / REST API)。Bearer-gated `/api/v1/*` + `/api/mcp` 保留给写动作 + 审计 | ✅ 已上线 (2026-05-13, PR #36) |
 

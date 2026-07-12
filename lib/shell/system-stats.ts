@@ -76,6 +76,13 @@ export type SystemSnapshot = {
   };
 };
 
+/** Raw-SQL `max(<timestamp_ms column>)` comes back as an epoch-ms number
+ *  under libSQL (drizzle only applies the timestamp_ms codec to selected
+ *  Column objects, not to raw `sql` expressions) — lift it back to a Date
+ *  for the cron / relative-time consumers. */
+const msToDate = (ms: number | null | undefined): Date | null =>
+  ms == null ? null : new Date(ms);
+
 export async function getSystemSnapshot(): Promise<SystemSnapshot> {
   const snapshotAt = new Date();
   const client = db();
@@ -140,18 +147,18 @@ export async function getSystemSnapshot(): Promise<SystemSnapshot> {
   // --- queues from items + raw_items ------------------------------
   const [queueRow] = await client
     .select({
-      rawPending: sql<number>`count(*) filter (where ${rawItems.normalizedAt} is null)::int`,
-      rawTotal: sql<number>`count(*)::int`,
-      lastNormalizedAt: sql<Date | null>`max(${rawItems.normalizedAt})`,
+      rawPending: sql<number>`count(*) filter (where ${rawItems.normalizedAt} is null)`,
+      rawTotal: sql<number>`count(*)`,
+      lastNormalizedAt: sql<number | null>`max(${rawItems.normalizedAt})`,
     })
     .from(rawItems);
 
   const [itemsRow] = await client
     .select({
-      bodyPrefetchPending: sql<number>`count(*) filter (where ${bodyPrefetchPendingSql(items.bodyFetchedAt, items.canonicalUrl)})::int`,
+      bodyPrefetchPending: sql<number>`count(*) filter (where ${bodyPrefetchPendingSql(items.bodyFetchedAt, items.canonicalUrl)})`,
       enrichClaimable: sql<number>`count(*) filter (
         where ${enrichClaimableSql(items)}
-      )::int`,
+      )`,
       itemCommentaryPending: sql<number>`count(*) filter (
         where ${inArray(items.tier, VISIBLE_ITEM_TIERS)}
           and ${items.commentaryAt} is null
@@ -159,13 +166,13 @@ export async function getSystemSnapshot(): Promise<SystemSnapshot> {
             ${items.clusterId} is null
             or coalesce(${clusters.memberCount}, 1) < 2
           )
-      )::int`,
+      )`,
       scoreBackfillPending: sql<number>`count(*) filter (
         where ${scoreBackfillPendingSql(items)}
-      )::int`,
-      lastBodyFetchedAt: sql<Date | null>`max(${items.bodyFetchedAt})`,
-      lastEnrichedAt: sql<Date | null>`max(${items.enrichedAt})`,
-      lastItemCommentaryAt: sql<Date | null>`max(${items.commentaryAt})`,
+      )`,
+      lastBodyFetchedAt: sql<number | null>`max(${items.bodyFetchedAt})`,
+      lastEnrichedAt: sql<number | null>`max(${items.enrichedAt})`,
+      lastItemCommentaryAt: sql<number | null>`max(${items.commentaryAt})`,
     })
     .from(items)
     .leftJoin(clusters, eq(items.clusterId, clusters.id));
@@ -176,16 +183,16 @@ export async function getSystemSnapshot(): Promise<SystemSnapshot> {
         where ${inArray(clusters.eventTier, VISIBLE_ITEM_TIERS)}
           and ${clusters.memberCount} >= 2
           and ${clusters.commentaryAt} is null
-          and COALESCE(${clusters.latestMemberAt}, ${clusters.firstSeenAt}) >= now() - make_interval(hours => ${EVENT_COMMENTARY_CRON_RECENCY_HOURS})
-      )::int`,
-      lastClusterActivityAt: sql<Date | null>`max(${clusters.updatedAt})`,
+          and COALESCE(${clusters.latestMemberAt}, ${clusters.firstSeenAt}) >= ${Date.now()} - ${EVENT_COMMENTARY_CRON_RECENCY_HOURS * 3_600_000}
+      )`,
+      lastClusterActivityAt: sql<number | null>`max(${clusters.updatedAt})`,
     })
     .from(clusters);
 
   const [newsletterRow] = await client
     .select({
-      lastDailyNewsletterAt: sql<Date | null>`max(${newsletters.publishedAt}) filter (where ${newsletters.kind} = 'daily')`,
-      lastMonthlyNewsletterAt: sql<Date | null>`max(${newsletters.publishedAt}) filter (where ${newsletters.kind} = 'monthly')`,
+      lastDailyNewsletterAt: sql<number | null>`max(${newsletters.publishedAt}) filter (where ${newsletters.kind} = 'daily')`,
+      lastMonthlyNewsletterAt: sql<number | null>`max(${newsletters.publishedAt}) filter (where ${newsletters.kind} = 'monthly')`,
     })
     .from(newsletters);
 
@@ -214,17 +221,17 @@ export async function getSystemSnapshot(): Promise<SystemSnapshot> {
       "fetch-hourly": latestFetchForCadences(["live", "hourly"]),
       "fetch-daily": latestFetchForCadences(["daily"]),
       "fetch-weekly": latestFetchForCadences(["weekly"]),
-      normalize: queueRow?.lastNormalizedAt ?? null,
-      "article-body": itemsRow?.lastBodyFetchedAt ?? null,
-      enrich: itemsRow?.lastEnrichedAt ?? null,
-      commentary: itemsRow?.lastItemCommentaryAt ?? null,
+      normalize: msToDate(queueRow?.lastNormalizedAt),
+      "article-body": msToDate(itemsRow?.lastBodyFetchedAt),
+      enrich: msToDate(itemsRow?.lastEnrichedAt),
+      commentary: msToDate(itemsRow?.lastItemCommentaryAt),
       // Score-backfill has no dedicated run-log or `score_updated_at`.
       // Live enrich also emits score LLM usage, so deriving this from
       // `llm_usage.task = score` would create a false activity signal.
       "score-backfill": NO_DURABLE_CRON_ACTIVITY_SIGNAL,
-      cluster: clustersRow?.lastClusterActivityAt ?? null,
-      "newsletter-daily": newsletterRow?.lastDailyNewsletterAt ?? null,
-      "newsletter-monthly": newsletterRow?.lastMonthlyNewsletterAt ?? null,
+      cluster: msToDate(clustersRow?.lastClusterActivityAt),
+      "newsletter-daily": msToDate(newsletterRow?.lastDailyNewsletterAt),
+      "newsletter-monthly": msToDate(newsletterRow?.lastMonthlyNewsletterAt),
     },
     snapshotAt,
   );

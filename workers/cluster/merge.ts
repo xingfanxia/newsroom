@@ -112,7 +112,7 @@ export async function runMergeBatch(opts: MergeOpts): Promise<MergeReport> {
   const recencyFilter =
     opts.recencyHours == null
       ? sql`TRUE`
-      : sql`c.latest_member_at > now() - make_interval(hours => ${opts.recencyHours})`;
+      : sql`c.latest_member_at > ${Date.now() - opts.recencyHours * 3_600_000}`;
 
   // No-content cluster filter: clusters of items whose source had no body
   // (e.g., an X post that's just a t.co link, or an RSS entry whose body
@@ -121,21 +121,23 @@ export async function runMergeBatch(opts: MergeOpts): Promise<MergeReport> {
   // These clusters' embeddings encode "I have no content" — pairs will be
   // similar, but the items aren't about the same event. Merging them spawns
   // a mega-cluster of unrelated noise. Skip outright.
+  // SQLite LIKE is ASCII-case-insensitive by default (matches pg ILIKE for
+  // these English patterns; CJK has no case, so those are unaffected).
   const noContentSkip = sql`(
-    (c.canonical_title_zh ILIKE '%未披露%'
-      OR c.canonical_title_zh ILIKE '%无法核实%'
-      OR c.canonical_title_zh ILIKE '%无法验证%'
-      OR c.canonical_title_zh ILIKE '%未提供%'
-      OR c.canonical_title_zh ILIKE '%内容不明%'
-      OR c.canonical_title_zh ILIKE '%链接占位%'
-      OR c.canonical_title_zh ILIKE '%神秘链接%')
+    (c.canonical_title_zh LIKE '%未披露%'
+      OR c.canonical_title_zh LIKE '%无法核实%'
+      OR c.canonical_title_zh LIKE '%无法验证%'
+      OR c.canonical_title_zh LIKE '%未提供%'
+      OR c.canonical_title_zh LIKE '%内容不明%'
+      OR c.canonical_title_zh LIKE '%链接占位%'
+      OR c.canonical_title_zh LIKE '%神秘链接%')
     OR
-    (c.canonical_title_en ILIKE '%undisclosed%'
-      OR c.canonical_title_en ILIKE '%unable to verify%'
-      OR c.canonical_title_en ILIKE '%cannot be verified%'
-      OR c.canonical_title_en ILIKE '%no verifiable%'
-      OR c.canonical_title_en ILIKE '%without disclosed%'
-      OR c.canonical_title_en ILIKE '%mysterious link%')
+    (c.canonical_title_en LIKE '%undisclosed%'
+      OR c.canonical_title_en LIKE '%unable to verify%'
+      OR c.canonical_title_en LIKE '%cannot be verified%'
+      OR c.canonical_title_en LIKE '%no verifiable%'
+      OR c.canonical_title_en LIKE '%without disclosed%'
+      OR c.canonical_title_en LIKE '%mysterious link%')
   )`;
 
   // Time-overlap is computed at the ITEM level on published_at — NOT at
@@ -144,7 +146,7 @@ export async function runMergeBatch(opts: MergeOpts): Promise<MergeReport> {
   // we must not merge it with another cluster of items from a different
   // period just because both rows happen to have been created on the same
   // day.
-  const candidates = (await client.execute(sql`
+  const candidates = await client.all<CandidatePair>(sql`
     WITH multi AS (
       SELECT c.id,
              c.member_count
@@ -159,24 +161,24 @@ export async function runMergeBatch(opts: MergeOpts): Promise<MergeReport> {
         b.id AS cluster_b,
         a.member_count AS size_a,
         b.member_count AS size_b,
-        MIN(ia.embedding <=> ib.embedding)::float8 AS min_distance,
-        AVG(ia.embedding <=> ib.embedding)::float8 AS mean_distance,
-        COUNT(*) FILTER (WHERE (ia.embedding <=> ib.embedding) <= ${MERGE_MIN_DISTANCE})::int AS pairs_within,
-        COUNT(*)::int AS total_pairs
+        MIN(vector_distance_cos(ia.embedding, ib.embedding)) AS min_distance,
+        AVG(vector_distance_cos(ia.embedding, ib.embedding)) AS mean_distance,
+        SUM(CASE WHEN vector_distance_cos(ia.embedding, ib.embedding) <= ${MERGE_MIN_DISTANCE} THEN 1 ELSE 0 END) AS pairs_within,
+        COUNT(*) AS total_pairs
       FROM multi a
       JOIN multi b ON a.id < b.id
       JOIN items ia ON ia.cluster_id = a.id AND ia.embedding IS NOT NULL
       JOIN items ib ON ib.cluster_id = b.id AND ib.embedding IS NOT NULL
-      WHERE ABS(EXTRACT(EPOCH FROM (ia.published_at - ib.published_at))) <= ${MERGE_TIME_OVERLAP_HOURS * 3600}
+      WHERE ABS(ia.published_at - ib.published_at) <= ${MERGE_TIME_OVERLAP_HOURS * 3_600_000}
       GROUP BY a.id, b.id, a.member_count, b.member_count
     )
     SELECT *
     FROM pair_distances
     WHERE min_distance <= ${MERGE_MIN_DISTANCE}
       AND mean_distance <= ${MERGE_MEAN_DISTANCE}
-      AND (pairs_within::float8 / total_pairs::float8) >= ${MERGE_PAIRS_WITHIN_FRACTION}
+      AND (CAST(pairs_within AS REAL) / total_pairs) >= ${MERGE_PAIRS_WITHIN_FRACTION}
     ORDER BY mean_distance ASC, cluster_a ASC
-  `)) as unknown as CandidatePair[];
+  `);
 
   // Multiple candidate pairs may share a cluster (transitive merges):
   //   {A, B} and {B, C} should both merge → A absorbs B, then C.

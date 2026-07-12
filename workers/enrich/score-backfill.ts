@@ -44,7 +44,7 @@ export async function runScoreBackfill(): Promise<ScoreBackfillReport> {
 
   // Pick items that either lack HKR (pre-rubric rows), lack the bilingual
   // reasoning pair (pre-bilingual rows), or lack the per-axis reasons
-  // (pre-reasons rows — the hkr jsonb has `h/k/r` booleans but no
+  // (pre-reasons rows — the hkr json has `h/k/r` booleans but no
   // `reasonsZh`/`reasonsEn`). Each case signals a stale score row.
   const pending = await client
     .select()

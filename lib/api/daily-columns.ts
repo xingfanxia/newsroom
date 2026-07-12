@@ -131,8 +131,8 @@ export async function getDailyColumnRowByDate(
     .from(newsletters)
     .where(
       sql`${dailyColumnWhere(locale)}
-        AND ${newsletters.periodStart} >= ${start.toISOString()}::timestamptz
-        AND ${newsletters.periodStart} <  ${end.toISOString()}::timestamptz`,
+        AND ${newsletters.periodStart} >= ${start.getTime()}
+        AND ${newsletters.periodStart} <  ${end.getTime()}`,
     )
     .limit(1);
 

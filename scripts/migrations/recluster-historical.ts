@@ -54,25 +54,22 @@ async function main() {
   const args = parseArgs(process.argv.slice(2));
   const client = db();
 
-  // Bumped statement_timeout for the deletes/updates which scan the items table.
-  await client.execute(sql`SET statement_timeout = '600s'`);
-
   console.log(args.dryRun ? "🔍 DRY RUN" : args.resume ? "▶ RESUME" : "🚀 RECLUSTER");
 
   // Pre-flight.
-  const preRows = (await client.execute(sql`
-    SELECT
-      (SELECT count(*) FROM clusters)::int AS cluster_count,
-      (SELECT count(*) FROM items WHERE cluster_id IS NOT NULL)::int AS clustered_items,
-      (SELECT count(*) FROM items
-        WHERE clustered_at IS NULL
-          AND embedding IS NOT NULL
-          AND enriched_at IS NOT NULL)::int AS pending_recluster
-  `)) as unknown as Array<{
+  const preRows = await client.all<{
     cluster_count: number;
     clustered_items: number;
     pending_recluster: number;
-  }>;
+  }>(sql`
+    SELECT
+      (SELECT count(*) FROM clusters) AS cluster_count,
+      (SELECT count(*) FROM items WHERE cluster_id IS NOT NULL) AS clustered_items,
+      (SELECT count(*) FROM items
+        WHERE clustered_at IS NULL
+          AND embedding IS NOT NULL
+          AND enriched_at IS NOT NULL) AS pending_recluster
+  `);
   const pre = preRows[0];
 
   console.log("\n=== Pre-flight ===");
@@ -92,20 +89,26 @@ async function main() {
     mkdirSync(backupDir, { recursive: true });
     console.log(`\n=== Snapshot to ${backupDir} ===`);
 
-    const clustersDump = (await client.execute(sql`
+    const clustersDump = await client.all<ClusterSnapshot>(sql`
       SELECT id, lead_item_id, member_count FROM clusters
-    `)) as unknown as ClusterSnapshot[];
+    `);
     writeFileSync(
       resolve(backupDir, "clusters.jsonl"),
       clustersDump.map((c) => JSON.stringify(c)).join("\n"),
     );
     console.log(`  ${clustersDump.length} clusters snapshotted`);
 
-    const itemsDump = (await client.execute(sql`
-      SELECT id, cluster_id, clustered_at::text AS clustered_at
+    // clustered_at is INTEGER ms epoch now; render it to an ISO-8601 string
+    // for the human-readable backup (was clustered_at::text on Postgres).
+    const itemsDump = await client.all<ItemSnapshot>(sql`
+      SELECT
+        id,
+        cluster_id,
+        strftime('%Y-%m-%dT%H:%M:%fZ', clustered_at / 1000.0, 'unixepoch')
+          AS clustered_at
       FROM items
       WHERE cluster_id IS NOT NULL
-    `)) as unknown as ItemSnapshot[];
+    `);
     writeFileSync(
       resolve(backupDir, "items-cluster.jsonl"),
       itemsDump.map((i) => JSON.stringify(i)).join("\n"),
@@ -114,7 +117,7 @@ async function main() {
 
     // ── Step 2. Clear cluster state ──────────────────────────────────────────
     console.log("\n=== Reset ===");
-    await client.execute(sql`
+    await client.run(sql`
       UPDATE items
       SET cluster_id = NULL,
           clustered_at = NULL,
@@ -127,12 +130,13 @@ async function main() {
 
     // cluster_splits has FK on items(id) ON DELETE cascade, but FK on
     // clusters is NOT defined (per schema comment about circular dep), so
-    // deleting clusters won't cascade to cluster_splits. Truncate it too —
-    // the audit history was for clusters that no longer exist.
-    await client.execute(sql`TRUNCATE TABLE cluster_splits`);
-    console.log("  cluster_splits truncated");
+    // deleting clusters won't cascade to cluster_splits. Clear it too —
+    // the audit history was for clusters that no longer exist. (SQLite has
+    // no TRUNCATE; an unqualified DELETE FROM is the equivalent.)
+    await client.run(sql`DELETE FROM cluster_splits`);
+    console.log("  cluster_splits cleared");
 
-    await client.execute(sql`DELETE FROM clusters`);
+    await client.run(sql`DELETE FROM clusters`);
     console.log("  clusters cleared");
   }
 
@@ -168,23 +172,23 @@ async function main() {
   console.log(`\n  total: processed=${totalProcessed} assigned=${totalAssigned} new=${totalNewClusters} (${elapsedSec}s)`);
 
   // ── Step 4. Post-flight ──────────────────────────────────────────────────
-  const postRows = (await client.execute(sql`
-    SELECT
-      (SELECT count(*) FROM clusters)::int AS clusters,
-      (SELECT count(*) FROM clusters WHERE member_count >= 2)::int AS multi_member,
-      (SELECT count(*) FROM clusters WHERE member_count = 1)::int AS singletons,
-      (SELECT count(*) FROM items WHERE cluster_id IS NOT NULL)::int AS clustered_items,
-      (SELECT count(*) FROM items
-        WHERE clustered_at IS NULL
-          AND embedding IS NOT NULL
-          AND enriched_at IS NOT NULL)::int AS still_pending
-  `)) as unknown as Array<{
+  const postRows = await client.all<{
     clusters: number;
     multi_member: number;
     singletons: number;
     clustered_items: number;
     still_pending: number;
-  }>;
+  }>(sql`
+    SELECT
+      (SELECT count(*) FROM clusters) AS clusters,
+      (SELECT count(*) FROM clusters WHERE member_count >= 2) AS multi_member,
+      (SELECT count(*) FROM clusters WHERE member_count = 1) AS singletons,
+      (SELECT count(*) FROM items WHERE cluster_id IS NOT NULL) AS clustered_items,
+      (SELECT count(*) FROM items
+        WHERE clustered_at IS NULL
+          AND embedding IS NOT NULL
+          AND enriched_at IS NOT NULL) AS still_pending
+  `);
   const post = postRows[0];
 
   console.log("\n=== Post-flight ===");

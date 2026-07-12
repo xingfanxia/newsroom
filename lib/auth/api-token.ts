@@ -13,7 +13,7 @@
  * revoke it and mint a fresh one.
  */
 import { createHash } from "node:crypto";
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { apiTokens } from "@/db/schema";
 import type { SessionUser } from "./session";
@@ -56,7 +56,7 @@ async function verifyApiToken(
 
   void client
     .update(apiTokens)
-    .set({ lastUsedAt: sql`now()` })
+    .set({ lastUsedAt: new Date() })
     .where(eq(apiTokens.id, row.id))
     .catch((err) => {
       console.error("[api-token] last_used_at bump failed", err);

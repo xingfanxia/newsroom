@@ -1,9 +1,10 @@
 /**
  * GET /api/public/search — Anonymous lexical + semantic search.
  *
- * `mode=lexical` (default) — ILIKE substring against title/summary, fast + cheap.
+ * `mode=lexical` (default) — LIKE substring against title/summary, fast + cheap.
  * `mode=semantic` — embeds q via Azure text-embedding-3-large and ranks by
- *   pgvector cosine distance. Each hit gets a `distance` field (smaller = closer).
+ *   libSQL vector cosine distance. Each hit gets a `distance` field
+ *   (0 = identical, smaller = closer).
  *
  * Same item shape and field stripping as /api/public/feed.
  */

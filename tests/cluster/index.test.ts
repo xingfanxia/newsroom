@@ -75,26 +75,26 @@ describe("Neighbor SQL — published_at window anchor", () => {
     );
   });
 
-  it("uses BETWEEN … make_interval for bidirectional window", () => {
+  it("uses BETWEEN … ms-window arithmetic for bidirectional window", () => {
     expect(workerSrc).toContain("i.published_at BETWEEN");
-    expect(workerSrc).toContain("make_interval(hours =>");
+    expect(workerSrc).toContain("WINDOW_HOURS * 3_600_000");
   });
 
-  it("does NOT use now() as the window anchor", () => {
-    // The old query used `now() - make_interval(hours => ...)`.
-    // After the rewrite the anchor comes from target.published_at.
-    expect(workerSrc).not.toContain("now() - make_interval");
+  it("does NOT use the current time as the window anchor", () => {
+    // The old query used a now-relative window. After the rewrite the
+    // anchor comes from target.published_at.
+    expect(workerSrc).not.toContain("Date.now() - windowMs");
   });
 
   it("lower bound subtracts WINDOW_HOURS from target published_at", () => {
     expect(workerSrc).toContain(
-      "(SELECT published_at FROM target) - make_interval(hours =>",
+      "(SELECT published_at FROM target) - ${windowMs}",
     );
   });
 
   it("upper bound adds WINDOW_HOURS to target published_at", () => {
     expect(workerSrc).toContain(
-      "(SELECT published_at FROM target) + make_interval(hours =>",
+      "(SELECT published_at FROM target) + ${windowMs}",
     );
   });
 });
@@ -127,7 +127,7 @@ describe("Neighbor SQL — split audit exclusions", () => {
 
   it("stops fuzzy-joining items after several distinct split rejections", () => {
     expect(workerSrc).toContain(
-      "count(DISTINCT split_audit.from_cluster_id)::int",
+      "count(DISTINCT split_audit.from_cluster_id)",
     );
     expect(workerSrc).toContain("hasReachedSplitRejectionCap");
   });
@@ -204,7 +204,8 @@ describe("Nearest-neighbor result extraction", () => {
     // turned the entire cluster pipeline into a no-op (all member_count=1).
     expect(workerSrc).not.toContain("(nearestResult as { rows?: unknown[] })");
     expect(workerSrc).not.toContain(".rows?.[0]");
-    expect(workerSrc).toContain("nearestClusteredResult as unknown as Array<");
+    // drizzle-libsql's client.all<T>() returns a typed array directly.
+    expect(workerSrc).toContain("nearestClusteredResult[0]");
   });
 });
 
@@ -236,7 +237,7 @@ describe("Prefer-clustered bias (clone-cluster prevention)", () => {
   it("only runs the unclustered query when the clustered query missed", () => {
     // Saves one HNSW probe in the common case (clustered match exists).
     expect(workerSrc).toMatch(
-      /nearestClustered && nearestClustered\.distance <= threshold[\s\S]+?\? null[\s\S]+?: \(\(await client\.execute\(sql`/,
+      /nearestClustered && nearestClustered\.distance <= threshold[\s\S]+?\? null[\s\S]+?await client\.all<\{ id: number; distance: number \}>\(sql`/,
     );
   });
 

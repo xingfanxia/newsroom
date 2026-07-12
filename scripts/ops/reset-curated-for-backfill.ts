@@ -21,7 +21,7 @@ async function main() {
   const c = db();
 
   const counts = await c
-    .select({ tier: items.tier, n: sql<number>`count(*)::int` })
+    .select({ tier: items.tier, n: sql<number>`count(*)` })
     .from(items)
     .where(
       and(inArray(items.tier, VISIBLE_ITEM_TIERS), isNotNull(items.enrichedAt)),

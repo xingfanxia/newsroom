@@ -92,7 +92,7 @@ async function upsertCatalogSource(client: DbClient, s: Source): Promise<void> {
         notes: sql`EXCLUDED.notes`,
         curated: sql`EXCLUDED.curated`,
         neverExclude: sql`EXCLUDED.never_exclude`,
-        updatedAt: sql`now()`,
+        updatedAt: new Date(),
       },
     });
 
@@ -115,10 +115,10 @@ export async function disableCatalogOrphanSources(
     .set({
       enabled: false,
       notes: sql<string>`CASE
-        WHEN ${sources.notes} IS NULL OR ${sources.notes} = '' THEN ${CATALOG_ORPHAN_SOURCE_NOTE}::text
-        ELSE ${sources.notes} || chr(10) || ${CATALOG_ORPHAN_SOURCE_NOTE}::text
+        WHEN ${sources.notes} IS NULL OR ${sources.notes} = '' THEN ${CATALOG_ORPHAN_SOURCE_NOTE}
+        ELSE ${sources.notes} || char(10) || ${CATALOG_ORPHAN_SOURCE_NOTE}
       END`,
-      updatedAt: sql`now()`,
+      updatedAt: new Date(),
     })
     .where(and(eq(sources.enabled, true), notInArray(sources.id, catalogIds)))
     .returning({ id: sources.id });

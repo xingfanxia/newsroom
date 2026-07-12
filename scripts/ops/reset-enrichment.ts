@@ -11,7 +11,7 @@ import { sql, isNotNull } from "drizzle-orm";
 async function main() {
   const c = db();
   const before = await c
-    .select({ n: sql<number>`count(*)::int` })
+    .select({ n: sql<number>`count(*)` })
     .from(items)
     .where(isNotNull(items.enrichedAt));
   console.log("enriched before:", before[0]?.n ?? 0);
@@ -27,7 +27,7 @@ async function main() {
   console.log("reset rows:", updated.length);
 
   const after = await c
-    .select({ n: sql<number>`count(*)::int` })
+    .select({ n: sql<number>`count(*)` })
     .from(items)
     .where(isNotNull(items.enrichedAt));
   console.log("enriched after:", after[0]?.n ?? 0);

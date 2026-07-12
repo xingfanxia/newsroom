@@ -1,6 +1,6 @@
 /**
  * Real-DB integration tests for the M3 feedback schema. Skips when
- * POSTGRES_URL / DATABASE_URL is unset (CI without DB access).
+ * TURSO_DATABASE_URL is unset (CI without DB access).
  *
  * Uses a throwaway user with a random id so parallel runs + retries don't
  * collide, and cleans up in afterAll even on failure.
@@ -11,11 +11,7 @@ import { closeDb, db, schema } from "@/db/client";
 
 const TEST_USER_ID = `m3-test-${crypto.randomUUID()}`;
 const TEST_EMAIL = `m3-test-${Date.now()}@example.test`;
-const hasDb = Boolean(
-  process.env.POSTGRES_URL ||
-    process.env.DATABASE_URL ||
-    process.env.POSTGRES_PRISMA_URL,
-);
+const hasDb = Boolean(process.env.TURSO_DATABASE_URL);
 
 async function pickAnyItemId(): Promise<number | null> {
   const rows = await db()

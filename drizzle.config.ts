@@ -19,19 +19,23 @@ try {
 }
 
 /**
- * Migrations & schema ops use the NON-pooling URL — PgBouncer transaction
- * pooling breaks DDL and prepared statements that drizzle-kit relies on.
+ * Turso libSQL (NEWSROOM-TURSO, 2026-07-11).
+ *
+ * ⚠️ `db:push` caveats on this schema:
+ *   - drizzle-kit false-diffs custom-typed columns (drizzle-orm #3047) — a
+ *     push may propose dropping/recreating `items.embedding`. NEVER accept
+ *     that plan; it destroys the stored vectors.
+ *   - drizzle-kit cannot express the DiskANN vector index. After any push,
+ *     re-run `bun run db:vector-index` (idempotent).
+ * Prefer `db:generate` + reviewed migrations for schema changes.
  */
 export default defineConfig({
   schema: "./db/schema.ts",
   out: "./db/migrations",
-  dialect: "postgresql",
+  dialect: "turso",
   dbCredentials: {
-    url:
-      process.env.POSTGRES_URL_NON_POOLING ??
-      process.env.DATABASE_URL ??
-      process.env.POSTGRES_URL ??
-      "",
+    url: process.env.TURSO_DATABASE_URL ?? "",
+    authToken: process.env.TURSO_AUTH_TOKEN,
   },
   verbose: true,
   strict: true,

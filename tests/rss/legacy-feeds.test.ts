@@ -69,7 +69,7 @@ describe("legacy RSS feed helpers", () => {
         title: "Raw title",
         summary_zh: null,
         summary_en: "English summary",
-        published_at: "2026-06-13T10:36:00.000Z",
+        published_at: Date.parse("2026-06-13T10:36:00.000Z"),
         url: "https://example.com/story",
       }),
     ).toEqual({

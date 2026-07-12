@@ -1,61 +1,60 @@
-import postgres from "postgres";
-import { drizzle } from "drizzle-orm/postgres-js";
+import { createClient, type Client } from "@libsql/client";
+import { drizzle } from "drizzle-orm/libsql";
 import * as schema from "./schema";
 
 /**
- * Postgres connection for AX's AI RADAR.
+ * Turso libSQL connection for AX's AI RADAR (NEWSROOM-TURSO, 2026-07-11 —
+ * replaced Supabase Postgres / postgres.js).
  *
- * Works with any Postgres + pgvector (Supabase / Railway / self-hosted).
- * On Supabase (via Vercel Marketplace), these env vars are auto-wired:
- *   POSTGRES_URL              — pooled connection (port 6543, PgBouncer transaction mode)
- *   POSTGRES_URL_NON_POOLING  — direct connection (port 5432, for migrations / long tx)
+ * Env vars:
+ *   TURSO_DATABASE_URL — libsql://newsroom-<org>.aws-us-west-2.turso.io
+ *   TURSO_AUTH_TOKEN   — database auth token (full-access)
  *
- * Runtime uses the pooled URL with `prepare: false` because PgBouncer's
- * transaction mode does not support prepared statements.
+ * The libsql:// scheme is rewritten to https:// so the client speaks
+ * stateless HTTP (hrana-over-fetch) instead of a WebSocket — no socket to
+ * cold-start, works identically under bun scripts, Next.js on Vercel Fluid
+ * Compute, and tests. The client is cached at module scope; Fluid reuses
+ * warm instances so this amortizes across invocations. SQLite is
+ * single-writer: concurrent UPDATEs from worker fan-outs serialize on the
+ * server side (each is sub-ms; the LLM calls around them dominate).
  */
 function resolveRuntimeUrl() {
-  const url =
-    process.env.POSTGRES_URL ??
-    process.env.DATABASE_URL ??
-    process.env.POSTGRES_PRISMA_URL;
+  const url = process.env.TURSO_DATABASE_URL;
   if (!url) {
     throw new Error(
-      "POSTGRES_URL is not set. Link Supabase via Vercel Marketplace, or set DATABASE_URL manually.",
+      "TURSO_DATABASE_URL is not set. Create a Turso DB and set " +
+        "TURSO_DATABASE_URL + TURSO_AUTH_TOKEN.",
     );
   }
-  return url;
+  return url.replace(/^libsql:/, "https:");
 }
 
-let cachedSql: ReturnType<typeof postgres> | null = null;
+let cachedClient: Client | null = null;
 let cachedDb: ReturnType<typeof drizzle<typeof schema>> | null = null;
 
 export function db() {
   if (!cachedDb) {
-    cachedSql = postgres(resolveRuntimeUrl(), {
-      // PgBouncer transaction mode — no prepared statements across tx boundaries.
-      prepare: false,
-      // Allow parallel queries per invocation. Backfill workers fan out
-      // 30-50 concurrent LLM calls that each finish with a DB UPDATE, so
-      // the pool needs headroom above that to avoid queueing updates behind
-      // each other. PgBouncer handles fan-in on its side.
-      max: 40,
-      // Quick idle release so hot invocations don't hoard connections.
-      idle_timeout: 20,
-      // Connection timeout in seconds.
-      connect_timeout: 10,
-      // Don't crash the process on pool errors — surface via throw.
-      onnotice: () => {},
+    cachedClient = createClient({
+      url: resolveRuntimeUrl(),
+      authToken: process.env.TURSO_AUTH_TOKEN,
     });
-    cachedDb = drizzle(cachedSql, { schema, casing: "snake_case" });
+    cachedDb = drizzle(cachedClient, { schema, casing: "snake_case" });
   }
   return cachedDb;
 }
 
-/** Close the underlying pool — used by scripts that need a clean exit. */
+/** Direct libSQL client — for batch() and vector queries that don't fit
+ *  the ORM surface. Same cached connection as db(). */
+export function libsqlClient(): Client {
+  db();
+  return cachedClient!;
+}
+
+/** Close the underlying client — used by scripts that need a clean exit. */
 export async function closeDb() {
-  if (cachedSql) {
-    await cachedSql.end({ timeout: 5 });
-    cachedSql = null;
+  if (cachedClient) {
+    cachedClient.close();
+    cachedClient = null;
     cachedDb = null;
   }
 }

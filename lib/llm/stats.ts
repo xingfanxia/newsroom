@@ -9,30 +9,20 @@ export const USAGE_WINDOWS = ["today", "week", "month", "all"] as const;
 export type WindowKey = (typeof USAGE_WINDOWS)[number];
 
 function windowClause(w: WindowKey) {
+  // created_at is integer ms epoch (Turso migration); windows are computed
+  // in JS and bound as numbers. "today" is UTC-day-aligned like the old
+  // date_trunc('day', now()).
+  const startOfUtcDayMs = Date.now() - (Date.now() % 86_400_000);
   switch (w) {
     case "today":
-      return sql`created_at >= date_trunc('day', now())`;
+      return sql`created_at >= ${startOfUtcDayMs}`;
     case "week":
-      return sql`created_at >= now() - interval '7 days'`;
+      return sql`created_at >= ${Date.now() - 7 * 86_400_000}`;
     case "month":
-      return sql`created_at >= now() - interval '30 days'`;
+      return sql`created_at >= ${Date.now() - 30 * 86_400_000}`;
     case "all":
       return sql`true`;
   }
-}
-
-/**
- * drizzle-orm's `.execute(sql)` with postgres-js returns an array-like result
- * indexed by numeric keys (res[0], res[1], ...), NOT a {rows: [...]} wrapper
- * that pg/node-postgres uses. Earlier code assumed `.rows` and silently read
- * 0 for every aggregate. Normalize to a plain Record array here.
- */
-function asRows(result: unknown): Record<string, unknown>[] {
-  const r = result as unknown as
-    | Record<string, unknown>[]
-    | { rows?: Record<string, unknown>[] };
-  if (Array.isArray(r)) return r;
-  return r.rows ?? [];
 }
 
 export type WindowTotals = {
@@ -49,17 +39,17 @@ export async function totalsByWindow(
   w: WindowKey = "today",
 ): Promise<WindowTotals> {
   const client = db();
-  const result = await client.execute(sql`
+  const result = await client.all<Record<string, unknown>>(sql`
     SELECT
-      count(*)::int AS calls,
-      coalesce(sum(input_tokens), 0)::int AS input_tokens,
-      coalesce(sum(cached_input_tokens), 0)::int AS cached_input_tokens,
-      coalesce(sum(output_tokens), 0)::int AS output_tokens,
-      coalesce(sum(reasoning_tokens), 0)::int AS reasoning_tokens,
-      coalesce(sum(cost_usd), 0)::float AS cost_usd
+      count(*) AS calls,
+      coalesce(sum(input_tokens), 0) AS input_tokens,
+      coalesce(sum(cached_input_tokens), 0) AS cached_input_tokens,
+      coalesce(sum(output_tokens), 0) AS output_tokens,
+      coalesce(sum(reasoning_tokens), 0) AS reasoning_tokens,
+      coalesce(sum(cost_usd), 0) AS cost_usd
     FROM llm_usage WHERE ${windowClause(w)}
   `);
-  const r = asRows(result)[0] ?? {};
+  const r = result[0] ?? {};
   return {
     window: w,
     calls: Number(r.calls ?? 0),
@@ -91,19 +81,19 @@ export async function breakdownByTask(
   w: WindowKey = "week",
 ): Promise<TaskBreakdown[]> {
   const client = db();
-  const result = await client.execute(sql`
+  const result = await client.all<Record<string, unknown>>(sql`
     SELECT
       task, provider, model,
-      count(*)::int AS calls,
-      coalesce(sum(input_tokens), 0)::int AS input_tokens,
-      coalesce(sum(output_tokens), 0)::int AS output_tokens,
-      coalesce(sum(cost_usd), 0)::float AS cost_usd
+      count(*) AS calls,
+      coalesce(sum(input_tokens), 0) AS input_tokens,
+      coalesce(sum(output_tokens), 0) AS output_tokens,
+      coalesce(sum(cost_usd), 0) AS cost_usd
     FROM llm_usage WHERE ${windowClause(w)}
     GROUP BY task, provider, model
     ORDER BY cost_usd DESC
   `);
   const byTask = new Map<string, TaskBreakdown>();
-  for (const r of asRows(result)) {
+  for (const r of result) {
     const task = (r.task as string | null) ?? null;
     const key = task ?? "untagged";
     const calls = Number(r.calls ?? 0);
@@ -146,16 +136,16 @@ export async function breakdownByModel(
   w: WindowKey = "week",
 ): Promise<ModelBreakdown[]> {
   const client = db();
-  const result = await client.execute(sql`
+  const result = await client.all<Record<string, unknown>>(sql`
     SELECT
       provider, model,
-      count(*)::int AS calls,
-      coalesce(sum(cost_usd), 0)::float AS cost_usd
+      count(*) AS calls,
+      coalesce(sum(cost_usd), 0) AS cost_usd
     FROM llm_usage WHERE ${windowClause(w)}
     GROUP BY provider, model
     ORDER BY cost_usd DESC
   `);
-  return asRows(result).map((r) => ({
+  return result.map((r) => ({
     provider: String(r.provider),
     model: String(r.model),
     calls: Number(r.calls ?? 0),
@@ -184,26 +174,27 @@ export type RecentCall = {
 export type DailySpendPoint = { date: string; spend: number; calls: number };
 export async function dailySpend(days = 30): Promise<DailySpendPoint[]> {
   const client = db();
-  const result = await client.execute(sql`
-    WITH series AS (
-      SELECT to_char(d::date, 'YYYY-MM-DD') AS date
-      FROM generate_series(
-        (now() - (${days - 1} * interval '1 day'))::date,
-        now()::date,
-        interval '1 day'
-      ) AS d
-    )
+  // SQLite has no generate_series by default — build the day list in JS and
+  // unnest it with json_each. Days are UTC-aligned like the old ::date.
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  const dayList = Array.from({ length: days }, (_, i) =>
+    new Date(today.getTime() - (days - 1 - i) * 86_400_000)
+      .toISOString()
+      .slice(0, 10),
+  );
+  const result = await client.all<Record<string, unknown>>(sql`
     SELECT
-      s.date,
-      coalesce(sum(u.cost_usd), 0)::float AS spend,
-      coalesce(count(u.id), 0)::int AS calls
-    FROM series s
+      s.value AS date,
+      coalesce(sum(u.cost_usd), 0) AS spend,
+      coalesce(count(u.id), 0) AS calls
+    FROM json_each(${JSON.stringify(dayList)}) s
     LEFT JOIN llm_usage u
-      ON to_char(date_trunc('day', u.created_at), 'YYYY-MM-DD') = s.date
-    GROUP BY s.date
-    ORDER BY s.date ASC
+      ON strftime('%Y-%m-%d', u.created_at / 1000.0, 'unixepoch') = s.value
+    GROUP BY s.value
+    ORDER BY s.value ASC
   `);
-  return asRows(result).map((r) => ({
+  return result.map((r) => ({
     date: String(r.date),
     spend: Number(r.spend ?? 0),
     calls: Number(r.calls ?? 0),

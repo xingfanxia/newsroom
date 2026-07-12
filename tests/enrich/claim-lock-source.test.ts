@@ -14,23 +14,20 @@ describe("enrich worker claim lock", () => {
   const worker = readSource("workers/enrich/index.ts");
   const pendingPredicates = readSource("workers/enrich/pending-predicates.ts");
   const claimState = readOptional("workers/enrich/claim-state.ts");
-  const migration = readOptional(
-    "db/migrations/manual/2026-06-11-enrich-claim-lock.sql",
-  );
 
   it("tracks claim state, attempts, and errors on items", () => {
-    expect(schema).toContain('enrichClaimedAt: timestamp("enrich_claimed_at"');
+    expect(schema).toContain('enrichClaimedAt: integer("enrich_claimed_at"');
     expect(schema).toContain('enrichAttempts: integer("enrich_attempts"');
     expect(schema).toContain('enrichError: text("enrich_error")');
-    expect(migration).toContain("ADD COLUMN IF NOT EXISTS enrich_claimed_at");
-    expect(migration).toContain("ADD COLUMN IF NOT EXISTS enrich_attempts");
-    expect(migration).toContain("ADD COLUMN IF NOT EXISTS enrich_error");
   });
 
   it("claims pending rows atomically before spending LLM calls", () => {
-    expect(worker).toContain("FOR UPDATE SKIP LOCKED");
+    // Single UPDATE ... WHERE id IN (SELECT ... LIMIT n) RETURNING — SQLite is
+    // single-writer, so the whole claim serializes (replaced the Postgres
+    // FOR UPDATE SKIP LOCKED writable CTE).
     expect(worker).toContain("claimPendingEnrichItems");
-    expect(worker).toContain("enrich_claimed_at = now()");
+    expect(worker).toMatch(/UPDATE \$\{items\}[\s\S]+?RETURNING \$\{items\.id\} AS id/);
+    expect(worker).toContain("enrich_claimed_at = ${Date.now()}");
     expect(worker).toContain("enrich_attempts = coalesce(enrich_attempts, 0) + 1");
   });
 

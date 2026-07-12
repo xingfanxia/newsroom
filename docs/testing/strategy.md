@@ -36,7 +36,7 @@ For source-contract changes, prefer the existing `tests/**/**-source.test.ts`
 pattern. These tests intentionally read runtime files and docs to prevent
 duplicate enum lists, stale routing guidance, or helper drift from returning.
 
-For real-DB tests, keep the `POSTGRES_URL` / `DATABASE_URL` skip behavior in
+For real-DB tests, keep the `TURSO_DATABASE_URL` skip behavior in
 the test itself. Do not replace DB-backed invariants with source-only checks
 unless the behavior is impossible to exercise locally.
 

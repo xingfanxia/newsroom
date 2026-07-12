@@ -45,7 +45,7 @@ async function persist(args: RecordUsageArgs): Promise<void> {
     cachedInputTokens: args.tokens.cachedInputTokens ?? 0,
     outputTokens: args.tokens.outputTokens ?? 0,
     reasoningTokens: args.tokens.reasoningTokens ?? 0,
-    costUsd: cost !== null ? String(cost) : null,
+    costUsd: cost,
     itemId: args.itemId ?? null,
     durationMs: args.durationMs,
   });

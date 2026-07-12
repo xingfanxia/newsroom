@@ -1,26 +1,27 @@
 /**
- * Semantic search over items.embedding using pgvector HNSW.
+ * Semantic search over items.embedding using libSQL native vector search.
  *
  * Flow: embed the user's query via the same Azure text-embedding-3-large
- * deployment that enriched the items, then `ORDER BY embedding <#> $q`
- * and return the top-N hits. `<#>` is negative-inner-product; for the
- * unit-length vectors OpenAI's embeddings produce, this ranks identically
- * to cosine distance (`<=>`) but skips the renormalization, saving ~15%
- * of per-query work.
+ * deployment that enriched the items, then probe the DiskANN index
+ * (`vector_top_k`) for a candidate set, and rank the filtered survivors by
+ * exact `vector_distance_cos`. Cosine distance = 1 − cosine similarity
+ * (0 = identical, ~1 = unrelated) — the old pgvector `<#>` inner-product
+ * shortcut has no libSQL equivalent, so scores changed scale in the Turso
+ * migration (they remain "smaller = closer").
  *
- * The HNSW index was created by scripts/ops/db-create-hnsw.ts and is
- * re-created automatically after every `bun run db:push` (gotcha #2 in
- * docs/HANDOFF.md).
+ * The DiskANN index is created by scripts/ops/db-create-vector-index.ts and
+ * must be re-created after any `bun run db:push` (same gotcha as the old
+ * HNSW index — see docs/HANDOFF.md gotcha #2).
  *
- * Known caveat: adding WHERE filters (tier/source_id/date) can force the
- * planner off the HNSW index into a seq scan. At today's 6.8k-item index
- * this is still sub-200ms, so v1 just accepts the risk and measures. If
- * it becomes a bottleneck, switch to the two-query fallback (HNSW candidate
- * set of 500, then filter in app).
+ * Two-phase shape (candidates → filter) is deliberate: `vector_top_k` can't
+ * see WHERE clauses, so we over-fetch candidates and filter after. If every
+ * candidate gets filtered out the result is thin — same class of caveat the
+ * pgvector version had when the planner fell off the HNSW index. At ~21k
+ * items a TOP_K_CANDIDATES probe is a few thousand row reads, still cheap.
  */
-import { and, eq, isNotNull, sql } from "drizzle-orm";
-import { db } from "@/db/client";
-import { items, sources, clusters, halfvecToDriver } from "@/db/schema";
+import { and, eq, inArray, isNotNull, sql } from "drizzle-orm";
+import { db, libsqlClient } from "@/db/client";
+import { items, sources, clusters, embeddingToVectorText } from "@/db/schema";
 import { storySelectFields } from "@/lib/items/story-select";
 import { toStory } from "@/lib/items/story-mapper";
 import { embed } from "@/lib/llm";
@@ -36,6 +37,11 @@ import {
   type SourceKind,
   type Story,
 } from "@/lib/types";
+
+/** Candidate pool fetched from the vector index before SQL filters run.
+ *  Matches the "HNSW candidate set of 500, then filter" fallback the
+ *  pgvector version documented. */
+const TOP_K_CANDIDATES = 500;
 
 export type SemanticFilters = {
   locale?: AppLocale;
@@ -65,11 +71,21 @@ export async function semanticSearch(
   }
 
   const { embedding } = await embed({ value: trimmed, task: "search" });
-  const queryVecText = halfvecToDriver(embedding);
+  const queryVecText = embeddingToVectorText(embedding);
   const limit = Math.min(
     Math.max(opts.limit ?? DEFAULT_SEARCH_LIMIT, SEARCH_LIMIT_MIN),
     MCP_SEARCH_LIMIT_MAX,
   );
+
+  // Phase 1 — DiskANN probe for the nearest candidate ids.
+  const topK = await libsqlClient().execute({
+    sql: "SELECT id FROM vector_top_k('items_embedding_idx', vector32(?), ?)",
+    args: [queryVecText, TOP_K_CANDIDATES],
+  });
+  const candidateIds = topK.rows.map((r) => Number(r.id));
+  if (candidateIds.length === 0) {
+    return { items: [], total: 0, embeddingDims: embedding.length };
+  }
 
   const sourceIdFilter = opts.sourceId
     ? sql`${items.sourceId} = ${opts.sourceId}`
@@ -82,7 +98,7 @@ export async function semanticSearch(
     : sql`TRUE`;
   const dateFilter =
     opts.dateFrom || opts.dateTo
-      ? sql`${items.publishedAt} >= ${opts.dateFrom ?? "1970-01-01"}::timestamptz AND ${items.publishedAt} < ${opts.dateTo ?? "2999-01-01"}::timestamptz`
+      ? sql`${items.publishedAt} >= ${Date.parse(opts.dateFrom ?? "1970-01-01")} AND ${items.publishedAt} < ${Date.parse(opts.dateTo ?? "2999-01-01")}`
       : sql`TRUE`;
   const exclusionFilter = opts.includeExcluded
     ? sql`TRUE`
@@ -95,9 +111,8 @@ export async function semanticSearch(
   // lead is always indexed too and usually ranks close enough.
   const dedupFilter = sql`(${items.clusterId} IS NULL OR ${clusters.leadItemId} = ${items.id})`;
 
-  // `<#>` returns negative distance for unit vectors; smaller = closer.
-  // We expose raw distance to the caller so they can tune a threshold.
-  const distance = sql<number>`(${items.embedding} <#> ${queryVecText}::halfvec(3072))::float`;
+  // Phase 2 — exact cosine distance over the candidate set, post-filters.
+  const distance = sql<number>`vector_distance_cos(${items.embedding}, vector32(${queryVecText}))`;
 
   const rows = await db()
     .select({
@@ -109,6 +124,7 @@ export async function semanticSearch(
     .leftJoin(clusters, eq(items.clusterId, clusters.id))
     .where(
       and(
+        inArray(items.id, candidateIds),
         isNotNull(items.embedding),
         isNotNull(items.enrichedAt),
         exclusionFilter,
@@ -119,7 +135,7 @@ export async function semanticSearch(
         dateFilter,
       ),
     )
-    .orderBy(sql`${items.embedding} <#> ${queryVecText}::halfvec(3072)`)
+    .orderBy(distance)
     .limit(limit);
 
   const locale = opts.locale ?? DEFAULT_API_SEARCH_LOCALE;

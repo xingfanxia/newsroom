@@ -26,7 +26,7 @@ describe("paper source cleanup script", () => {
     const src = readSource(cleanupPath);
     expect(src).toContain("MIXED_PAPER_SOURCE_IDS");
     expect(src).toContain("aihot-selected");
-    expect(src).toContain("raw_payload->>'category' = 'paper'");
+    expect(src).toContain("json_extract(r.raw_payload, '$.category') = 'paper'");
     expect(src).toContain("cleanup_paper_raw_items");
   });
 

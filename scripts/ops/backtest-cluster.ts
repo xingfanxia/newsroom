@@ -8,10 +8,11 @@
  *
  * Strategy: instead of replaying the full clustering algorithm against a
  * shadow schema (the workers write back to live tables, so a clean shadow
- * would require deep refactoring), we use pgvector's HNSW index directly.
- * For each item in the window, we ask the index for its k=3 nearest
- * neighbors. Pairs whose distance falls under the new threshold but
- * currently belong to different clusters are the "would newly merge" set.
+ * would require deep refactoring), we compute cosine distance
+ * (vector_distance_cos) directly over the stored F32 embeddings. For each
+ * item in the window, we take its k=3 nearest neighbors. Pairs whose
+ * distance falls under the new threshold but currently belong to different
+ * clusters are the "would newly merge" set.
  * That's the population the spot-check sample is drawn from and the
  * primary input to the operator gate.
  *
@@ -128,12 +129,15 @@ type DistributionRow = {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const distanceCutoff = 1 - args.threshold;
+  // Time bounds as integer ms epoch (published_at is timestamp_ms).
+  const sinceMs = Date.parse(args.since);
+  const windowMs = args.windowHours * 3_600_000;
   const client = db();
 
-  // The full-window cross-join over thousands of items × HNSW lateral can
-  // exceed Supabase's default 60-120s statement_timeout. Bump it for this
-  // session — operator-only script, not on the request path.
-  await client.execute(sql`SET statement_timeout = '600s'`);
+  // NOTE: this exact-cosine self-join over the full window is O(N²) and can
+  // run long on wide windows. libSQL has no per-statement timeout knob to
+  // raise (unlike Supabase's statement_timeout) — narrow --since / --window
+  // if it runs too long. Operator-only script, not on the request path.
 
   console.log("=== Backtest configuration ===");
   console.log(`  threshold:    ${args.threshold} (distance cutoff ${distanceCutoff.toFixed(3)})`);
@@ -146,20 +150,20 @@ async function main() {
   mkdirSync(outputDir, { recursive: true });
 
   // Pre-flight counts.
-  const preCountsRows = (await client.execute(sql`
-    SELECT
-      count(*)::int AS total_items,
-      count(*) FILTER (WHERE embedding IS NOT NULL)::int AS embedded,
-      count(*) FILTER (WHERE cluster_id IS NOT NULL)::int AS clustered,
-      count(DISTINCT cluster_id)::int AS clusters
-    FROM items
-    WHERE published_at >= ${args.since}::date
-  `)) as unknown as Array<{
+  const preCountsRows = await client.all<{
     total_items: number;
     embedded: number;
     clustered: number;
     clusters: number;
-  }>;
+  }>(sql`
+    SELECT
+      count(*) AS total_items,
+      count(*) FILTER (WHERE embedding IS NOT NULL) AS embedded,
+      count(*) FILTER (WHERE cluster_id IS NOT NULL) AS clustered,
+      count(DISTINCT cluster_id) AS clusters
+    FROM items
+    WHERE published_at >= ${sinceMs}
+  `);
   const preCounts = preCountsRows[0];
 
   console.log("=== Population in window ===");
@@ -169,60 +173,65 @@ async function main() {
   console.log(`  clusters:      ${preCounts.clusters}\n`);
 
   // Find pairs that would newly merge under the new threshold.
-  // For each item in the window, get its 3 nearest neighbors via HNSW index,
-  // filtered to within the time window AND below the new distance cutoff.
-  // A pair is a "new merge" if the two items are in different clusters today
-  // (or one is unclustered).
-  console.log(`=== Searching for new-merge pairs (this may take ~30s) ===`);
+  // For each item in the window, take its 3 nearest neighbors by exact cosine
+  // distance (vector_distance_cos), filtered to within the time window AND
+  // below the new distance cutoff. libSQL has no correlated LATERAL, so the
+  // per-target k-NN is expressed as a windowed self-join (row_number() over
+  // the in-window candidates). A pair is a "new merge" if the two items are in
+  // different clusters today (or one is unclustered).
+  console.log(`=== Searching for new-merge pairs (exact cosine scan — may take a while) ===`);
   const t0 = Date.now();
-  const newMergesResult = await client.execute(sql`
+  const newMerges = await client.all<NewMergeRow>(sql`
     WITH targets AS (
       SELECT id, embedding, published_at, cluster_id
       FROM items
-      WHERE published_at >= ${args.since}::date
+      WHERE published_at >= ${sinceMs}
         AND embedding IS NOT NULL
     ),
-    neighbors AS (
+    ranked AS (
       SELECT
         t.id AS a_id,
         t.cluster_id AS a_cluster,
         n.id AS b_id,
         n.cluster_id AS b_cluster,
-        (t.embedding <=> n.embedding) AS distance
+        vector_distance_cos(t.embedding, n.embedding) AS distance,
+        row_number() OVER (
+          PARTITION BY t.id
+          ORDER BY vector_distance_cos(t.embedding, n.embedding)
+        ) AS rn
       FROM targets t
-      CROSS JOIN LATERAL (
-        SELECT id, cluster_id, embedding
-        FROM items
-        WHERE id <> t.id
-          AND embedding IS NOT NULL
-          AND published_at BETWEEN
-              t.published_at - make_interval(hours => ${args.windowHours})
-          AND t.published_at + make_interval(hours => ${args.windowHours})
-        ORDER BY embedding <=> t.embedding
-        LIMIT 3
-      ) n
-      WHERE (t.embedding <=> n.embedding) <= ${distanceCutoff}
-        AND t.id < n.id  -- dedupe (a, b) and (b, a)
+      JOIN items n
+        ON n.id <> t.id
+       AND n.embedding IS NOT NULL
+       AND n.published_at BETWEEN
+             t.published_at - ${windowMs}
+         AND t.published_at + ${windowMs}
+    ),
+    neighbors AS (
+      SELECT a_id, a_cluster, b_id, b_cluster, distance
+      FROM ranked
+      WHERE rn <= 3
+        AND distance <= ${distanceCutoff}
+        AND a_id < b_id  -- dedupe (a, b) and (b, a)
     )
     SELECT
       n.a_id, n.a_cluster, n.b_id, n.b_cluster, n.distance,
       a.title AS a_title,
       a.title_zh AS a_title_zh,
-      a.published_at::text AS a_published,
+      strftime('%Y-%m-%d %H:%M:%S', a.published_at / 1000.0, 'unixepoch') AS a_published,
       sa.name_en AS a_source,
       b.title AS b_title,
       b.title_zh AS b_title_zh,
-      b.published_at::text AS b_published,
+      strftime('%Y-%m-%d %H:%M:%S', b.published_at / 1000.0, 'unixepoch') AS b_published,
       sb.name_en AS b_source
     FROM neighbors n
     JOIN items a ON a.id = n.a_id
     JOIN items b ON b.id = n.b_id
     JOIN sources sa ON sa.id = a.source_id
     JOIN sources sb ON sb.id = b.source_id
-    WHERE n.a_cluster IS DISTINCT FROM n.b_cluster  -- not currently merged
+    WHERE n.a_cluster IS NOT n.b_cluster  -- null-safe inequality: not currently merged
     ORDER BY n.distance
   `);
-  const newMerges = newMergesResult as unknown as NewMergeRow[];
   console.log(`  found ${newMerges.length} new-merge pairs in ${Date.now() - t0}ms\n`);
 
   // Distance distribution among new-merges (for histogram-style summary).

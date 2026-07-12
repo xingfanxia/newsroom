@@ -1,35 +1,37 @@
-import postgres from "postgres";
+import { closeDb, libsqlClient } from "@/db/client";
 
 async function main() {
-  const url = process.env.POSTGRES_URL_NON_POOLING ?? process.env.POSTGRES_URL;
-  if (!url) {
-    console.error("No POSTGRES_URL set");
+  if (!process.env.TURSO_DATABASE_URL) {
+    console.error("No TURSO_DATABASE_URL set");
     process.exit(2);
   }
 
   console.log(
-    `connecting to ${url.replace(/:[^:@]+@/, ":***@").slice(0, 80)}...`,
+    `connecting to ${process.env.TURSO_DATABASE_URL.slice(0, 60)}...`,
   );
-  const sql = postgres(url, {
-    prepare: false,
-    max: 1,
-    connect_timeout: 10,
-    idle_timeout: 5,
-    ssl: "require",
-  });
 
   try {
-    const rows = await sql`SELECT 1 AS ok, version() AS version, current_database() AS db`;
+    const client = libsqlClient();
+    const rows = await client.execute(
+      "SELECT 1 AS ok, sqlite_version() AS version",
+    );
     console.log("✓ connected");
-    console.log(JSON.stringify(rows[0], null, 2));
+    console.log(JSON.stringify(rows.rows[0], null, 2));
 
-    const ext = await sql`SELECT extname FROM pg_extension WHERE extname IN ('vector','pg_trgm')`;
-    console.log("extensions:", ext.map((e) => e.extname));
+    const vec = await client.execute(
+      "SELECT name FROM sqlite_master WHERE name = 'items_embedding_idx'",
+    );
+    console.log(
+      "vector index:",
+      vec.rows.length > 0
+        ? "items_embedding_idx ✓"
+        : "MISSING — run db:vector-index",
+    );
   } catch (err) {
     console.error("✗ failed:", err instanceof Error ? err.message : err);
     process.exit(1);
   } finally {
-    await sql.end({ timeout: 3 });
+    await closeDb();
   }
 }
 

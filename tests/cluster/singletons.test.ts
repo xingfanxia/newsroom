@@ -72,7 +72,7 @@ describe("cron singleton recluster wiring", () => {
     );
     expect(singletonSrc).toContain("MAX_DISTINCT_SPLIT_RETRIES_PER_ITEM");
     expect(singletonSrc).toContain(
-      "count(DISTINCT split_audit.from_cluster_id)::int",
+      "count(DISTINCT split_audit.from_cluster_id)",
     );
   });
 

@@ -8,11 +8,7 @@ import {
 import type { SessionUser } from "@/lib/auth/session";
 import { readSource as read } from "@/tests/helpers/source";
 
-const hasDb = Boolean(
-  process.env.POSTGRES_URL ||
-    process.env.DATABASE_URL ||
-    process.env.POSTGRES_PRISMA_URL,
-);
+const hasDb = Boolean(process.env.TURSO_DATABASE_URL);
 const describeOrSkip = hasDb ? describe : describe.skip;
 
 describe("tweaks route payload source contract", () => {

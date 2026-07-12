@@ -1,5 +1,35 @@
 # AX's AI RADAR — Current Handoff
 
+## 2026-07-11 — Database migrated: Supabase Postgres → Turso libSQL (SQLite)
+
+The entire DB layer moved to **Turso libSQL** (DB `newsroom`, org `xingfanxia`,
+`aws-us-west-2` — co-located with the `sfo1` Vercel region pin). Supabase is
+decommissioned. What changed:
+
+- **Client**: `db/client.ts` is `@libsql/client` (HTTP hrana) + `drizzle-orm/libsql`.
+  Env: `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN` (all Vercel envs + `.env.local`).
+  `libsqlClient()` exposes the raw client for batch/vector SQL.
+- **Storage conventions** (see `db/schema.ts` header): timestamps = INTEGER ms
+  epoch (drizzle `timestamp_ms` mode — app code still sees JS `Date`), jsonb →
+  JSON text, booleans → 0/1, `serial` → INTEGER PK AUTOINCREMENT, `numeric` →
+  REAL, `text[]` → JSON text array, pg enums → typed TEXT.
+- **Vectors**: pgvector `halfvec(3072)`+HNSW → libSQL native `F32_BLOB(3072)` +
+  DiskANN cosine index `items_embedding_idx` (created by
+  `bun run db:vector-index` — rerun after any `db:push`, drizzle-kit can't
+  express it). `<=>`/`<#>` → `vector_distance_cos()`; semantic search probes
+  `vector_top_k` then filters. Distances are now cosine (0 = identical).
+- **Claims**: enrich's `FOR UPDATE SKIP LOCKED` CTE became a single atomic
+  `UPDATE ... WHERE id IN (SELECT ... LIMIT n) RETURNING` (SQLite single-writer).
+- **FK enforcement**: Turso enables `foreign_keys` server-side by default —
+  cascades verified live; no client pragma needed.
+- **db:push caveat**: drizzle-kit false-diffs the custom vector column
+  (drizzle-orm #3047) — NEVER accept a push plan that drops/recreates
+  `items.embedding`, and rerun `db:vector-index` after every push.
+- Data copied 2026-07-11 (all 15 tables, count-verified, embeddings as raw F32
+  buffers). Historical pg-era manual migrations (`db/migrations/manual/`)
+  removed; RLS doc marked superseded.
+
+
 ## 2026-06-12 — Code-quality and docs source-of-truth cleanup
 
 Current maintenance direction:

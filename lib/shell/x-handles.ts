@@ -9,17 +9,24 @@ import type { XHandleEntry } from "@/components/x-monitor/handles-sidebar";
  * selector so a click narrows the main feed to one handle.
  */
 export async function getXHandles(): Promise<XHandleEntry[]> {
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  const rows = await db().execute(sql`
+  const sinceMs = Date.now() - 24 * 60 * 60 * 1000;
+  const rows = await db().all<{
+    id: string;
+    url: string | null;
+    name_en: string | null;
+    name_zh: string | null;
+    last_24h: number;
+    total: number;
+  }>(sql`
     SELECT
       ${sources.id} AS id,
       ${sources.url} AS url,
       ${sources.nameEn} AS name_en,
       ${sources.nameZh} AS name_zh,
-      (SELECT count(*)::int FROM ${items}
+      (SELECT count(*) FROM ${items}
          WHERE ${items.sourceId} = ${sources.id}
-           AND ${items.createdAt} >= ${since}) AS last_24h,
-      (SELECT count(*)::int FROM ${items}
+           AND ${items.createdAt} >= ${sinceMs}) AS last_24h,
+      (SELECT count(*) FROM ${items}
          WHERE ${items.sourceId} = ${sources.id}) AS total
     FROM ${sources}
     WHERE ${sources.kind} = 'x-api'

@@ -1,15 +1,16 @@
 /**
  * GET /api/v1/search — Bearer-gated search across enriched items.
  *
- *   mode=lexical: case-insensitive ILIKE against title + both-locale
+ *   mode=lexical: case-insensitive LIKE against title + both-locale
  *   title/summary columns. Fast, cheap, exact substring matches only.
  *
  *   mode=semantic: embeds the query via Azure text-embedding-3-large (one call
- *   per request, ~$0.00002) and ranks items by pgvector cosine distance on the
- *   HNSW-indexed embedding column. Finds conceptual matches ("agentic coding"
- *   returns items about autonomous IDE agents even if the exact phrase is
- *   absent). Returns each hit with a `distance` field the agent can use to
- *   threshold results (smaller = closer; for unit vectors -1 is identical).
+ *   per request, ~$0.00002) and ranks items by libSQL vector cosine distance
+ *   on the DiskANN-indexed embedding column. Finds conceptual matches
+ *   ("agentic coding" returns items about autonomous IDE agents even if the
+ *   exact phrase is absent). Returns each hit with a `distance` field the
+ *   agent can use to threshold results (cosine distance, 0 = identical,
+ *   smaller = closer).
  *
  * Response shape matches /api/v1/feed so agents can reuse their item parser.
  *

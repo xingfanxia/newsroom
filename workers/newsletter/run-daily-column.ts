@@ -80,7 +80,7 @@ export async function runDailyColumn(
       .where(
         sql`${newsletters.kind} = ${DAILY_NEWSLETTER_KIND}
           AND ${newsletters.locale} = ${DAILY_COLUMN_LOCALE}
-          AND ${newsletters.periodStart} = ${pool.windowStart.toISOString()}::timestamptz
+          AND ${newsletters.periodStart} = ${pool.windowStart.getTime()}
           AND ${newsletters.columnTitle} IS NOT NULL`,
       )
       .limit(1);

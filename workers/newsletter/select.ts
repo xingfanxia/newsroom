@@ -53,12 +53,15 @@ export function computeColumnWindow(now: Date): {
   return computeDailyNewsletterWindow(now);
 }
 
+// Raw libSQL wire shape (client.all): none of the ORM's decoding runs on raw
+// SQL, so timestamp_ms columns arrive as ms-epoch INTEGERs, json columns as
+// unparsed TEXT, and a selected boolean literal as 0/1.
 type RawRow = {
   id: number;
   cluster_id: number | null;
   coverage: number | null;
-  published_at: Date | string;
-  enriched_at: Date | string | null;
+  published_at: number;
+  enriched_at: number | null;
   title_zh: string | null;
   title_en: string | null;
   title: string;
@@ -70,18 +73,28 @@ type RawRow = {
   editor_note_en: string | null;
   importance: number | null;
   tier: string | null;
-  tags: unknown;
-  source_tags: string[] | null;
-  from_curated: boolean;
+  tags: string | null;
+  source_tags: string | null;
+  from_curated: number;
 };
+
+function parseJsonColumn(value: string | null): unknown {
+  if (value == null) return null;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
 
 function rawToSelected(r: RawRow): SelectedRow {
   return {
     id: r.id,
     clusterId: r.cluster_id,
     coverage: r.coverage ?? 1,
-    publishedAt: r.published_at instanceof Date ? r.published_at : new Date(r.published_at),
-    enrichedAt: r.enriched_at == null ? null : (r.enriched_at instanceof Date ? r.enriched_at : new Date(r.enriched_at)),
+    // timestamp_ms columns come back as ms-epoch integers on raw SQL.
+    publishedAt: new Date(r.published_at),
+    enrichedAt: r.enriched_at == null ? null : new Date(r.enriched_at),
     titleZh: r.title_zh,
     titleEn: r.title_en,
     title: r.title,
@@ -93,9 +106,10 @@ function rawToSelected(r: RawRow): SelectedRow {
     noteEn: r.editor_note_en,
     importance: r.importance,
     tier: r.tier,
-    tags: r.tags,
-    sourceTags: r.source_tags,
-    fromCurated: r.from_curated,
+    // json columns come back as raw TEXT on raw SQL — parse at this boundary.
+    tags: parseJsonColumn(r.tags),
+    sourceTags: parseJsonColumn(r.source_tags) as string[] | null,
+    fromCurated: r.from_curated === 1,
   };
 }
 
@@ -114,7 +128,7 @@ export async function selectDailyColumnPool(
   const { start, end } = computeDailyNewsletterWindow(now);
   const client = db();
 
-  const curatedRaw = (await client.execute(sql`
+  const curatedRaw = await client.all<RawRow>(sql`
     SELECT
       i.id, i.cluster_id,
       COALESCE(c.member_count, 1) AS coverage,
@@ -130,13 +144,13 @@ export async function selectDailyColumnPool(
     JOIN sources s ON s.id = i.source_id
     LEFT JOIN clusters c ON c.id = i.cluster_id
     WHERE s.curated = true
-      AND i.published_at >= ${start.toISOString()}::timestamptz
-      AND i.published_at <  ${end.toISOString()}::timestamptz
+      AND i.published_at >= ${start.getTime()}
+      AND i.published_at <  ${end.getTime()}
       AND i.enriched_at IS NOT NULL
     ORDER BY i.importance DESC NULLS LAST, i.published_at DESC
-  `)) as unknown as RawRow[];
+  `);
 
-  const hotRaw = (await client.execute(sql`
+  const hotRaw = await client.all<RawRow>(sql`
     SELECT
       i.id, i.cluster_id,
       COALESCE(c.member_count, 1) AS coverage,
@@ -151,12 +165,12 @@ export async function selectDailyColumnPool(
     FROM items i
     JOIN sources s ON s.id = i.source_id
     LEFT JOIN clusters c ON c.id = i.cluster_id
-    WHERE i.published_at >= ${start.toISOString()}::timestamptz
-      AND i.published_at <  ${end.toISOString()}::timestamptz
+    WHERE i.published_at >= ${start.getTime()}
+      AND i.published_at <  ${end.getTime()}
       AND i.enriched_at IS NOT NULL
     ORDER BY i.importance DESC NULLS LAST, i.published_at DESC
     LIMIT ${HOT_TOP_N}
-  `)) as unknown as RawRow[];
+  `);
 
   const curated = curatedRaw.map(rawToSelected);
   const hot = hotRaw.map(rawToSelected);

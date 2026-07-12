@@ -27,8 +27,10 @@ export type ClusterReport = {
  * - If nearest neighbor (cosine sim ≥ threshold, within N-hour window) exists: join.
  * - Else: create a new single-member cluster with this item as lead.
  *
- * Uses pgvector's `<=>` operator (cosine distance = 1 - cosine sim) for the
- * HNSW-indexed nearest-neighbor lookup.
+ * Uses libSQL's `vector_distance_cos()` (cosine distance = 1 - cosine sim)
+ * for the nearest-neighbor lookup. The ±WINDOW_HOURS published_at window
+ * bounds the scan to a few hundred candidate rows, so this runs as an
+ * index-assisted brute-force pass — no DiskANN probe needed here.
  */
 export async function runClusterBatch(): Promise<ClusterReport> {
   const started = Date.now();
@@ -125,7 +127,12 @@ async function assignOneToCluster(itemId: number): Promise<AssignOutcome> {
   // on every cron tick. The cluster_splits audit table is the negative edge.
   // After several distinct rejected clusters, keep the item as a singleton;
   // its embedding neighborhood is topical rather than event-equivalent.
-  const nearestClusteredResult = await client.execute(sql`
+  const windowMs = WINDOW_HOURS * 3_600_000;
+  const nearestClusteredResult = await client.all<{
+    id: number;
+    cluster_id: number;
+    distance: number;
+  }>(sql`
     WITH target AS (
       SELECT
         embedding,
@@ -135,7 +142,7 @@ async function assignOneToCluster(itemId: number): Promise<AssignOutcome> {
     SELECT
       i.id,
       i.cluster_id,
-      (i.embedding <=> (SELECT embedding FROM target))::float8 AS distance
+      vector_distance_cos(i.embedding, (SELECT embedding FROM target)) AS distance
     FROM items i
     WHERE i.id <> ${itemId}
       AND i.embedding IS NOT NULL
@@ -149,27 +156,22 @@ async function assignOneToCluster(itemId: number): Promise<AssignOutcome> {
           AND split_audit.from_cluster_id = i.cluster_id
       )
       AND i.published_at BETWEEN
-          (SELECT published_at FROM target) - make_interval(hours => ${WINDOW_HOURS})
+          (SELECT published_at FROM target) - ${windowMs}
           AND
-          (SELECT published_at FROM target) + make_interval(hours => ${WINDOW_HOURS})
-    ORDER BY i.embedding <=> (SELECT embedding FROM target)
+          (SELECT published_at FROM target) + ${windowMs}
+    ORDER BY vector_distance_cos(i.embedding, (SELECT embedding FROM target))
     LIMIT 1
   `);
 
-  // postgres-js's drizzle adapter returns a RowList that extends Array<T>;
-  // it has NO `.rows` property. Indexing as an array is the correct shape.
-  const nearestClustered = (nearestClusteredResult as unknown as Array<{
-    id: number;
-    cluster_id: number;
-    distance: number;
-  }>)[0];
+  const nearestClustered = nearestClusteredResult[0];
 
   // Only run the unclustered-neighbor query if the clustered one didn't give
-  // us a within-threshold winner — saves one HNSW probe in the common case.
+  // us a within-threshold winner — saves one scan in the common case.
   const nearestUnclustered =
     nearestClustered && nearestClustered.distance <= threshold
       ? null
-      : ((await client.execute(sql`
+      : (
+          await client.all<{ id: number; distance: number }>(sql`
           WITH target AS (
             SELECT
               embedding,
@@ -178,7 +180,7 @@ async function assignOneToCluster(itemId: number): Promise<AssignOutcome> {
           )
           SELECT
             i.id,
-            (i.embedding <=> (SELECT embedding FROM target))::float8 AS distance
+            vector_distance_cos(i.embedding, (SELECT embedding FROM target)) AS distance
           FROM items i
           WHERE i.id <> ${itemId}
             AND i.embedding IS NOT NULL
@@ -186,12 +188,13 @@ async function assignOneToCluster(itemId: number): Promise<AssignOutcome> {
             AND ${visibleTierInSql(sql`i.tier`)}
             AND i.cluster_id IS NULL
             AND i.published_at BETWEEN
-                (SELECT published_at FROM target) - make_interval(hours => ${WINDOW_HOURS})
+                (SELECT published_at FROM target) - ${windowMs}
                 AND
-                (SELECT published_at FROM target) + make_interval(hours => ${WINDOW_HOURS})
-          ORDER BY i.embedding <=> (SELECT embedding FROM target)
+                (SELECT published_at FROM target) + ${windowMs}
+          ORDER BY vector_distance_cos(i.embedding, (SELECT embedding FROM target))
           LIMIT 1
-        `)) as unknown as Array<{ id: number; distance: number }>)[0];
+        `)
+        )[0];
 
   let clusterId: number;
   let outcome: AssignOutcome;
@@ -254,14 +257,12 @@ async function countDistinctRejectedClusters(
   client: ClusterClient,
   itemId: number,
 ): Promise<number> {
-  const result = await client.execute(sql`
-    SELECT count(DISTINCT split_audit.from_cluster_id)::int AS count
+  const result = await client.all<{ count: number | string | null }>(sql`
+    SELECT count(DISTINCT split_audit.from_cluster_id) AS count
     FROM cluster_splits split_audit
     WHERE split_audit.item_id = ${itemId}
   `);
-  return Number(
-    (result as unknown as Array<{ count: number | string | null }>)[0]?.count ?? 0,
-  );
+  return Number(result[0]?.count ?? 0);
 }
 
 async function createSingletonCluster(

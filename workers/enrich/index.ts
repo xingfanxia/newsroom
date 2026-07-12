@@ -129,14 +129,10 @@ async function claimPendingEnrichItems(
     enrichClaimableSql(items, { maxAttempts }),
   ];
   if (opts.windowStart) {
-    filters.push(
-      sql`${items.publishedAt} >= ${opts.windowStart.toISOString()}::timestamptz`,
-    );
+    filters.push(sql`${items.publishedAt} >= ${opts.windowStart.getTime()}`);
   }
   if (opts.windowEnd) {
-    filters.push(
-      sql`${items.publishedAt} < ${opts.windowEnd.toISOString()}::timestamptz`,
-    );
+    filters.push(sql`${items.publishedAt} < ${opts.windowEnd.getTime()}`);
   }
 
   // Priority order:
@@ -146,9 +142,22 @@ async function claimPendingEnrichItems(
   //   2. items that have bodyMd (Jina/article-body already fetched) —
   //      they'll benefit from a richer enrichment than a title-only item.
   //   3. most-recent-first by publishedAt.
-  const claimedRows = await client.execute(sql`
-    WITH candidates AS (
-      SELECT ${items.id} AS id
+  //
+  // Claim atomicity: this was `SELECT ... FOR UPDATE SKIP LOCKED` + a
+  // writable CTE on Postgres. SQLite has no row locks and no data-modifying
+  // CTEs — instead the whole claim is ONE UPDATE statement, and SQLite's
+  // single-writer serialization makes it atomic: a concurrent cron's claim
+  // runs strictly before or after this one, and whichever runs second
+  // re-evaluates the claimable predicate (enrich_claimed_at freshness), so
+  // the two claims never overlap.
+  const claimedRows = await client.all<{ id: number }>(sql`
+    UPDATE ${items}
+    SET
+      enrich_claimed_at = ${Date.now()},
+      enrich_attempts = coalesce(enrich_attempts, 0) + 1,
+      enrich_error = NULL
+    WHERE ${items.id} IN (
+      SELECT ${items.id}
       FROM ${items}
       WHERE ${and(...filters)}
       ORDER BY
@@ -160,21 +169,11 @@ async function claimPendingEnrichItems(
         END,
         ${items.publishedAt} DESC
       LIMIT ${limit}
-      FOR UPDATE SKIP LOCKED
-    ),
-    claimed AS (
-      UPDATE ${items}
-      SET
-        enrich_claimed_at = now(),
-        enrich_attempts = coalesce(enrich_attempts, 0) + 1,
-        enrich_error = NULL
-      WHERE ${items.id} IN (SELECT id FROM candidates)
-      RETURNING ${items.id} AS id
     )
-    SELECT id FROM claimed
+    RETURNING ${items.id} AS id
   `);
 
-  const ids = claimedRows.map((r) => Number((r as { id: number }).id));
+  const ids = claimedRows.map((r) => Number(r.id));
   if (ids.length === 0) return [];
 
   const rows = await client.select().from(items).where(inArray(items.id, ids));

@@ -60,7 +60,8 @@ type SingletonRow = {
 
 type LiveRow = {
   member_count: number;
-  verified: boolean;
+  /** SQLite boolean expression — 0/1. */
+  verified: number;
 };
 
 type NeighborRow = {
@@ -119,12 +120,12 @@ export async function runSingletonReclusterBatch(
   const windowFilter =
     opts.recencyHours == null
       ? sql`TRUE`
-      : sql`i.published_at > now() - make_interval(hours => ${opts.recencyHours})`;
+      : sql`i.published_at > ${Date.now() - opts.recencyHours * 3_600_000}`;
   const limitClause = maxPerRun == null ? sql`` : sql`LIMIT ${maxPerRun}`;
 
-  const singletons = (await client.execute(sql`
+  const singletons = await client.all<SingletonRow>(sql`
     SELECT i.id AS item_id, i.cluster_id,
-           LEFT(COALESCE(i.title_zh, i.title), 120) AS title
+           SUBSTR(COALESCE(i.title_zh, i.title), 1, 120) AS title
     FROM items i
     JOIN clusters c ON i.cluster_id = c.id
     WHERE c.member_count = 1
@@ -135,7 +136,7 @@ export async function runSingletonReclusterBatch(
       AND ${visibleTierInSql(sql`i.tier`)}
     ORDER BY i.published_at ASC
     ${limitClause}
-  `)) as unknown as SingletonRow[];
+  `);
 
   let merged = 0;
   let kept = 0;
@@ -143,32 +144,34 @@ export async function runSingletonReclusterBatch(
 
   for (const s of singletons) {
     try {
-      const liveRows = (await client.execute(sql`
+      const liveRows = await client.all<LiveRow>(sql`
         SELECT c.member_count, i.cluster_verified_at IS NOT NULL AS verified
         FROM items i
         JOIN clusters c ON i.cluster_id = c.id
         WHERE i.id = ${s.item_id}
-      `)) as unknown as LiveRow[];
+      `);
       const live = liveRows[0];
       if (!live || live.member_count > 1 || live.verified) {
         kept++;
         continue;
       }
 
-      const neighbors = (await client.execute(sql`
+      const reclusterWindowMs =
+        SINGLETON_RECLUSTER_WINDOW_HOURS * 3_600_000;
+      const neighbors = await client.all<NeighborRow>(sql`
         WITH target AS (
           SELECT
             embedding,
             published_at,
             (
-              SELECT count(DISTINCT split_audit.from_cluster_id)::int
+              SELECT count(DISTINCT split_audit.from_cluster_id)
               FROM cluster_splits split_audit
               WHERE split_audit.item_id = ${s.item_id}
             ) AS rejected_cluster_count
           FROM items WHERE id = ${s.item_id}
         )
         SELECT i.id, i.cluster_id,
-               (i.embedding <=> (SELECT embedding FROM target))::float8 AS distance
+               vector_distance_cos(i.embedding, (SELECT embedding FROM target)) AS distance
         FROM items i
         WHERE i.id <> ${s.item_id}
           AND i.cluster_id IS NOT NULL
@@ -183,12 +186,12 @@ export async function runSingletonReclusterBatch(
               AND split_audit.from_cluster_id = i.cluster_id
           )
           AND i.published_at BETWEEN
-              (SELECT published_at FROM target) - make_interval(hours => ${SINGLETON_RECLUSTER_WINDOW_HOURS})
+              (SELECT published_at FROM target) - ${reclusterWindowMs}
               AND
-              (SELECT published_at FROM target) + make_interval(hours => ${SINGLETON_RECLUSTER_WINDOW_HOURS})
-        ORDER BY i.embedding <=> (SELECT embedding FROM target)
+              (SELECT published_at FROM target) + ${reclusterWindowMs}
+        ORDER BY vector_distance_cos(i.embedding, (SELECT embedding FROM target))
         LIMIT 1
-      `)) as unknown as NeighborRow[];
+      `);
 
       const nearest = neighbors[0];
       const decision = decideSingletonRecluster({
@@ -249,53 +252,58 @@ async function moveSingletonToCluster(input: {
   const client = db();
   let movedCount = 0;
 
-  await client.transaction(async (tx) => {
-    const sourceRows = (await tx.execute(sql`
+  // `behavior: "immediate"` takes the write lock up front so the
+  // member_count guard read happens under it (replaces Postgres's
+  // row-level SELECT ... FOR UPDATE — SQLite locks are database-wide).
+  await client.transaction(
+    async (tx) => {
+      const sourceRows = await tx.all<{ id: number }>(sql`
       SELECT id
       FROM clusters
       WHERE id = ${input.fromClusterId}
         AND member_count = 1
-      FOR UPDATE
-    `)) as unknown as Array<{ id: number }>;
+    `);
 
-    if (sourceRows.length === 0) return;
+      if (sourceRows.length === 0) return;
 
-    const moved = await tx
-      .update(items)
-      .set({
-        clusterId: input.targetClusterId,
-        clusteredAt: new Date(),
-        clusterVerifiedAt: null,
-      })
-      .where(
-        sql`${items.id} = ${input.itemId}
+      const moved = await tx
+        .update(items)
+        .set({
+          clusterId: input.targetClusterId,
+          clusteredAt: new Date(),
+          clusterVerifiedAt: null,
+        })
+        .where(
+          sql`${items.id} = ${input.itemId}
           AND ${items.clusterId} = ${input.fromClusterId}`,
-      )
-      .returning({ id: items.id });
+        )
+        .returning({ id: items.id });
 
-    movedCount = moved.length;
-    if (movedCount === 0) return;
+      movedCount = moved.length;
+      if (movedCount === 0) return;
 
-    await tx
-      .update(clusters)
-      .set({
-        memberCount: sql`${clusters.memberCount} + ${movedCount}`,
-        coverage: sql`${clusters.memberCount} + ${movedCount}`,
-        latestMemberAt: new Date(),
-        verifiedAt: null,
-        titledAt: null,
-        commentaryAt: null,
-        updatedAt: new Date(),
-      })
-      .where(sql`${clusters.id} = ${input.targetClusterId}`);
+      await tx
+        .update(clusters)
+        .set({
+          memberCount: sql`${clusters.memberCount} + ${movedCount}`,
+          coverage: sql`${clusters.memberCount} + ${movedCount}`,
+          latestMemberAt: new Date(),
+          verifiedAt: null,
+          titledAt: null,
+          commentaryAt: null,
+          updatedAt: new Date(),
+        })
+        .where(sql`${clusters.id} = ${input.targetClusterId}`);
 
-    await tx
-      .delete(clusters)
-      .where(
-        sql`${clusters.id} = ${input.fromClusterId}
+      await tx
+        .delete(clusters)
+        .where(
+          sql`${clusters.id} = ${input.fromClusterId}
           AND ${clusters.memberCount} = 1`,
-      );
-  });
+        );
+    },
+    { behavior: "immediate" },
+  );
 
   return movedCount;
 }
