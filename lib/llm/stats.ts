@@ -39,6 +39,10 @@ export async function totalsByWindow(
   w: WindowKey = "today",
 ): Promise<WindowTotals> {
   const client = db();
+  // T7 (2026-07-12 review finding 2c): renders on the same admin usage page as
+  // the breakdowns; the 'all' window would otherwise full-scan the fat table.
+  // Pin the covering index (created_at leading → bounded windows still prune,
+  // 'all' stays inside the index with no fat-row lookups).
   const result = await client.all<Record<string, unknown>>(sql`
     SELECT
       count(*) AS calls,
@@ -47,7 +51,7 @@ export async function totalsByWindow(
       coalesce(sum(output_tokens), 0) AS output_tokens,
       coalesce(sum(reasoning_tokens), 0) AS reasoning_tokens,
       coalesce(sum(cost_usd), 0) AS cost_usd
-    FROM llm_usage WHERE ${windowClause(w)}
+    FROM llm_usage INDEXED BY llm_usage_totals_cover_idx WHERE ${windowClause(w)}
   `);
   const r = result[0] ?? {};
   return {
@@ -81,6 +85,16 @@ export async function breakdownByTask(
   w: WindowKey = "week",
 ): Promise<TaskBreakdown[]> {
   const client = db();
+  // T7 (and the 2026-07-12 review): the two new llm_usage covering indexes are
+  // group-ordered candidates the stat-less Turso planner might now prefer over
+  // the created_at range index for bounded windows — which would drop the
+  // range prune and scan the whole index. Pin explicitly per window: all-time
+  // has no range to prune (covering index); bounded windows must keep the
+  // created_at prune.
+  const fromClause =
+    w === "all"
+      ? sql`llm_usage INDEXED BY llm_usage_breakdown_cover_idx`
+      : sql`llm_usage INDEXED BY llm_usage_created_at_idx`;
   const result = await client.all<Record<string, unknown>>(sql`
     SELECT
       task, provider, model,
@@ -88,7 +102,7 @@ export async function breakdownByTask(
       coalesce(sum(input_tokens), 0) AS input_tokens,
       coalesce(sum(output_tokens), 0) AS output_tokens,
       coalesce(sum(cost_usd), 0) AS cost_usd
-    FROM llm_usage WHERE ${windowClause(w)}
+    FROM ${fromClause} WHERE ${windowClause(w)}
     GROUP BY task, provider, model
     ORDER BY cost_usd DESC
   `);
@@ -136,12 +150,22 @@ export async function breakdownByModel(
   w: WindowKey = "week",
 ): Promise<ModelBreakdown[]> {
   const client = db();
+  // T7: for the all-time window there's no created_at range to prune on, so the
+  // GROUP BY would scan the fat table (audit: ~4.1s). Pin the covering index
+  // (provider, model, cost_usd) so the scan stays inside it. Bounded windows
+  // pin created_at instead so the range prune survives (the new covering
+  // indexes are group-ordered candidates the stat-less planner might otherwise
+  // prefer, losing the prune — 2026-07-12 review finding 2a).
+  const fromClause =
+    w === "all"
+      ? sql`llm_usage INDEXED BY llm_usage_model_cover_idx`
+      : sql`llm_usage INDEXED BY llm_usage_created_at_idx`;
   const result = await client.all<Record<string, unknown>>(sql`
     SELECT
       provider, model,
       count(*) AS calls,
       coalesce(sum(cost_usd), 0) AS cost_usd
-    FROM llm_usage WHERE ${windowClause(w)}
+    FROM ${fromClause} WHERE ${windowClause(w)}
     GROUP BY provider, model
     ORDER BY cost_usd DESC
   `);
@@ -168,31 +192,48 @@ export type RecentCall = {
   createdAt: Date;
 };
 
-/** Daily-spend series for the usage page sparkline. Returns last `days`
- *  buckets newest-first-by-default, each with its ISO date + spend. Zeroes
- *  fill gaps so the bar chart keeps a stable width. */
+/** Daily-spend series for the usage page sparkline. Returns the last `days`
+ *  buckets oldest-first (ORDER BY date ASC), each with its ISO date + spend.
+ *  Zeroes fill gaps so the bar chart keeps a stable width. */
 export type DailySpendPoint = { date: string; spend: number; calls: number };
 export async function dailySpend(days = 30): Promise<DailySpendPoint[]> {
   const client = db();
-  // SQLite has no generate_series by default — build the day list in JS and
-  // unnest it with json_each. Days are UTC-aligned like the old ::date.
+  // SQLite has no generate_series — build the day list in JS and unnest with
+  // json_each. Days are UTC-aligned like the old ::date.
+  //
+  // Perf (T7): the previous version JOINed on
+  // `strftime('%Y-%m-%d', created_at/1000.0, 'unixepoch') = s.value`, a
+  // function on the column that forced a full 364k-row scan every page load
+  // (~39s). Now: (1) each day carries its integer UTC-day index (ms / 86.4M)
+  // so bucketing is plain integer division, and (2) a lower bound on created_at
+  // lets the planner prune via llm_usage_created_at_idx. Turso is stat-less
+  // (rejects ANALYZE — see db-optimize.ts) so the bound is explicit and the
+  // index is pinned. 86400000 is written as a SQL literal (not a bound param)
+  // to keep the division integer.
+  const DAY_MS = 86_400_000;
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
-  const dayList = Array.from({ length: days }, (_, i) =>
-    new Date(today.getTime() - (days - 1 - i) * 86_400_000)
-      .toISOString()
-      .slice(0, 10),
-  );
+  const dayList = Array.from({ length: days }, (_, i) => {
+    const ms = today.getTime() - (days - 1 - i) * DAY_MS;
+    return { d: new Date(ms).toISOString().slice(0, 10), i: Math.floor(ms / DAY_MS) };
+  });
+  const minBoundMs = today.getTime() - (days - 1) * DAY_MS;
   const result = await client.all<Record<string, unknown>>(sql`
     SELECT
-      s.value AS date,
-      coalesce(sum(u.cost_usd), 0) AS spend,
-      coalesce(count(u.id), 0) AS calls
+      json_extract(s.value, '$.d') AS date,
+      coalesce(agg.spend, 0) AS spend,
+      coalesce(agg.calls, 0) AS calls
     FROM json_each(${JSON.stringify(dayList)}) s
-    LEFT JOIN llm_usage u
-      ON strftime('%Y-%m-%d', u.created_at / 1000.0, 'unixepoch') = s.value
-    GROUP BY s.value
-    ORDER BY s.value ASC
+    LEFT JOIN (
+      SELECT
+        created_at / 86400000 AS day_idx,
+        sum(cost_usd) AS spend,
+        count(id) AS calls
+      FROM llm_usage INDEXED BY llm_usage_created_at_idx
+      WHERE created_at >= ${minBoundMs}
+      GROUP BY day_idx
+    ) agg ON agg.day_idx = json_extract(s.value, '$.i')
+    ORDER BY date ASC
   `);
   return result.map((r) => ({
     date: String(r.date),

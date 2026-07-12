@@ -16,10 +16,12 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import { clusters, items, sources, clusterSplits } from "@/db/schema";
 import { generateStructured, profiles } from "@/lib/llm";
+import type { SourceGroup } from "@/lib/types";
 import {
   recomputeEventImportance,
   approximateTierForImportance,
 } from "./importance";
+import { pickBestLead } from "./lead-pick";
 import { arbitrateSystem, arbitrateUserPrompt } from "./prompt";
 
 /** Drizzle transaction client — same shape as the top-level db() client. */
@@ -64,6 +66,8 @@ type MemberRow = {
   rawTitle: string;
   publishedAt: string;
   sourceName: string;
+  sourceGroup: SourceGroup;
+  sourcePriority: number;
   importance: number | null;
 };
 
@@ -75,6 +79,8 @@ type MemberDbRow = {
   rawTitle: string;
   publishedAt: Date;
   sourceName: string;
+  sourceGroup: SourceGroup;
+  sourcePriority: number;
   importance: number | null;
 };
 
@@ -175,6 +181,8 @@ async function arbitrateOne(
       rawTitle: items.title,
       publishedAt: items.publishedAt,
       sourceName: sources.nameEn,
+      sourceGroup: sources.group,
+      sourcePriority: sources.priority,
       importance: items.importance,
     })
     .from(items)
@@ -237,6 +245,7 @@ async function arbitrateOne(
     const rejectedIds = verdict.rejectedMemberIds ?? [];
     const moved = await applySplitVerdict(
       candidate.id,
+      candidate.leadItemId,
       members,
       rejectedIds,
       verdict.reason,
@@ -248,8 +257,9 @@ async function arbitrateOne(
 async function applyKeepVerdict(
   clusterId: number,
   members: MemberRow[],
+  dbc: ReturnType<typeof db> = db(),
 ): Promise<void> {
-  const client = db();
+  const client = dbc;
   const now = new Date();
 
   await client.transaction(async (tx: DbTx) => {
@@ -269,18 +279,24 @@ async function applyKeepVerdict(
   });
 
   // Recompute importance outside transaction (read + write, no atomicity needed)
-  await persistImportance(clusterId, members);
+  await persistImportance(clusterId, members, dbc);
 }
 
-async function applySplitVerdict(
+/**
+ * `dbc` is injectable so behavioral tests can drive the split/lead-repick logic
+ * against a local libSQL DB; production callers omit it (shared connection).
+ */
+export async function applySplitVerdict(
   clusterId: number,
+  leadItemId: number,
   members: MemberRow[],
   rejectedIds: number[],
   reason: string,
+  dbc: ReturnType<typeof db> = db(),
 ): Promise<number> {
   if (rejectedIds.length === 0) {
     // LLM said split but gave no IDs — treat as keep
-    await applyKeepVerdict(clusterId, members);
+    await applyKeepVerdict(clusterId, members, dbc);
     return 0;
   }
 
@@ -292,11 +308,11 @@ async function applySplitVerdict(
     console.warn(
       `[arbitrate] cluster ${clusterId}: LLM rejected all ${members.length} members; treating as keep`,
     );
-    await applyKeepVerdict(clusterId, members);
+    await applyKeepVerdict(clusterId, members, dbc);
     return 0;
   }
 
-  const client = db();
+  const client = dbc;
   const now = new Date();
   const rejectedSet = new Set(rejectedIds);
 
@@ -322,23 +338,54 @@ async function applySplitVerdict(
       if (updated.length === 0) continue;
       actuallyUnlinked++;
 
-      // Audit only the rejections that actually fired.
-      await tx.insert(clusterSplits).values({
-        itemId,
-        fromClusterId: clusterId,
-        reason,
-      });
+      // Audit only the rejections that actually fired. The (item_id,
+      // from_cluster_id) pair is unique (cluster_splits_item_cluster_uq) — a
+      // re-rejection of the same pair is a no-op, not an unbounded append, so
+      // the negative edge stays absolute and the rejection cap counts real
+      // distinct clusters.
+      await tx
+        .insert(clusterSplits)
+        .values({ itemId, fromClusterId: clusterId, reason })
+        .onConflictDoNothing();
     }
 
     if (actuallyUnlinked > 0) {
       // Decrement by the count of real unlinks, not the LLM-supplied length.
+      // coverage is a member_count clone — decrement it in lockstep (T4.2) so
+      // the reconciler doesn't later flag a phantom coverage drift.
       await tx
         .update(clusters)
         .set({
           memberCount: sql`${clusters.memberCount} - ${actuallyUnlinked}`,
+          coverage: sql`${clusters.coverage} - ${actuallyUnlinked}`,
           updatedAt: now,
         })
         .where(eq(clusters.id, clusterId));
+
+      // If the arbitrator ejected the item that IS the cluster's lead, the feed
+      // dedup (cluster_id IS NULL OR lead_item_id = items.id) would render
+      // NOTHING for this cluster. Re-pick the lead from the survivors, authority-
+      // aware, inside the same transaction. Works down to a single survivor —
+      // the "rejected every member" case already short-circuited to keep above,
+      // so at least one survivor is guaranteed here.
+      if (rejectedSet.has(leadItemId)) {
+        const survivors = members.filter((m) => !rejectedSet.has(m.itemId));
+        if (survivors.length > 0) {
+          const best = pickBestLead(
+            survivors.map((m) => ({
+              itemId: m.itemId,
+              sourceGroup: m.sourceGroup,
+              sourcePriority: m.sourcePriority,
+              importance: m.importance,
+              publishedAt: m.publishedAt,
+            })),
+          );
+          await tx
+            .update(clusters)
+            .set({ leadItemId: best.itemId })
+            .where(eq(clusters.id, clusterId));
+        }
+      }
     }
 
     // Verify surviving members
@@ -359,7 +406,7 @@ async function applySplitVerdict(
   // Recompute importance for surviving members
   const survivors = members.filter((m) => !rejectedSet.has(m.itemId));
   if (survivors.length > 0) {
-    await persistImportance(clusterId, survivors);
+    await persistImportance(clusterId, survivors, dbc);
   }
 
   return actuallyUnlinked;
@@ -368,8 +415,9 @@ async function applySplitVerdict(
 async function persistImportance(
   clusterId: number,
   members: MemberRow[],
+  dbc: ReturnType<typeof db> = db(),
 ): Promise<void> {
-  const client = db();
+  const client = dbc;
 
   const { importance } = recomputeEventImportance(
     members.map((m) => ({ importance: m.importance })),

@@ -1,200 +1,25 @@
 /**
- * Stage B arbitrator — unit tests.
+ * Stage B arbitrator — source-contract + pure-logic unit tests.
  *
- * Strategy: mock the db() client and generateStructured so no live Postgres
- * or LLM credentials are needed. Tests verify the SQL shapes (which tables
- * are read/written, with which values) rather than the DB behavior itself.
- *
- * Each describe block owns its mock state to avoid bleed between scenarios.
+ * These assert the SQL shapes and control flow of arbitrate.ts (which tables
+ * are read/written, the branch structure, the pure helpers) without a DB or
+ * LLM credentials. End-to-end BEHAVIORAL coverage of the split + lead-repick
+ * path (against a local libSQL DB via the injected client) lives in
+ * tests/cluster/behavioral.test.ts.
  */
 
-import { describe, it, expect, mock, beforeEach } from "bun:test";
+import { describe, it, expect } from "bun:test";
+import { readSource } from "@/tests/helpers/source";
+import { pickBestLead } from "./lead-pick";
 
-// ── Shared mock factories ──────────────────────────────────────────────────
+const arbitrateSrc = readSource("workers/cluster/arbitrate.ts");
 
-/** Build a minimal item member row as returned by the members query. */
-function makeMember(overrides: {
-  itemId: number;
-  clusterId?: number;
-  clusterVerifiedAt?: Date | null;
-  importance?: number | null;
-}) {
-  return {
-    itemId: overrides.itemId,
-    titleZh: `title-zh-${overrides.itemId}`,
-    titleEn: `title-en-${overrides.itemId}`,
-    rawTitle: `raw-${overrides.itemId}`,
-    publishedAt: new Date("2026-04-24T10:00:00Z"),
-    sourceName: "TestSource",
-    importance: overrides.importance ?? 60,
-    clusterId: overrides.clusterId ?? 1,
-    clusterVerifiedAt: overrides.clusterVerifiedAt ?? null,
-  };
-}
+// ── Shared helpers ─────────────────────────────────────────────────────────
 
 /** Build a minimal candidate cluster row. */
 function makeCandidate(id: number, memberCount = 2, leadItemId = 100) {
   return { id, leadItemId, memberCount };
 }
-
-// ── Capture lists for assertions ──────────────────────────────────────────
-
-type UpdateCall = { table: string; set: Record<string, unknown>; where?: unknown };
-type InsertCall = { table: string; values: unknown };
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Test suite: keep verdict
-// ─────────────────────────────────────────────────────────────────────────────
-
-describe("runArbitrationBatch — keep verdict", () => {
-  const updates: UpdateCall[] = [];
-  const inserts: InsertCall[] = [];
-
-  const members = [makeMember({ itemId: 1 }), makeMember({ itemId: 2 })];
-
-  beforeEach(() => {
-    updates.length = 0;
-    inserts.length = 0;
-  });
-
-  /**
-   * Build a mock db client for a keep-verdict scenario.
-   * - candidates query returns one cluster with memberCount=2
-   * - members query returns two members
-   * - lead summary query returns a row
-   * - transaction executes update calls
-   * - post-tx importance update captured
-   */
-  function buildMockDbKeep() {
-    let queryIndex = 0;
-
-    const selectReturns = [
-      // 1. candidates query
-      [makeCandidate(1, 2, 100)],
-      // 2. members query
-      members,
-      // 3. lead summary query
-      [{ summaryZh: "AI news summary" }],
-    ];
-
-    const mockQuery = {
-      from: mock(() => mockQuery),
-      innerJoin: mock(() => mockQuery),
-      where: mock(() => mockQuery),
-      orderBy: mock(() => mockQuery),
-      limit: mock(() => {
-        const result = selectReturns[queryIndex++] ?? [];
-        return Promise.resolve(result);
-      }),
-    };
-
-    const txUpdates: UpdateCall[] = [];
-
-    const mockTxUpdate = (table: { _: { name: string } } | string) => {
-      const tableName = typeof table === "string" ? table : String(table);
-      const chain = {
-        set: mock((values: Record<string, unknown>) => {
-          txUpdates.push({ table: tableName, set: values });
-          updates.push({ table: tableName, set: values });
-          return chain;
-        }),
-        where: mock(() => chain),
-      };
-      return chain;
-    };
-
-    const mockTx = {
-      update: mock(mockTxUpdate),
-      insert: mock(() => ({
-        values: mock((vals: unknown) => {
-          inserts.push({ table: "clusterSplits", values: vals });
-          return Promise.resolve([]);
-        }),
-      })),
-    };
-
-    const mockTransaction = mock(async (fn: (tx: typeof mockTx) => Promise<void>) => {
-      await fn(mockTx);
-    });
-
-    // Post-tx importance update
-    const mockOuterUpdate = (table: { _: { name: string } } | string) => {
-      const tableName = typeof table === "string" ? table : String(table);
-      const chain = {
-        set: mock((values: Record<string, unknown>) => {
-          updates.push({ table: tableName, set: values });
-          return chain;
-        }),
-        where: mock(() => chain),
-      };
-      return chain;
-    };
-
-    return {
-      select: mock(() => mockQuery),
-      update: mock(mockOuterUpdate),
-      insert: mock(() => ({
-        values: mock(() => Promise.resolve([])),
-      })),
-      transaction: mockTransaction,
-      execute: mock(() => Promise.resolve({ rows: [] })),
-    };
-  }
-
-  it("keep verdict stamps verified_at on cluster and cluster_verified_at on all members", async () => {
-    const mockDb = buildMockDbKeep();
-
-    // Mock generateStructured to return keep verdict
-    const mockGenerateStructured = mock(async (args: unknown) => {
-      expect(args).toMatchObject({
-        task: "arbitrate",
-        schemaName: "ArbitrateVerdict",
-      });
-      return {
-        data: { verdict: "keep" as const, reason: "same product launch" },
-        provider: "azure-deepseek" as const,
-        model: "DeepSeek-V4-Flash",
-      };
-    });
-
-    // Dynamically import using mocks — since we can't use module mocking directly
-    // in bun:test without vi.mock, we test the inner logic by calling the arbitration
-    // functions through a test harness that injects mocked dependencies.
-    //
-    // The important invariants to verify:
-    // 1. transaction is called
-    // 2. clusters.verifiedAt is set
-    // 3. items.clusterVerifiedAt is set for unverified members
-
-    // Simulate the keep-verdict path directly
-    const now = new Date();
-    // Simulate the keep path: tx.update(clusters).set({verifiedAt}) + tx.update(items).set({clusterVerifiedAt})
-    const clusterVerifiedAtSet: Record<string, unknown>[] = [];
-    const itemVerifiedAtSet: Record<string, unknown>[] = [];
-
-    // Mimic applyKeepVerdict behavior
-    clusterVerifiedAtSet.push({ verifiedAt: now, updatedAt: now });
-    itemVerifiedAtSet.push({ clusterVerifiedAt: now });
-
-    expect(clusterVerifiedAtSet[0]).toHaveProperty("verifiedAt");
-    expect(itemVerifiedAtSet[0]).toHaveProperty("clusterVerifiedAt");
-
-    // Verify generateStructured would be called with "keep" verdict expectations
-    const result = await mockGenerateStructured({
-      provider: "azure-deepseek",
-      deployment: "DeepSeek-V4-Flash",
-      task: "arbitrate",
-      system: "system prompt",
-      messages: [],
-      schema: {} as never,
-      schemaName: "ArbitrateVerdict",
-      maxTokens: 512,
-    });
-
-    expect(result.data.verdict).toBe("keep");
-    expect(mockDb.transaction).not.toHaveBeenCalled(); // mock wasn't wired into the real fn
-  });
-});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Test suite: split verdict
@@ -533,5 +358,66 @@ describe("ArbitrationReport type contract", () => {
 
     expect(emptyReport.processed).toBe(0);
     expect(emptyReport.errors).toHaveLength(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Test suite: lead re-pick on split (W2 / T3)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("lead integrity on split", () => {
+  it("re-picks the lead from survivors when the ejected set includes the lead", () => {
+    // A split that unlinks the item that IS clusters.lead_item_id would leave a
+    // dangling lead — the feed dedup (cluster_id IS NULL OR lead_item_id =
+    // items.id) then renders NOTHING for the cluster. applySplitVerdict now
+    // re-picks the lead from survivors inside the same transaction.
+    expect(arbitrateSrc).toContain("rejectedSet.has(leadItemId)");
+    expect(arbitrateSrc).toContain("pickBestLead(");
+    expect(arbitrateSrc).toContain("leadItemId: best.itemId");
+  });
+
+  it("threads the current lead id into applySplitVerdict", () => {
+    expect(arbitrateSrc).toContain("candidate.leadItemId");
+    expect(arbitrateSrc).toMatch(/applySplitVerdict\(\s*clusterId: number,\s*leadItemId: number/);
+  });
+
+  it("pure-logic: pickBestLead over survivors returns a surviving member (never the ejected lead)", () => {
+    // Cluster of 3; the arbitrator ejects the vendor-official lead (item 1).
+    // The re-pick must return one of the survivors (2 or 3), authority-ranked.
+    const members = [
+      { itemId: 1, sourceGroup: "vendor-official" as const, sourcePriority: 2, importance: 90, publishedAt: "2026-07-10T00:00:00Z" },
+      { itemId: 2, sourceGroup: "media" as const, sourcePriority: 2, importance: 70, publishedAt: "2026-07-10T01:00:00Z" },
+      { itemId: 3, sourceGroup: "social" as const, sourcePriority: 3, importance: 40, publishedAt: "2026-07-10T02:00:00Z" },
+    ];
+    const ejected = new Set([1]);
+    const survivors = members.filter((m) => !ejected.has(m.itemId));
+    const best = pickBestLead(survivors);
+    expect(ejected.has(best.itemId)).toBe(false);
+    // media (80) outranks social (20) → item 2 wins.
+    expect(best.itemId).toBe(2);
+  });
+
+  it("pure-logic: works down to a single survivor", () => {
+    const survivors = [
+      { itemId: 5, sourceGroup: "media" as const, sourcePriority: 2, importance: 50, publishedAt: "2026-07-10T00:00:00Z" },
+    ];
+    expect(pickBestLead(survivors).itemId).toBe(5);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Test suite: absolute negative edge + lockstep coverage (W1 / T4.2)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("cluster_splits negative edge + bookkeeping", () => {
+  it("inserts cluster_splits with ON CONFLICT DO NOTHING (unique (item, cluster) edge)", () => {
+    // The (item_id, from_cluster_id) pair is unique; a re-rejection is a no-op,
+    // not an unbounded append, so the rejection cap counts real distinct clusters.
+    expect(arbitrateSrc).toContain(".onConflictDoNothing()");
+  });
+
+  it("decrements coverage in lockstep with member_count on split", () => {
+    expect(arbitrateSrc).toContain("coverage: sql`${clusters.coverage} - ${actuallyUnlinked}`");
+    expect(arbitrateSrc).toContain("memberCount: sql`${clusters.memberCount} - ${actuallyUnlinked}`");
   });
 });

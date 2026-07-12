@@ -182,13 +182,27 @@ describe("Cluster UPDATE on member join", () => {
     expect(workerSrc).toContain("latestMemberAt: new Date()");
   });
 
-  it("updates coverage to match new memberCount", () => {
-    // coverage is kept in sync with the incremented memberCount
-    expect(workerSrc).toContain("coverage: sql`${clusters.memberCount} + 1`");
+  it("increments coverage in lockstep with memberCount (not recomputed from it)", () => {
+    // coverage moves by the same delta as memberCount. The old form
+    // `coverage = member_count + 1` recomputed coverage from member_count and
+    // non-deterministically half-healed drift (audit W3); lockstep `+ 1` on
+    // coverage itself is the fix.
+    expect(workerSrc).toContain("coverage: sql`${clusters.coverage} + 1`");
+    expect(workerSrc).not.toContain("coverage: sql`${clusters.memberCount} + 1`");
   });
 
   it("memberCount is still incremented by 1", () => {
     expect(workerSrc).toContain("memberCount: sql`${clusters.memberCount} + 1`");
+  });
+
+  it("wraps the item-claim + member_count bump in a transaction (atomic bookkeeping)", () => {
+    // Two autocommit statements let a crash land between claim and bump and
+    // drift member_count forever (clusters have no self-heal). The claim +
+    // bump now run inside client.transaction. (T4)
+    expect(workerSrc).toContain("client.transaction(async (tx)");
+    expect(workerSrc).toMatch(
+      /client\.transaction\(async \(tx\)[\s\S]+?tx[\s\S]+?\.update\(items\)[\s\S]+?\.update\(clusters\)/,
+    );
   });
 });
 
@@ -266,9 +280,17 @@ describe("Neighbor-promotion race safety", () => {
     // Before this fix: insert with memberCount=1 (assuming neighbor will join),
     // then itemId join +1 → 2 even when the neighbor was claimed by a concurrent
     // worker. After the fix: start at 0, only bump when the neighbor claim
-    // returns rows.
+    // returns rows. coverage starts at 0 too so it's in lockstep from birth.
     expect(workerSrc).toContain(
-      ".values({ leadItemId: nearestUnclustered.id, memberCount: 0 })",
+      ".values({ leadItemId: nearestUnclustered.id, memberCount: 0, coverage: 0 })",
+    );
+  });
+
+  it("wraps the promote-neighbor create+claim+bump in a transaction", () => {
+    // insert cluster + claim neighbor + bump were three autocommit statements;
+    // a crash between claim and bump drifts member_count. Now one transaction. (T4)
+    expect(workerSrc).toMatch(
+      /const promoted = await client\.transaction\(async \(tx\)/,
     );
   });
 

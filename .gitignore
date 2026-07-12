@@ -47,3 +47,6 @@ scripts/ops/backfill-state.json
 scripts/ops/backfill-chinese-state.json
 scripts/ops/backfill-daily-columns-state.json
 tmp/
+
+# local DB backups (gzipped JSONL dumps from scripts/ops/db-dump.ts)
+backups/

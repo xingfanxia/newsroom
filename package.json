@@ -15,7 +15,7 @@
     "test": "bun test --env-file=.env.local",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:push": "drizzle-kit push --force",
+    "db:push": "echo 'db:push is DISABLED — drizzle-kit push --force applies a known F32_BLOB false-diff that DROPS items.embedding + the DiskANN index (unrecoverable, no backup). Schema changes go through ordered raw-SQL ops scripts + schema_migrations. See docs/HANDOFF.md § Turso.' && exit 1",
     "db:studio": "drizzle-kit studio",
     "db:seed": "bun scripts/ops/seed-sources.ts",
     "db:ping": "bun scripts/ops/ping-db.ts",

@@ -1,11 +1,45 @@
 # AX's AI RADAR — Current Handoff
 
-## 2026-07-12 — Two audits: clustering pipeline + Turso-switch residue
+## 2026-07-12 — Audit remediation APPLIED (FIX-GOAL charter, PR `ax/audit-fixes`)
 
-Both audits are complete, findings adversarially verified, nothing applied
-yet. **The remediation charter for the next agent session is
-`docs/FIX-GOAL-2026-07-12.md`** (bounded scope: P0 safety + W1-W3 + quick
-wins; /goal predicate + per-task acceptance criteria included). Reports:
+The bounded charter `docs/FIX-GOAL-2026-07-12.md` is **DONE** — P0 safety +
+W1-W3 + the quick wins, tasks T1-T7. What shipped:
+
+- **P0 safety (T6):** `db:push` neutered (`echo … && exit 1` — no more
+  `drizzle-kit push --force` one-liner that would drop `items.embedding` +
+  the DiskANN index); Turso `delete_protection` **enabled** for `newsroom-v2`;
+  new `scripts/ops/db-dump.ts` streams every table to gzipped JSONL under
+  git-ignored `backups/` with per-table row-count parity (346 MB verified
+  backup taken before any mutation). Restore doc: `docs/ops/db-backup-restore.md`.
+- **W1 split-loop reunite vector (T2):** `mergeClusters` now unlinks (not
+  reunites) loser items that hold a `cluster_splits` row vs the winner;
+  `cluster_splits_item_cluster_uq` unique index added + `onConflictDoNothing`
+  on the arbitrate insert (57 731 historical dup rows deduped first).
+- **W2 lead integrity (T3):** `applySplitVerdict` re-picks `lead_item_id` from
+  survivors (via `pickBestLead`) when a split ejects the current lead.
+- **W3 bookkeeping atomicity (T4):** item-claim+count-bump and the
+  promote-neighbor path wrapped in `client.transaction`; `coverage` moved to
+  lockstep with `member_count`; `cluster-health.ts --repair` is the standing
+  reconciler (shared `workers/cluster/reconcile.ts`).
+- **T1 one-off prod repair:** `scripts/migrations/repair-cluster-drift-20260712.ts`
+  applied — 109 aggregates fixed, 1 zombie deleted, 10 leads re-pointed, 5
+  stuck clusters cleared for re-arbitration. cluster-health now: 0 drift /
+  0 dangling / 0 zombies / 0 merge-eligible-unmerged.
+- **T7 unbounded queries:** `dailySpend` bounded+indexed (was ~39s → covering
+  scan), `breakdownByModel` all-window pinned to a covering index,
+  semantic-search brute-force fallback recency-bounded + loud log.
+
+**Still open (explicitly OUT of scope this run — see the charter's "OUT of
+scope" list):** W4 (singleton-twin arbitrated sweep, A.5 window redesign),
+W5 (cohesion gate, digest `clustering_opt_out` — needs an AX product call,
+structural `no_content` flag), W6 (tombstone re-open + commentary regen
+policy), W7 (DiskANN routing of Stage A/A.5, pipeline cron split, SQLITE_BUSY
+retry wrapper). The two audit reports below remain the source of truth for
+these.
+
+Original audit context (findings adversarially verified; reports are the
+per-workstream source of truth). **The charter was `docs/FIX-GOAL-2026-07-12.md`**
+(bounded scope: P0 safety + W1-W3 + quick wins). Reports:
 
 - **Clustering audit** → `docs/reports/cluster-audit-2026-07-12/`
   (FINDINGS.md + DATA.md). Headlines: the June-12 split-loop fix left the

@@ -762,6 +762,17 @@ export const clusterSplits = sqliteTable(
   (t) => ({
     recentIdx: index("cluster_splits_recent_idx").on(t.splitAt),
     itemIdx: index("cluster_splits_item_idx").on(t.itemId),
+    /** The (item, cluster) negative edge is absolute — an item rejected from a
+     *  cluster must never be re-logged (or re-joined). This unique constraint
+     *  makes re-rejections a no-op (arbitrate inserts ON CONFLICT DO NOTHING)
+     *  instead of appending unbounded rows, so the rejection cap counts real
+     *  distinct clusters. Created on the live DB by scripts/ops/db-optimize.ts
+     *  (after the 2026-07-12 dedupe migration); declared here as the source of
+     *  truth for its name/shape. */
+    itemClusterUq: uniqueIndex("cluster_splits_item_cluster_uq").on(
+      t.itemId,
+      t.fromClusterId,
+    ),
   }),
 );
 
