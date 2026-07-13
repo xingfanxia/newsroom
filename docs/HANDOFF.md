@@ -1,5 +1,53 @@
 # AX's AI RADAR — Current Handoff
 
+## 2026-07-13 — W7 read-budget DEPLOYED (P3 executed end-to-end)
+
+**Both PRs merged to `main`; production is live on the W7 code.** AX authorized
+the full prod sequence ("全部自己 merge deploy apply ddl"). Executed:
+
+1. **Backup** — `db-dump.ts` → `backups/2026-07-13T06-29-32-415Z/` (parity-checked,
+   15 tables, items=21638 + clusters=16346 incl. embeddings). Restore point.
+2. **DDL applied to prod** (idempotent, PRAGMA-guarded): `items.last_recheck_at`
+   (`db:add-recheck-column`), the 3 W567 cluster-fix columns
+   (`add-cluster-fix-columns.ts`), and the A3 partial index
+   `clusters_multimember_idx` (`db:optimize`, all 12 PLAN_CHECKS PASS on real prod
+   data confirming structural index selection). Verified live via PRAGMA/sqlite_master.
+3. **Digest opt-out** — targeted `set-digest-clustering-optout-20260713.ts --apply`
+   (NOT `db:seed`, to avoid clobbering manual `curated` prod drift). ai-chatgroup-daily
+   + aihot-selected → `clustering_opt_out=1`.
+4. **#42 merged** (merge commit `feda34a`, `ax/cluster-recall-precision`) → deployed OK.
+5. **#43 merged** (merge commit `ce62ede`, `ax/w7-read-budget`) → prod deploy Ready,
+   aliased `news.ax0x.ai`, sfo1. Prod health: `/en` 200.
+6. **Scoped digest-unlink** — `unlink-digest-cluster-members-20260712.ts --apply`:
+   1826 digest items unlinked; scoped reconcile (1678 clusters) → 1300 zombie
+   clusters GC'd + 378 aggregates fixed + 24 leads repointed (1300+378=1678 ✓).
+   Post-state: 0 digest items still clustered; clusters 16346→15047.
+
+**⚠️ Unlink reconcile scoping fix (commit `78fb3ce`, in #43).** The unlink called
+`reconcileClusters()` with NO `clusterIds` → it reconciled ALL 16,346 clusters, not
+just the ones it touched (docstring said "affected clusters"; code was global).
+Decomposition of the 16,237-cluster "drift" it flagged: **member_count drift = 0,
+coverage drift = 0** — 100% is a `latest_member_at` timestamp artifact (stored value
+vs `max(clustered_at)`, magnitude up to ~172h) from the pg→Turso migration + merge-time
+bumps, **unrelated to digest cleanup** and feeding the merge 6h window + feed ordering.
+Fix: pass `clusterIds: affectedClusterIds` to both reconcile calls → blast radius
+16,237 → the 1,678 clusters actually modified. **The ~14.7k untouched clusters keep
+their `latest_member_at`; the global artifact is LEFT ALONE as a separate decision**
+(reconcile defines `latest_member_at = max(clustered_at)`, but merge-time semantics may
+intentionally diverge — do NOT globally rewrite it without validating that semantic).
+
+**Read-budget baseline: `newsroom-v2` rows_read = 554,440,281 @ 2026-07-13 ~06:52 UTC**
+(cumulative *cycle* total, dominated by the one-off migration flood — will NOT drop;
+it resets at cycle boundary). W7 success = a lower forward **run-rate**, measured as
+a clean-day delta ×30 over the next full day, NOT a drop in this cumulative number.
+
+**Post-deploy checks still pending a cluster tick (:55 hourly):** A.5 stamping
+(`last_recheck_at > 0`), opt-out holds (contamination stays 0), no "no such column"
+in cron logs. **Follow-ups:** wire A5 monitor as a cron (GH Action needs AX to add
+`TURSO_API_TOKEN` secret); clean-day rows_read re-measurement; A1(ANN)/A6 still deferred.
+
+---
+
 ## 2026-07-12 — W7 read-budget BUILT → PR #43 (charter `docs/FIX-W7-read-budget-2026-07-12.md`)
 
 The durable read-budget fix. Branch `ax/w7-read-budget`, **stacked on #42**
@@ -36,11 +84,10 @@ all findings fixed); non-live + full `bun test` gate green (exit 0).
   *approximate* → needs a ≥99% recall backtest before it can ship; after A2 its
   marginal cut isn't worth a blind clustering-quality risk.
 
-**P3 (not yet done — needs prod, confirm-before-apply):** back up → apply
-`last_recheck_at` DDL **before** deploy (`bun run db:add-recheck-column`; additive+
-nullable ⇒ backward-compatible) → `bun run db:optimize` (A3 index) → merge/deploy →
-measure clean-day delta × 30 (< 100M) → wire A5 as a cron. Full sequence + the
-A6/A7 escalation paths: the charter.
+**P3 — ✅ EXECUTED 2026-07-13** (see the DEPLOYED block at the top of this file).
+Sequence run: back up → apply `last_recheck_at` DDL + A3 index → targeted opt-out →
+merge #42/#43 → deploy → scoped digest-unlink. Remaining: clean-day rows_read
+re-measurement (delta ×30 < 100M) + wire A5 as a cron. A6/A7 escalation: the charter.
 
 ## 2026-07-12 — W5+W6 recall/precision APPLIED (FIX-W567 charter, PR `ax/cluster-recall-precision`)
 
