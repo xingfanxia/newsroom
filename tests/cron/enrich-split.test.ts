@@ -80,14 +80,19 @@ describe("vercel.json — staggered cron schedules for 4 split routes", () => {
 
   const cronByPath = new Map(vercelJson.crons.map((c) => [c.path, c.schedule]));
 
-  it("registers /api/cron/article-body with a 15-min cadence", () => {
+  it("registers /api/cron/article-body at an hourly-or-finer cadence (W9)", () => {
     expect(cronByPath.has("/api/cron/article-body")).toBe(true);
     const sched = cronByPath.get("/api/cron/article-body")!;
-    expect(sched).toMatch(/^\S+\s+\*\s+\*\s+\*\s+\*$/); // valid 5-field
-    // Stagger is achieved via different minute offsets vs other routes
+    // Must stay `<min> * * * *` (runs every hour): body-fetch is throughput-
+    // critical — on the anonymous Jina tier MAX_PER_RUN=20, so <24 runs/day
+    // would starve it below the ~190 items/day ingest. W9 cut it 4×/h → 1×/h
+    // (the read win is the index-leak fix, not the cadence). Stagger via minute.
+    expect(sched).toMatch(/^\S+\s+\*\s+\*\s+\*\s+\*$/); // valid 5-field, hourly
   });
 
-  it("registers /api/cron/score-backfill (hourly is sufficient — pre-rubric backfill)", () => {
+  it("registers /api/cron/score-backfill (W9: weekly — drained legacy backfill)", () => {
+    // Was hourly; the pre-rubric backfill is drained, so an hourly full-scan of
+    // ~20k enriched rows found 0 work every tick. W9 dropped it to weekly.
     expect(cronByPath.has("/api/cron/score-backfill")).toBe(true);
   });
 

@@ -1,5 +1,49 @@
 # AX's AI RADAR — Current Handoff
 
+## 2026-07-13 — W9 read-budget: cron cadence + cache-purge + scale (in progress)
+
+W8 shipped but a full decomposition (6-agent workflow + a clean 22.9-min prod
+measurement) showed the run-rate is still **~824k rows/h ≈ ~590M/mo, ~6× over the
+<100M target**. Two structural facts: (1) the **cron/background floor alone is
+~148k rows/h ≈ 107M/mo** — over the target with zero feed traffic; (2) the feed is
+dominated by **getDayCounts**, a 60-day calendar scan whose cache is purged 6×/hr
+unconditionally by the content crons (`_route.ts` has no content-changed guard), so
+it reprimes every ~10 min. AX's call: this is fundamentally a **daily-update site,
+run too frequently** → attack frequency + scale. Shipping in 3 measurable PRs.
+
+**W9a — content-cron cadence cuts (SHIPPED via PR #__).** `vercel.json` only
+(+ the cron-cadence tests). Aggressive daily-site cadence:
+- `cluster` `55 * * * *` → `55 */8 * * *` (3×/day). Its ±72h NN pipeline is ~50k
+  reads/tick, so frequency IS the lever. New items still appear immediately as
+  singletons via enrich; only event-grouping lags ≤8h.
+- `commentary` `10,40 * * * *` → `10 */12 * * *` (2×/day). 200/run × 2 > ~190/day
+  ingest, no backlog.
+- `score-backfill` `25 * * * *` → `25 6 * * 1` (weekly). Drained legacy backfill
+  that full-scanned ~20k enriched rows hourly to find 0 work.
+- `article-body` `0,15,30,45 * * * *` → `0 * * * *` (hourly, 4× cut, NOT 3×/day).
+  Deliberately kept hourly: body-fetch is throughput-critical (anon Jina tier
+  MAX_PER_RUN=20 → <24 runs/day starves the ~190/day ingest). Its real cost is the
+  **`items_unfetched_body_idx` leak** (never-stamped x-status rows accumulate) —
+  fixed by index narrowing in W9b, not by cadence.
+- `enrich` unchanged (4×/h, ~2k reads/h, keeps new items fresh).
+- Parser note: `cadenceMinutesFromCron` only understands `*/N` hour steps (comma
+  hour-lists → null), so cadences use `*/8`/`*/12`, not `1,9,17`.
+- Est. background floor drop ~148k → ~42k rows/h (score-backfill→0, commentary/
+  cluster amortized down). article-body's 32k/h stays until W9b's leak fix.
+
+**W9b (next) — cache-purge decouple + getDayCounts scale.** Decouple getDayCounts
+to a long-lived `feed-calendar` tag (6h TTL, NOT cron-purged) + a `published_at`-
+leading covering index (or a day_counts rollup) so the 60d bound SEEKs; make the
+content-cron feed purge conditional (only when content actually changed); narrow
+`items_unfetched_body_idx` to exclude never-fetched x-status (the article-body
+leak) + add `items_commentary_pending_idx`. Biggest single lever (~508M/mo).
+
+**W9c (next) — cache getFeaturedStories + bound API/RSS/MCP.** unstable_cache the
+bounded public feed views (traffic-independence) + apply the W8a recency floor to
+`getFeaturedStories`+`countFeaturedStories` on the API/RSS/MCP paths (the
+adversarial verify flagged these as unbounded ~40k-row/call — a single RSS poller
+otherwise blows past 100M). Target after full W9: durable ~70M/mo.
+
 ## 2026-07-13 — W8 read-budget: feed recency floor + aggregate cache
 
 Attacks the REAL read hog identified 2026-07-13: >90% of the read bill is

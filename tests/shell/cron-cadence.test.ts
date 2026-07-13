@@ -13,6 +13,8 @@ describe("cadenceMinutesFromCron", () => {
     expect(cadenceMinutesFromCron("23 4 * * *")).toBe(60 * 24);
     expect(cadenceMinutesFromCron("43 5 * * 1")).toBe(60 * 24 * 7);
     expect(cadenceMinutesFromCron("37 */6 * * *")).toBe(60 * 6);
+    expect(cadenceMinutesFromCron("55 */8 * * *")).toBe(60 * 8); // W9: cluster 3×/day
+    expect(cadenceMinutesFromCron("10 */12 * * *")).toBe(60 * 12); // W9: commentary 2×/day
     expect(cadenceMinutesFromCron("0,15,30,45 * * * *")).toBe(15);
     expect(cadenceMinutesFromCron("12,42 * * * *")).toBe(30);
     expect(cadenceMinutesFromCron("37 9 1 * *")).toBe(60 * 24 * 30);
@@ -38,7 +40,7 @@ describe("cadenceMinutesFromCron", () => {
       expected,
     );
     expect(snapshots.find((c) => c.name === "article-body")?.next).toBe(
-      "~15m cadence",
+      "~1h cadence",
     );
     expect(snapshots.find((c) => c.name === "newsletter-daily")?.next).toBe(
       "~24h cadence",
@@ -46,11 +48,14 @@ describe("cadenceMinutesFromCron", () => {
     expect(snapshots.every((c) => c.last === "—")).toBe(true);
   });
 
-  it("keeps the cluster pipeline at most hourly (W7 read-budget guard)", () => {
+  it("keeps the cluster pipeline no more frequent than hourly (read-budget guard)", () => {
     // Clustering can only work on content the hourly fetch (17 * * * *) has
     // pulled, so sub-hourly ticks re-scan the same corpus for nothing — the
-    // top read amplifier. This guard fails if the cadence is cranked back below
-    // 60 min. See docs/FIX-W7-read-budget-2026-07-12.md (A4).
+    // top read amplifier (W7). W9 went further: this is a daily-update site, so
+    // cluster now runs 3×/day (55 */8 * * * → 480 min) — the ±72h NN pipeline is
+    // ~50k reads/tick, so frequency IS the read lever here. This guard fails if
+    // the cadence is ever cranked back below 60 min. See
+    // docs/FIX-W7-read-budget-2026-07-12.md (A4) and the W9 cadence cut.
     const cluster = (
       (vercelConfig as { crons?: Array<{ path: string; schedule: string }> })
         .crons ?? []
