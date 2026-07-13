@@ -1,5 +1,47 @@
 # AX's AI RADAR — Current Handoff
 
+## 2026-07-12 — W7 read-budget BUILT → PR #43 (charter `docs/FIX-W7-read-budget-2026-07-12.md`)
+
+The durable read-budget fix. Branch `ax/w7-read-budget`, **stacked on #42**
+(`ax/cluster-recall-precision`). Goal: steady-state Turso `rows_read` **< 100M/mo**
+(design projection ~10–15M). Multipass-reviewed (code-reviewer + database-reviewer,
+all findings fixed); non-live + full `bun test` gate green (exit 0).
+
+**Two corrections to the quota-block diagnosis below (measured in P1):**
+- **The 549.6M was a ONE-OFF flood, not steady-state.** Through 2026-07-11 prod
+  had read only **2.84M cumulative** — it was reading ~nothing. The 554M spike on
+  2026-07-12 was migration-day work (pg→Turso copy + verify + 95+58 audit agents +
+  backtests). The pipeline was nonetheless **structurally able to re-bust** (A.5
+  ~99M/mo projected), which is what W7 fixes.
+- **ANN routing is NOT the dominant lever.** The quota section below called
+  "two-stage ANN (`vector_top_k`)" *the* W7 fix. P1 EXPLAIN showed **Stage A is
+  already index-bounded** (`SEARCH … USING items_published_at_idx`, ~456 rows/probe
+  — not a full scan). The real dominant cost was **A.5 re-scanning the same
+  singletons ~144×/72h**. So the shipped fix is the **A.5 waterline (A2)**, not ANN.
+- **Region: nothing was re-homed.** `newsroom-v2` is in group `default` @
+  aws-us-west-2, co-located with the sfo1 app (~20ms) — always was. (`tokyo` group
+  holds the unrelated exif-photo-blog-ax.)
+
+**Shipped in PR #43 (projected ~10–15M/mo, from ~110–175M unfixed):**
+- **A2 — A.5 recheck waterline** (`items.last_recheck_at`, 12h cooldown). Kills the
+  ~144× redundant re-scan (dominant, ~100× cut). Candidate window = neighbor-window
+  + cooldown (**84h**) so no in-window neighbor is missed (recall guarantee).
+- **A4 — cadence** `12,42 * * * *` → `55 * * * *` (hourly; fetch is already hourly).
+- **A3 — partial index** `clusters(member_count, updated_at) WHERE member_count>=2`
+  bounds the arbitrate + canonical-title candidate scans (~16K → ~1.1K). Structural
+  selection (no ANALYZE / no pin — empirically confirmed).
+- **A5 — read-budget monitor** (`scripts/ops/read-budget.ts`) — billing API →
+  grade vs cap + project run-rate; fails loud, cron-ready.
+- **A1 (ANN) + A6 (A.5 outer index) DEFERRED** to post-deploy measurement. A1 is
+  *approximate* → needs a ≥99% recall backtest before it can ship; after A2 its
+  marginal cut isn't worth a blind clustering-quality risk.
+
+**P3 (not yet done — needs prod, confirm-before-apply):** back up → apply
+`last_recheck_at` DDL **before** deploy (`bun run db:add-recheck-column`; additive+
+nullable ⇒ backward-compatible) → `bun run db:optimize` (A3 index) → merge/deploy →
+measure clean-day delta × 30 (< 100M) → wire A5 as a cron. Full sequence + the
+A6/A7 escalation paths: the charter.
+
 ## 2026-07-12 — W5+W6 recall/precision APPLIED (FIX-W567 charter, PR `ax/cluster-recall-precision`)
 
 Follow-on to the FIX-GOAL charter below. Implements the **product-gated +
