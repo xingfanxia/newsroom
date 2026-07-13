@@ -468,6 +468,21 @@ export const items = sqliteTable(
       t.sourceId,
       t.publishedAt,
     ),
+    /** Recency-bounded twin of feedCoverIdx (W8): published_at LEADS so the
+     *  public feed views' `published_at >= <floor>` predicate SEEKs the recent
+     *  window instead of scanning every enriched row (feedCoverIdx has
+     *  published_at last → it can only filter, not seek). Same trailing cover
+     *  columns so the bounded scan stays inside the index. Pinned by
+     *  getFeaturedStories/countFeaturedStories whenever a published_at lower
+     *  bound (recencyFloorDays or an explicit date) is present. */
+    feedRecentIdx: index("items_feed_recent_idx").on(
+      t.publishedAt,
+      t.enrichedAt,
+      t.importance,
+      t.tier,
+      t.clusterId,
+      t.sourceId,
+    ),
     /** Pending Stage B — items the arbitrator hasn't seen yet. */
     clusterVerifiedIdx: index("items_cluster_verified_idx")
       .on(t.clusterVerifiedAt)

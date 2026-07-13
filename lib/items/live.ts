@@ -99,14 +99,41 @@ export type FeedQuery = {
    *  top-N by importance, so noise stays capped. Day-aligned (not rolling
    *  24h) so the rescue boundary doesn't drift across the day. */
   recentDayRescueDays?: number;
+  /** Recency floor (W8): only return items whose published_at is within the
+   *  last N days, so the scan SEEKs the recent window on items_feed_recent_idx
+   *  instead of reading every enriched row (~144k rows/render → a few k). This
+   *  is an OPT-IN read-budget bound set only by the public page views (home /
+   *  all / curated); API/RSS/MCP callers omit it and stay unbounded. Ignored
+   *  when an explicit `date`/`dateFrom`/`dateTo` is set (those already bound
+   *  published_at, and drilling into a specific day must reach any date). */
+  recencyFloorDays?: number;
 };
+
+/**
+ * True when the query carries an explicit calendar bound (a single day or a
+ * date range). These already pin published_at, so the W8 recency floor stands
+ * down (the calendar must reach any day). Shared by buildFeedWhere AND
+ * feedIndexFor so the index pin and the WHERE predicate can never drift — the
+ * forced recent index is only ever chosen when some published_at range is in
+ * the WHERE for it to seek.
+ */
+function hasExplicitDateBound(q: FeedQuery): boolean {
+  return Boolean(q.date || q.dateFrom || q.dateTo);
+}
+
+/** True when the W8 recency floor is active (a positive day count). */
+function hasRecencyFloor(q: FeedQuery): boolean {
+  return q.recencyFloorDays != null && q.recencyFloorDays > 0;
+}
 
 /**
  * Build the shared WHERE expression used by both getFeaturedStories and
  * countFeaturedStories so pagination totals can't drift from the
- * actually-returned rows.
+ * actually-returned rows. Exported so the behavioral test can compile it and
+ * assert the recency-floor predicate is present/absent per query shape (the
+ * read-budget bound W8 must never silently lose).
  */
-function buildFeedWhere(q: FeedQuery) {
+export function buildFeedWhere(q: FeedQuery) {
   const tier: VisibleItemTier = q.tier ?? DEFAULT_FEED_TIER;
   const view = q.view ?? DEFAULT_FEED_VIEW;
   const hotH = q.hotWindowHours ?? DEFAULT_FEED_HOT_WINDOW_HOURS;
@@ -242,6 +269,19 @@ function buildFeedWhere(q: FeedQuery) {
         : sql`COALESCE(${clusters.importance}, ${items.importance}) >= ${q.minImportance}`
       : sql`TRUE`;
 
+  // Recency floor (W8): a top-level `published_at >= floor` bound so the scan
+  // SEEKs the recent window on items_feed_recent_idx (published_at leads there)
+  // instead of reading every enriched row. AND-ed alongside the view's dateFilter
+  // OR, so even the `today` view's cluster-timestamp branches are confined to the
+  // floor window (a still-developing event whose lead is older than the floor
+  // drops from the default view — reachable via the calendar/date nav, which
+  // bypasses the floor). Only when no explicit date bound is set (those already
+  // pin published_at and must reach any day).
+  const recencyFloorFilter =
+    hasRecencyFloor(q) && !hasExplicitDateBound(q)
+      ? sql`${items.publishedAt} >= ${Date.now() - q.recencyFloorDays! * 86_400_000}`
+      : sql`TRUE`;
+
   return and(
     isNotNull(items.enrichedAt),
     isNotNull(items.importance),
@@ -251,12 +291,26 @@ function buildFeedWhere(q: FeedQuery) {
     groupFilter,
     kindFilter,
     dateFilter,
+    recencyFloorFilter,
     searchFilter,
     curatedFilter,
     excludeTagsFilter,
     includeTagsFilter,
     minImportanceFilter,
   );
+}
+
+/**
+ * Whether a query carries a published_at lower bound (an explicit date window
+ * or the W8 recency floor). When it does, getFeaturedStories/countFeaturedStories
+ * pin items_feed_recent_idx (published_at leads → the bound SEEKs) instead of
+ * items_feed_cover_idx (published_at last → the bound can only filter). Kept as
+ * a shared helper so the two-phase fetch and the COUNT can't drift.
+ */
+export function feedIndexFor(q: FeedQuery): "items_feed_recent_idx" | "items_feed_cover_idx" {
+  return hasExplicitDateBound(q) || hasRecencyFloor(q)
+    ? "items_feed_recent_idx"
+    : "items_feed_cover_idx";
 }
 
 /**
@@ -318,9 +372,12 @@ export async function getFeaturedStories(q: FeedQuery = {}): Promise<Story[]> {
   // clusters is probed once per enriched item for the tier/dedup/today
   // predicates — clusters_feed_cover_idx keeps that probe off the
   // payload-heavy cluster rows (canonical titles/summaries).
+  // Pin the recency-bounded index when the query carries a published_at bound
+  // (W8) so the scan seeks the recent window; else the original cover index.
+  const feedIndex = feedIndexFor(q);
   const idFilter = sql`${items.id} IN (
     SELECT ${items.id}
-    FROM ${items} INDEXED BY items_feed_cover_idx
+    FROM ${items} INDEXED BY ${sql.raw(feedIndex)}
     INNER JOIN ${sources} ON ${items.sourceId} = ${sources.id}
     LEFT JOIN ${clusters} INDEXED BY clusters_feed_cover_idx
       ON ${items.clusterId} = ${clusters.id}
@@ -436,11 +493,12 @@ export async function getEventMembers(
  */
 export async function countFeaturedStories(q: FeedQuery = {}): Promise<number> {
   const client = db();
-  // Raw shape so the FROM can pin items_feed_cover_idx — same sparse-filter
-  // rationale as getFeaturedStories' id-subquery above.
+  // Raw shape so the FROM can pin the feed index — same sparse-filter rationale
+  // as getFeaturedStories' id-subquery above. Must pick the SAME index as
+  // getFeaturedStories (via feedIndexFor) so pagination totals can't drift.
   const rows = await client.all<{ c: number }>(sql`
     SELECT count(*) AS c
-    FROM ${items} INDEXED BY items_feed_cover_idx
+    FROM ${items} INDEXED BY ${sql.raw(feedIndexFor(q))}
     INNER JOIN ${sources} ON ${items.sourceId} = ${sources.id}
     LEFT JOIN ${clusters} INDEXED BY clusters_feed_cover_idx
       ON ${items.clusterId} = ${clusters.id}

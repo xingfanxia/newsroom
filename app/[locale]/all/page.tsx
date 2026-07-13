@@ -62,6 +62,11 @@ export default async function AllPostsPage({
       limit,
       offset,
       date: activeDate,
+      // W8: bound the default /all scan to 30d (seeks items_feed_recent_idx).
+      // Skipped when a source filter is active (source views stay unbounded);
+      // ignored when a date is picked — the calendar reaches any older day.
+      recencyFloorDays:
+        sourceId || sourcePreset !== "all" ? undefined : 30,
       ...sourceFilter,
     });
   } catch {

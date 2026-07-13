@@ -30,6 +30,17 @@ const INDEXES = [
   `CREATE INDEX IF NOT EXISTS clusters_feed_cover_idx
      ON clusters (id, event_tier, lead_item_id, first_seen_at,
                   latest_member_at, importance)`,
+  // Recency-bounded twin of items_feed_cover_idx (W8). published_at LEADS so
+  // the public feed views' `published_at >= <floor>` predicate seeks the recent
+  // window (a few hundred rows) instead of scanning all ~21.6k enriched rows —
+  // items_feed_cover_idx has published_at last, so a floor there filters but
+  // can't seek. Trailing columns mirror the cover index so the bounded scan
+  // stays inside the index (no fat-row lookups). getFeaturedStories pins this
+  // whenever a published_at lower bound (recencyFloorDays or explicit date) is
+  // set. Plain b-tree — safe to create on Turso (NOT a vector index).
+  `CREATE INDEX IF NOT EXISTS items_feed_recent_idx
+     ON items (published_at, enriched_at, importance, tier,
+               cluster_id, source_id)`,
   // Partial index for the arbitrate + canonical-title candidate scans (W7/A3).
   // Both select `member_count >= 2 AND <needs-work>` ORDER BY member_count DESC,
   // updated_at DESC. Holding only the ~1.1K multi-member clusters in that sort
@@ -74,6 +85,29 @@ const PLAN_CHECKS: Array<{ name: string; index: string; sql: string }> = [
             LEFT JOIN clusters INDEXED BY clusters_feed_cover_idx
               ON items.cluster_id = clusters.id
             WHERE items.enriched_at IS NOT NULL
+              AND items.importance IS NOT NULL
+            ORDER BY +items.published_at DESC LIMIT 120)`,
+  },
+  {
+    // W8 — recency-bounded feed scan must SEEK items_feed_recent_idx on the
+    // published_at floor, not scan items_feed_cover_idx. A faithful mirror of
+    // getFeaturedStories' id-subquery when recencyFloorDays/date is set. The
+    // index is pinned via INDEXED BY, so asserting the bare name only proves it
+    // EXISTS — a full `SCAN … USING INDEX items_feed_recent_idx` contains the
+    // name too. We assert the `(published_at>?)` seek shape so a column-order
+    // regression (published_at no longer leading) degrades the plan to a scan
+    // and trips this check. `published_at >= 0` keeps the range predicate (Turso
+    // forbids ANALYZE, so it can't fold to always-true), yielding that shape.
+    name: "recency-bounded feed subquery seeks items_feed_recent_idx (W8)",
+    index: "items_feed_recent_idx (published_at>?)",
+    sql: `SELECT id FROM items
+          WHERE id IN (
+            SELECT items.id FROM items INDEXED BY items_feed_recent_idx
+            INNER JOIN sources ON items.source_id = sources.id
+            LEFT JOIN clusters INDEXED BY clusters_feed_cover_idx
+              ON items.cluster_id = clusters.id
+            WHERE items.published_at >= 0
+              AND items.enriched_at IS NOT NULL
               AND items.importance IS NOT NULL
             ORDER BY +items.published_at DESC LIMIT 120)`,
   },

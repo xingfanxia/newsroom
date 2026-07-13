@@ -96,6 +96,19 @@ export default async function HotNewsPage({
     tier === DEFAULT_HOME_TIER &&
     homeView === "daily";
 
+  // W8 read-budget floor: bound the default feed scan to the recent window so
+  // it seeks items_feed_recent_idx instead of scanning every enriched row.
+  // Skipped when a source filter is active (source views stay unbounded);
+  // ignored inside buildFeedWhere when a date is picked (calendar reaches any
+  // day). `today` view needs only ~2 days of content → 7d is generous; the
+  // daily-highlights archive browses back → 30d.
+  const feedFloorDays =
+    sourceId || sourcePreset !== "all"
+      ? undefined
+      : dailyHighlights
+        ? 30
+        : 7;
+
   let stories: Story[] = [];
   try {
     stories = await getFeaturedStories({
@@ -110,6 +123,7 @@ export default async function HotNewsPage({
       //   - Otherwise (tab/source drill-in) → today view (trending events
       //     with hot-window + start-of-yesterday rescue, see lib/items/live.ts)
       view: activeDate || dailyHighlights ? "archive" : "today",
+      recencyFloorDays: feedFloorDays,
       // Default home (no filter): up to 3 stories per day at importance >= 80.
       // Surfaces the day's notable events (Apple CEO transition, GPT-5.5 release,
       // Google→Anthropic $40B + secondary stories like DRAM shortages, OpenAI
