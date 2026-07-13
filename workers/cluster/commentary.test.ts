@@ -32,9 +32,9 @@ import {
 } from "./prompt";
 
 // MAX_EVENT_COMMENTARY_PER_RUN is defined in commentary.ts (drizzle dep).
-// We document the expected value here as a specification test; the constant
-// is also verified structurally by the candidate query cap in commentary.ts.
-const EXPECTED_MAX_PER_RUN = 8;
+// We document the expected value here as a specification test; the assertion
+// below also greps the worker source so this can't drift into a tautology.
+const EXPECTED_MAX_PER_RUN = 16;
 const workerSource = readFileSync(resolve(import.meta.dir, "commentary.ts"), "utf8");
 
 // ── Prompt shape tests (pure, no mocks needed) ────────────────────────────
@@ -325,11 +325,16 @@ describe("eventCommentarySchema", () => {
 // ── MAX_EVENT_COMMENTARY_PER_RUN specification ────────────────────────────
 
 describe("MAX_EVENT_COMMENTARY_PER_RUN specification", () => {
-  it("is documented as 8 — lower than Stage B/C because event commentary is expensive", () => {
-    // This is a specification test: we assert the expected value here
-    // so any change to the constant surfaces as a test failure requiring
-    // deliberate acknowledgment. The actual constant lives in commentary.ts.
-    expect(EXPECTED_MAX_PER_RUN).toBe(8);
+  it("is 16 — cost-bounded, sized to the 3×/day cluster cadence (W9)", () => {
+    // Specification test: any change to the constant must be acknowledged here.
+    // Raised 8→16 in W9 when cluster went 1/h→3/day so 8h of event formation
+    // still gets commented (16 × 3 = 48/day capacity), while staying low enough
+    // that the sequential stage fits the 300s cluster-invocation budget.
+    // Grep the source too so this doesn't decay into `16 === 16`.
+    expect(EXPECTED_MAX_PER_RUN).toBe(16);
+    expect(workerSource).toContain(
+      `MAX_EVENT_COMMENTARY_PER_RUN = ${EXPECTED_MAX_PER_RUN}`,
+    );
   });
 });
 

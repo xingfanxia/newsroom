@@ -43,7 +43,14 @@ import {
 import { generateChineseCommentary } from "@/workers/enrich/chinese";
 import { treatmentForScore } from "@/workers/enrich/treatment";
 
-const MAX_EVENT_COMMENTARY_PER_RUN = 8;
+// Per cron-tick cap. Event commentary is sequential (no concurrency) and runs
+// inside the cluster pipeline's single invocation, so this also bounds the
+// stage's wall-clock against the 300s function limit — hence 16, not higher.
+// Coupled to the cluster cadence (W9: 3×/day): capacity = 16 × 3 = 48 events/
+// day, and with EVENT_COMMENTARY_CRON_RECENCY_HOURS=36 (~4 runs) a starved
+// low-importance event gets ~4 chances before ageing out. Was 8 when cluster
+// ran hourly (192/day); if the cadence changes again, revisit this + the window.
+const MAX_EVENT_COMMENTARY_PER_RUN = 16;
 
 type EventCommentaryBatchOptions = {
   /**

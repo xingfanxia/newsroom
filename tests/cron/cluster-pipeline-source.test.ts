@@ -23,7 +23,7 @@ describe("cluster cron pipeline wiring", () => {
     for (const idx of stageOrder) expect(idx).toBeGreaterThan(0);
     expect(stageOrder).toEqual([...stageOrder].sort((a, b) => a - b));
     expect(src).toContain("safeStage");
-    expect(src).toContain("MERGE_RECENCY_HOURS = 6");
+    expect(src).toContain("MERGE_RECENCY_HOURS = 24"); // W9: >= 8h cluster cadence
     // Stage A.5 recency is the imported candidate window (window + cooldown,
     // the W7 A2 recall guarantee), passed through to the recluster batch —
     // renamed from the old local SINGLETON_RECLUSTER_RECENCY_HOURS = 72.

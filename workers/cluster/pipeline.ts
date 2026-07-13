@@ -24,9 +24,15 @@ import {
 import { EVENT_COMMENTARY_CRON_RECENCY_HOURS } from "@/lib/events/commentary-window";
 
 // Merge-stage recency window. Each tick only considers multi-member clusters
-// whose latest_member_at is within the last 6h, keeping pairwise distance
+// whose latest_member_at is within the last N hours, keeping pairwise distance
 // checks cheap. Wider manual sweeps belong in scripts/migrations.
-const MERGE_RECENCY_HOURS = 6;
+//
+// MUST stay >= the cluster cron cadence (W9: 3×/day = every 8h, vercel.json)
+// with margin, or clusters updated in the ~2h band after a run never re-enter
+// the window before it lapses → merge never re-evaluates them → duplicate event
+// cards accumulate. 24h gives every updated cluster ~3 merge passes. If the
+// cluster cadence is lengthened again, raise this in lockstep.
+const MERGE_RECENCY_HOURS = 24;
 
 type ClusterPipelineStageError = { stage: string; error: string };
 type ClusterPipelineStage<T> = T | ClusterPipelineStageError;
