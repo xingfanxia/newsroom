@@ -62,14 +62,19 @@ Three fixes:
   score-backfill rescored>0, normalize created>0). cluster stays unconditional
   (7-stage, ~always mutates, 3×/day; a reliable cross-stage predicate is fragile).
 
-**W9b-idx (next) — the two INDEX changes deferred out of W9b because they need an
-AX-authorized prod apply** (`bun scripts/ops/db-optimize.ts` is manual — indexes do
-NOT auto-apply on Vercel deploy; drizzle push is disabled). Narrow
-`items_unfetched_body_idx` to exclude never-stamped x-status rows (the article-body
-32k/h read leak — DROP+CREATE with a tighter WHERE) + add
-`items_commentary_pending_idx`. Edit `db/schema.ts` + `scripts/ops/db-optimize.ts`
-(INDEXES + PLAN_CHECKS) + the pinning queries; database-reviewer pass; apply to prod
-only after AX confirms.
+**W9b-idx — commentary partial index (SHIPPED, PR #52, squash 5b0e3fe; index LIVE
+on prod).** Scope CUT after measurement: the article-body `items_unfetched_body_idx`
+narrowing was **dropped** — the "32k/h leak" estimate was wrong; the dead-weight
+accumulation is only **1,373 never-fetchable rows** (~1-2M/mo at hourly cadence),
+not worth a fragile `NOT (LIKE OR LIKE)` partial index that risks silent
+planner-match failure. Kept the robust half: `items_commentary_pending_idx ON items
+(tier, cluster_id) WHERE commentary_at IS NULL`. The commentary worker scanned every
+visible-tier row (measured **8,926**) 2×/day to find the ~27 commentary-pending
+(~1M/mo); the partial index collapses that to ~27. Applied to prod via
+`db-optimize.ts` (17.6s build); the UNPINNED plan check PASSes with a `(tier=?)` SEEK
+(planner structurally selects it — no INDEXED BY pin needed). database-reviewer pass
+(both hardening findings applied). AX granted STANDING authorization for prod
+index/cache ops via db-optimize.ts, so no per-index confirm.
 
 **Gate-hygiene follow-up (found during W9b):** the local `bun run test` gate is
 NON-hermetic — a CLASS of `(real DB)` tests run whenever `TURSO_DATABASE_URL` is set
@@ -84,11 +89,41 @@ PR): gate the `(real DB)` writes behind an explicit opt-in env (not bare
 `TURSO_DATABASE_URL`) so the default gate is hermetic. **Vercel CI is unaffected — it
 runs only `next build`, never `bun run test`.**
 
-**W9c (next) — cache getFeaturedStories + bound API/RSS/MCP.** unstable_cache the
-bounded public feed views (traffic-independence) + apply the W8a recency floor to
-`getFeaturedStories`+`countFeaturedStories` on the API/RSS/MCP paths (the
-adversarial verify flagged these as unbounded ~40k-row/call — a single RSS poller
-otherwise blows past 100M). Target after full W9: durable ~70M/mo.
+**W9c-1 — main RSS recency floor (SHIPPED, PR #53, squash 46f264d, non-breaking).**
+The decisive finding: the routes split by caching. `/api/feed/[locale]/rss.xml` is
+`revalidate=600` but each render is a full **21,666-row cover scan** (getFeaturedStories,
+no floor) — a continuously-polled reader drives that ~288×/day/locale ≈ **~187M rows/mo
+at full poll**, plausibly the largest remaining sink. Fix: `MAIN_RSS_RECENCY_FLOOR_DAYS
+= 14` on the PRIMARY featured query → pins `items_feed_recent_idx`, SEEKs the 14d
+window (**2,682 rows, ~8× cut**). Non-breaking: RSS is recent-by-nature and prod has
+373 featured+p1 leads in 14d (7.5× the 50-item limit) → byte-identical output. The
+slow-day `tier:'all'` fallback stays UNFLOORED (drought safety net). code-reviewer
+caught + fixed a CRITICAL: the test's bare `mock.module` dropped @/lib/items/live's
+other exports → reddened the gate by breaking 7 suites; fixed with a spread
+partial-mock.
+
+**W9c-2 (DECISION PENDING — the one remaining lever with a product tradeoff).** The
+JSON feed APIs `/api/public/feed` + `/api/v1/feed` are `force-dynamic` (UNCACHED) →
+~43k rows/call (getFeaturedStories + countFeaturedStories) IF polled. Bounding them
+has a real API-contract cost, UNLIKE the RSS path: a default recency floor changes
+the PUBLIC API's returned items (deep pagination past the window → empty) AND
+`countFeaturedStories` `total` (windowed, not all-time). Options: (a) measure-first —
+the big structural cuts are shipped; observe the forward run-rate over a clean day
+before a breaking change [recommended]; (b) NON-breaking route-caching (revalidate)
+like the RSS feed — bounds default-param polls without a contract change; (c) breaking
+default floor (aggressive). We have NO HTTP traffic data for these JSON endpoints, so
+(c) speculatively breaks the contract for a possibly-nonexistent cost. Target after
+full W9: durable ~70M/mo.
+
+**W9 measurement baseline (for the forward run-rate proof).** Billing-period
+cumulative `rows_read` = **597.68M @ 2026-07-13** (over the 500M free cap — but this
+period includes the pre-W9 days; the accumulated damage is sunk). The proof of the W9
+cuts is the **forward run-rate (rows/h over the next clean day)**, NOT the cumulative
+(masked by the sunk pre-W9 reads + edge cache + lagged usage API). Shipped this
+session: W9a (cadence) + W9b (feed-cache decouple + getDayCounts seek) + W9b-idx
+(commentary index) + W9c-1 (RSS floor). Pull current usage:
+`curl -s -H "Authorization: Bearer $TURSO_API_TOKEN" https://api.turso.tech/v1/organizations/xingfanxia/databases/newsroom-v2/usage`
+(token in `~/.claude/turso.env`; NEVER print it).
 
 ## 2026-07-13 — W8 read-budget: feed recency floor + aggregate cache
 
