@@ -401,8 +401,19 @@ export const items = sqliteTable(
     /** A.5 recheck waterline (FIX-W7 / A2). Last time the singleton-recluster
      *  stage neighbor-scanned this item and kept it a singleton. Persistent
      *  singletons are skipped for SINGLETON_RECHECK_COOLDOWN_HOURS to stop the
-     *  every-tick re-scan that dominated read cost. Cooldown ≪ the 72h A.5
-     *  window ⇒ late duplicates are still caught, just within ≤cooldown hours. */
+     *  every-tick re-scan that dominated read cost. No in-window neighbor is
+     *  missed: the A.5 candidate window is (neighbor-window + cooldown), so a
+     *  kept singleton stays selectable ≥1 cooldown past the latest possible
+     *  neighbor arrival — the waterline only DELAYS a merge by ≤cooldown hours.
+     *  See SINGLETON_RECLUSTER_CANDIDATE_RECENCY_HOURS in workers/cluster/
+     *  singletons.ts for the full recall guarantee.
+     *  NOTE ON PHYSICAL LAYOUT: this logical position (before the fat payload
+     *  block) only holds for a fresh CREATE TABLE. On the live DB the column was
+     *  ALTER-appended (add-recheck-column.ts), so it sits physically AFTER the
+     *  ~45KB payload — reading it walks overflow pages. That is a per-row
+     *  server-side latency in the hourly A.5 worker only; it does NOT increment
+     *  Turso rows_read, so the read budget is unaffected (never-stamped NULL
+     *  rows skip the walk entirely). A supporting index is A6, deferred. */
     lastRecheckAt: integer("last_recheck_at", { mode: "timestamp_ms" }),
     // ── Large payloads — MUST STAY LAST (SQLite inlines them in the row;
     // reading any column stored AFTER a big value walks its overflow pages,

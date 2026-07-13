@@ -8,6 +8,36 @@
 
 const MONTH_MS = 30 * 86_400_000;
 
+export type UsageTotals = { rows_read: number; rows_written: number };
+
+/**
+ * Parse + validate a Turso usage response body. Throws on a missing or non-finite
+ * `total.rows_read` so the monitor fails LOUD — coercing an API error to 0 rows
+ * would silently grade "ok" (a guardrail that green-lights on failure is worse
+ * than no guardrail). `rows_written` is informational (not a guardrail input),
+ * so it defaults to 0 when absent.
+ */
+export function parseUsageTotals(body: unknown): UsageTotals {
+  const total = (
+    body as { total?: { rows_read?: unknown; rows_written?: unknown } } | null
+  )?.total;
+  const rowsRead = total?.rows_read;
+  if (typeof rowsRead !== "number" || !Number.isFinite(rowsRead)) {
+    throw new Error(
+      `Turso usage response missing/invalid total.rows_read ` +
+        `(got ${JSON.stringify(total)})`,
+    );
+  }
+  const rowsWritten = total?.rows_written;
+  return {
+    rows_read: rowsRead,
+    rows_written:
+      typeof rowsWritten === "number" && Number.isFinite(rowsWritten)
+        ? rowsWritten
+        : 0,
+  };
+}
+
 export type ReadBudgetVerdict = {
   rowsRead: number;
   capRows: number;

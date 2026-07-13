@@ -12,29 +12,37 @@
  *   PREV_ROWS=566269103 PREV_AT=2026-07-12T09:00:00Z \
  *     bun --env-file=.env.local scripts/ops/read-budget.ts
  */
-import { assessReadBudget, projectMonthlyReads } from "@/lib/ops/read-budget";
+import {
+  assessReadBudget,
+  parseUsageTotals,
+  projectMonthlyReads,
+} from "@/lib/ops/read-budget";
 
 // Grade against the FREE cap even on Developer — the W7 goal is to sit well
 // under free, so the free cap is the meaningful safety line.
 const FREE_CAP_ROWS = 500_000_000;
 const MONTHLY_TARGET_ROWS = 100_000_000;
 
+/**
+ * Fetch a Turso usage endpoint and FAIL LOUD on any error — the whole point of
+ * this guardrail is to trip on a real overage, so an API failure that coerced
+ * rows_read to 0 would silently report "ok" (worse than no monitor). Throws on
+ * missing token, non-2xx, or a missing/NaN rows_read. The caller's exit-1 catch
+ * turns any throw into a red cron.
+ */
 async function fetchUsage(
   path: string,
-): Promise<{ rows_read: number; rows_written: number } | null> {
+): Promise<{ rows_read: number; rows_written: number }> {
   const token = process.env.TURSO_API_TOKEN;
   const org = process.env.TURSO_ORG ?? "xingfanxia";
-  if (!token) return null;
+  if (!token) throw new Error("no TURSO_API_TOKEN");
   const res = await fetch(`https://api.turso.tech/v1/organizations/${org}${path}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  const j = (await res.json()) as {
-    total?: { rows_read?: number; rows_written?: number };
-  };
-  return {
-    rows_read: j.total?.rows_read ?? 0,
-    rows_written: j.total?.rows_written ?? 0,
-  };
+  if (!res.ok) {
+    throw new Error(`Turso usage ${path} → HTTP ${res.status} ${res.statusText}`);
+  }
+  return parseUsageTotals(await res.json());
 }
 
 function pct(n: number): string {
@@ -50,14 +58,10 @@ async function main() {
     return;
   }
 
-  const org = await fetchUsage("/usage");
-  const dbUsage = await fetchUsage("/databases/newsroom-v2/usage");
-  const usage = dbUsage ?? org;
-  if (!usage) {
-    console.error("failed to fetch Turso usage");
-    process.exitCode = 1;
-    return;
-  }
+  // Grade newsroom-v2's per-DB usage directly. (Grading the org total against a
+  // per-DB baseline was the source of the negative-delta "baseline mismatch"
+  // noise; per-DB is the number the read budget is actually about.)
+  const usage = await fetchUsage("/databases/newsroom-v2/usage");
 
   const verdict = assessReadBudget(usage, { capRows: FREE_CAP_ROWS });
   console.log(`newsroom-v2 rows_read (cycle): ${usage.rows_read.toLocaleString()}`);
@@ -71,12 +75,12 @@ async function main() {
     const delta = usage.rows_read - prevRows;
     const elapsedMs = Date.now() - prevAt;
     if (delta < 0) {
-      // Baseline is a per-DB vs org mismatch, or the billing cycle reset —
-      // a negative delta is not a real rate, don't project a bogus "OK".
+      // Current < prev means the billing cycle rolled over (usage reset to ~0)
+      // — a negative delta is not a real rate, don't project a bogus "OK".
       console.log(
         `run-rate: prev ${prevRows.toLocaleString()} > current ` +
-          `${usage.rows_read.toLocaleString()} — baseline mismatch or cycle ` +
-          `reset; skipping projection`,
+          `${usage.rows_read.toLocaleString()} — billing cycle reset; ` +
+          `skipping projection`,
       );
     } else {
       const projected = projectMonthlyReads(delta, elapsedMs);

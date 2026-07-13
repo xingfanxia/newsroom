@@ -12,7 +12,17 @@
  * skipped). No data backfill needed: NULL means "never rechecked", which the
  * waterline treats as immediately eligible, so the pipeline self-populates it.
  *
+ * ⚠️ DEPLOY ORDERING — run this BEFORE (or with) the deploy that ships the A.5
+ * waterline code. Vercel auto-deploys on push to main; the A.5 candidate SELECT
+ * references last_recheck_at, so if the code ships first the cluster pipeline
+ * throws `no such column: last_recheck_at` every tick (isolated by safeStage, so
+ * the pipeline limps on but Stage A.5 silently no-ops until the column exists).
+ * Because the column is additive + nullable, applying it EARLY is 100% backward-
+ * compatible — the pre-deploy code never references it. So: apply here first,
+ * then merge/deploy.
+ *
  * Run: bun --env-file=.env.local scripts/ops/add-recheck-column.ts
+ *   (or `bun run db:add-recheck-column`)
  *
  * NEVER use `db:push` for this (disabled — it false-diffs the F32_BLOB
  * embedding column and would drop items.embedding + the DiskANN index).

@@ -6,8 +6,10 @@
  * `items.last_recheck_at` cooldown: a singleton rechecked within
  * SINGLETON_RECHECK_COOLDOWN_HOURS is skipped, and the candidate ordering is
  * recheck-stalest-first (never published-ASC) so no singleton is starved.
- * Cooldown ≪ the 72h A.5 window ⇒ every late duplicate is still caught, just
- * within ≤cooldown hours — zero recall loss, ~20× fewer neighbor scans.
+ * The candidate window is (neighbor-window + cooldown), so a kept singleton
+ * stays selectable ≥1 cooldown past the latest possible neighbor arrival ⇒ no
+ * in-window neighbor is missed, just merged ≤cooldown hours later — with ~20×
+ * fewer neighbor scans.
  *
  * Runs the REAL query/loop against a fresh file-backed libSQL DB (F32_BLOB
  * embeddings, real vector_distance_cos) through the injected-client seam.
@@ -25,6 +27,8 @@ import {
   selectSingletonReclusterCandidates,
   resolveSingletonCooldownMs,
   SINGLETON_RECHECK_COOLDOWN_HOURS,
+  SINGLETON_RECLUSTER_WINDOW_HOURS,
+  SINGLETON_RECLUSTER_CANDIDATE_RECENCY_HOURS,
 } from "@/workers/cluster/singletons";
 
 type Tdb = ReturnType<typeof drizzle<typeof schema>>;
@@ -230,10 +234,38 @@ describe("A.5 recheck waterline — stamp + skip loop", () => {
   });
 });
 
-describe("A.5 recheck waterline — constants", () => {
-  it("has a cooldown well under the 72h A.5 window (no recall loss)", () => {
+describe("A.5 recheck waterline — recall guarantee (candidate window)", () => {
+  // The recall guarantee: a kept singleton must stay a *candidate* for ≥1
+  // cooldown past the latest possible neighbor arrival, or a neighbor landing in
+  // its final cooldown hours could be missed forever (A.5 is the sole late-merge
+  // path; published_at only ages). That requires candidate recency ≥ neighbor
+  // window + cooldown. This invariant test trips if a future edit shrinks it.
+  it("candidate recency ≥ neighbor window + cooldown", () => {
     expect(SINGLETON_RECHECK_COOLDOWN_HOURS).toBeGreaterThan(0);
-    expect(SINGLETON_RECHECK_COOLDOWN_HOURS).toBeLessThan(72);
+    expect(SINGLETON_RECLUSTER_CANDIDATE_RECENCY_HOURS).toBeGreaterThanOrEqual(
+      SINGLETON_RECLUSTER_WINDOW_HOURS + SINGLETON_RECHECK_COOLDOWN_HOURS,
+    );
+  });
+
+  it("keeps a singleton older than the neighbor window selectable (late-neighbor recall)", async () => {
+    // Published 80h ago: PAST the 72h neighbor window but still inside the
+    // 84h candidate recency. It must remain a candidate so a neighbor arriving
+    // in its final hours can still be caught before it ages out.
+    await seedSingleton({
+      itemId: 60,
+      clusterId: 60,
+      lastRecheckAt: null,
+      publishedAt: NOW - 80 * HOUR,
+    });
+    const rows = await selectSingletonReclusterCandidates(
+      {
+        recencyHours: SINGLETON_RECLUSTER_CANDIDATE_RECENCY_HOURS,
+        now: NOW,
+        cooldownHours: 12,
+      },
+      tdb,
+    );
+    expect(rows.map((r) => r.item_id)).toEqual([60]);
   });
 
   it("resolves cooldown ms; null means no cooldown", () => {

@@ -30,7 +30,8 @@ CREATE TABLE clusters (
   member_count INTEGER NOT NULL DEFAULT 0,
   updated_at INTEGER NOT NULL DEFAULT 0,
   verified_at INTEGER,
-  titled_at INTEGER
+  titled_at INTEGER,
+  canonical_title_zh TEXT
 );
 CREATE TABLE items (
   id INTEGER PRIMARY KEY,
@@ -40,8 +41,9 @@ CREATE TABLE items (
 ${PARTIAL_INDEX};
 `;
 
-// The arbitrate candidate query (raw form of the drizzle builder in
-// runArbitrationBatch) — unpinned, exactly as production emits it.
+// The arbitrate candidate query — a faithful mirror of the drizzle builder in
+// runArbitrationBatch (same WHERE/ORDER BY/LIMIT). Unpinned, exactly as
+// production emits it. LIMIT = MAX_ARBITRATIONS_PER_RUN (15).
 const ARBITRATE_SQL = `
   SELECT c.id, c.lead_item_id, c.member_count
   FROM clusters c
@@ -54,17 +56,23 @@ const ARBITRATE_SQL = `
       )
     )
   ORDER BY c.member_count DESC, c.updated_at DESC
-  LIMIT 40
+  LIMIT 15
 `;
 
-// The canonical-title candidate query (raw form).
+// The canonical-title candidate query — mirror of the runCanonicalTitleBatch
+// builder, including the `canonical_title_zh IS NULL` branch (never given a zh
+// title). LIMIT = MAX_TITLES_PER_RUN (15).
 const TITLE_SQL = `
   SELECT c.id, c.member_count
   FROM clusters c
   WHERE c.member_count >= 2
-    AND (c.titled_at IS NULL OR c.updated_at > c.titled_at)
+    AND (
+      c.canonical_title_zh IS NULL
+      OR c.titled_at IS NULL
+      OR c.updated_at > c.titled_at
+    )
   ORDER BY c.member_count DESC, c.updated_at DESC
-  LIMIT 40
+  LIMIT 15
 `;
 
 let client: Client;
@@ -94,10 +102,13 @@ async function seedCluster(o: {
   verifiedAt?: number | null;
   titledAt?: number | null;
   updatedAt?: number;
+  canonicalTitleZh?: string | null;
 }) {
   await client.execute({
-    sql: `INSERT INTO clusters (id, lead_item_id, member_count, updated_at, verified_at, titled_at)
-          VALUES (?, ?, ?, ?, ?, ?)`,
+    sql: `INSERT INTO clusters
+            (id, lead_item_id, member_count, updated_at, verified_at,
+             titled_at, canonical_title_zh)
+          VALUES (?, ?, ?, ?, ?, ?, ?)`,
     args: [
       o.id,
       o.id * 10,
@@ -105,6 +116,7 @@ async function seedCluster(o: {
       o.updatedAt ?? 1000,
       o.verifiedAt ?? null,
       o.titledAt ?? null,
+      o.canonicalTitleZh ?? null,
     ],
   });
 }
@@ -140,14 +152,37 @@ describe("A3 partial index — behavior preserved", () => {
     expect(res.rows.map((r) => Number(r.id))).toEqual([1]);
   });
 
-  it("canonical-title returns untitled and grown-since-titled clusters", async () => {
-    await seedCluster({ id: 1, memberCount: 3, titledAt: null }); // untitled
-    await seedCluster({ id: 2, memberCount: 5, titledAt: 1000, updatedAt: 2000 }); // grew after title
-    await seedCluster({ id: 3, memberCount: 4, titledAt: 2000, updatedAt: 1000 }); // titled, unchanged — excluded
+  it("canonical-title returns untitled, un-zh-titled, and grown-since-titled clusters", async () => {
+    // untitled (titled_at NULL) → included
+    await seedCluster({ id: 1, memberCount: 3, titledAt: null });
+    // grew after title (updated_at > titled_at), has zh title → included
+    await seedCluster({
+      id: 2,
+      memberCount: 5,
+      titledAt: 1000,
+      updatedAt: 2000,
+      canonicalTitleZh: "标题",
+    });
+    // titled + has zh + unchanged → EXCLUDED (all three branches false)
+    await seedCluster({
+      id: 3,
+      memberCount: 4,
+      titledAt: 2000,
+      updatedAt: 1000,
+      canonicalTitleZh: "标题",
+    });
+    // titled + unchanged BUT no zh title yet → included via canonical_title_zh IS NULL
+    await seedCluster({
+      id: 5,
+      memberCount: 2,
+      titledAt: 2000,
+      updatedAt: 1000,
+      canonicalTitleZh: null,
+    });
     await seedCluster({ id: 4, memberCount: 1, titledAt: null }); // singleton — excluded
 
     const res = await client.execute(TITLE_SQL);
-    // member_count DESC → [2 (5 members), 1 (3 members)]
-    expect(res.rows.map((r) => Number(r.id))).toEqual([2, 1]);
+    // member_count DESC → [2 (5), 1 (3), 5 (2)]
+    expect(res.rows.map((r) => Number(r.id))).toEqual([2, 1, 5]);
   });
 });

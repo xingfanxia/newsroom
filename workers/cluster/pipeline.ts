@@ -14,6 +14,7 @@ import {
 import { runMergeBatch, type MergeReport } from "@/workers/cluster/merge";
 import {
   runSingletonReclusterBatch,
+  SINGLETON_RECLUSTER_CANDIDATE_RECENCY_HOURS,
   type SingletonReclusterReport,
 } from "@/workers/cluster/singletons";
 import {
@@ -26,7 +27,6 @@ import { EVENT_COMMENTARY_CRON_RECENCY_HOURS } from "@/lib/events/commentary-win
 // whose latest_member_at is within the last 6h, keeping pairwise distance
 // checks cheap. Wider manual sweeps belong in scripts/migrations.
 const MERGE_RECENCY_HOURS = 6;
-const SINGLETON_RECLUSTER_RECENCY_HOURS = 72;
 
 type ClusterPipelineStageError = { stage: string; error: string };
 type ClusterPipelineStage<T> = T | ClusterPipelineStageError;
@@ -64,10 +64,13 @@ export async function runClusterPipeline(): Promise<ClusterPipelineReport> {
   const cluster = await safeStage("cluster", () => runClusterBatch());
 
   // Stage A.5: recheck recent singleton clusters that Stage A will never see
-  // again (`clustered_at IS NULL` no longer holds).
+  // again (`clustered_at IS NULL` no longer holds). The candidate window is
+  // window + cooldown (not just the neighbor window) so a neighbor arriving in
+  // a singleton's final cooldown hours is still guaranteed ≥1 recheck before
+  // the singleton ages out — see SINGLETON_RECLUSTER_CANDIDATE_RECENCY_HOURS.
   const singletonRecluster = await safeStage("singleton-recluster", () =>
     runSingletonReclusterBatch({
-      recencyHours: SINGLETON_RECLUSTER_RECENCY_HOURS,
+      recencyHours: SINGLETON_RECLUSTER_CANDIDATE_RECENCY_HOURS,
     }),
   );
 

@@ -78,9 +78,22 @@ term). Comfortably beats the <100M target with large margin.
 - **P1 (done):** measured baseline above (corpus, plans, cadence, attribution).
 - **P2 (this PR — the dominant amplifiers + the guardrail):**
   - **A2 (done)** — A.5 recheck waterline (`items.last_recheck_at`, 12h
-    cooldown). ~99M → ~12M/mo. 9 behavioral tests.
+    cooldown). ~99M → ~12M/mo. Behavioral tests (cooldown filter, anti-
+    starvation ordering, stamp+skip loop, dry-run, recall guarantee).
+    **Recall guarantee:** the A.5 *candidate* recency window is
+    `neighbor-window + cooldown` (84h), deliberately wider than the ±72h
+    neighbor window, so a neighbor arriving in a singleton's final cooldown
+    hours still gets ≥1 recheck before the singleton ages out — a plain 72h
+    candidate window would drop it permanently (A.5 is the sole late-merge path).
+    Stamp writes are busy-retried + chunked (backfill-safe under SQLite's
+    variable cap).
   - **A4 (done)** — cluster pipeline 30min → hourly (fetch is hourly). ~2× on
-    all stages. Cron-cadence guard test.
+    all stages. Cron-cadence guard test. **Throughput tradeoff (accepted):**
+    arbitrate + canonical-title are capped at 15/run, so hourly halves their
+    drain rate (15/h vs 30/h) — backlog recovery after downtime is ~2× slower
+    and worst-case late-merge latency rises from ≤30min to ≤60min. Fine for a
+    personal radar; the per-run caps can be raised later if backlog ever bites
+    (at some added LLM cost), independent of this cadence.
   - **A5 (done)** — read-budget monitor (`assessReadBudget` +
     `projectMonthlyReads` + billing script) so the run-rate is watched and the
     remaining-lever decision is measured, not guessed.
@@ -99,9 +112,64 @@ term). Comfortably beats the <100M target with large margin.
   cut isn't worth a blind clustering-quality risk. A6 (A.5 outer-query index) is
   a minor scan whose need is only provable from post-deploy EXPLAIN. Build both
   only if the measured run-rate demands it.
-- **P3 (needs prod):** apply `last_recheck_at` DDL (confirm-before-apply; back up
-  first); deploy A2+A4; measure clean-day delta × 30 (target ≪ 100M); wire the
-  A5 monitor as a cron/alert; add A3/A1 iff measurement demands it.
+- **P3 (needs prod):** ordered, confirm-before-apply:
+  1. Back up (`scripts/ops/db-dump.ts`).
+  2. **Apply `last_recheck_at` DDL BEFORE the deploy** (`bun run
+     db:add-recheck-column`). It is additive + nullable, so the pre-deploy code
+     never references it — applying early is backward-compatible. If the code
+     deploys first, every cluster tick throws `no such column: last_recheck_at`
+     and Stage A.5 silently no-ops (isolated by `safeStage`) until the column
+     exists.
+  3. Apply the A3 partial index (`bun run db:optimize` — note it also runs a
+     `cluster_splits` dedupe DELETE, so honor the back-up-first rule).
+  4. Merge/deploy A2+A4+A3.
+  5. Measure clean-day delta × 30 (target ≪ 100M); wire the A5 monitor as a
+     cron/alert (`PREV_ROWS`/`PREV_AT` for the run-rate projection).
+  6. Add A1/A6 iff the measured run-rate demands it.
+
+## Review (P2 adversarial passes — all findings fixed)
+
+`code-reviewer` + `database-reviewer` (empirical, local file-backed libSQL — no
+live-DB reads). Every finding fixed before merge:
+
+- **[MEDIUM] Recall gap (code):** the original 72h candidate window could
+  permanently miss a neighbor arriving in a singleton's final cooldown hours →
+  widened candidate recency to `window + cooldown` (84h); corrected the
+  overstated "zero recall loss" docstrings; added the invariant + late-neighbor
+  recall tests. See A2 above.
+- **[MEDIUM] Monitor silent-ok (code):** `fetchUsage` coerced any API error to
+  `rows_read:0` → graded "ok" → now fails LOUD (`res.ok` + `parseUsageTotals`
+  throws on missing/NaN `rows_read`); dropped the org-vs-perDB fallback (root of
+  the negative-delta noise) → grades `newsroom-v2` directly. `parseUsageTotals`
+  unit-tested.
+- **[MEDIUM] Deploy-ordering (db):** the DDL was 100% manual + unwired → added
+  `db:add-recheck-column` script + the DDL-before-deploy ordering in P3 above.
+- **[MEDIUM] Stamp not busy-retried (db):** the set-based waterline stamp was a
+  bare write → a SQLITE_BUSY would leave the whole batch unstamped (re-scanned
+  next tick, defeating the fix under contention) → now `withBusyRetry`-wrapped.
+- **[LOW] Backfill var-limit (db):** the stamp IN-list on the `maxPerRun=null`
+  backfill path could exceed SQLite's 32766-variable cap → chunked at 500/UPDATE.
+- **[LOW] PLAN_CHECK fidelity (code+db):** the arbitrate/canonical PLAN_CHECKS +
+  CI test now mirror the real drizzle queries (LIMIT 15, canonical
+  `canonical_title_zh IS NULL` branch) so they can't silently rot. The CI test
+  (`tests/cluster/arbitrate-index.test.ts`) EXPLAINs against a seeded local DB —
+  the automated coverage the db-reviewer wanted (db:optimize's checks are manual).
+- **Confirmed sound (db, empirical):** partial-index selection is *structural* —
+  the planner picks `clusters_multimember_idx` with no `INDEXED BY` and no
+  ANALYZE, and satisfies the ORDER BY by reverse scan (no TEMP B-TREE). Q3 write-
+  amplification (~100–200K index writes/mo) is negligible vs the 25M write cap.
+
+**Deferred (not needed for <100M; recorded as escalation paths):**
+- **A6 (supporting index for `last_recheck_at`):** on the live DB the column is
+  ALTER-appended (physically after the ~45KB payload), so A.5 reads of it walk
+  overflow pages. This is per-row *latency* in the hourly worker only — it does
+  NOT increment `rows_read` (Turso bills rows, not overflow pages), and never-
+  stamped NULL rows skip the walk. So it doesn't touch the read budget; add the
+  index only if A.5 wall-time becomes a problem.
+- **A7 (side table `item_recheck(item_id PK, last_recheck_at)`):** stamping an
+  8-byte column on the fat row rewrites the whole ~45KB record (150×/tick). Write
+  *count* is negligible and byte-churn isn't billed, so not worth it now; it's
+  the clean escalation if A.5 stamp volume grows (also removes the A6 walk).
 
 ## Guardrails (standing)
 

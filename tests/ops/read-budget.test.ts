@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
   assessReadBudget,
+  parseUsageTotals,
   projectMonthlyReads,
 } from "@/lib/ops/read-budget";
 
@@ -39,6 +40,42 @@ describe("assessReadBudget — cumulative-vs-cap guardrail", () => {
     const v = assessReadBudget({ rows_read: 10 }, { capRows: 0 });
     expect(v.fraction).toBe(0);
     expect(v.status).toBe("ok");
+  });
+});
+
+describe("parseUsageTotals — fail-loud response guard", () => {
+  it("parses a well-formed usage body", () => {
+    const t = parseUsageTotals({ total: { rows_read: 1234, rows_written: 56 } });
+    expect(t).toEqual({ rows_read: 1234, rows_written: 56 });
+  });
+
+  it("defaults rows_written to 0 when absent (informational, not a guardrail input)", () => {
+    expect(parseUsageTotals({ total: { rows_read: 7 } })).toEqual({
+      rows_read: 7,
+      rows_written: 0,
+    });
+  });
+
+  // The core guard: an API error/malformed body must THROW, never coerce to
+  // rows_read:0 (which would silently grade "ok" and hide a real overage).
+  it("throws when total is missing (e.g. an error body)", () => {
+    expect(() => parseUsageTotals({ error: "unauthorized" })).toThrow(
+      /missing\/invalid total\.rows_read/,
+    );
+  });
+
+  it("throws when rows_read is missing", () => {
+    expect(() => parseUsageTotals({ total: { rows_written: 5 } })).toThrow();
+  });
+
+  it("throws when rows_read is NaN / non-numeric", () => {
+    expect(() => parseUsageTotals({ total: { rows_read: NaN } })).toThrow();
+    expect(() => parseUsageTotals({ total: { rows_read: "1000" } })).toThrow();
+  });
+
+  it("throws on a null/undefined body rather than reading 0", () => {
+    expect(() => parseUsageTotals(null)).toThrow();
+    expect(() => parseUsageTotals(undefined)).toThrow();
   });
 });
 
