@@ -40,10 +40,43 @@ review (opus code-reviewer + database-reviewer) run; all findings fixed.
 **Gate:** non-live `verify` steps all green (typecheck + lint 0-warn + build +
 3 knip checks + 130 local cluster/db tests). ⚠️ Full `bun run verify` currently
 exits non-zero ONLY on `workers/newsletter/select.test.ts` (`selectDailyColumnPool`
-hits the live Turso DB, which is under a **read-quota block** — "reads are
-blocked, do you need to upgrade your plan?"). Environmental/billing, unrelated
-to this charter. **This also means live reads may be failing site-wide — worth
-AX attention.**
+hits the live Turso DB, which is under a **read-quota block**). See the quota
+diagnosis below.
+
+### 🔴 Turso read-quota block — DIAGNOSED 2026-07-12 (measured via billing API)
+
+`newsroom-v2` burned **549.6M rows_read = 109.9% of the 500M monthly cap** in ~1
+calendar day (the DB was only created at the pg→Turso cutover). **Writes are NOT
+blocked** (7.15M/10M). Cap **auto-resets 2026-08-01 04:00 UTC** (~20 days); this
+tier has **no pay-through overage** — only reset or a plan upgrade unblocks reads.
+
+- **What busted it (this time):** a ONE-OFF migration-day flood — pg copy-in + row
+  verify, `recluster-historical` re-runs during threshold tuning, cluster-health /
+  repair / backtest fired dozens of times by the 95+58 audit agents, plus ~6.75h of
+  unindexed home-feed full-scan regression. (`db-dump` read only ~0.5M rows — 346MB
+  is bytes, not rows — NOT the culprit.)
+- **Will prod re-bust on its own? YES — structural (W7).** `workers/cluster/` Stage
+  A / A.5 / reopen / merge run `vector_distance_cos` over the FULL 3072-dim
+  `embedding` in `ORDER BY … LIMIT 1` (no index satisfies → every predicate row is
+  read), while the 256-dim DiskANN `items_embedding_small_idx` sits used only by
+  `semantic-search.ts`. A.5 has no waterline (re-scans the same singletons ~144×/72h)
+  × 48 ticks/day. **This reframes W7 from a deferred perf item to the quota-critical
+  fix.**
+- **The fix (W7):** two-stage ANN via `vector_top_k('items_embedding_small_idx', …)`
+  then rerank on the full vector (`semantic-search.ts:103` is the template) +
+  `INDEXED BY` pins on the arbitrate/canonical-title/commentary 16K-cluster scans +
+  A.5 `last_recheck_at` waterline.
+- **Free mitigations before the fix / reset:** throttle or pause the cluster cron
+  (`:12,:42`), freeze any audit/backfill/db-dump against prod, and add a staging
+  Turso DB or `hasDb` skip-gate (`bun test` currently connects straight to prod —
+  part of what fed this flood).
+- **AX decision (only $/region tradeoff):** wait for the 8/1 reset ($0, ~20 days
+  read-limited) vs upgrade **Developer** ($4.99/mo, 2.5B reads, immediate unblock —
+  but Developer is single-region, would drop the current 2-region setup).
+- **This PR's prod ops under the block:** `add-cluster-fix-columns.ts` (metadata-only
+  `ADD COLUMN` + PRAGMA schema guard, no user-row reads) can likely run even now, but
+  `db:seed` (upsert reads) and `unlink` (`SELECT`) will hit the read block — run the
+  whole prod-ops sequence AFTER reset/upgrade.
 
 **Prod ops NOT yet applied (confirm-before-apply — Turso is the only data copy):**
 backup (`db-dump.ts`) → `add-cluster-fix-columns.ts` → `bun run db:seed` →
