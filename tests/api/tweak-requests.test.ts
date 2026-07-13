@@ -41,6 +41,15 @@ describe("tweak request schemas", () => {
     expect(patch?.watchlist).toEqual(["gpt-6", "agentic ide"]);
   });
 
+  test("strips the URL-derived language from the tweaks patch", () => {
+    // `language` follows the route locale, never persistence — the server
+    // schema omits it, so a client that sends it has it dropped (not stored).
+    const parsed = tweaksPatchBodySchema.parse({
+      tweaks: { language: "zh", theme: "obsidian" },
+    });
+    expect(parsed.tweaks).toEqual({ theme: "obsidian" });
+  });
+
   test("rejects invalid tweak values and unsafe watchlist payloads", () => {
     expect(
       tweaksPatchBodySchema.safeParse({ tweaks: { accent: "beige" } }).success,
@@ -59,11 +68,11 @@ describe("tweak request schemas", () => {
     expect(buildTweaksDbPatch({})).toBeNull();
 
     const patch = buildTweaksDbPatch({
-      tweaks: { language: "zh" },
+      tweaks: { theme: "obsidian" },
       watchlist: [],
     });
     expect(patch?.updatedAt).toBeInstanceOf(Date);
-    expect(patch?.tweaks).toEqual({ language: "zh" });
+    expect(patch?.tweaks).toEqual({ theme: "obsidian" });
     expect(patch?.watchlist).toEqual([]);
   });
 });

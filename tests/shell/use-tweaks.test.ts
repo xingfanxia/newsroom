@@ -1,5 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
+  parsePersistedTweaks,
+  persistableTweaks,
   resolveTweaks,
   TWEAK_DEFAULTS,
   TWEAK_LANGUAGES,
@@ -7,9 +9,9 @@ import {
 } from "@/lib/tweaks";
 import { APP_LOCALES } from "@/lib/types";
 
-// The full TweaksProvider requires a DOM; we can't exercise React here. Instead
-// we assert the public shape + defaults so a rename or silently dropped field
-// is caught in CI rather than in prod.
+// This file covers the pure tweak helpers (shape / defaults / resolve /
+// validate / persist). The DOM-bound TweaksProvider React behavior is exercised
+// separately in tweaks-provider.test.tsx (happy-dom).
 describe("TWEAK_DEFAULTS", () => {
   it("uses the app locale tuple for tweak language options", () => {
     expect(TWEAK_LANGUAGES).toEqual(APP_LOCALES);
@@ -107,5 +109,64 @@ describe("resolveTweaks — language follows the URL locale, never storage", () 
   it("with no overrides returns the defaults carrying the URL locale", () => {
     expect(resolveTweaks("zh")).toEqual({ ...TWEAK_DEFAULTS, language: "zh" });
     expect(resolveTweaks("en")).toEqual(TWEAK_DEFAULTS);
+  });
+});
+
+describe("parsePersistedTweaks — tolerant runtime validation of stored blobs", () => {
+  it("keeps a fully valid blob unchanged", () => {
+    const valid: Tweaks = { ...TWEAK_DEFAULTS, theme: "paper", accent: "blue" };
+    expect(parsePersistedTweaks(valid)).toEqual(valid);
+  });
+
+  it("drops individual invalid fields, keeping the valid ones", () => {
+    const r = parsePersistedTweaks({
+      theme: "neon", // not a TWEAK_THEME → dropped
+      accent: "blue", // valid → kept
+      density: 42, // wrong type → dropped
+      mutedMeta: false, // valid → kept
+    });
+    expect(r).toEqual({ accent: "blue", mutedMeta: false });
+  });
+
+  it("drops legacy language 'both' but keeps a valid locale", () => {
+    expect(parsePersistedTweaks({ language: "both" })).toEqual({});
+    expect(parsePersistedTweaks({ language: "zh" })).toEqual({
+      language: "zh",
+    });
+  });
+
+  it("ignores unknown keys", () => {
+    expect(parsePersistedTweaks({ theme: "slate", bogusKey: 1 })).toEqual({
+      theme: "slate",
+    });
+  });
+
+  it("returns {} for non-object input", () => {
+    expect(parsePersistedTweaks(null)).toEqual({});
+    expect(parsePersistedTweaks(undefined)).toEqual({});
+    expect(parsePersistedTweaks("nope")).toEqual({});
+    expect(parsePersistedTweaks(7)).toEqual({});
+  });
+});
+
+describe("persistableTweaks — strips the URL-derived language", () => {
+  it("omits language and keeps every other field", () => {
+    const persisted = persistableTweaks({ ...TWEAK_DEFAULTS, language: "zh" });
+    expect("language" in persisted).toBe(false);
+    const expectedKeys = Object.keys(TWEAK_DEFAULTS)
+      .filter((k) => k !== "language")
+      .sort();
+    expect(Object.keys(persisted).sort()).toEqual(expectedKeys);
+    for (const key of expectedKeys) {
+      expect(persisted[key as keyof typeof persisted] as unknown).toBe(
+        TWEAK_DEFAULTS[key as keyof Tweaks],
+      );
+    }
+  });
+
+  it("does not mutate its input", () => {
+    const input: Tweaks = { ...TWEAK_DEFAULTS, language: "zh" };
+    persistableTweaks(input);
+    expect(input.language).toBe("zh");
   });
 });

@@ -1,5 +1,30 @@
 # AX's AI RADAR — Current Handoff
 
+## 2026-07-13 — Tweaks/locale single-source-of-truth + persist hardening
+
+Follow-up on the language-desync fix (`main`: site-config LANGUAGE toggle
+flipped chrome to 中文 but left feed titles English — dual source of truth
+between the URL `[locale]` segment and client `tweaks.language`).
+
+- **URL `[locale]` is the ONLY language source.** `TweaksProvider` takes
+  `initialLanguage` (the route locale the server used to resolve titles);
+  `resolveTweaks(urlLanguage, …overrides)` force-sets `language` on every merge
+  and drops any persisted `language` (incl. legacy `"both"`). The config toggle
+  + `locale-switcher` now `router.replace({pathname, query}, {locale})` —
+  navigation flips chrome AND titles together, no client-only language state.
+- **`language` is no longer persisted** (localStorage or `users.tweaks`):
+  `persistableTweaks()` strips it before every write — it's URL-derived and
+  never read back, so storing it was dead, misleading data.
+- **`TWEAKS_SCHEMA` (`lib/tweaks.ts`) is now the single source of truth for
+  tweak field shapes.** The server PATCH validator (`lib/api/tweak-requests.ts`)
+  derives its body schema via `TWEAKS_SCHEMA.partial()`; the client validates
+  untrusted persisted/fetched blobs field-by-field via `parsePersistedTweaks()`
+  (drops corrupt/unknown fields rather than nuking the whole config).
+- Tests: `tests/shell/use-tweaks.test.ts` (pure helpers) +
+  `tests/shell/tweaks-provider.test.tsx` (new — happy-dom, scoped register/
+  unregister; asserts URL-locale wins, server-over-local merge, language never
+  persisted, and the debounced PATCH body strips `language`). Full suite green.
+
 ## 2026-07-13 — W7 read-budget DEPLOYED (P3 executed end-to-end)
 
 **Both PRs merged to `main`; production is live on the W7 code.** AX authorized
@@ -1157,8 +1182,9 @@ Commentary: 106/106 enriched items have deep notes.
    client-side publisher-name workaround is not current guidance.
 5. **M4 agent still must use `reasoningEffort: "medium"`** on Azure
    Pro — xhigh/high hit 5-min ceiling on 12KB prompts.
-6. **Tweaks localStorage migration** — legacy `"both"` language auto-
-   normalises to `"en"`. Removed from UI in s6.
+6. **Tweaks language is URL-derived, never persisted** (see top entry
+   2026-07-13). Legacy `"both"` (and any persisted `language`) is dropped on
+   load; the UI language always follows the route `[locale]` segment.
 7. **Password rotation invalidates cookies** — `ADMIN_PASSWORD` is the
    HMAC key. Feature, not bug.
 8. **rsshub.app is dead** — all 8 rsshub sources still disabled.
