@@ -61,6 +61,9 @@ export default async function CuratedPage({
       date: activeDate,
       curatedOnly: true,
       sourceId,
+      // W8: bound the default /curated scan to 30d (seeks items_feed_recent_idx).
+      // Skipped when pinned to a single source; ignored when a date is picked.
+      recencyFloorDays: sourceId ? undefined : 30,
     });
   } catch {
     stories = [];
