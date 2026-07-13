@@ -321,6 +321,14 @@ export const clusters = sqliteTable(
       t.latestMemberAt,
       t.importance,
     ),
+    /** Partial index for the arbitrate + canonical-title candidate scans
+     *  (W7/A3). Both filter `member_count >= 2` and ORDER BY member_count DESC,
+     *  updated_at DESC; this holds only the ~1.1K multi-member clusters in that
+     *  order, so the every-tick scan bounds to them instead of all ~16K.
+     *  Created + plan-checked in scripts/ops/db-optimize.ts. */
+    multiMemberIdx: index("clusters_multimember_idx")
+      .on(t.memberCount, t.updatedAt)
+      .where(sql`${t.memberCount} >= 2`),
   }),
 );
 

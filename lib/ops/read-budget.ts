@@ -6,7 +6,7 @@
  * run-rate delta into a projected 30-day total (the "< 100M/mo" check).
  */
 
-export const MONTH_MS = 30 * 86_400_000;
+const MONTH_MS = 30 * 86_400_000;
 
 export type ReadBudgetVerdict = {
   rowsRead: number;
