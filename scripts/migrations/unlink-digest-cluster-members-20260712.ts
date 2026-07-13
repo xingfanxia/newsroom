@@ -13,6 +13,15 @@
  * and GC any cluster left empty — reusing tested repair logic rather than
  * hand-rolling aggregate math here.
  *
+ * SCOPED reconcile (fixed 2026-07-12): the reconciler is passed
+ * `clusterIds: affectedClusterIds` so it only repairs the clusters this script
+ * actually touched. An UNSCOPED reconcile would also rewrite `latest_member_at`
+ * on ~16k clusters carrying a pre-existing pg→Turso migration timestamp artifact
+ * (member_count/coverage are clean; only latest_member_at diverges, up to ~172h)
+ * — a large, unrelated feed-ordering / merge-window side effect that has nothing
+ * to do with digest cleanup. That global artifact is a separate decision; this
+ * migration must not drag it in.
+ *
  * SAFE BY DEFAULT: dry-run unless `--apply` is passed. Turso is the only data
  * copy — take a backup (scripts/ops/db-dump.ts) before `--apply`.
  *
@@ -46,8 +55,14 @@ async function main() {
   );
 
   if (!apply) {
-    // Preview the reconcile that would follow, without writing.
-    const preview = await reconcileClusters({ apply: false, client });
+    // Preview the reconcile that would follow, without writing. Scoped to the
+    // clusters this script touches so the preview reflects the real (scoped)
+    // apply, not a global 16k-cluster latest_member_at rewrite.
+    const preview = await reconcileClusters({
+      apply: false,
+      clusterIds: affectedClusterIds,
+      client,
+    });
     console.log(
       `reconcile preview (post-unlink numbers are approximate — items not ` +
         `actually unlinked in dry-run): ${JSON.stringify(preview)}`,
@@ -71,7 +86,13 @@ async function main() {
   console.log(`unlinked ${res.rowsAffected} digest items`);
 
   // Repair every affected cluster's aggregates + leads; GC any now-empty ones.
-  const rep = await reconcileClusters({ apply: true, client });
+  // Scoped to affectedClusterIds so this does NOT rewrite latest_member_at on
+  // the ~16k clusters carrying the unrelated migration timestamp artifact.
+  const rep = await reconcileClusters({
+    apply: true,
+    clusterIds: affectedClusterIds,
+    client,
+  });
   console.log(`reconcile: ${JSON.stringify(rep)}`);
   console.log("done");
 }

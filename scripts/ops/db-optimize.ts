@@ -30,6 +30,15 @@ const INDEXES = [
   `CREATE INDEX IF NOT EXISTS clusters_feed_cover_idx
      ON clusters (id, event_tier, lead_item_id, first_seen_at,
                   latest_member_at, importance)`,
+  // Partial index for the arbitrate + canonical-title candidate scans (W7/A3).
+  // Both select `member_count >= 2 AND <needs-work>` ORDER BY member_count DESC,
+  // updated_at DESC. Holding only the ~1.1K multi-member clusters in that sort
+  // order turns the every-tick full scan of ~16K clusters into a bounded index
+  // scan. Partial-index selection is structural (not stats-based), so the
+  // planner picks it even without ANALYZE — see the two PLAN_CHECKS below.
+  `CREATE INDEX IF NOT EXISTS clusters_multimember_idx
+     ON clusters (member_count, updated_at)
+     WHERE member_count >= 2`,
   // Absolute (item, cluster) negative-edge constraint for Stage B rejections.
   // REQUIRES the 2026-07-12 dedupe migration to have run first — creating this
   // over duplicate pairs throws "UNIQUE constraint failed". See
@@ -76,6 +85,37 @@ const PLAN_CHECKS: Array<{ name: string; index: string; sql: string }> = [
             ON items.cluster_id = clusters.id
           WHERE items.enriched_at IS NOT NULL
             AND COALESCE(clusters.event_tier, items.tier) <> 'excluded'`,
+  },
+  {
+    // W7/A3 — arbitrate candidate scan. UNPINNED on purpose: this verifies the
+    // planner structurally selects the partial index (no INDEXED BY), which is
+    // how the drizzle query in runArbitrationBatch benefits. Keep this SQL a
+    // faithful mirror of that builder (workers/cluster/arbitrate.ts — same
+    // WHERE/ORDER BY/LIMIT) so the guard tracks the real query, not a stale
+    // proxy. LIMIT = MAX_ARBITRATIONS_PER_RUN (15).
+    name: "arbitrate candidate scan uses partial multimember index (W7/A3)",
+    index: "clusters_multimember_idx",
+    sql: `SELECT c.id, c.lead_item_id, c.member_count FROM clusters c
+          WHERE c.member_count >= 2
+            AND (c.verified_at IS NULL OR EXISTS (
+              SELECT 1 FROM items i
+              WHERE i.cluster_id = c.id AND i.cluster_verified_at IS NULL))
+          ORDER BY c.member_count DESC, c.updated_at DESC LIMIT 15`,
+  },
+  {
+    // Mirror of the canonical-title builder (workers/cluster/canonical-title.ts):
+    // the WHERE includes the `canonical_title_zh IS NULL` branch and LIMIT =
+    // MAX_TITLES_PER_RUN (15). The extra OR term is a residual filter on a
+    // non-indexed column, so it does not change index selection, but the guard
+    // must carry it to stay a faithful mirror.
+    name: "canonical-title candidate scan uses partial multimember index (W7/A3)",
+    index: "clusters_multimember_idx",
+    sql: `SELECT c.id, c.member_count FROM clusters c
+          WHERE c.member_count >= 2
+            AND (c.canonical_title_zh IS NULL
+                 OR c.titled_at IS NULL
+                 OR c.updated_at > c.titled_at)
+          ORDER BY c.member_count DESC, c.updated_at DESC LIMIT 15`,
   },
   {
     name: "radar stats 24h counts (getRadarStats)",
