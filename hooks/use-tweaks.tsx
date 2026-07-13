@@ -9,7 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { TWEAK_DEFAULTS, type Tweaks } from "@/lib/tweaks";
+import { resolveTweaks, TWEAK_DEFAULTS, type Tweaks } from "@/lib/tweaks";
 import type { AppLocale } from "@/lib/types";
 
 export type { Tweaks };
@@ -28,17 +28,14 @@ type TweaksValue = {
 
 const TweaksContext = createContext<TweaksValue | null>(null);
 
-function loadFromStorage(fallback: Tweaks): Tweaks {
-  if (typeof window === "undefined") return fallback;
+function readStoredTweaks(): Partial<Tweaks> | null {
+  if (typeof window === "undefined") return null;
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return fallback;
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
-    // Migrate legacy "both" language value to "en" (binary mode only).
-    if (parsed.language === "both") parsed.language = "en";
-    return { ...fallback, ...(parsed as Partial<Tweaks>) };
+    if (!raw) return null;
+    return JSON.parse(raw) as Partial<Tweaks>;
   } catch {
-    return fallback;
+    return null;
   }
 }
 
@@ -59,20 +56,24 @@ export function TweaksProvider({
   children: ReactNode;
   initialLanguage?: AppLocale;
 }) {
-  const base: Tweaks = useMemo(
-    () => ({
-      ...TWEAK_DEFAULTS,
-      ...(initialLanguage ? { language: initialLanguage } : {}),
-    }),
-    [initialLanguage],
-  );
+  // Language is the URL `[locale]` segment (single source of truth — the same
+  // locale the server used to resolve story titles), passed in as
+  // `initialLanguage`. It is NEVER read back from persisted storage, so the
+  // chrome can't desync from the feed titles (the "Chinese chrome, English
+  // titles" bug). Every other tweak still persists per-browser.
+  const urlLanguage: AppLocale = initialLanguage ?? TWEAK_DEFAULTS.language;
+  const base: Tweaks = useMemo(() => resolveTweaks(urlLanguage), [urlLanguage]);
   const [tweaks, setTweaksState] = useState<Tweaks>(base);
   const [open, setOpen] = useState(false);
   const pendingServerTweaksRef = useRef<Tweaks | null>(null);
   const serverSyncTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
-    const local = loadFromStorage(base);
+    const localRaw = readStoredTweaks();
+    // `resolveTweaks` forces `language` to the URL locale in every merge, so a
+    // persisted language can never win. State starts at `base` (SSR-matching)
+    // and reconciles here: server copy on success, localStorage copy otherwise.
+    const localTweaks = resolveTweaks(urlLanguage, localRaw);
     let cancelled = false;
 
     async function loadServerTweaks() {
@@ -82,11 +83,8 @@ export function TweaksProvider({
         });
         const body = response.ok ? await response.json() : null;
         if (cancelled) return;
-        const server = body?.tweaks as Record<string, unknown> | undefined;
-        if (server?.language === "both") server.language = "en";
-        const merged: Tweaks = server
-          ? { ...local, ...(server as Partial<Tweaks>) }
-          : local;
+        const server = body?.tweaks as Partial<Tweaks> | undefined;
+        const merged = resolveTweaks(urlLanguage, localRaw, server);
         setTweaksState(merged);
         try {
           window.localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
@@ -94,8 +92,8 @@ export function TweaksProvider({
           /* ignore */
         }
       } catch {
-        // auth_required / network error — localStorage is still applied.
-        if (!cancelled) setTweaksState(local);
+        // auth_required / network error — fall back to the localStorage copy.
+        if (!cancelled) setTweaksState(localTweaks);
       }
     }
 
@@ -104,7 +102,7 @@ export function TweaksProvider({
     return () => {
       cancelled = true;
     };
-  }, [base]);
+  }, [urlLanguage]);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -119,8 +117,11 @@ export function TweaksProvider({
     b.setAttribute("data-density", tweaks.density);
     b.setAttribute("data-linenum", tweaks.showLineNumbers ? "on" : "off");
     b.setAttribute("data-mutedmeta", tweaks.mutedMeta ? "on" : "off");
-    b.setAttribute("data-lang", tweaks.language);
-  }, [tweaks]);
+    // Language is URL-driven — read it straight from `urlLanguage` so a
+    // same-page locale switch flips `data-lang` synchronously with the render,
+    // not after the async /api/tweaks reconcile resolves.
+    b.setAttribute("data-lang", urlLanguage);
+  }, [tweaks, urlLanguage]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -169,15 +170,18 @@ export function TweaksProvider({
 
   const setTweaks = useCallback(
     (next: Tweaks) => {
-      setTweaksState(next);
+      // Language is URL-driven — coerce it on every write so no control can
+      // desync the chrome from the URL-locale titles.
+      const coerced: Tweaks = { ...next, language: urlLanguage };
+      setTweaksState(coerced);
       try {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(coerced));
       } catch {
         /* quota / disabled — still update in-memory + body attrs */
       }
-      scheduleServerSync(next);
+      scheduleServerSync(coerced);
     },
-    [scheduleServerSync],
+    [scheduleServerSync, urlLanguage],
   );
 
   const patch = useCallback(
@@ -187,10 +191,24 @@ export function TweaksProvider({
     [tweaks, setTweaks],
   );
 
-  const reset = useCallback(() => setTweaks(TWEAK_DEFAULTS), [setTweaks]);
+  const reset = useCallback(
+    () => setTweaks(resolveTweaks(urlLanguage)),
+    [setTweaks, urlLanguage],
+  );
+
+  // Expose `language` as a synchronous derivation of the URL locale rather than
+  // the async-reconciled state. Without this, a same-page locale switch shows
+  // stale chrome (old language) over new-locale titles for the duration of the
+  // /api/tweaks fetch. Raw `tweaks` stays the persistence vehicle for every
+  // other field; the setTweaks/reset coercions keep raw state's language in
+  // sync as belt-and-suspenders.
+  const exposedTweaks = useMemo<Tweaks>(
+    () => ({ ...tweaks, language: urlLanguage }),
+    [tweaks, urlLanguage],
+  );
 
   const value: TweaksValue = {
-    tweaks,
+    tweaks: exposedTweaks,
     setTweaks,
     patch,
     reset,

@@ -1,4 +1,8 @@
 "use client";
+import { useLocale } from "next-intl";
+import { useTransition } from "react";
+import { useSearchParams } from "next/navigation";
+import { usePathname, useRouter } from "@/i18n/navigation";
 import { useTweaks, type Tweaks } from "@/hooks/use-tweaks";
 import {
   TWEAK_ACCENTS,
@@ -11,6 +15,7 @@ import {
   TWEAK_SCORE_STYLES,
   TWEAK_THEMES,
 } from "@/lib/tweaks";
+import type { AppLocale } from "@/lib/types";
 
 type SegmentOption<K extends keyof Tweaks> = [Tweaks[K], string];
 
@@ -149,6 +154,47 @@ function ToggleControl({
 }
 
 /**
+ * Language control — NAVIGATES the URL `[locale]` segment (next-intl) rather
+ * than patching a client-only `tweaks.language`. The URL locale is what the
+ * server uses to resolve story titles; a client-only toggle only flipped chrome
+ * labels and left the feed titles in the old locale (Chinese chrome, English
+ * titles). Navigating re-renders the feed in the chosen locale and sets
+ * next-intl's NEXT_LOCALE cookie so the choice sticks on the next visit.
+ */
+function LanguageControl() {
+  const activeLocale = useLocale() as AppLocale;
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  return (
+    <div className="seg" role="group" aria-label="language">
+      {LANGUAGE_OPTIONS.map(([value, label]) => (
+        <button
+          key={value}
+          type="button"
+          aria-pressed={activeLocale === value}
+          className={`s ${activeLocale === value ? "on" : ""}`}
+          disabled={pending}
+          onClick={() => {
+            if (activeLocale === value) return;
+            // Carry the active feed filters (tier/source/date/view live in the
+            // query string) across the locale switch — a bare pathname replace
+            // would drop them.
+            const query = Object.fromEntries(searchParams.entries());
+            startTransition(() =>
+              router.replace({ pathname, query }, { locale: value }),
+            );
+          }}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/**
  * Site configuration panel — floats bottom-right on desktop, opened via
  * the "site config" entry in the left-rail or ⌥,. Toggles theme, accent,
  * typography, shape, and layout flags. Persists via useTweaks's localStorage.
@@ -275,12 +321,7 @@ export function Tweaks() {
               <span>language</span>
               <span className="v">{tweaks.language}</span>
             </div>
-            <SegmentControl
-              tweaks={tweaks}
-              patch={patch}
-              k="language"
-              opts={LANGUAGE_OPTIONS}
-            />
+            <LanguageControl />
           </div>
         </div>
 
