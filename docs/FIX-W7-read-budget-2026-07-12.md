@@ -76,12 +76,32 @@ term). Comfortably beats the <100M target with large margin.
 - **P0 (done):** charter + `scripts/ops/w7-baseline.ts` (EXPLAIN + corpus +
   billing snapshot).
 - **P1 (done):** measured baseline above (corpus, plans, cadence, attribution).
-- **P2 (offline TDD on local libSQL):** land A4, A2, A3, A6, A1. Gate: behavioral
-  tests (waterline both branches, bounded scans, ANN parity, cadence split),
-  `bun run verify` non-live green, PLAN_CHECKS pass.
+- **P2 (this PR — the dominant amplifiers + the guardrail):**
+  - **A2 (done)** — A.5 recheck waterline (`items.last_recheck_at`, 12h
+    cooldown). ~99M → ~12M/mo. 9 behavioral tests.
+  - **A4 (done)** — cluster pipeline 30min → hourly (fetch is hourly). ~2× on
+    all stages. Cron-cadence guard test.
+  - **A5 (done)** — read-budget monitor (`assessReadBudget` +
+    `projectMonthlyReads` + billing script) so the run-rate is watched and the
+    remaining-lever decision is measured, not guessed.
+  - **A3 (done)** — partial index `clusters(member_count, updated_at) WHERE
+    member_count >= 2` accelerates the arbitrate + canonical-title candidate
+    scans (identical queries, ~16K-cluster scan → ~1.1K multi-member clusters,
+    ~14×). A **partial index, not a recency bound** — the query is unchanged, so
+    reopened clusters (verified_at nulled, old latest_member_at) are still found;
+    a recency bound would have orphaned them. Verified by a PLAN_CHECKS entry.
+  - Projected after A2+A4+A3: **~15M/mo** — well under the <100M target. Gate:
+    `bun run verify` non-live green.
+- **A1 / A6 — DEFERRED to P3, gated on measurement.** A1 (ANN routing) is
+  *approximate*: it can silently drop clustering recall (duplicate events not
+  merging), so it must not ship without a recall backtest (≥99% agreement vs the
+  exact scan) on the now-unblocked prod DB. After A2+A4+A3 (~15M/mo) its marginal
+  cut isn't worth a blind clustering-quality risk. A6 (A.5 outer-query index) is
+  a minor scan whose need is only provable from post-deploy EXPLAIN. Build both
+  only if the measured run-rate demands it.
 - **P3 (needs prod):** apply `last_recheck_at` DDL (confirm-before-apply; back up
-  first); deploy; clean-day delta × 30 < 100M (target < 10M); ANN recall
-  backtest; wire read-budget monitor + staging gate (A5).
+  first); deploy A2+A4; measure clean-day delta × 30 (target ≪ 100M); wire the
+  A5 monitor as a cron/alert; add A3/A1 iff measurement demands it.
 
 ## Guardrails (standing)
 
