@@ -497,6 +497,17 @@ export const items = sqliteTable(
     topicsCoverIdx: index("items_topics_cover_idx")
       .on(t.createdAt, t.tags)
       .where(sql`${t.enrichedAt} IS NOT NULL`),
+    /** Partial index for the commentary-backfill candidate scan (W9b-idx).
+     *  runCommentaryBackfill filters `tier IN (visible) AND commentary_at IS
+     *  NULL` — without this it seeks items_tier_idx and reads EVERY visible-tier
+     *  row (~8.9K) to find the handful still lacking commentary (measured 27),
+     *  twice a day. Holding only the commentary-pending rows, tier-leading, so
+     *  the visible-tier seek touches just those. cluster_id trails so the
+     *  `cluster_id IS NULL` branch resolves from the index. Partial selection is
+     *  structural (Turso forbids ANALYZE) — see the PLAN_CHECK in db-optimize. */
+    commentaryPendingIdx: index("items_commentary_pending_idx")
+      .on(t.tier, t.clusterId)
+      .where(sql`${t.commentaryAt} IS NULL`),
   }),
 );
 
