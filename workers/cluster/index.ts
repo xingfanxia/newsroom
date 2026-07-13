@@ -1,9 +1,72 @@
 import { sql, and, inArray, isNull, isNotNull } from "drizzle-orm";
-import { db } from "@/db/client";
+import { db, retryTransaction } from "@/db/client";
 import { items, clusters } from "@/db/schema";
 import { visibleTierInSql } from "@/lib/items/tier-sql";
 import { VISIBLE_ITEM_TIERS } from "@/lib/types";
 import { hasReachedSplitRejectionCap } from "./split-audit";
+import { notClusteringOptedOut } from "./clustering-eligibility";
+
+// Cohesion gate for Stage A joins (W5.1). Even when a clustered neighbor sits
+// within SIMILARITY_THRESHOLD, reject the join if the item is farther than this
+// cosine distance from that cluster's LEAD. Single-link chaining (join to the
+// nearest MEMBER, ignoring the rest) let cluster diameter grow unbounded and
+// fused distinct events through digest/bridge members. 0.35 (sim ≥ 0.65) is a
+// deliberately looser bound than the 0.25 join threshold — it only rejects a
+// join that would clearly stretch the cluster off-topic, not borderline ones.
+const COHESION_MAX_DISTANCE = 0.35;
+
+// Prefer-clustered slack (W4b). Stage A biases toward joining an existing
+// cluster over pairing two unclustered twins (see the long comment in
+// assignOneToCluster). That bias is bounded: only take the clustered neighbor
+// when it's within this cosine distance of the closer unclustered neighbor, so
+// a borderline clustered match (0.249) can't beat a near-certain unclustered
+// twin (0.02) and feed chaining drift.
+export const PREFER_CLUSTERED_SLACK = 0.05;
+
+export type JoinOutcome =
+  | "join-clustered"
+  | "promote-unclustered"
+  | "singleton";
+
+/**
+ * Pure Stage-A join decision (W5.1 cohesion gate + W4b prefer-clustered bound),
+ * factored out of the DB orchestration so it is unit-testable without a client.
+ *
+ * Inputs are cosine DISTANCES (1 − similarity); null means "no such neighbor"
+ * (or, for `unclusteredDistance`, "not computed" — the caller skips that scan
+ * when a strong clustered match already wins, which reads here as no
+ * unclustered neighbor and correctly yields join-clustered).
+ *
+ *   - A within-threshold clustered neighbor is a valid join target ONLY if the
+ *     item is also within COHESION_MAX_DISTANCE of that cluster's lead (W5.1).
+ *   - Even then, a within-threshold unclustered twin that is closer by more
+ *     than PREFER_CLUSTERED_SLACK wins the pairing (W4b).
+ */
+export function resolveJoinOutcome(input: {
+  clusteredDistance: number | null;
+  leadDistance: number | null;
+  unclusteredDistance: number | null;
+  threshold: number;
+}): JoinOutcome {
+  const clusteredWithin =
+    input.clusteredDistance != null && input.clusteredDistance <= input.threshold;
+  const clusteredJoinOk =
+    clusteredWithin &&
+    input.leadDistance != null &&
+    input.leadDistance <= COHESION_MAX_DISTANCE;
+  const unclusteredWithin =
+    input.unclusteredDistance != null &&
+    input.unclusteredDistance <= input.threshold;
+  const unclusteredBeatsClustered =
+    clusteredJoinOk &&
+    unclusteredWithin &&
+    input.clusteredDistance! >
+      input.unclusteredDistance! + PREFER_CLUSTERED_SLACK;
+
+  if (clusteredJoinOk && !unclusteredBeatsClustered) return "join-clustered";
+  if (unclusteredWithin) return "promote-unclustered";
+  return "singleton";
+}
 
 const MAX_PER_RUN = 200;
 // Cosine similarity floor for join. 0.75 catches cross-source coverage of the
@@ -45,6 +108,8 @@ export async function runClusterBatch(): Promise<ClusterReport> {
         isNotNull(items.embedding),
         isNotNull(items.enrichedAt),
         inArray(items.tier, VISIBLE_ITEM_TIERS),
+        // W5.2: never cluster items from opted-out digest/curation sources.
+        notClusteringOptedOut("items"),
       ),
     )
     .limit(MAX_PER_RUN);
@@ -149,6 +214,7 @@ async function assignOneToCluster(itemId: number): Promise<AssignOutcome> {
       AND i.enriched_at IS NOT NULL
       AND ${visibleTierInSql(sql`i.tier`)}
       AND i.cluster_id IS NOT NULL
+      AND ${notClusteringOptedOut("i")}
       AND NOT EXISTS (
         SELECT 1
         FROM cluster_splits split_audit
@@ -164,11 +230,44 @@ async function assignOneToCluster(itemId: number): Promise<AssignOutcome> {
   `);
 
   const nearestClustered = nearestClusteredResult[0];
+  const clusteredWithin =
+    !!nearestClustered && nearestClustered.distance <= threshold;
 
-  // Only run the unclustered-neighbor query if the clustered one didn't give
-  // us a within-threshold winner — saves one scan in the common case.
+  // W5.1 cohesion gate: a within-threshold clustered neighbor is only a valid
+  // join target if the item is ALSO within COHESION_MAX_DISTANCE of that
+  // cluster's LEAD. Stage A joins to the single nearest MEMBER; without the
+  // gate, single-link chaining lets diameter grow unbounded and fuses distinct
+  // events (a digest bridge fused the White-House-restriction event with the
+  // GPT-5.6 release). One cheap keyed lookup (cluster → lead embedding), run
+  // only when there is a within-threshold clustered neighbor to check.
+  let leadDistance: number | null = null;
+  if (clusteredWithin) {
+    const leadDistanceRows = await client.all<{ lead_distance: number | null }>(sql`
+      SELECT vector_distance_cos(
+               lead.embedding,
+               (SELECT embedding FROM items WHERE id = ${itemId})
+             ) AS lead_distance
+      FROM clusters c
+      JOIN items lead ON lead.id = c.lead_item_id
+      WHERE c.id = ${nearestClustered!.cluster_id}
+    `);
+    leadDistance = leadDistanceRows[0]?.lead_distance ?? null;
+  }
+  const clusteredJoinOk =
+    clusteredWithin &&
+    leadDistance != null &&
+    leadDistance <= COHESION_MAX_DISTANCE;
+
+  // Compute the unclustered neighbor only when it can change the outcome:
+  // either the clustered join is off (no neighbor / below cohesion) and we
+  // need a fallback, or the clustered match is BORDERLINE (W4b) and a much
+  // closer unclustered twin could be the better pairing. A strong clustered
+  // match keeps the fast path (no second scan).
+  const clusteredBorderline =
+    clusteredJoinOk &&
+    nearestClustered!.distance > threshold - PREFER_CLUSTERED_SLACK;
   const nearestUnclustered =
-    nearestClustered && nearestClustered.distance <= threshold
+    clusteredJoinOk && !clusteredBorderline
       ? null
       : (
           await client.all<{ id: number; distance: number }>(sql`
@@ -187,6 +286,7 @@ async function assignOneToCluster(itemId: number): Promise<AssignOutcome> {
             AND i.enriched_at IS NOT NULL
             AND ${visibleTierInSql(sql`i.tier`)}
             AND i.cluster_id IS NULL
+            AND ${notClusteringOptedOut("i")}
             AND i.published_at BETWEEN
                 (SELECT published_at FROM target) - ${windowMs}
                 AND
@@ -196,16 +296,29 @@ async function assignOneToCluster(itemId: number): Promise<AssignOutcome> {
         `)
         )[0];
 
-  let clusterId: number;
-  let outcome: AssignOutcome;
+  // Final decision (W5.1 cohesion + W4b prefer-clustered bound) is pure and
+  // unit-tested — see resolveJoinOutcome.
+  const outcome = resolveJoinOutcome({
+    clusteredDistance: nearestClustered?.distance ?? null,
+    leadDistance,
+    unclusteredDistance: nearestUnclustered?.distance ?? null,
+    threshold,
+  });
 
-  if (nearestClustered && nearestClustered.distance <= threshold) {
-    // Bias: join the existing cluster even if an unclustered neighbor is
-    // slightly closer. Trades best-mate optimality for cross-cluster recall.
-    clusterId = nearestClustered.cluster_id;
-    outcome = "assigned";
-  } else if (nearestUnclustered && nearestUnclustered.distance <= threshold) {
-    // No clustered neighbor close enough; promote the unclustered neighbor
+  if (outcome === "join-clustered") {
+    // Join the existing cluster even if an unclustered neighbor is slightly
+    // closer (bounded by W4b; cohesion-checked by W5.1). Trades best-mate
+    // optimality for cross-cluster recall.
+    return claimClusterAssignment(
+      client,
+      itemId,
+      nearestClustered!.cluster_id,
+      "assigned",
+    );
+  }
+
+  if (outcome === "promote-unclustered") {
+    // No clustered neighbor won; promote the unclustered neighbor
     // to the lead of a new shared cluster.
     //
     // Race-safe sequence:
@@ -221,17 +334,17 @@ async function assignOneToCluster(itemId: number): Promise<AssignOutcome> {
     // that window. Adding itemId (the second member) happens in
     // claimClusterAssignment's own transaction just below — a crash between the
     // two leaves a consistent single-member cluster, not drift.
-    const promoted = await client.transaction(async (tx) => {
+    const promoted = await retryTransaction(client, async (tx) => {
       const [created] = await tx
         .insert(clusters)
-        .values({ leadItemId: nearestUnclustered.id, memberCount: 0, coverage: 0 })
+        .values({ leadItemId: nearestUnclustered!.id, memberCount: 0, coverage: 0 })
         .returning({ id: clusters.id });
 
       const neighborClaim = await tx
         .update(items)
         .set({ clusterId: created.id, clusteredAt: new Date() })
         .where(
-          sql`${items.id} = ${nearestUnclustered.id} AND ${items.clusteredAt} IS NULL`,
+          sql`${items.id} = ${nearestUnclustered!.id} AND ${items.clusteredAt} IS NULL`,
         )
         .returning({ id: items.id });
 
@@ -255,14 +368,17 @@ async function assignOneToCluster(itemId: number): Promise<AssignOutcome> {
         .where(sql`${clusters.id} = ${created.id}`);
       return { clusterId: created.id, outcome: "created" as const };
     });
-    clusterId = promoted.clusterId;
-    outcome = promoted.outcome;
-  } else {
-    // No neighbor above threshold — new singleton cluster.
-    return createSingletonCluster(client, itemId);
+    return claimClusterAssignment(
+      client,
+      itemId,
+      promoted.clusterId,
+      promoted.outcome,
+    );
   }
 
-  return claimClusterAssignment(client, itemId, clusterId, outcome);
+  // No neighbor above threshold (or the clustered one failed cohesion) — new
+  // singleton cluster.
+  return createSingletonCluster(client, itemId);
 }
 
 async function countDistinctRejectedClusters(
@@ -300,7 +416,7 @@ async function claimClusterAssignment(
   // aggregates don't — see workers/cluster/reconcile.ts). One transaction
   // closes the window. The claim itself stays race-safe: only bump if the
   // guarded UPDATE actually assigned the item.
-  return await client.transaction(async (tx) => {
+  return await retryTransaction(client, async (tx) => {
     const claimed = await tx
       .update(items)
       .set({ clusterId, clusteredAt: new Date() })

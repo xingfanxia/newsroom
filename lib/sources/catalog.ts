@@ -192,6 +192,9 @@ export const sourceCatalog: Source[] = [
     priority: 2,
     tags: ["community", "digest", "zh", "newsletter"],
     enabled: true,
+    // Multi-topic daily digest — opt out of clustering (W5.2). It's curation,
+    // not single-event coverage; leaving it in glued unrelated events together.
+    clusteringOptOut: true,
     notes:
       "Atom feed — RSS <summary> is only the first ~500 chars; the real post is at the <link> URL. Jina Reader fetches the full page on the body-fetch stage.",
   },
@@ -704,6 +707,9 @@ export const sourceCatalog: Source[] = [
     enabled: true,
     curated: true,
     neverExclude: true,
+    // Pre-curated multi-topic digest pool — opt out of clustering (W5.2). Its
+    // items span many events; clustering them bridged unrelated stories.
+    clusteringOptOut: true,
     notes:
       "Hourly pull of AI HOT's mode=selected pool. Pre-curated by 卡兹克; our scorer should not demote below 'all'. Daily-report path is separate (workers/newsletter/aihot-daily.ts).",
   },

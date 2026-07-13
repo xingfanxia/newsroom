@@ -89,7 +89,9 @@ Hard rules:
 
 7. If members genuinely disagree on what the event IS (different products, different dates), pick the narrowest concrete event they share.
 
-Output JSON: { canonicalTitleZh: string, canonicalTitleEn: string }`;
+8. **no_content flag.** Set no_content=true ONLY when the members have genuinely nothing verifiable to name — only undisclosed/placeholder links (a bare t.co URL, a "mystery link", 内容未披露/无法核实, an RSS entry whose body never fetched). This is a structural signal for downstream dedup, NOT a judgment about title quality or thin coverage: if there is a real event you can name, set no_content=false even if you're unsure of details. Still emit your best-guess titles either way.
+
+Output JSON: { canonicalTitleZh: string, canonicalTitleEn: string, noContent: boolean }`;
 
 export function canonicalTitleUserPrompt(input: {
   memberTitles: Array<{
@@ -128,7 +130,7 @@ export function canonicalTitleUserPrompt(input: {
 Lead summary (zh): ${input.leadSummaryZh ?? "(none)"}
 Lead summary (en): ${input.leadSummaryEn ?? "(none)"}
 
-Emit { canonicalTitleZh, canonicalTitleEn } JSON only.`;
+Emit { canonicalTitleZh, canonicalTitleEn, noContent } JSON only.`;
 }
 
 // ═════════════════════════════════════════════════════════════════════════════

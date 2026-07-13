@@ -75,6 +75,7 @@ async function upsertCatalogSource(client: DbClient, s: Source): Promise<void> {
       notes: s.notes ?? null,
       curated: s.curated ?? false,
       neverExclude: s.neverExclude ?? false,
+      clusteringOptOut: s.clusteringOptOut ?? false,
     })
     .onConflictDoUpdate({
       target: sources.id,
@@ -92,6 +93,7 @@ async function upsertCatalogSource(client: DbClient, s: Source): Promise<void> {
         notes: sql`EXCLUDED.notes`,
         curated: sql`EXCLUDED.curated`,
         neverExclude: sql`EXCLUDED.never_exclude`,
+        clusteringOptOut: sql`EXCLUDED.clustering_opt_out`,
         updatedAt: new Date(),
       },
     });

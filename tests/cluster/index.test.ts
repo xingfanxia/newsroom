@@ -10,7 +10,11 @@ import {
   hasReachedSplitRejectionCap,
   MAX_DISTINCT_SPLIT_RETRIES_PER_ITEM,
 } from "@/workers/cluster/split-audit";
+import { resolveJoinOutcome, PREFER_CLUSTERED_SLACK } from "@/workers/cluster";
 import { readSource } from "@/tests/helpers/source";
+
+// Stage A cosine-distance join threshold (1 - 0.75 similarity).
+const T = 0.25;
 
 // Read the worker source once; all assertions are string searches.
 const workerSrc = readSource("workers/cluster/index.ts");
@@ -198,10 +202,10 @@ describe("Cluster UPDATE on member join", () => {
   it("wraps the item-claim + member_count bump in a transaction (atomic bookkeeping)", () => {
     // Two autocommit statements let a crash land between claim and bump and
     // drift member_count forever (clusters have no self-heal). The claim +
-    // bump now run inside client.transaction. (T4)
-    expect(workerSrc).toContain("client.transaction(async (tx)");
+    // bump now run inside a retryTransaction (SQLITE_BUSY-retried, W7a). (T4)
+    expect(workerSrc).toContain("retryTransaction(client, async (tx)");
     expect(workerSrc).toMatch(
-      /client\.transaction\(async \(tx\)[\s\S]+?tx[\s\S]+?\.update\(items\)[\s\S]+?\.update\(clusters\)/,
+      /retryTransaction\(client, async \(tx\)[\s\S]+?tx[\s\S]+?\.update\(items\)[\s\S]+?\.update\(clusters\)/,
     );
   });
 });
@@ -248,28 +252,30 @@ describe("Prefer-clustered bias (clone-cluster prevention)", () => {
     expect(workerSrc).toContain("AND i.cluster_id IS NULL");
   });
 
-  it("only runs the unclustered query when the clustered query missed", () => {
-    // Saves one HNSW probe in the common case (clustered match exists).
+  it("skips the unclustered query only when a strong (non-borderline) clustered match already wins", () => {
+    // Saves one HNSW probe when the clustered join is solid; a borderline
+    // clustered match (W4b) or a cohesion-failed one still runs it.
     expect(workerSrc).toMatch(
-      /nearestClustered && nearestClustered\.distance <= threshold[\s\S]+?\? null[\s\S]+?await client\.all<\{ id: number; distance: number \}>\(sql`/,
+      /clusteredJoinOk && !clusteredBorderline[\s\S]+?\? null[\s\S]+?await client\.all<\{ id: number; distance: number \}>\(sql`/,
     );
   });
 
-  it("prefers nearestClustered over nearestUnclustered when both within threshold", () => {
-    // The branching block: nearestClustered first, nearestUnclustered second.
-    // This is the bias that fixes the clone-cluster bug — clustered wins even
-    // if unclustered is slightly closer.
+  it("prefers a clustered join over promotion via resolveJoinOutcome (bias order)", () => {
+    // The dispatch checks join-clustered BEFORE promote-unclustered — the bias
+    // that fixes the clone-cluster bug (clustered wins, bounded by W4b). The
+    // decision itself is unit-tested in resolveJoinOutcome; here we just assert
+    // the wiring routes clustered first.
     expect(workerSrc).toMatch(
-      /if \(nearestClustered && nearestClustered\.distance <= threshold\)[\s\S]+?else if \(nearestUnclustered && nearestUnclustered\.distance <= threshold\)/,
+      /if \(outcome === "join-clustered"\)[\s\S]+?if \(outcome === "promote-unclustered"\)/,
     );
   });
 
   it("documents the bias rule and its rationale", () => {
-    expect(workerSrc).toContain("Bias:");
     // The rationale must mention what the bias trades off (best-mate optimality)
     // for what it gains (cross-cluster recall) — without the why, future
     // maintainers will revert this thinking it's a regression.
     expect(workerSrc).toContain("cross-cluster recall");
+    expect(workerSrc).toContain("Prefer-clustered slack");
   });
 });
 
@@ -282,7 +288,7 @@ describe("Neighbor-promotion race safety", () => {
     // worker. After the fix: start at 0, only bump when the neighbor claim
     // returns rows. coverage starts at 0 too so it's in lockstep from birth.
     expect(workerSrc).toContain(
-      ".values({ leadItemId: nearestUnclustered.id, memberCount: 0, coverage: 0 })",
+      ".values({ leadItemId: nearestUnclustered!.id, memberCount: 0, coverage: 0 })",
     );
   });
 
@@ -290,7 +296,7 @@ describe("Neighbor-promotion race safety", () => {
     // insert cluster + claim neighbor + bump were three autocommit statements;
     // a crash between claim and bump drifts member_count. Now one transaction. (T4)
     expect(workerSrc).toMatch(
-      /const promoted = await client\.transaction\(async \(tx\)/,
+      /const promoted = await retryTransaction\(client, async \(tx\)/,
     );
   });
 
@@ -305,5 +311,120 @@ describe("Neighbor-promotion race safety", () => {
     // itemId; lead must point to itemId since the original neighbor is now in
     // some other cluster.
     expect(workerSrc).toContain(".set({ leadItemId: itemId })");
+  });
+});
+
+// ── resolveJoinOutcome: pure W5.1 cohesion gate + W4b prefer-clustered bound ──
+
+describe("resolveJoinOutcome (W5.1 + W4b)", () => {
+  it("joins a within-threshold clustered neighbor whose lead is within cohesion", () => {
+    expect(
+      resolveJoinOutcome({
+        clusteredDistance: 0.1,
+        leadDistance: 0.2,
+        unclusteredDistance: null,
+        threshold: T,
+      }),
+    ).toBe("join-clustered");
+  });
+
+  it("W5.1: rejects the clustered join when the lead is beyond cohesion, falling back to a twin", () => {
+    // lead 0.5 > COHESION_MAX_DISTANCE 0.35 → not a valid join target.
+    expect(
+      resolveJoinOutcome({
+        clusteredDistance: 0.1,
+        leadDistance: 0.5,
+        unclusteredDistance: 0.1,
+        threshold: T,
+      }),
+    ).toBe("promote-unclustered");
+  });
+
+  it("W5.1: a cohesion-failed clustered neighbor with no twin becomes a singleton", () => {
+    expect(
+      resolveJoinOutcome({
+        clusteredDistance: 0.1,
+        leadDistance: 0.5,
+        unclusteredDistance: null,
+        threshold: T,
+      }),
+    ).toBe("singleton");
+  });
+
+  it("W5.1: no lead embedding (null lead distance) fails cohesion", () => {
+    expect(
+      resolveJoinOutcome({
+        clusteredDistance: 0.1,
+        leadDistance: null,
+        unclusteredDistance: null,
+        threshold: T,
+      }),
+    ).toBe("singleton");
+  });
+
+  it("W4b: a much-closer unclustered twin beats a borderline clustered match", () => {
+    // clustered 0.24, twin 0.02 → 0.24 > 0.02 + 0.05 slack → twin wins.
+    expect(
+      resolveJoinOutcome({
+        clusteredDistance: 0.24,
+        leadDistance: 0.2,
+        unclusteredDistance: 0.02,
+        threshold: T,
+      }),
+    ).toBe("promote-unclustered");
+  });
+
+  it("W4b: the prefer-clustered bias holds when the twin is only slightly closer", () => {
+    // clustered 0.24, twin 0.21 → 0.24 <= 0.21 + 0.05 → clustered still wins.
+    expect(
+      resolveJoinOutcome({
+        clusteredDistance: 0.24,
+        leadDistance: 0.2,
+        unclusteredDistance: 0.21,
+        threshold: T,
+      }),
+    ).toBe("join-clustered");
+  });
+
+  it("promotes an unclustered twin when there is no clustered neighbor", () => {
+    expect(
+      resolveJoinOutcome({
+        clusteredDistance: null,
+        leadDistance: null,
+        unclusteredDistance: 0.1,
+        threshold: T,
+      }),
+    ).toBe("promote-unclustered");
+  });
+
+  it("skipped unclustered scan (null) on a strong clustered match still joins clustered", () => {
+    // Caller skips the second scan when the clustered match is strong; null
+    // reads as 'no twin' and correctly yields join-clustered.
+    expect(
+      resolveJoinOutcome({
+        clusteredDistance: 0.1,
+        leadDistance: 0.2,
+        unclusteredDistance: null,
+        threshold: T,
+      }),
+    ).toBe("join-clustered");
+  });
+
+  it("nothing within threshold → singleton", () => {
+    expect(
+      resolveJoinOutcome({
+        clusteredDistance: 0.4,
+        leadDistance: 0.2,
+        unclusteredDistance: 0.5,
+        threshold: T,
+      }),
+    ).toBe("singleton");
+  });
+
+  it("W4b: the prefer-clustered slack constant matches the tested scenarios", () => {
+    // The bias cases above hardcode a 0.05 gap (0.24 vs 0.21 holds, 0.24 vs
+    // 0.02 breaks). Pin the constant so a retune flags those scenarios for
+    // review instead of silently drifting past them.
+    expect(PREFER_CLUSTERED_SLACK).toBe(0.05);
   });
 });

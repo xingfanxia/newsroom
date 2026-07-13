@@ -47,7 +47,7 @@
  */
 
 import { sql } from "drizzle-orm";
-import { db } from "@/db/client";
+import { db, retryTransaction } from "@/db/client";
 import { items, clusters } from "@/db/schema";
 
 export const MERGE_MIN_DISTANCE = 0.25;
@@ -116,14 +116,21 @@ export async function runMergeBatch(opts: MergeOpts): Promise<MergeReport> {
 
   // No-content cluster filter: clusters of items whose source had no body
   // (e.g., an X post that's just a t.co link, or an RSS entry whose body
-  // failed to fetch). Stage C's canonical-title LLM falls back to phrases
-  // like "未披露内容无法核实" / "X post with undisclosed link content".
-  // These clusters' embeddings encode "I have no content" — pairs will be
-  // similar, but the items aren't about the same event. Merging them spawns
-  // a mega-cluster of unrelated noise. Skip outright.
+  // failed to fetch). These clusters' embeddings encode "I have no content" —
+  // pairs will be similar, but the items aren't about the same event. Merging
+  // them spawns a mega-cluster of unrelated noise. Skip outright.
+  //
+  // PRIMARY signal (W5.3): the structural `clusters.no_content` flag stamped by
+  // Stage C — decoupled from the title's exact phrasing. The LIKE list is kept
+  // only as a TRANSITIONAL FALLBACK for clusters titled before the flag existed
+  // (no_content defaults to 0 until they're re-titled); once re-titled they
+  // carry the flag and the LIKE match is redundant. Remove the LIKE arm after a
+  // full re-title pass has populated no_content.
   // SQLite LIKE is ASCII-case-insensitive by default (matches pg ILIKE for
   // these English patterns; CJK has no case, so those are unaffected).
   const noContentSkip = sql`(
+    COALESCE(c.no_content, 0) = 1
+    OR
     (c.canonical_title_zh LIKE '%未披露%'
       OR c.canonical_title_zh LIKE '%无法核实%'
       OR c.canonical_title_zh LIKE '%无法验证%'
@@ -294,7 +301,7 @@ export async function mergeClusters(
 ): Promise<number> {
   let movedCount = 0;
 
-  await dbc.transaction(async (tx) => {
+  await retryTransaction(dbc, async (tx) => {
     // 1. Unlink loser items the arbitrator already rejected from the winner.
     //    Stage A's existing NOT EXISTS(cluster_splits) guard then keeps them
     //    from rejoining the winner on future ticks.
