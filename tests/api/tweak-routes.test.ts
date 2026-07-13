@@ -49,7 +49,6 @@ describeOrSkip("tweaks route payload helpers (real DB)", () => {
       saveTweaksRoutePayload(user, {
         tweaks: {
           accent: "cyan",
-          language: "zh",
           showTicker: false,
         },
         watchlist: ["gpt-6", "agentic ide"],
@@ -59,7 +58,6 @@ describeOrSkip("tweaks route payload helpers (real DB)", () => {
     await expect(getTweaksRoutePayload(user)).resolves.toEqual({
       tweaks: {
         accent: "cyan",
-        language: "zh",
         showTicker: false,
       },
       watchlist: ["gpt-6", "agentic ide"],
@@ -74,7 +72,6 @@ describeOrSkip("tweaks route payload helpers (real DB)", () => {
     await expect(getTweaksRoutePayload(user)).resolves.toEqual({
       tweaks: {
         accent: "cyan",
-        language: "zh",
         showTicker: false,
       },
       watchlist: ["deepseek"],

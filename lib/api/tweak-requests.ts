@@ -1,42 +1,17 @@
 import { z } from "zod";
-import {
-  TWEAK_ACCENTS,
-  TWEAK_CHROME_STYLES,
-  TWEAK_CJK_FONTS,
-  TWEAK_DENSITIES,
-  TWEAK_LANGUAGES,
-  TWEAK_MONO_FONTS,
-  TWEAK_RADII,
-  TWEAK_SCORE_STYLES,
-  TWEAK_THEMES,
-  type Tweaks,
-} from "@/lib/tweaks";
+import { TWEAKS_SCHEMA } from "@/lib/tweaks";
 import {
   MAX_WATCHLIST_TERM_CHARS,
   MAX_WATCHLIST_TERMS,
   normalizeWatchlist,
 } from "@/lib/watchlist";
 
-const tweakSettingsSchema = z.object({
-  density: z.enum(TWEAK_DENSITIES),
-  accent: z.enum(TWEAK_ACCENTS),
-  theme: z.enum(TWEAK_THEMES),
-  monoFont: z.enum(TWEAK_MONO_FONTS),
-  cjkFont: z.enum(TWEAK_CJK_FONTS),
-  radius: z.enum(TWEAK_RADII),
-  chromeStyle: z.enum(TWEAK_CHROME_STYLES),
-  scoreStyle: z.enum(TWEAK_SCORE_STYLES),
-  showTicker: z.boolean(),
-  showRadar: z.boolean(),
-  showPulse: z.boolean(),
-  showBreadcrumb: z.boolean(),
-  showLineNumbers: z.boolean(),
-  mutedMeta: z.boolean(),
-  language: z.enum(TWEAK_LANGUAGES),
-}) satisfies z.ZodType<Tweaks>;
-
 export const tweaksPatchBodySchema = z.object({
-  tweaks: tweakSettingsSchema.partial().optional(),
+  // `TWEAKS_SCHEMA` is the single source of truth for tweak field shapes; the
+  // PATCH body accepts any subset of the persistable fields. `language` is
+  // URL-derived (never persisted — see `persistableTweaks`), so it's omitted
+  // here: a stray/legacy client that sends it has it stripped, not stored.
+  tweaks: TWEAKS_SCHEMA.omit({ language: true }).partial().optional(),
   watchlist: z
     .array(z.string())
     .transform(normalizeWatchlist)

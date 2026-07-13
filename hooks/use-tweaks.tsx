@@ -9,7 +9,13 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { resolveTweaks, TWEAK_DEFAULTS, type Tweaks } from "@/lib/tweaks";
+import {
+  parsePersistedTweaks,
+  persistableTweaks,
+  resolveTweaks,
+  TWEAK_DEFAULTS,
+  type Tweaks,
+} from "@/lib/tweaks";
 import type { AppLocale } from "@/lib/types";
 
 export type { Tweaks };
@@ -33,7 +39,8 @@ function readStoredTweaks(): Partial<Tweaks> | null {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    return JSON.parse(raw) as Partial<Tweaks>;
+    // Untrusted persisted blob — validate field-by-field, drop corrupt values.
+    return parsePersistedTweaks(JSON.parse(raw));
   } catch {
     return null;
   }
@@ -65,7 +72,7 @@ export function TweaksProvider({
   const base: Tweaks = useMemo(() => resolveTweaks(urlLanguage), [urlLanguage]);
   const [tweaks, setTweaksState] = useState<Tweaks>(base);
   const [open, setOpen] = useState(false);
-  const pendingServerTweaksRef = useRef<Tweaks | null>(null);
+  const pendingServerTweaksRef = useRef<Partial<Tweaks> | null>(null);
   const serverSyncTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -83,11 +90,13 @@ export function TweaksProvider({
         });
         const body = response.ok ? await response.json() : null;
         if (cancelled) return;
-        const server = body?.tweaks as Partial<Tweaks> | undefined;
+        const server = parsePersistedTweaks(body?.tweaks);
         const merged = resolveTweaks(urlLanguage, localRaw, server);
         setTweaksState(merged);
         try {
-          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+          // `language` is URL-derived and never read back — don't persist it.
+          const persisted = persistableTweaks(merged);
+          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(persisted));
         } catch {
           /* ignore */
         }
@@ -145,7 +154,7 @@ export function TweaksProvider({
     };
   }, []);
 
-  const scheduleServerSync = useCallback((next: Tweaks) => {
+  const scheduleServerSync = useCallback((next: Partial<Tweaks>) => {
     pendingServerTweaksRef.current = next;
     if (serverSyncTimerRef.current !== null) {
       window.clearTimeout(serverSyncTimerRef.current);
@@ -174,12 +183,14 @@ export function TweaksProvider({
       // desync the chrome from the URL-locale titles.
       const coerced: Tweaks = { ...next, language: urlLanguage };
       setTweaksState(coerced);
+      // Persist / sync everything except the URL-derived language.
+      const persisted = persistableTweaks(coerced);
       try {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(coerced));
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(persisted));
       } catch {
         /* quota / disabled — still update in-memory + body attrs */
       }
-      scheduleServerSync(coerced);
+      scheduleServerSync(persisted);
     },
     [scheduleServerSync, urlLanguage],
   );
