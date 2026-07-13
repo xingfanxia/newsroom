@@ -1,0 +1,64 @@
+# FIX-W7 / A5 — daily Turso read-budget guardrail.
+#
+# Runs scripts/ops/read-budget.ts once a day, projects the steady-state monthly
+# rows_read run-rate, and FAILS THE JOB (→ GitHub emails the owner) if the
+# projection exceeds the 100M/mo target. The flood-polluted cumulative is NOT the
+# trip — the run-rate delta between two daily snapshots is (see the script).
+#
+# Snapshot persistence: the prior day's reading is carried between runs via
+# actions/cache (a tiny JSON), so no DB table + no DB creds are needed in CI —
+# only the Turso platform token. SECURITY: triggers are schedule + manual only
+# (NO pull_request), so a fork PR can never run this with the secret.
+name: read-budget-monitor
+
+on:
+  schedule:
+    - cron: "0 8 * * *" # daily 08:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: read-budget-monitor
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+
+      - run: bun install --frozen-lockfile
+
+      # Restore the most recent prior snapshot (prefix match on restore-keys;
+      # each run saves under a unique run_id key below).
+      - name: Restore previous snapshot
+        uses: actions/cache/restore@v4
+        with:
+          path: .read-budget-snapshot.json
+          key: read-budget-snapshot-${{ github.run_id }}
+          restore-keys: |
+            read-budget-snapshot-
+
+      # The script reads yesterday's reading from SNAPSHOT_IN and overwrites it
+      # with today's at SNAPSHOT_OUT (same file). No shell-side variable handling
+      # — the run: block passes only static env, so there is no injection surface.
+      - name: Run read-budget monitor
+        env:
+          TURSO_API_TOKEN: ${{ secrets.TURSO_API_TOKEN }}
+          SNAPSHOT_IN: .read-budget-snapshot.json
+          SNAPSHOT_OUT: .read-budget-snapshot.json
+        run: bun scripts/ops/read-budget.ts
+
+      # Persist THIS run's reading (the script overwrote the file with the
+      # current usage) so tomorrow's run can diff against it. always() so the
+      # baseline still advances when the monitor trips (exit 1).
+      - name: Save snapshot for next run
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .read-budget-snapshot.json
+          key: read-budget-snapshot-${{ github.run_id }}
