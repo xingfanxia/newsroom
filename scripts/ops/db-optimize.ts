@@ -71,6 +71,16 @@ const INDEXES = [
   `CREATE INDEX IF NOT EXISTS llm_usage_totals_cover_idx
      ON llm_usage (created_at, input_tokens, cached_input_tokens,
                    output_tokens, reasoning_tokens, cost_usd)`,
+  // Partial index for the commentary-backfill candidate scan (W9b-idx). The
+  // worker filters `tier IN (visible) AND commentary_at IS NULL`; without this
+  // it seeks items_tier_idx and reads every visible-tier row (~8.9K measured) to
+  // find the ~27 still lacking commentary, twice a day (~1M rows_read/mo). Only
+  // commentary-pending rows live here, tier-leading, so the visible-tier seek
+  // touches just those. Partial selection is structural (Turso forbids ANALYZE),
+  // like clusters_multimember_idx — verified by the UNPINNED plan check below.
+  `CREATE INDEX IF NOT EXISTS items_commentary_pending_idx
+     ON items (tier, cluster_id)
+     WHERE commentary_at IS NULL`,
 ];
 
 /** Hot query shapes and the index each one's plan must reference. */
@@ -161,6 +171,26 @@ const PLAN_CHECKS: Array<{ name: string; index: string; sql: string }> = [
     index: "items_topics_cover_idx",
     sql: `SELECT tags FROM items INDEXED BY items_topics_cover_idx
           WHERE created_at >= 0 AND enriched_at IS NOT NULL`,
+  },
+  {
+    // W9b-idx — commentary-backfill candidate scan. UNPINNED on purpose (like the
+    // multimember checks): verifies the planner STRUCTURALLY selects the partial
+    // index — the drizzle query in runCommentaryBackfill has no INDEXED BY, so its
+    // read savings depend on the planner picking items_commentary_pending_idx over
+    // items_tier_idx. Faithful mirror of that builder (workers/enrich/commentary.ts:
+    // same tier IN / commentary_at IS NULL / cluster OR / LIMIT 200). If this FAILs,
+    // the query still scans ~8.9K visible-tier rows — pin it via INDEXED BY.
+    // Assert the `(tier=?)` SEEK shape, not bare presence (W8 precedent): a
+    // column-order regression (e.g. swap to (cluster_id, tier)) would degrade the
+    // seek to a full partial-index scan while a bare-name check kept passing.
+    name: "commentary candidate scan uses partial commentary-pending index (W9b-idx)",
+    index: "items_commentary_pending_idx (tier=?)",
+    sql: `SELECT i.* FROM items i
+          LEFT JOIN clusters c ON i.cluster_id = c.id
+          WHERE i.tier IN ('featured', 'p1', 'all')
+            AND i.commentary_at IS NULL
+            AND (i.cluster_id IS NULL OR COALESCE(c.member_count, 1) < 2)
+          LIMIT 200`,
   },
   {
     name: "usage daily-spend bounded scan (dailySpend)",
