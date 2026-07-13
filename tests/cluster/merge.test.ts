@@ -202,8 +202,11 @@ describe("Cron stage wiring (Stage B+ between B and C)", () => {
     expect(titlesIdx).toBeGreaterThan(mergeIdx);
   });
 
-  it("scopes merge to a recency window (default 6h) for cron-tick speed", () => {
-    expect(pipelineSrc).toContain("MERGE_RECENCY_HOURS = 6");
+  it("scopes merge to a recency window (>= cluster cadence) for cron-tick speed", () => {
+    // W9: cluster went 1/h → 3/day (every 8h), so the window was raised 6h → 24h
+    // — it MUST stay >= the cadence or clusters updated just after a run never
+    // re-enter the window and duplicate event cards accumulate.
+    expect(pipelineSrc).toContain("MERGE_RECENCY_HOURS = 24");
     expect(pipelineSrc).toContain("recencyHours: MERGE_RECENCY_HOURS");
   });
 

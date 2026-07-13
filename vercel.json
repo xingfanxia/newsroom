@@ -10,7 +10,7 @@
     { "path": "/api/cron/enrich", "schedule": "5,20,35,50 * * * *" },
     { "path": "/api/cron/commentary", "schedule": "10 */12 * * *" },
     { "path": "/api/cron/score-backfill", "schedule": "25 6 * * 1" },
-    { "path": "/api/cron/cluster", "schedule": "55 */8 * * *" },
+    { "path": "/api/cron/cluster", "schedule": "55 4,12,20 * * *" },
     { "path": "/api/cron/newsletter-daily", "schedule": "0 5 * * *" },
     { "path": "/api/cron/newsletter-monthly", "schedule": "37 9 1 * *" }
   ]

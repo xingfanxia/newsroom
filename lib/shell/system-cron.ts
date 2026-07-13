@@ -80,6 +80,14 @@ export function cadenceMinutesFromCron(schedule: string): number | null {
     return hourStep * 60;
   }
 
+  // Evenly-spaced hour list, e.g. "4,12,20" → every 8h (phased so a run can land
+  // just before a time-sensitive consumer like newsletter-daily at 05:00). Same
+  // even-spacing rule as the minute list, cycle = 24h.
+  const hourInterval = evenlySpacedInterval(hour, 24);
+  if (hourInterval !== null && dayOfMonth === "*" && dayOfWeek === "*") {
+    return hourInterval * 60;
+  }
+
   if (!isSingleNumber(hour)) return null;
   if (dayOfMonth === "*" && dayOfWeek === "*") return 60 * 24;
   if (dayOfMonth === "*" && isSingleNumber(dayOfWeek)) return 60 * 24 * 7;

@@ -13,7 +13,9 @@ describe("cadenceMinutesFromCron", () => {
     expect(cadenceMinutesFromCron("23 4 * * *")).toBe(60 * 24);
     expect(cadenceMinutesFromCron("43 5 * * 1")).toBe(60 * 24 * 7);
     expect(cadenceMinutesFromCron("37 */6 * * *")).toBe(60 * 6);
-    expect(cadenceMinutesFromCron("55 */8 * * *")).toBe(60 * 8); // W9: cluster 3×/day
+    // W9: cluster 3×/day, phased (4,12,20) so 04:55 lands before newsletter 05:00.
+    expect(cadenceMinutesFromCron("55 4,12,20 * * *")).toBe(60 * 8);
+    expect(cadenceMinutesFromCron("55 */8 * * *")).toBe(60 * 8); // equivalent step form
     expect(cadenceMinutesFromCron("10 */12 * * *")).toBe(60 * 12); // W9: commentary 2×/day
     expect(cadenceMinutesFromCron("0,15,30,45 * * * *")).toBe(15);
     expect(cadenceMinutesFromCron("12,42 * * * *")).toBe(30);

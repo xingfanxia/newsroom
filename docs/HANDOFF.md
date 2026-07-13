@@ -13,9 +13,11 @@ run too frequently** → attack frequency + scale. Shipping in 3 measurable PRs.
 
 **W9a — content-cron cadence cuts (SHIPPED via PR #__).** `vercel.json` only
 (+ the cron-cadence tests). Aggressive daily-site cadence:
-- `cluster` `55 * * * *` → `55 */8 * * *` (3×/day). Its ±72h NN pipeline is ~50k
-  reads/tick, so frequency IS the lever. New items still appear immediately as
-  singletons via enrich; only event-grouping lags ≤8h.
+- `cluster` `55 * * * *` → `55 4,12,20 * * *` (3×/day, phased so a run lands at
+  04:55 — just before newsletter-daily at 05:00, which dedups by cluster_id and
+  can't dedup still-unclustered items). Its ±72h NN pipeline is ~50k reads/tick,
+  so frequency IS the lever. New items still appear immediately as singletons via
+  enrich; only event-grouping lags ≤8h.
 - `commentary` `10,40 * * * *` → `10 */12 * * *` (2×/day). 200/run × 2 > ~190/day
   ingest, no backlog.
 - `score-backfill` `25 * * * *` → `25 6 * * 1` (weekly). Drained legacy backfill
@@ -26,8 +28,17 @@ run too frequently** → attack frequency + scale. Shipping in 3 measurable PRs.
   **`items_unfetched_body_idx` leak** (never-stamped x-status rows accumulate) —
   fixed by index narrowing in W9b, not by cadence.
 - `enrich` unchanged (4×/h, ~2k reads/h, keeps new items fresh).
-- Parser note: `cadenceMinutesFromCron` only understands `*/N` hour steps (comma
-  hour-lists → null), so cadences use `*/8`/`*/12`, not `1,9,17`.
+- Parser note: `cadenceMinutesFromCron` was extended to parse evenly-spaced comma
+  hour-lists (e.g. `4,12,20` → every 8h), so the cluster phase-shift is expressible
+  without breaking the W7 non-null cadence guard.
+- **Coupled constants the code-review caught (fixed in the same PR):** three
+  constants silently assumed "cluster runs ≥ hourly" and broke at 3×/day —
+  (1) `MERGE_RECENCY_HOURS` 6→24 (was < the 8h cadence → a ~2h/run band of
+  clusters never got re-merged → duplicate event cards); (2)
+  `MAX_EVENT_COMMENTARY_PER_RUN` 8→16 (event commentary runs inside the cluster
+  tick, so its throughput was 8×-cut → bare cards on burst days; 16 fits the 300s
+  invocation budget); (3) `EVENT_COMMENTARY_CRON_RECENCY_HOURS` 24→36 (~4 cluster
+  runs of coverage so a starved low-importance event still gets an editor note).
 - Est. background floor drop ~148k → ~42k rows/h (score-backfill→0, commentary/
   cluster amortized down). article-body's 32k/h stays until W9b's leak fix.
 

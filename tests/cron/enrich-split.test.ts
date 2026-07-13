@@ -15,6 +15,7 @@
 import { describe, expect, it } from "bun:test";
 import { existsSync } from "fs";
 import { readSource, sourcePath } from "@/tests/helpers/source";
+import { cadenceMinutesFromCron } from "@/lib/shell/system-cron";
 
 describe("split enrich cron — each worker has its own route", () => {
   it("/api/cron/article-body route exists and runs articleBody + youtubeTranscript only", () => {
@@ -90,10 +91,14 @@ describe("vercel.json — staggered cron schedules for 4 split routes", () => {
     expect(sched).toMatch(/^\S+\s+\*\s+\*\s+\*\s+\*$/); // valid 5-field, hourly
   });
 
-  it("registers /api/cron/score-backfill (W9: weekly — drained legacy backfill)", () => {
+  it("registers /api/cron/score-backfill at a weekly cadence (W9: drained legacy backfill)", () => {
     // Was hourly; the pre-rubric backfill is drained, so an hourly full-scan of
     // ~20k enriched rows found 0 work every tick. W9 dropped it to weekly.
+    // Assert the actual cadence so a revert to hourly is caught (not a tautology).
     expect(cronByPath.has("/api/cron/score-backfill")).toBe(true);
+    expect(cadenceMinutesFromCron(cronByPath.get("/api/cron/score-backfill")!)).toBe(
+      60 * 24 * 7,
+    );
   });
 
   it("registers /api/cron/commentary", () => {
