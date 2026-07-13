@@ -13,7 +13,7 @@
 
 import { and, eq, isNull, or, sql, exists } from "drizzle-orm";
 import { z } from "zod";
-import { db } from "@/db/client";
+import { db, retryTransaction } from "@/db/client";
 import { clusters, items, sources, clusterSplits } from "@/db/schema";
 import { generateStructured, profiles } from "@/lib/llm";
 import type { SourceGroup } from "@/lib/types";
@@ -262,7 +262,7 @@ async function applyKeepVerdict(
   const client = dbc;
   const now = new Date();
 
-  await client.transaction(async (tx: DbTx) => {
+  await retryTransaction(client, async (tx: DbTx) => {
     // Stamp verified_at on the cluster
     await tx
       .update(clusters)
@@ -320,7 +320,7 @@ export async function applySplitVerdict(
   // that doesn't belong to this cluster) doesn't drive member_count negative.
   let actuallyUnlinked = 0;
 
-  await client.transaction(async (tx: DbTx) => {
+  await retryTransaction(client, async (tx: DbTx) => {
     // Unlink each rejected item, but ONLY if it currently belongs to this
     // cluster. Hallucinated ids (cross-cluster or already-unlinked) silently
     // no-op rather than corrupting another cluster's membership.
@@ -388,19 +388,30 @@ export async function applySplitVerdict(
       }
     }
 
-    // Verify surviving members
-    await tx
-      .update(items)
-      .set({ clusterVerifiedAt: now })
-      .where(
-        and(eq(items.clusterId, clusterId), isNull(items.clusterVerifiedAt)),
-      );
+    // W4a — verified-singleton lock fix: only stamp the verified tombstone when
+    // 2+ members actually remain. A split that leaves exactly ONE survivor is
+    // "this item is not the same event as its old siblings" — NOT "this item is
+    // permanently solo". Stamping cluster_verified_at on a lone survivor would
+    // exclude it from A.5 (singletons.ts filters on cluster_verified_at IS NULL)
+    // forever, so a later same-event twin could never reconcile with it. Leave
+    // it unverified; the cluster_splits negative edge already prevents it from
+    // rejoining the cluster it was rejected from.
+    const remainingMembers = members.length - actuallyUnlinked;
+    if (remainingMembers > 1) {
+      // Verify surviving members
+      await tx
+        .update(items)
+        .set({ clusterVerifiedAt: now })
+        .where(
+          and(eq(items.clusterId, clusterId), isNull(items.clusterVerifiedAt)),
+        );
 
-    // Stamp verified_at on the cluster (survivors are now confirmed)
-    await tx
-      .update(clusters)
-      .set({ verifiedAt: now })
-      .where(eq(clusters.id, clusterId));
+      // Stamp verified_at on the cluster (survivors are now confirmed)
+      await tx
+        .update(clusters)
+        .set({ verifiedAt: now })
+        .where(eq(clusters.id, clusterId));
+    }
   });
 
   // Recompute importance for surviving members

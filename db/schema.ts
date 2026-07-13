@@ -160,6 +160,15 @@ export const sources = sqliteTable(
      *  editorial picks tab. YouTube channels stay on /podcasts so they don't
      *  need this flag; newsletters/digests worth surfacing do. */
     curated: integer("curated", { mode: "boolean" }).notNull().default(false),
+    /** Opt this source's items OUT of event clustering entirely (Stage A/A.5).
+     *  For multi-topic *curation* feeds (群聊日报 / AI HOT) that are digests,
+     *  not single-event coverage: they glue unrelated events together via
+     *  single-link chaining and inflate the coverage boost. Opted-out items
+     *  still render as standalone feed cards — they just never join or bridge
+     *  a cluster. (W5.2, 2026-07-12 audit.) */
+    clusteringOptOut: integer("clustering_opt_out", { mode: "boolean" })
+      .notNull()
+      .default(false),
     notes: text("notes"),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
@@ -270,6 +279,16 @@ export const clusters = sqliteTable(
     editorAnalysisZh: text("editor_analysis_zh"),
     editorAnalysisEn: text("editor_analysis_en"),
     commentaryAt: integer("commentary_at", { mode: "timestamp_ms" }),
+    /** member_count at the moment commentary_at was last stamped. Lets Stage D
+     *  regenerate stale commentary once the event has meaningfully grown
+     *  (member_count >= 2× this) without re-running on every +1. NULL = never
+     *  commented (or commented before this column existed). (W6b, 2026-07-12.) */
+    commentaryMemberCount: integer("commentary_member_count"),
+    /** Structural "these members have no verifiable content" flag, stamped by
+     *  Stage C (canonical-title) when it detects a no-content cluster. Replaces
+     *  merge.ts's brittle LIKE-on-title keyword list (which coupled to the
+     *  LLM's exact phrasing). NULL/0 = has content. (W5.3, 2026-07-12.) */
+    noContent: integer("no_content", { mode: "boolean" }).notNull().default(false),
     // ── Event importance + tier (computed from members + coverage boost) ──
     importance: integer("importance"),
     /** featured | p1 | all | excluded — matches items.tier semantics but event-level. */

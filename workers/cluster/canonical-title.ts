@@ -20,6 +20,11 @@ export type CanonicalTitleReport = {
 const canonicalTitleSchema = z.object({
   canonicalTitleZh: z.string().min(1).max(200),
   canonicalTitleEn: z.string().min(1).max(200),
+  // W5.3 — structural no-content signal. Replaces merge.ts inferring "these
+  // members have no verifiable content" from the title's exact phrasing (a
+  // coupling that drifted). Stage C names the event AND explicitly flags the
+  // no-content case; merge.ts reads the flag, not the title text.
+  noContent: z.boolean(),
 });
 
 /**
@@ -188,6 +193,7 @@ async function titleOneCluster(
     .set({
       canonicalTitleZh: result.data.canonicalTitleZh,
       canonicalTitleEn: result.data.canonicalTitleEn,
+      noContent: result.data.noContent,
       titledAt: new Date(),
     })
     .where(eq(clusters.id, clusterId));

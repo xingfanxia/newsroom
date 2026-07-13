@@ -172,6 +172,14 @@ describe("noContentSkip NULL-guard", () => {
     expect(mergeSrc).toContain("COALESCE(NOT ${noContentSkip}, 1)");
     expect(mergeSrc).not.toContain("AND NOT ${noContentSkip}");
   });
+
+  it("uses the structural no_content flag as the PRIMARY skip signal (W5.3)", () => {
+    // The old skip was a brittle LIKE-list over canonical titles ('未公开' …).
+    // W5.3 makes the LLM-stamped clusters.no_content column authoritative and
+    // keeps the LIKE list only as a transitional fallback for un-retitled rows.
+    // Regressing to LIKE-only would silently unlink the structural flag.
+    expect(mergeSrc).toContain("COALESCE(c.no_content, 0) = 1");
+  });
 });
 
 // ── Cron pipeline integration ───────────────────────────────────────────────

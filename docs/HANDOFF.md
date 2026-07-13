@@ -1,5 +1,92 @@
 # AX's AI RADAR — Current Handoff
 
+## 2026-07-12 — W5+W6 recall/precision APPLIED (FIX-W567 charter, PR `ax/cluster-recall-precision`)
+
+Follow-on to the FIX-GOAL charter below. Implements the **product-gated +
+surgical** remainder of the clustering audit: W5 (precision), W6 (staleness),
+and the safe parts of W4/W7. Charter + AX product decisions:
+`docs/FIX-W567-2026-07-12.md`. What shipped (branch `ax/cluster-recall-precision`,
+commits `0528d57` + review-fix `3407978`):
+
+- **W5.1 cohesion gate** — Stage-A join now requires the item be within
+  `COHESION_MAX_DISTANCE` (0.35) of the cluster **lead**, not just the nearest
+  member (kills single-link chaining). Pure decision extracted to
+  `resolveJoinOutcome()` (unit-tested; the "strong clustered match always wins"
+  invariant is encoded in the function, not just the caller's scan-skip).
+- **W5.2 digest opt-out** — `sources.clustering_opt_out` flags 群聊日报 / AI HOT;
+  `notClusteringOptedOut()` excludes them from every Stage A / A.5 candidate +
+  neighbor query. They render as standalone cards, never join/bridge a cluster.
+- **W5.3 structural no_content** — `clusters.no_content` stamped by the Stage-C
+  LLM is now the PRIMARY merge-skip signal (LIKE list kept as transitional
+  fallback).
+- **W6a tombstone re-open** — new `workers/cluster/reopen.ts` (Stage B− before
+  arbitrate) nulls `verified_at` + members' `cluster_verified_at` (atomically)
+  when a grown cluster has a member drifted > `REOPEN_COHESION_DISTANCE` (0.38)
+  from the lead. **Lead-anchored, O(members)**, full-embedding space (NOT
+  embedding_small — thresholds are calibrated there). Loop-safe via
+  `latest_member_at > verified_at`.
+- **W6b commentary regen** — `clusters.commentary_member_count`; regen on 2×
+  growth OR featured/p1 tier-upgrade with no analysis. Loop-safe via count-stamp
+  + `editor_analysis_zh` guard. Extracted `commentaryRegenClause()`.
+- **W4a** — a split leaving 1 survivor no longer stamps `verified_at` (keeps it
+  visible to A.5).
+- **W7a** — `withBusyRetry()` / `retryTransaction()` (capped exponential backoff)
+  wrap every cluster-pipeline write transaction on transient SQLITE_BUSY.
+
+Schema: 3 new columns applied to prod via the idempotent PRAGMA-guarded
+`scripts/ops/add-cluster-fix-columns.ts` (db:push stays banned). Multipass
+review (opus code-reviewer + database-reviewer) run; all findings fixed.
+
+**Gate:** non-live `verify` steps all green (typecheck + lint 0-warn + build +
+3 knip checks + 130 local cluster/db tests). ⚠️ Full `bun run verify` currently
+exits non-zero ONLY on `workers/newsletter/select.test.ts` (`selectDailyColumnPool`
+hits the live Turso DB, which is under a **read-quota block**). See the quota
+diagnosis below.
+
+### 🔴 Turso read-quota block — DIAGNOSED 2026-07-12 (measured via billing API)
+
+`newsroom-v2` burned **549.6M rows_read = 109.9% of the 500M monthly cap** in ~1
+calendar day (the DB was only created at the pg→Turso cutover). **Writes are NOT
+blocked** (7.15M/10M). Cap **auto-resets 2026-08-01 04:00 UTC** (~20 days); this
+tier has **no pay-through overage** — only reset or a plan upgrade unblocks reads.
+
+- **What busted it (this time):** a ONE-OFF migration-day flood — pg copy-in + row
+  verify, `recluster-historical` re-runs during threshold tuning, cluster-health /
+  repair / backtest fired dozens of times by the 95+58 audit agents, plus ~6.75h of
+  unindexed home-feed full-scan regression. (`db-dump` read only ~0.5M rows — 346MB
+  is bytes, not rows — NOT the culprit.)
+- **Will prod re-bust on its own? YES — structural (W7).** `workers/cluster/` Stage
+  A / A.5 / reopen / merge run `vector_distance_cos` over the FULL 3072-dim
+  `embedding` in `ORDER BY … LIMIT 1` (no index satisfies → every predicate row is
+  read), while the 256-dim DiskANN `items_embedding_small_idx` sits used only by
+  `semantic-search.ts`. A.5 has no waterline (re-scans the same singletons ~144×/72h)
+  × 48 ticks/day. **This reframes W7 from a deferred perf item to the quota-critical
+  fix.**
+- **The fix (W7):** two-stage ANN via `vector_top_k('items_embedding_small_idx', …)`
+  then rerank on the full vector (`semantic-search.ts:103` is the template) +
+  `INDEXED BY` pins on the arbitrate/canonical-title/commentary 16K-cluster scans +
+  A.5 `last_recheck_at` waterline.
+- **Free mitigations before the fix / reset:** throttle or pause the cluster cron
+  (`:12,:42`), freeze any audit/backfill/db-dump against prod, and add a staging
+  Turso DB or `hasDb` skip-gate (`bun test` currently connects straight to prod —
+  part of what fed this flood).
+- **AX decision (only $/region tradeoff):** wait for the 8/1 reset ($0, ~20 days
+  read-limited) vs upgrade **Developer** ($4.99/mo, 2.5B reads, immediate unblock —
+  but Developer is single-region, would drop the current 2-region setup).
+- **This PR's prod ops under the block:** `add-cluster-fix-columns.ts` (metadata-only
+  `ADD COLUMN` + PRAGMA schema guard, no user-row reads) can likely run even now, but
+  `db:seed` (upsert reads) and `unlink` (`SELECT`) will hit the read block — run the
+  whole prod-ops sequence AFTER reset/upgrade.
+
+**Prod ops NOT yet applied (confirm-before-apply — Turso is the only data copy):**
+backup (`db-dump.ts`) → `add-cluster-fix-columns.ts` → `bun run db:seed` →
+optional `unlink-digest-cluster-members-20260712.ts --apply`. See the charter's
+"Prod ops" section.
+
+**Still open (deferred bigger redesigns):** W4 singleton-twin arbitrated daily
+sweep + A.5 window redesign; W7 DiskANN routing of Stage A/A.5, A.5 waterline,
+pipeline cron split, write-lock collapse to set-based statements.
+
 ## 2026-07-12 — Audit remediation APPLIED (FIX-GOAL charter, PR `ax/audit-fixes`)
 
 The bounded charter `docs/FIX-GOAL-2026-07-12.md` is **DONE** — P0 safety +
@@ -29,13 +116,14 @@ W1-W3 + the quick wins, tasks T1-T7. What shipped:
   scan), `breakdownByModel` all-window pinned to a covering index,
   semantic-search brute-force fallback recency-bounded + loud log.
 
-**Still open (explicitly OUT of scope this run — see the charter's "OUT of
-scope" list):** W4 (singleton-twin arbitrated sweep, A.5 window redesign),
-W5 (cohesion gate, digest `clustering_opt_out` — needs an AX product call,
+**Still open at the time of THIS charter (most now shipped in the FIX-W567
+charter above — see it for current status):** W4 (singleton-twin arbitrated
+sweep, A.5 window redesign), W5 (cohesion gate, digest `clustering_opt_out`,
 structural `no_content` flag), W6 (tombstone re-open + commentary regen
 policy), W7 (DiskANN routing of Stage A/A.5, pipeline cron split, SQLITE_BUSY
-retry wrapper). The two audit reports below remain the source of truth for
-these.
+retry wrapper). W5 + W6 + W4a + W7a landed in FIX-W567; the W4/W7 bigger
+redesigns remain deferred. The two audit reports below remain the source of
+truth for the deferred items.
 
 Original audit context (findings adversarially verified; reports are the
 per-workstream source of truth). **The charter was `docs/FIX-GOAL-2026-07-12.md`**

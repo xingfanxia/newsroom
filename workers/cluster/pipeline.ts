@@ -16,6 +16,10 @@ import {
   runSingletonReclusterBatch,
   type SingletonReclusterReport,
 } from "@/workers/cluster/singletons";
+import {
+  reopenIncoherentClusters,
+  type ReopenReport,
+} from "@/workers/cluster/reopen";
 import { EVENT_COMMENTARY_CRON_RECENCY_HOURS } from "@/lib/events/commentary-window";
 
 // Merge-stage recency window. Each tick only considers multi-member clusters
@@ -30,6 +34,7 @@ type ClusterPipelineStage<T> = T | ClusterPipelineStageError;
 export type ClusterPipelineReport = {
   cluster: ClusterPipelineStage<ClusterReport>;
   singletonRecluster: ClusterPipelineStage<SingletonReclusterReport>;
+  reopen: ClusterPipelineStage<ReopenReport>;
   arbitrate: ClusterPipelineStage<ArbitrationReport>;
   merge: ClusterPipelineStage<MergeReport>;
   canonicalTitles: ClusterPipelineStage<CanonicalTitleReport>;
@@ -66,6 +71,13 @@ export async function runClusterPipeline(): Promise<ClusterPipelineReport> {
     }),
   );
 
+  // Stage B− (re-open): un-verify clusters that drifted incoherent since their
+  // last verdict so the arbitrator below re-examines them (W6a). Runs BEFORE
+  // arbitrate so a re-opened cluster is re-arbitrated in the SAME tick.
+  const reopen = await safeStage("reopen", () =>
+    reopenIncoherentClusters({ apply: true }),
+  );
+
   // Stage B: LLM arbitrator decides keep-or-split for unverified clusters.
   const arbitrate = await safeStage("arbitrate", () => runArbitrationBatch());
 
@@ -91,6 +103,7 @@ export async function runClusterPipeline(): Promise<ClusterPipelineReport> {
   return {
     cluster,
     singletonRecluster,
+    reopen,
     arbitrate,
     merge,
     canonicalTitles,

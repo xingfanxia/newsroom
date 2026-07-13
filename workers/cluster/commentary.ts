@@ -18,7 +18,16 @@
  * cheap, but we keep the same cap so a featured-heavy hour doesn't blow
  * the per-tick budget.
  */
-import { and, desc, eq, inArray, isNull, isNotNull, sql } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  inArray,
+  isNull,
+  isNotNull,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 import { db } from "@/db/client";
 import { clusters, items } from "@/db/schema";
 import { generateStructured, profiles } from "@/lib/llm";
@@ -92,13 +101,14 @@ export async function runEventCommentaryBatch(
       memberCount: clusters.memberCount,
       importance: clusters.importance,
       eventTier: clusters.eventTier,
+      commentaryAt: clusters.commentaryAt,
     })
     .from(clusters)
     .where(
       and(
         inArray(clusters.eventTier, VISIBLE_ITEM_TIERS),
         sql`${clusters.memberCount} >= 2`,
-        isNull(clusters.commentaryAt),
+        commentaryRegenClause(),
         commentaryRecencyFilter(opts),
       ),
     )
@@ -134,6 +144,35 @@ export async function runEventCommentaryBatch(
 
 // ── Internal helpers ──────────────────────────────────────────────────────
 
+/**
+ * W6b — the "regenerate stale commentary, not just fill the initial null"
+ * predicate. A cluster is (re)commented when:
+ *   (a) it was never commented (commentary_at IS NULL), OR
+ *   (b) it grew to ≥2× the member_count recorded at last commentary — the
+ *       early 2-source note is stale once the event reaches ~10 sources, OR
+ *   (c) it crossed into featured/p1 but the full analysis was never written
+ *       (it was commented note-only at a lower tier).
+ *
+ * Loop-safe by construction: (b) re-stamps commentary_member_count on every
+ * regen, so it can't fire again until the count doubles ANEW; (c) writes
+ * editor_analysis_zh, so that arm goes false after one full pass. A NULL
+ * commentary_member_count (pre-column rows) makes (b) evaluate NULL/false —
+ * those clusters regen only via (c) and never thrash.
+ *
+ * Exported so the trigger is unit-testable against real SQLite without paying
+ * for the LLM path the batch runner wraps it in.
+ */
+export function commentaryRegenClause(): SQL {
+  return sql`(
+    ${clusters.commentaryAt} IS NULL
+    OR ${clusters.memberCount} >= 2 * ${clusters.commentaryMemberCount}
+    OR (
+      ${clusters.eventTier} IN ('featured', 'p1')
+      AND ${clusters.editorAnalysisZh} IS NULL
+    )
+  )`;
+}
+
 function commentaryRecencyFilter(opts: EventCommentaryBatchOptions) {
   if (opts.recencyHours == null) return sql`true`;
   // ms-epoch INTEGER columns: compare against Date.now() minus the window in ms
@@ -149,6 +188,7 @@ interface ClusterCandidate {
   memberCount: number;
   importance: number | null;
   eventTier: string | null;
+  commentaryAt: Date | null;
 }
 
 type MemberRow = {
@@ -219,6 +259,15 @@ async function processOneCluster(candidate: ClusterCandidate): Promise<void> {
     tier: candidate.eventTier,
   });
 
+  // Optimistic write guard (W6b). The old guard was `commentary_at IS NULL`
+  // (write once, never again) — that blocked regen. Guard on the commentary_at
+  // we LOADED instead: a concurrent run that already regenerated moves the
+  // value, so our stale write no-ops; a fresh regen still lands.
+  const commentaryUnchanged =
+    candidate.commentaryAt == null
+      ? isNull(clusters.commentaryAt)
+      : eq(clusters.commentaryAt, candidate.commentaryAt);
+
   if (isFull) {
     // Full deep dive — note + analysis, both locales.
     const result = await generateStructured({
@@ -247,15 +296,11 @@ async function processOneCluster(candidate: ClusterCandidate): Promise<void> {
         editorAnalysisZh: "editorAnalysisZh" in zh ? zh.editorAnalysisZh : c.editorAnalysisZh,
         editorAnalysisEn: c.editorAnalysisEn,
         commentaryAt: new Date(),
+        // Stamp the member_count at commentary time so the W6b growth-regen
+        // trigger measures from here, not from the last +1.
+        commentaryMemberCount: candidate.memberCount,
       })
-      .where(
-        and(
-          eq(clusters.id, candidate.id),
-          // Idempotency guard: only write if still null — concurrent runs
-          // can't double-write.
-          isNull(clusters.commentaryAt),
-        ),
-      );
+      .where(and(eq(clusters.id, candidate.id), commentaryUnchanged));
   } else {
     // Note-only — event_tier='all'.
     const result = await generateStructured({
@@ -283,12 +328,8 @@ async function processOneCluster(candidate: ClusterCandidate): Promise<void> {
         // value written by a prior featured/p1 run (or stays null on first
         // commentary). Demotion semantics live elsewhere if/when added.
         commentaryAt: new Date(),
+        commentaryMemberCount: candidate.memberCount,
       })
-      .where(
-        and(
-          eq(clusters.id, candidate.id),
-          isNull(clusters.commentaryAt),
-        ),
-      );
+      .where(and(eq(clusters.id, candidate.id), commentaryUnchanged));
   }
 }

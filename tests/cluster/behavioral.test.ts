@@ -306,6 +306,80 @@ describe("applySplitVerdict — lead integrity on split (W2)", () => {
     expect(Number(c!.member_count)).toBe(2);
     expect(await clusterIdOf(201)).toBeNull();
   });
+
+  it("W4a: a split leaving ONE survivor does NOT stamp verified (frees it for A.5)", async () => {
+    // Rejecting 2 of 3 leaves a lone survivor. Stamping cluster_verified_at on
+    // it would exclude it from A.5 forever ("not same as its old siblings" ≠
+    // "permanently solo"). It must stay unverified.
+    await seedCluster({
+      id: 1,
+      leadItemId: 100,
+      memberCount: 3,
+      coverage: 3,
+      verifiedAt: null,
+    });
+    await seedItem({ id: 100, clusterId: 1, importance: 70 });
+    await seedItem({ id: 101, clusterId: 1, importance: 50 });
+    await seedItem({ id: 102, clusterId: 1, importance: 90 });
+
+    const members = [
+      member({ itemId: 100, importance: 70 }),
+      member({ itemId: 101, importance: 50 }),
+      member({ itemId: 102, importance: 90 }),
+    ];
+
+    const unlinked = await applySplitVerdict(
+      1,
+      100,
+      members,
+      [100, 101],
+      "off-topic",
+      tdb,
+    );
+
+    expect(unlinked).toBe(2);
+    expect(await clusterIdOf(100)).toBeNull();
+    expect(await clusterIdOf(101)).toBeNull();
+    expect(await clusterIdOf(102)).toBe(1); // lone survivor
+
+    const c = await clusterRow(1);
+    expect(Number(c!.member_count)).toBe(1);
+    expect(Number(c!.lead_item_id)).toBe(102); // re-pointed to the survivor
+    expect(c!.verified_at).toBeNull(); // W4a: NOT verified
+
+    const sv = await client.execute({
+      sql: `SELECT cluster_verified_at FROM items WHERE id = ?`,
+      args: [102],
+    });
+    expect(sv.rows[0]?.cluster_verified_at).toBeNull(); // survivor stays visible to A.5
+  });
+
+  it("still stamps verified when 2+ members survive the split", async () => {
+    // Contrast to the lone-survivor case: a genuine multi-member event IS a
+    // confirmed cluster after the split.
+    await seedCluster({
+      id: 1,
+      leadItemId: 100,
+      memberCount: 3,
+      coverage: 3,
+      verifiedAt: null,
+    });
+    await seedItem({ id: 100, clusterId: 1, importance: 70 });
+    await seedItem({ id: 101, clusterId: 1, importance: 50 });
+    await seedItem({ id: 102, clusterId: 1, importance: 90 });
+
+    const members = [
+      member({ itemId: 100, importance: 70 }),
+      member({ itemId: 101, importance: 50 }),
+      member({ itemId: 102, importance: 90 }),
+    ];
+
+    await applySplitVerdict(1, 100, members, [101], "off-topic", tdb);
+
+    const c = await clusterRow(1);
+    expect(Number(c!.member_count)).toBe(2);
+    expect(c!.verified_at).not.toBeNull(); // 2 survivors → verified
+  });
 });
 
 // ── reconcile ─────────────────────────────────────────────────────────────────

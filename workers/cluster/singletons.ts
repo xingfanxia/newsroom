@@ -11,10 +11,11 @@
  */
 
 import { sql } from "drizzle-orm";
-import { db } from "@/db/client";
+import { db, retryTransaction } from "@/db/client";
 import { clusters, items } from "@/db/schema";
 import { visibleTierInSql } from "@/lib/items/tier-sql";
 import { MAX_DISTINCT_SPLIT_RETRIES_PER_ITEM } from "./split-audit";
+import { notClusteringOptedOut } from "./clustering-eligibility";
 
 export const SINGLETON_RECLUSTER_SIMILARITY_THRESHOLD = 0.75;
 export const SINGLETON_RECLUSTER_WINDOW_HOURS = 72;
@@ -134,6 +135,7 @@ export async function runSingletonReclusterBatch(
       AND i.embedding IS NOT NULL
       AND i.enriched_at IS NOT NULL
       AND ${visibleTierInSql(sql`i.tier`)}
+      AND ${notClusteringOptedOut("i")}
     ORDER BY i.published_at ASC
     ${limitClause}
   `);
@@ -178,6 +180,7 @@ export async function runSingletonReclusterBatch(
           AND i.embedding IS NOT NULL
           AND i.enriched_at IS NOT NULL
           AND ${visibleTierInSql(sql`i.tier`)}
+          AND ${notClusteringOptedOut("i")}
           AND (SELECT rejected_cluster_count FROM target) < ${MAX_DISTINCT_SPLIT_RETRIES_PER_ITEM}
           AND NOT EXISTS (
             SELECT 1
@@ -255,7 +258,8 @@ async function moveSingletonToCluster(input: {
   // `behavior: "immediate"` takes the write lock up front so the
   // member_count guard read happens under it (replaces Postgres's
   // row-level SELECT ... FOR UPDATE — SQLite locks are database-wide).
-  await client.transaction(
+  await retryTransaction(
+    client,
     async (tx) => {
       const sourceRows = await tx.all<{ id: number }>(sql`
       SELECT id

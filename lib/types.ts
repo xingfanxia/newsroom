@@ -211,6 +211,10 @@ export type Source = {
   /** Source's items get tier floor of "all" regardless of scorer verdict —
    *  for pre-curated digests where their picks are pre-vetted. Default false. */
   neverExclude?: boolean;
+  /** Opt this source's items OUT of event clustering (Stage A/A.5). For
+   *  multi-topic digest/curation feeds (群聊日报 / AI HOT) that glue unrelated
+   *  events together — they still show as standalone cards. Default false. */
+  clusteringOptOut?: boolean;
 };
 
 export type Story = {

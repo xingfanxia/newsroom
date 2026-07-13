@@ -50,6 +50,67 @@ export function libsqlClient(): Client {
   return cachedClient!;
 }
 
+/** True if `err` is a transient SQLite write-lock contention error. SQLite is
+ *  single-writer; under worker fan-out a write can lose the lock race and
+ *  surface as SQLITE_BUSY / "database is locked". */
+export function isBusyError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /SQLITE_BUSY|database is locked|database table is locked/i.test(msg);
+}
+
+/**
+ * Retry a libSQL write on transient SQLITE_BUSY contention (W7a). Capped
+ * exponential backoff; rethrows non-busy errors immediately and rethrows the
+ * busy error after the final attempt (loud failure — never swallowed). Wrap
+ * whole transactions, not individual statements: a rolled-back transaction is
+ * safe to re-run in full.
+ *
+ * `sleep` is injectable so tests can drive the backoff without real timers.
+ */
+export async function withBusyRetry<T>(
+  fn: () => Promise<T>,
+  opts: {
+    retries?: number;
+    baseDelayMs?: number;
+    /** Ceiling on any single backoff sleep. Keeps the exponential growth from
+     *  turning a large `retries` into a multi-hour hang; the wrapper must fail
+     *  loud, not stall a worker. */
+    maxDelayMs?: number;
+    sleep?: (ms: number) => Promise<void>;
+  } = {},
+): Promise<T> {
+  const retries = opts.retries ?? 4;
+  const baseDelayMs = opts.baseDelayMs ?? 50;
+  const maxDelayMs = opts.maxDelayMs ?? 2_000;
+  const sleep =
+    opts.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)));
+
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (!isBusyError(err) || attempt >= retries) throw err;
+      await sleep(Math.min(baseDelayMs * 2 ** attempt, maxDelayMs));
+    }
+  }
+}
+
+type SchemaDb = ReturnType<typeof drizzle<typeof schema>>;
+type SchemaTx = Parameters<Parameters<SchemaDb["transaction"]>[0]>[0];
+
+/**
+ * A drizzle `client.transaction(...)` wrapped in withBusyRetry (W7a). Drop-in
+ * for `client.transaction(fn, config)` — same signature, plus transparent
+ * SQLITE_BUSY retry of the whole (atomic, rolled-back-on-failure) transaction.
+ */
+export function retryTransaction<T>(
+  client: SchemaDb,
+  fn: (tx: SchemaTx) => Promise<T>,
+  config?: Parameters<SchemaDb["transaction"]>[1],
+): Promise<T> {
+  return withBusyRetry(() => client.transaction(fn, config));
+}
+
 /** Close the underlying client — used by scripts that need a clean exit. */
 export async function closeDb() {
   if (cachedClient) {
