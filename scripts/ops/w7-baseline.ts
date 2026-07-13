@@ -12,6 +12,7 @@
  * (Optionally `set -a; source ~/.claude/turso.env; set +a` first to include the
  *  Turso billing snapshot — needs TURSO_API_TOKEN; the script skips it if absent.)
  */
+import type { InValue } from "@libsql/client";
 import { closeDb, libsqlClient } from "@/db/client";
 
 const WINDOW_HOURS = 72;
@@ -23,7 +24,7 @@ async function explain(
   client: ReturnType<typeof libsqlClient>,
   label: string,
   sql: string,
-  args: unknown[],
+  args: InValue[],
 ) {
   try {
     const res = await client.execute({ sql: `EXPLAIN QUERY PLAN ${sql}`, args });
@@ -41,7 +42,7 @@ async function explain(
 async function scalar(
   client: ReturnType<typeof libsqlClient>,
   sql: string,
-  args: unknown[] = [],
+  args: InValue[] = [],
 ): Promise<number> {
   const res = await client.execute({ sql, args });
   return Number(Object.values(res.rows[0] ?? { n: 0 })[0] ?? 0);

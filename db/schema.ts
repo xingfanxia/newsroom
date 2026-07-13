@@ -390,6 +390,12 @@ export const items = sqliteTable(
      *  embedding-based clustering will skip this item as a neighbor
      *  candidate — its cluster assignment has been LLM-confirmed. */
     clusterVerifiedAt: integer("cluster_verified_at", { mode: "timestamp_ms" }),
+    /** A.5 recheck waterline (FIX-W7 / A2). Last time the singleton-recluster
+     *  stage neighbor-scanned this item and kept it a singleton. Persistent
+     *  singletons are skipped for SINGLETON_RECHECK_COOLDOWN_HOURS to stop the
+     *  every-tick re-scan that dominated read cost. Cooldown ≪ the 72h A.5
+     *  window ⇒ late duplicates are still caught, just within ≤cooldown hours. */
+    lastRecheckAt: integer("last_recheck_at", { mode: "timestamp_ms" }),
     // ── Large payloads — MUST STAY LAST (SQLite inlines them in the row;
     // reading any column stored AFTER a big value walks its overflow pages,
     // so a filter on e.g. cluster_id placed after these would drag ~45KB per
