@@ -244,6 +244,12 @@ A good structure, in rough order:
 
 - **Don't claim "real-time push":** agents pull on demand. Webhooks are
   a future-v2 item, not shipped.
+- **Don't claim the feed/search APIs return live / always-fresh data:** as of
+  the W9c-2 read-budget work (2026-07), the JSON feed + search surfaces
+  (`/api/public/feed`, `/api/v1/feed`, `/api/public/search`, `/api/v1/search`,
+  MCP `ax_radar_feed` / `ax_radar_search`) are `unstable_cache`-wrapped with a
+  ~10-min TTL, so a newly-ingested item can be invisible for up to one TTL.
+  On-demand pull ≠ instantly fresh — say "up to ~10 min stale, like the RSS feeds."
 - **Don't claim MCP supports writes unconditionally:** the operator has
   to explicitly give the agent a Bearer token. Tokens can be revoked.
   The `ax_radar_save` tool requires explicit operator intent per the

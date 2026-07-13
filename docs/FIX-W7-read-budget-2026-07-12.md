@@ -1,5 +1,13 @@
 # FIX-W7 — read-budget: steady-state Turso rows_read well under 100M/mo
 
+> **⚠️ SUPERSEDED DIAGNOSIS (2026-07-13).** Post-deploy measurement showed
+> clustering was only ~1% of the read bill — the dominant sink was **uncached
+> public-feed renders** (W8) plus **unbounded RSS + JSON-API scans** (W9c-1/2/3),
+> so the "well under 100M/mo, comfortably beats target" projection below did NOT
+> hold (measured ~590M/mo pre-W9). W7's levers shipped and are correct, but the
+> read-budget fight continued through W8/W9. **Current status + the real hog:
+> `docs/HANDOFF.md` top (W8 + W9 sections).**
+>
 > **STATUS: ✅ DEPLOYED 2026-07-13.** PRs #42 (`feda34a`) + #43 (`ce62ede`) merged
 > to `main`; prod live on `news.ax0x.ai`. P3 executed end-to-end (DDL + A3 index +
 > targeted opt-out + scoped digest-unlink). Post-deploy verified: cluster cron 200,

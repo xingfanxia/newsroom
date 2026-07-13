@@ -1,6 +1,6 @@
 # AX's AI RADAR — Current Handoff
 
-## 2026-07-13 — W9 read-budget: cron cadence + cache-purge + scale (in progress)
+## 2026-07-13 — W9 read-budget: cron cadence + cache-purge + scale (all read paths bounded; forward run-rate measurement pending)
 
 W8 shipped but a full decomposition (6-agent workflow + a clean 22.9-min prod
 measurement) showed the run-rate is still **~824k rows/h ≈ ~590M/mo, ~6× over the
@@ -165,7 +165,8 @@ period includes the pre-W9 days; the accumulated damage is sunk). The proof of t
 cuts is the **forward run-rate (rows/h over the next clean day)**, NOT the cumulative
 (masked by the sunk pre-W9 reads + edge cache + lagged usage API). Shipped this
 session: W9a (cadence) + W9b (feed-cache decouple + getDayCounts seek) + W9b-idx
-(commentary index) + W9c-1 (RSS floor). Pull current usage:
+(commentary index) + W9c-1 (RSS floor) + W9c-2 (feed+search JSON API cache, PR #54)
++ W9c-3 (legacy per-source RSS cache, PR #55). Pull current usage:
 `curl -s -H "Authorization: Bearer $TURSO_API_TOKEN" https://api.turso.tech/v1/organizations/xingfanxia/databases/newsroom-v2/usage`
 (token in `~/.claude/turso.env`; NEVER print it).
 
