@@ -1,5 +1,12 @@
 # FIX-W7 — read-budget: steady-state Turso rows_read well under 100M/mo
 
+> **STATUS: ✅ DEPLOYED 2026-07-13.** PRs #42 (`feda34a`) + #43 (`ce62ede`) merged
+> to `main`; prod live on `news.ax0x.ai`. P3 executed end-to-end (DDL + A3 index +
+> targeted opt-out + scoped digest-unlink). Post-deploy verified: cluster cron 200,
+> A.5 stamping `last_recheck_at` (68 first tick), 0 digest contamination. A1(ANN)/A6
+> deferred; clean-day rows_read re-measurement + A5 monitor cron still pending.
+> Current status: `docs/HANDOFF.md` top section.
+
 Follow-on to the 2026-07-12 cluster/Turso audit and the read-quota diagnosis
 (`docs/HANDOFF.md` → "Turso read-quota block"). Branch: `ax/w7-read-budget`.
 
