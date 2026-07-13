@@ -16,6 +16,8 @@ export async function GET(req: Request) {
       kind: "score-backfill",
       score: await runScoreBackfill(),
     }),
-    { revalidateFeed: true },
+    // The legacy pool is drained, so nearly every weekly run rescores 0 — purge
+    // only when it actually re-scored something.
+    { revalidateFeed: (b) => b.score.rescored > 0 },
   );
 }

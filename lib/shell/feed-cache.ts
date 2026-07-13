@@ -17,12 +17,22 @@ import type { AppLocale } from "@/lib/types";
  * W8b — the cache adapter in front of the feed-derived aggregates + calendar
  * counts. Every public-feed render recomputes these: the pages read
  * `searchParams`, which voids `export const revalidate`, so each request
- * re-renders dynamically. `getDayCounts` alone rescans the 60-day window (the
- * dominant per-render cost left after W8a's recency floor, which can't reduce a
- * calendar scan). `unstable_cache` dedupes them across renders; content-mutating
- * crons call `revalidateFeedCache()` so a new/enriched/clustered/scored item
- * surfaces on the next regenerated render rather than waiting out the TTL (see
- * revalidateFeedCache for the stale-while-revalidate caveat).
+ * re-renders dynamically. `unstable_cache` dedupes them across renders.
+ *
+ * TWO CACHE TIERS, split in W9b because they have very different cost + freshness
+ * profiles — DON'T merge them back:
+ *   - FEED_CACHE_TAG ('feed') — the CHEAP bounded-window aggregates (radar/pulse
+ *     = last 24h, top-topics = last 7d, ticker = top 24h). Content-mutating crons
+ *     purge this tag (conditionally — only when a run actually changed content)
+ *     so a freshly enriched item surfaces within one render. 30-min TTL backstop.
+ *   - FEED_CALENDAR_TAG ('feed-calendar') — `getDayCounts`, the 60-day calendar
+ *     scan the recency floor can't bound and the dominant per-render read cost.
+ *     Deliberately NOT cron-purged: the calendar mini-map is a coarse navigation
+ *     aid on a daily-update site, so a ≤6h staleness (today's cell counting
+ *     44→45, or a brand-new day appearing a few hours late) is imperceptible —
+ *     the feed itself is never calendar-gated, so new items still show instantly.
+ *     Decoupling it drops its re-prime rate from the enrich heartbeat (~4×/h) to
+ *     the 6h TTL (~4×/day), which is the W9b read-budget lever.
  *
  * Kept separate from dashboard-stats.ts / ticker.ts so those stay pure query
  * functions (unit-testable, no `next/cache` coupling) — this is the adapter.
@@ -35,8 +45,15 @@ import type { AppLocale } from "@/lib/types";
  * and collapse distinct calls onto one poisoned entry.
  */
 
-/** Shared invalidation tag for every feed-derived cache entry. */
+/** Invalidation tag for the cheap bounded-window aggregates (24h/7d). */
 export const FEED_CACHE_TAG = "feed";
+
+/**
+ * Invalidation tag for the calendar day-counts only (60-day scan). Its own tag
+ * so the content crons' feed purge does NOT reprime it — freshness comes from
+ * FEED_CALENDAR_TTL instead (see the module doc for why ≤6h staleness is fine).
+ */
+export const FEED_CALENDAR_TAG = "feed-calendar";
 
 /**
  * TTL backstop (seconds). Normal freshness is content-driven: the enrich cron
@@ -46,13 +63,27 @@ export const FEED_CACHE_TAG = "feed";
  */
 const FEED_CACHE_TTL = 1800;
 
+/**
+ * Calendar TTL (seconds) = 6h. This is the calendar's ONLY freshness mechanism
+ * (no cron purge), and it doubles as the read-budget lever: the 60-day scan
+ * reprimes at most 4×/day instead of riding the enrich heartbeat. 6h keeps the
+ * day-count mini-map current enough for a daily-update site.
+ */
+const FEED_CALENDAR_TTL = 21_600;
+
 const cacheOpts = { revalidate: FEED_CACHE_TTL, tags: [FEED_CACHE_TAG] };
+
+const calendarCacheOpts = {
+  revalidate: FEED_CALENDAR_TTL,
+  tags: [FEED_CALENDAR_TAG],
+};
 
 /**
  * Calendar-grid day counts — the 60-day scan the recency floor can't bound, so
  * the biggest post-W8a per-render cost. Keyed on days + opts (home passes
  * {tier:'featured'}, /all passes none, /curated passes {curatedOnly:true} → a
- * handful of stable keys, high hit rate).
+ * handful of stable keys, high hit rate). Uses calendarCacheOpts (its own tag +
+ * 6h TTL, NOT cron-purged) — see the module doc for why coarse staleness is fine.
  */
 export function getDayCountsCached(
   days = 30,
@@ -61,7 +92,7 @@ export function getDayCountsCached(
   return unstable_cache(
     () => getDayCounts(days, opts),
     ["feed:day-counts", String(days), JSON.stringify(opts ?? {})],
-    cacheOpts,
+    calendarCacheOpts,
   )();
 }
 
@@ -101,10 +132,16 @@ export function getRecentTickerItemsCached(
 }
 
 /**
- * Purge every feed-derived cache entry. Called from content-mutating cron route
- * handlers (enrich / cluster / score-backfill / normalize) after they change
- * items/clusters/importance/tags, so the next render recomputes fresh instead of
- * waiting out FEED_CACHE_TTL.
+ * Purge the cheap feed aggregates (radar/pulse/top-topics/ticker). Called from
+ * content-mutating cron route handlers (enrich / cluster / score-backfill /
+ * normalize) after they change items/clusters/importance/tags, so the next
+ * render recomputes fresh instead of waiting out FEED_CACHE_TTL. As of W9b those
+ * crons purge CONDITIONALLY (only when the run actually changed content — see
+ * _route.ts) so idle ticks preserve cache life.
+ *
+ * Deliberately does NOT purge FEED_CALENDAR_TAG — the calendar day-counts ride
+ * their own 6h TTL (see module doc), so a content change is reflected on the
+ * calendar within ≤6h, not on the next render. That decoupling is the point.
  *
  * `'max'` is stale-while-revalidate: the purge is immediate, but the FIRST render
  * after it may still serve the prior value once while the fresh value regenerates

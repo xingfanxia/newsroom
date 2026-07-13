@@ -13,6 +13,8 @@ export async function GET(req: Request) {
       kind: "normalize",
       normalize: await runNormalizer(),
     }),
-    { revalidateFeed: true },
+    // Standalone catch-up — most runs find nothing to normalize. Only a run that
+    // created new items changes what the (enriched-gated) aggregates will show.
+    { revalidateFeed: (b) => b.normalize.created > 0 },
   );
 }
