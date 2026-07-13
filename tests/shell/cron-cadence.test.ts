@@ -46,6 +46,21 @@ describe("cadenceMinutesFromCron", () => {
     expect(snapshots.every((c) => c.last === "—")).toBe(true);
   });
 
+  it("keeps the cluster pipeline at most hourly (W7 read-budget guard)", () => {
+    // Clustering can only work on content the hourly fetch (17 * * * *) has
+    // pulled, so sub-hourly ticks re-scan the same corpus for nothing — the
+    // top read amplifier. This guard fails if the cadence is cranked back below
+    // 60 min. See docs/FIX-W7-read-budget-2026-07-12.md (A4).
+    const cluster = (
+      (vercelConfig as { crons?: Array<{ path: string; schedule: string }> })
+        .crons ?? []
+    ).find((c) => c.path === "/api/cron/cluster");
+    expect(cluster).toBeDefined();
+    const cadence = cadenceMinutesFromCron(cluster!.schedule);
+    expect(cadence).not.toBeNull();
+    expect(cadence!).toBeGreaterThanOrEqual(60);
+  });
+
   it("adds optional last-activity labels without changing schedule ownership", () => {
     const snapshots = systemCronSnapshots(
       {
