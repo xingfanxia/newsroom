@@ -12,8 +12,12 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
-  return runCronJsonRoute(req, async () => ({
-    kind: "enrich",
-    enrich: await runEnrichBatch(),
-  }));
+  return runCronJsonRoute(
+    req,
+    async () => ({
+      kind: "enrich",
+      enrich: await runEnrichBatch(),
+    }),
+    { revalidateFeed: true },
+  );
 }

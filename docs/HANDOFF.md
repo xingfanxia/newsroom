@@ -1,5 +1,52 @@
 # AX's AI RADAR — Current Handoff
 
+## 2026-07-13 — W8 read-budget: feed recency floor + aggregate cache
+
+Attacks the REAL read hog identified 2026-07-13: >90% of the read bill is
+uncached public-feed renders (each rescanned ~144k rows), NOT clustering. Two
+halves.
+
+**W8a — recency-floored feed index (shipped, PR #48 `2d58e75`).** The public
+default views only need recent items, but the cover index
+`items_feed_cover_idx` has `published_at` LAST, so a floor could only *filter*,
+not *seek*. Added `items_feed_recent_idx (published_at, enriched_at, importance,
+tier, cluster_id, source_id)` — leads with `published_at` so a floor SEEKS.
+`buildFeedWhere`/`feedIndexFor` (`lib/items/live.ts`) apply a floor via
+`INDEXED BY` (Turso rejects `ANALYZE`, so hot queries pin the index). **Aggressive
+policy** (AX-chosen): home today=7d, daily-highlights/all/curated=30d;
+source-filtered + API/RSS/MCP views unbounded; an explicit calendar date always
+bypasses the floor (`hasExplicitDateBound` short-circuits it). Accepted tradeoff:
+a still-developing event whose lead `published_at` predates the floor drops from
+the default view (still reachable via calendar). **Measured on prod**: 143,954 →
+68,954 rows/render (52%) — larger than the ~28% item-scan estimate because the
+floor also shrinks the per-item clusters JOIN probe. Prod index created BEFORE
+the code deploy (additive b-tree) so `INDEXED BY` resolved; all 13 PLAN_CHECKs
+pass on prod.
+
+**W8b — aggregate + calendar-count cache (THIS PR).** Every public render also
+recomputes `getDayCounts` (60-day calendar scan the floor can't bound — the
+dominant residual cost), the radar/pulse widgets, top-topics, and the ticker.
+Pages read `searchParams` → that voids `export const revalidate`, so each request
+re-renders dynamically and recomputes all of them. New adapter
+`lib/shell/feed-cache.ts` wraps the 5 readers in `unstable_cache` under one shared
+`'feed'` tag (TTL 1800s backstop). The 4 content-mutating crons (enrich / cluster
+/ score-backfill / normalize) call `revalidateFeedCache()` →
+`revalidateTag('feed','max')` after writing, so a new/enriched/clustered/scored
+item surfaces on the next regenerated render, not on the TTL. Fetch buckets +
+commentary/article-body crons deliberately do NOT purge (they touch only
+fields no cached aggregate reads, or only un-enriched rows; radar/pulse raw
+counts lag ≤15 min via enrich's heartbeat). Invalidation completeness was mapped
+against every runtime write path (code-reviewer confirmed, no gaps).
+`'max'` is stale-while-revalidate: the first render after a purge may serve the
+prior value once while it regenerates. Manual `scripts/ops/*` mutations bypass the
+purge (TTL backstop, ≤30 min). Tests: `tests/shell/feed-cache.test.ts` (13 —
+behavioral with `next/cache` mocked + wiring tripwires) + updated
+calendar-counts/radar-stats source assertions to the `*Cached` names.
+
+**Next:** measure combined W8 per-render drop on prod; watch the forward
+run-rate (clean-day delta ×30) over the next full clean day. W4 + W7-ANN(A1)/A6
+still remain from the read-budget backlog.
+
 ## 2026-07-13 — Tweaks/locale single-source-of-truth + persist hardening
 
 Follow-up on the language-desync fix (`main`: site-config LANGUAGE toggle

@@ -7,8 +7,12 @@ export const runtime = "nodejs";
 
 /** Standalone normalize catch-up, in case some raw_items stay unnormalized. */
 export async function GET(req: Request) {
-  return runCronJsonRoute(req, async () => ({
-    kind: "normalize",
-    normalize: await runNormalizer(),
-  }));
+  return runCronJsonRoute(
+    req,
+    async () => ({
+      kind: "normalize",
+      normalize: await runNormalizer(),
+    }),
+    { revalidateFeed: true },
+  );
 }

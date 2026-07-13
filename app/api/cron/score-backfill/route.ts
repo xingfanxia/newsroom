@@ -10,8 +10,12 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
-  return runCronJsonRoute(req, async () => ({
-    kind: "score-backfill",
-    score: await runScoreBackfill(),
-  }));
+  return runCronJsonRoute(
+    req,
+    async () => ({
+      kind: "score-backfill",
+      score: await runScoreBackfill(),
+    }),
+    { revalidateFeed: true },
+  );
 }

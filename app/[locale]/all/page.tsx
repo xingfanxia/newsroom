@@ -20,9 +20,7 @@ import {
   FEED_PAGE_SIZE,
 } from "@/lib/feed/page-query";
 import { getFeaturedStories } from "@/lib/items/live";
-import {
-  getDayCounts,
-} from "@/lib/shell/dashboard-stats";
+import { getDayCountsCached } from "@/lib/shell/feed-cache";
 import { getShellChromeData } from "@/lib/shell/chrome-data";
 import { appLocaleFromParam, type Story } from "@/lib/types";
 
@@ -75,7 +73,7 @@ export default async function AllPostsPage({
 
   const [chrome, days] = await Promise.all([
     getShellChromeData({ pulse: true }),
-    getDayCounts(60).catch(() => []),
+    getDayCountsCached(60).catch(() => []),
   ]);
 
   // /all is a chronological full-feed view — sort by publishedAt DESC

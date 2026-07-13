@@ -1,5 +1,8 @@
 import type { PulsePoint } from "@/components/shell/pulse-box";
-import { getPulseData, getRadarStats } from "@/lib/shell/dashboard-stats";
+import {
+  getPulseDataCached,
+  getRadarStatsCached,
+} from "@/lib/shell/feed-cache";
 import { EMPTY_RADAR_STATS, type RadarStats } from "@/lib/shell/radar-stats";
 import {
   signalRatioFromRadar,
@@ -22,8 +25,10 @@ export async function getShellChromeData(
   opts: ShellChromeOptions = {},
 ): Promise<ShellChromeData> {
   const [radarStats, pulse] = await Promise.all([
-    getRadarStats().catch(() => EMPTY_RADAR_STATS),
-    opts.pulse ? getPulseData().catch(() => []) : Promise.resolve(undefined),
+    getRadarStatsCached().catch(() => EMPTY_RADAR_STATS),
+    opts.pulse
+      ? getPulseDataCached().catch(() => [])
+      : Promise.resolve(undefined),
   ]);
 
   const signalRatio =
