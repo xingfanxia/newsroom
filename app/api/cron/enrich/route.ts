@@ -18,6 +18,9 @@ export async function GET(req: Request) {
       kind: "enrich",
       enrich: await runEnrichBatch(),
     }),
-    { revalidateFeed: true },
+    // Purge only when items were actually enriched — this cron runs 4×/h but
+    // quiet-hours ticks enrich 0 items, and those must not evict the aggregate
+    // cache. `enriched` (not `processed`) is the count that enters the feed.
+    { revalidateFeed: (b) => b.enrich.enriched > 0 },
   );
 }

@@ -51,6 +51,16 @@ describe("getDayCounts — filter contract with feed", () => {
     expect(statsSrc).toContain("coalesce(c.event_tier, i.tier)");
     expect(statsSrc).not.toMatch(/IN\s*\(\s*'featured'\s*,\s*'p1'\s*\)/i);
   });
+
+  it("W9b: pins items_feed_recent_idx so the always-present 60-day bound SEEKs", () => {
+    // getDayCounts ALWAYS filters published_at >= floor, so it must pin the
+    // published_at-LEADING index (seek the window) not items_feed_cover_idx
+    // (published_at last → scans the whole enriched corpus). See feedIndexFor.
+    expect(statsSrc).toContain(
+      "FROM items i INDEXED BY items_feed_recent_idx",
+    );
+    expect(statsSrc).not.toContain("FROM items i INDEXED BY items_feed_cover_idx");
+  });
 });
 
 describe("dashboard stats display helpers", () => {

@@ -11,7 +11,7 @@ unconditionally by the content crons (`_route.ts` has no content-changed guard),
 it reprimes every ~10 min. AX's call: this is fundamentally a **daily-update site,
 run too frequently** → attack frequency + scale. Shipping in 3 measurable PRs.
 
-**W9a — content-cron cadence cuts (SHIPPED via PR #__).** `vercel.json` only
+**W9a — content-cron cadence cuts (SHIPPED via PR #50, squash 1b47362).** `vercel.json` only
 (+ the cron-cadence tests). Aggressive daily-site cadence:
 - `cluster` `55 * * * *` → `55 4,12,20 * * *` (3×/day, phased so a run lands at
   04:55 — just before newsletter-daily at 05:00, which dedups by cluster_id and
@@ -42,12 +42,47 @@ run too frequently** → attack frequency + scale. Shipping in 3 measurable PRs.
 - Est. background floor drop ~148k → ~42k rows/h (score-backfill→0, commentary/
   cluster amortized down). article-body's 32k/h stays until W9b's leak fix.
 
-**W9b (next) — cache-purge decouple + getDayCounts scale.** Decouple getDayCounts
-to a long-lived `feed-calendar` tag (6h TTL, NOT cron-purged) + a `published_at`-
-leading covering index (or a day_counts rollup) so the 60d bound SEEKs; make the
-content-cron feed purge conditional (only when content actually changed); narrow
-`items_unfetched_body_idx` to exclude never-fetched x-status (the article-body
-leak) + add `items_commentary_pending_idx`. Biggest single lever (~508M/mo).
+**W9b — cache-purge decouple + getDayCounts seek (SHIPPED, PR #51, pure code, no
+migration).** The dominant per-render read is getDayCounts (60-day calendar scan);
+it was cache-purged ~4×/h by the content crons, repriming almost every enrich tick.
+Three fixes:
+- `feed-cache.ts` — getDayCounts moved to its OWN `feed-calendar` tag (6h TTL, NOT
+  cron-purged). Reprime rate drops from the enrich heartbeat (~4×/h) to the TTL
+  (~4×/day). The cheap bounded-window aggregates (radar/pulse/top-topics/ticker)
+  stay on the `feed` tag (30-min TTL). ≤6h calendar staleness is fine — the feed
+  is never calendar-gated, so new items still show live.
+- `dashboard-stats.ts` — getDayCounts pins `items_feed_recent_idx` (published_at
+  LEADS) not `items_feed_cover_idx` (published_at LAST). getDayCounts ALWAYS has a
+  `published_at >= floor` bound → the recency index SEEKs the 60d window instead of
+  scanning the whole (ever-growing) enriched corpus. **No new index — recent_idx
+  exists since W8.** EXPLAIN proof: recent_idx `SEARCH … (published_at>?)` vs
+  cover_idx `SEARCH … (enriched_at>?)` (full corpus). Both COVERING.
+- `_route.ts` — `revalidateFeed` now accepts a predicate; a cron purges the `feed`
+  aggregate cache only when its run changed content (enrich enriched>0,
+  score-backfill rescored>0, normalize created>0). cluster stays unconditional
+  (7-stage, ~always mutates, 3×/day; a reliable cross-stage predicate is fragile).
+
+**W9b-idx (next) — the two INDEX changes deferred out of W9b because they need an
+AX-authorized prod apply** (`bun scripts/ops/db-optimize.ts` is manual — indexes do
+NOT auto-apply on Vercel deploy; drizzle push is disabled). Narrow
+`items_unfetched_body_idx` to exclude never-stamped x-status rows (the article-body
+32k/h read leak — DROP+CREATE with a tighter WHERE) + add
+`items_commentary_pending_idx`. Edit `db/schema.ts` + `scripts/ops/db-optimize.ts`
+(INDEXES + PLAN_CHECKS) + the pinning queries; database-reviewer pass; apply to prod
+only after AX confirms.
+
+**Gate-hygiene follow-up (found during W9b):** the local `bun run test` gate is
+NON-hermetic — a CLASS of `(real DB)` tests run whenever `TURSO_DATABASE_URL` is set
+(`.env.local` points at PROD): the feedback writes (`tests/feedback/toggle.test.ts`)
+AND the search-API reads (`/api/public/search`, `/api/v1/search` — seen timing out at
+20s/5s in the W9b verify run). They hit the live prod DB and intermittently time out
+under Turso's global write-lock contention with the running production crons. Worse, a bun **timeout** failure does NOT reliably
+propagate a non-zero exit (`VERIFY_EXIT=0` seen with a visible `(fail)`) — synchronous
+assertion fails DO exit 1 (gate-probe verified), only async timeouts mask. Mitigation
+in use: always cross-check `VERIFY_EXIT` with `grep -c "(fail)"`. Real fix (separate
+PR): gate the `(real DB)` writes behind an explicit opt-in env (not bare
+`TURSO_DATABASE_URL`) so the default gate is hermetic. **Vercel CI is unaffected — it
+runs only `next build`, never `bun run test`.**
 
 **W9c (next) — cache getFeaturedStories + bound API/RSS/MCP.** unstable_cache the
 bounded public feed views (traffic-independence) + apply the W8a recency floor to

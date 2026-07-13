@@ -184,14 +184,18 @@ export async function getDayCounts(
     ? sql`AND s.curated = TRUE`
     : sql``;
 
-  // INDEXED BY: same sparse-filter trap as getFeaturedStories — the default
-  // published_at-index plan fetches every row in the 60-day range from the
-  // payload-heavy table pages; the covering index answers the filter phase
-  // from slim index pages (2.2s → 30ms, 2026-07-12).
+  // INDEXED BY items_feed_recent_idx (published_at LEADS): this query ALWAYS
+  // carries a `published_at >= floor` bound, so the recency index SEEKs the
+  // window (~a few thousand rows) instead of scanning every enriched row.
+  // items_feed_cover_idx (published_at LAST, the W7 choice) answered the filter
+  // phase from slim index pages but still walked the whole enriched corpus — an
+  // unbounded scan that grows forever; the recent index bounds it to `days`.
+  // Both cover the same items columns, so this stays index-only (no fat-row
+  // lookups). W9b — mirrors getFeaturedStories' feedIndexFor() seek choice.
   const rows = await client.all<{ d: string; n: number }>(sql`
     SELECT strftime('%Y-%m-%d', i.published_at / 1000.0, 'unixepoch') AS d,
            count(*) AS n
-    FROM items i INDEXED BY items_feed_cover_idx
+    FROM items i INDEXED BY items_feed_recent_idx
     JOIN sources s ON s.id = i.source_id
     LEFT JOIN clusters c INDEXED BY clusters_feed_cover_idx
       ON c.id = i.cluster_id

@@ -20,6 +20,11 @@ import { describe, expect, it, mock } from "bun:test";
 import { readSource } from "@/tests/helpers/source";
 
 // --- Level 1: behavioral. Mock BEFORE importing the module under test. ---
+//
+// Bun mock hygiene: mock.module is PROCESS-GLOBAL with no reliable per-file
+// restore, so any test importing @/lib/shell/feed-cache (or @/app/api/cron/_route)
+// MUST register its own next/cache mock rather than rely on this one leaking in —
+// otherwise its assertions depend on file load order. See tests/cron/route-purge.
 
 const revalidateTagCalls: Array<[string, unknown]> = [];
 const ucCalls: Array<{ keys: unknown[]; tags?: string[]; revalidate?: number }> = [];
@@ -55,6 +60,7 @@ mock.module("@/lib/shell/ticker", () => ({
 
 const {
   FEED_CACHE_TAG,
+  FEED_CALENDAR_TAG,
   revalidateFeedCache,
   getDayCountsCached,
   getRadarStatsCached,
@@ -63,9 +69,14 @@ const {
   getRecentTickerItemsCached,
 } = await import("@/lib/shell/feed-cache");
 
-describe("feed-cache — every wrapper uses the shared 'feed' tag + a distinct key", () => {
-  it("exposes 'feed' as the invalidation tag", () => {
+/** The unstable_cache call recorded for a given key prefix (last one wins). */
+const ucFor = (prefix: string) =>
+  [...ucCalls].reverse().find((c) => String(c.keys[0]) === prefix);
+
+describe("feed-cache — two cache tiers (aggregates vs calendar) + distinct keys", () => {
+  it("exposes both invalidation tags", () => {
     expect(FEED_CACHE_TAG).toBe("feed");
+    expect(FEED_CALENDAR_TAG).toBe("feed-calendar");
   });
 
   it("each wrapper delegates to its raw function", async () => {
@@ -82,12 +93,25 @@ describe("feed-cache — every wrapper uses the shared 'feed' tag + a distinct k
     ]);
   });
 
-  it("every unstable_cache call carries tags:['feed'] and the 30-min TTL", () => {
-    expect(ucCalls.length).toBeGreaterThanOrEqual(5);
-    for (const c of ucCalls) {
-      expect(c.tags).toContain("feed");
-      expect(c.revalidate).toBe(1800);
+  it("cheap aggregates carry tags:['feed'] + the 30-min TTL", () => {
+    for (const prefix of [
+      "feed:radar-stats",
+      "feed:pulse",
+      "feed:top-topics",
+      "feed:ticker",
+    ]) {
+      const c = ucFor(prefix);
+      expect(c?.tags).toEqual(["feed"]);
+      expect(c?.revalidate).toBe(1800);
     }
+  });
+
+  it("W9b: day-counts is decoupled to tags:['feed-calendar'] + a 6h TTL", () => {
+    // Its own tag so the content crons' feed purge doesn't reprime the 60-day
+    // scan; 6h TTL is its only freshness mechanism (read-budget lever).
+    const c = ucFor("feed:day-counts");
+    expect(c?.tags).toEqual(["feed-calendar"]);
+    expect(c?.revalidate).toBe(21_600);
   });
 
   it("key prefixes are distinct per function (no cross-function collision)", () => {
@@ -119,7 +143,7 @@ describe("feed-cache — every wrapper uses the shared 'feed' tag + a distinct k
     expect(new Set(added).size).toBe(2);
   });
 
-  it("revalidateFeedCache purges the 'feed' tag with the non-deprecated 'max' profile", () => {
+  it("revalidateFeedCache purges ONLY the 'feed' tag (never 'feed-calendar') with the 'max' profile", () => {
     revalidateTagCalls.length = 0;
     revalidateFeedCache();
     expect(revalidateTagCalls).toEqual([["feed", "max"]]);
@@ -128,12 +152,24 @@ describe("feed-cache — every wrapper uses the shared 'feed' tag + a distinct k
 
 // --- Level 2: wiring tripwires (source checks — crons/routes aren't unit-run here). ---
 
-describe("content-mutating crons opt into feed-cache invalidation", () => {
-  it("enrich / cluster / score-backfill / normalize pass revalidateFeed", () => {
-    for (const cron of ["enrich", "cluster", "score-backfill", "normalize"]) {
-      expect(readSource(`app/api/cron/${cron}/route.ts`)).toContain(
-        "revalidateFeed: true",
-      );
+describe("content-mutating crons opt into feed-cache invalidation (W9b: conditionally)", () => {
+  it("cluster purges unconditionally (7-stage pipeline, ~always mutates)", () => {
+    expect(readSource("app/api/cron/cluster/route.ts")).toContain(
+      "revalidateFeed: true",
+    );
+  });
+
+  it("enrich / score-backfill / normalize purge only when the run changed content", () => {
+    // A predicate `(b) => …count > 0` — an idle tick must NOT evict the cache.
+    const conditional: Record<string, RegExp> = {
+      enrich: /revalidateFeed:\s*\(b\)\s*=>\s*b\.enrich\.enriched\s*>\s*0/,
+      "score-backfill": /revalidateFeed:\s*\(b\)\s*=>\s*b\.score\.rescored\s*>\s*0/,
+      normalize: /revalidateFeed:\s*\(b\)\s*=>\s*b\.normalize\.created\s*>\s*0/,
+    };
+    for (const [cron, re] of Object.entries(conditional)) {
+      const src = readSource(`app/api/cron/${cron}/route.ts`);
+      expect(src).toMatch(re);
+      expect(src).not.toContain("revalidateFeed: true");
     }
   });
 
@@ -143,10 +179,12 @@ describe("content-mutating crons opt into feed-cache invalidation", () => {
     );
   });
 
-  it("_route.ts fires revalidateFeedCache when the opt is set", () => {
+  it("_route.ts resolves boolean|predicate opts into a single shouldPurge gate", () => {
     const src = readSource("app/api/cron/_route.ts");
     expect(src).toContain("revalidateFeedCache");
-    expect(src).toMatch(/opts\?\.revalidateFeed\s*\)\s*revalidateFeedCache\(\)/);
+    // Predicate form is invoked with the built body; boolean form compares ===true.
+    expect(src).toMatch(/opts\.revalidateFeed\(body\)/);
+    expect(src).toMatch(/if\s*\(shouldPurge\)\s*revalidateFeedCache\(\)/);
   });
 });
 
