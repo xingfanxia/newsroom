@@ -102,18 +102,43 @@ caught + fixed a CRITICAL: the test's bare `mock.module` dropped @/lib/items/liv
 other exports → reddened the gate by breaking 7 suites; fixed with a spread
 partial-mock.
 
-**W9c-2 (DECISION PENDING — the one remaining lever with a product tradeoff).** The
-JSON feed APIs `/api/public/feed` + `/api/v1/feed` are `force-dynamic` (UNCACHED) →
-~43k rows/call (getFeaturedStories + countFeaturedStories) IF polled. Bounding them
-has a real API-contract cost, UNLIKE the RSS path: a default recency floor changes
-the PUBLIC API's returned items (deep pagination past the window → empty) AND
-`countFeaturedStories` `total` (windowed, not all-time). Options: (a) measure-first —
-the big structural cuts are shipped; observe the forward run-rate over a clean day
-before a breaking change [recommended]; (b) NON-breaking route-caching (revalidate)
-like the RSS feed — bounds default-param polls without a contract change; (c) breaking
-default floor (aggressive). We have NO HTTP traffic data for these JSON endpoints, so
-(c) speculatively breaks the contract for a possibly-nonexistent cost. Target after
-full W9: durable ~70M/mo.
+**W9c-2 — feed+search JSON API cache (SHIPPED, PR #54, non-breaking).** AX chose
+option (b): NON-breaking caching over a breaking floor (we have NO HTTP traffic data
+for these JSON endpoints, so a speculative floor would break the contract for a
+possibly-nonexistent cost). The `force-dynamic`, UNCACHED feed+search surfaces
+(`/api/public/feed`, `/api/v1/feed`, `/api/public/search`, `/api/v1/search`, MCP
+ax_radar_feed/search — ~43k rows/call for the lexical/feed scan, plus an embedding
+call for semantic) now wrap the two shared execution paths (`runFeedQuery`,
+`runSearchQuery` in `lib/api/{feed,search}-results.ts`) in `unstable_cache` — 10-min
+TTL, own tags `feed-api`/`search-api`, NOT cron-purged (pure TTL is the strongest
+db-load bound). Non-breaking: no floor, totals + pagination unchanged; bounds a hot
+param combo to ~1 DB execution/TTL (modulo a small refresh-boundary thundering-herd).
+Key details:
+- **Call-time cache construction** — the wrapper is built INSIDE `run*Query`, not at
+  module scope. `unstable_cache`'s Data Cache key is
+  `cb.toString()+keyParts+JSON.stringify(args)`, independent of wrapper identity, so
+  per-call construction is prod-identical to a module-scope singleton (verified vs
+  Next 16.2.4 source) AND re-mockable in tests (module-scope was untestable: ~8
+  earlier suites import these modules before the cache test's `mock.module`
+  registers). Same call-time style as `feed-cache.ts` `getDayCountsCached`.
+- **Semantic key canonicalization + latency** — semantic always returns offset 0 and
+  pages via dates, so `offset`+single-day `date` are stripped from the cache key
+  (paging dedupes to one entry); real end-to-end `latencyMs` is stamped OUTSIDE the
+  cache so a hit reports its true (fast) time, not the frozen miss-time value.
+- **Security** — auth/rate-limit run in the route adapters OUTSIDE `run*Query` (hit
+  still traverses the limiter, no bypass); shared-across-public/v1/MCP cache invariant
+  documented on `execute*Query` (no caller-privilege-dependent filtering inside).
+- **Freshness tradeoff (intended, AX-approved):** DATA contract unchanged; freshness
+  ≤10-min — new items invisible to the JSON APIs for up to a TTL, `view=today`
+  ordering + `stillDeveloping` freeze for the TTL. Consistent with RSS `revalidate=600`
+  + feed-cache 30min/6h. `view=today` is the most staleness-visible surface → revisit
+  its TTL first if it ever bites.
+- **Tests** — real Map-based memoizer mock (reproduces the arg key) exercises dedup /
+  no-collision / semantic offset-canonicalization / the latency override (deterministic
+  via a mocked advancing clock, no wall-clock flake); spread-mocks avoid the
+  process-global export-drop leak. code-reviewer (opus) APPROVE, all LOW/NIT fixed.
+
+This is the LAST unbounded read path. Target after full W9: durable ~70M/mo.
 
 **W9 measurement baseline (for the forward run-rate proof).** Billing-period
 cumulative `rows_read` = **597.68M @ 2026-07-13** (over the 500M free cap — but this

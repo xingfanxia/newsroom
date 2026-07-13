@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import {
   countFeaturedStories,
   getFeaturedStories,
@@ -90,16 +91,37 @@ export type AgentSearchPayload =
     };
 
 /**
- * Shared execution for REST search routes and MCP ax_radar_search.
- * Surface adapters own auth/rate-limit/cache/envelopes; this module owns the
- * search semantics and payload mapping so lexical totals, semantic filters,
- * and metadata fields cannot drift.
+ * Read-budget cache (W9c-2) for the search surfaces — the heavy peer of the feed
+ * cache. The lexical branch runs the same getFeaturedStories + countFeaturedStories
+ * scan (~43K rows on prod); the semantic branch embeds `q` (an LLM call) then runs
+ * a vector query. Both are force-dynamic + uncached, so a repeated identical query
+ * re-pays the full cost. Dedupe behind a ~10-min TTL keyed by the search params —
+ * non-breaking (no floor; totals + pagination unchanged), and it also spares the
+ * repeated embedding call.
+ *
+ * Hit-rate caveat: unlike the feed (polled with identical default params), search
+ * is free-text and high-cardinality, so the win concentrates on repeated/popular
+ * queries + the v1/MCP paths a CDN can't cache — one-off queries just add a
+ * short-lived entry. `unstable_cache` is stale-while-revalidate: past the TTL the
+ * triggering request is served the stale value while a background revalidation
+ * refreshes, which bounds a hot combo to ~1 DB execution per TTL (modulo a small
+ * thundering-herd at the refresh boundary — see feed-results.ts). Own 'search-api'
+ * tag, NOT cron-purged (pure TTL is the strongest db-load bound); exported for
+ * manual/admin purge. Same request-scope coupling + freshness tradeoff as the feed
+ * cache (see feed-results.ts module doc).
  */
-export async function runSearchQuery(
+export const SEARCH_API_CACHE_TAG = "search-api";
+const SEARCH_API_CACHE_TTL = 600;
+
+// SECURITY INVARIANT (see feed-results.ts executeFeedQuery): this cache entry is
+// SHARED across public / v1 / MCP. Safe ONLY because visibility differences are
+// key-included params or post-cache projection — executeSearchQuery takes no caller
+// identity (semanticIncludeExcluded is a keyed param, so it participates in the
+// key). Do NOT add caller-privilege-dependent row filtering here.
+async function executeSearchQuery(
   params: SearchExecutionParams,
 ): Promise<SearchExecutionResult> {
   if (params.mode === "semantic") {
-    const started = Date.now();
     const result = await semanticSearch(params.q, {
       locale: params.locale,
       limit: params.limit,
@@ -122,7 +144,10 @@ export async function runSearchQuery(
       limit: params.limit,
       offset: DEFAULT_SEARCH_OFFSET,
       embeddingDims: result.embeddingDims,
-      latencyMs: Date.now() - started,
+      // Placeholder — real end-to-end latency is stamped by runSearchQuery
+      // OUTSIDE the cache, so a cache hit reports its true (fast) response time
+      // instead of freezing the miss-time latency.
+      latencyMs: 0,
     };
   }
 
@@ -140,6 +165,43 @@ export async function runSearchQuery(
     limit: params.limit,
     offset: params.offset,
   };
+}
+
+/**
+ * Shared execution for REST search routes and MCP ax_radar_search.
+ * Surface adapters own auth/rate-limit/envelopes; this module owns the search
+ * semantics, the read-budget cache, and payload mapping so lexical totals,
+ * semantic filters, and metadata fields cannot drift.
+ *
+ * The `unstable_cache` wrapper is built PER CALL (see feed-results.ts's
+ * runFeedQuery for why that's prod-identical to a module-scope singleton). Keyed
+ * on keyParts + the JSON-serialized params, so each distinct query/filter set is
+ * its own entry. Result is JSON-safe (Story dates are ISO strings; semantic items
+ * add a numeric `distance`), so the round-trip preserves types.
+ */
+export async function runSearchQuery(
+  params: SearchExecutionParams,
+): Promise<SearchExecutionResult> {
+  const started = Date.now();
+  // Canonicalize the cache key for semantic mode: it always returns offset 0 and
+  // pages via date_from/date_to, so `offset` and the single-day `date` don't affect
+  // the result — dropping them from the key collapses ?offset=20 vs 40 (etc.) onto
+  // one entry instead of storing identical results N times. Lexical uses both, so
+  // it passes through untouched.
+  const cacheArg: SearchExecutionParams =
+    params.mode === "semantic"
+      ? { ...params, offset: DEFAULT_SEARCH_OFFSET, date: undefined }
+      : params;
+  const result = await unstable_cache(executeSearchQuery, ["search-api:v1"], {
+    revalidate: SEARCH_API_CACHE_TTL,
+    tags: [SEARCH_API_CACHE_TAG],
+  })(cacheArg);
+  // Stamp real end-to-end latency OUTSIDE the cache so a hit reports its true
+  // (fast) response time. NB: latencyMs now measures the whole cached call, not
+  // just semanticSearch compute — for a miss they're ~equal.
+  return result.mode === "semantic"
+    ? { ...result, latencyMs: Date.now() - started }
+    : result;
 }
 
 export function toPublicSearchPayload(

@@ -39,10 +39,16 @@ import type { AppLocale } from "@/lib/types";
  *
  * Two construction styles, both correct — DON'T unify them: a param-free reader
  * (radar/pulse) is memoised ONCE at module load as `unstable_cache(fn, key)`;
- * an arg-taking reader (day-counts/top-topics/ticker) must fold its runtime args
- * into `keyParts` per call, so it builds the cache inside the wrapper and invokes
- * it. Rewriting the arg-taking ones module-level would drop the args from the key
- * and collapse distinct calls onto one poisoned entry.
+ * an arg-taking reader (day-counts/top-topics/ticker) here wraps a ZERO-ARG
+ * closure (`() => getDayCounts(days, opts)`), so its args live in the closure and
+ * are NOT passed to the wrapper — those readers must therefore fold their runtime
+ * args into `keyParts` per call (build the cache inside the wrapper and invoke it).
+ * Rewriting THESE module-level would drop the args from the key and collapse
+ * distinct calls onto one poisoned entry. (A wrapper that instead RECEIVES its
+ * args as parameters keys on them automatically — `unstable_cache` appends
+ * `JSON.stringify(args)` to the key — which is why `lib/api/feed-results.ts` /
+ * `search-results.ts` can safely build the cache once at module scope. Different
+ * pattern, not a contradiction.)
  */
 
 /** Invalidation tag for the cheap bounded-window aggregates (24h/7d). */
