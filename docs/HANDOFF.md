@@ -42,7 +42,7 @@ run too frequently** → attack frequency + scale. Shipping in 3 measurable PRs.
 - Est. background floor drop ~148k → ~42k rows/h (score-backfill→0, commentary/
   cluster amortized down). article-body's 32k/h stays until W9b's leak fix.
 
-**W9b — cache-purge decouple + getDayCounts seek (SHIPPED, PR #__, pure code, no
+**W9b — cache-purge decouple + getDayCounts seek (SHIPPED, PR #51, pure code, no
 migration).** The dominant per-render read is getDayCounts (60-day calendar scan);
 it was cache-purged ~4×/h by the content crons, repriming almost every enrich tick.
 Three fixes:
@@ -72,10 +72,11 @@ NOT auto-apply on Vercel deploy; drizzle push is disabled). Narrow
 only after AX confirms.
 
 **Gate-hygiene follow-up (found during W9b):** the local `bun run test` gate is
-NON-hermetic — `tests/feedback/toggle.test.ts` `(real DB)` tests run whenever
-`TURSO_DATABASE_URL` is set (`.env.local` points at PROD), so they WRITE to the live
-prod DB and intermittently time out (20s) under Turso's global write-lock contention
-with the running production crons. Worse, a bun **timeout** failure does NOT reliably
+NON-hermetic — a CLASS of `(real DB)` tests run whenever `TURSO_DATABASE_URL` is set
+(`.env.local` points at PROD): the feedback writes (`tests/feedback/toggle.test.ts`)
+AND the search-API reads (`/api/public/search`, `/api/v1/search` — seen timing out at
+20s/5s in the W9b verify run). They hit the live prod DB and intermittently time out
+under Turso's global write-lock contention with the running production crons. Worse, a bun **timeout** failure does NOT reliably
 propagate a non-zero exit (`VERIFY_EXIT=0` seen with a visible `(fail)`) — synchronous
 assertion fails DO exit 1 (gate-probe verified), only async timeouts mask. Mitigation
 in use: always cross-check `VERIFY_EXIT` with `grep -c "(fail)"`. Real fix (separate
