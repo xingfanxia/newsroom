@@ -1,14 +1,23 @@
 # FIX-W7 / A5 — daily Turso read-budget guardrail.
 #
 # Runs scripts/ops/read-budget.ts once a day, projects the steady-state monthly
-# rows_read run-rate, and FAILS THE JOB (→ GitHub emails the owner) if the
-# projection exceeds the 100M/mo target. The flood-polluted cumulative is NOT the
-# trip — the run-rate delta between two daily snapshots is (see the script).
+# rows_read run-rate over a rolling multi-day window, and FAILS THE JOB (→ GitHub
+# emails the owner) if the projection exceeds the alert threshold OR the
+# cumulative nears the plan cap. The flood-polluted cumulative is NOT the primary
+# trip — the run-rate is (see the script).
 #
-# Snapshot persistence: the prior day's reading is carried between runs via
+# Snapshot persistence: the rolling reading history is carried between runs via
 # actions/cache (a tiny JSON), so no DB table + no DB creds are needed in CI —
-# only the Turso platform token. SECURITY: triggers are schedule + manual only
-# (NO pull_request), so a fork PR can never run this with the secret.
+# only the Turso platform token.
+#
+# SECURITY hardening (the token can manage/delete Turso DBs; the repo is public):
+#   - triggers are schedule + manual only (NO pull_request) → a fork PR can never
+#     run this with the secret;
+#   - permissions: contents: read (least privilege);
+#   - actions are SHA-pinned (a moved tag can't inject code into the token's job);
+#   - no `bun install` — the script imports only node:fs + a pure local module, so
+#     there are zero npm deps and thus no postinstall/native-build code execution
+#     alongside the token.
 name: read-budget-monitor
 
 on:
@@ -27,25 +36,25 @@ jobs:
   monitor:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
 
-      - run: bun install --frozen-lockfile
-
-      # Restore the most recent prior snapshot (prefix match on restore-keys;
-      # each run saves under a unique run_id key below).
+      # Restore the most recent prior snapshot. The save key includes run_attempt
+      # so a manual "re-run failed job" saves under a NEW key and the restore
+      # prefix-matches the PRIOR run's snapshot — not its own just-saved one
+      # (which would collapse the window and green-flip a real alert).
       - name: Restore previous snapshot
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: .read-budget-snapshot.json
-          key: read-budget-snapshot-${{ github.run_id }}
+          key: read-budget-snapshot-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
             read-budget-snapshot-
 
-      # The script reads yesterday's reading from SNAPSHOT_IN and overwrites it
-      # with today's at SNAPSHOT_OUT (same file). No shell-side variable handling
-      # — the run: block passes only static env, so there is no injection surface.
+      # The script reads yesterday's history from SNAPSHOT_IN and writes the
+      # appended+pruned history to SNAPSHOT_OUT (same file). No shell-side
+      # variable handling — only static env, so there is no injection surface.
       - name: Run read-budget monitor
         env:
           TURSO_API_TOKEN: ${{ secrets.TURSO_API_TOKEN }}
@@ -53,12 +62,11 @@ jobs:
           SNAPSHOT_OUT: .read-budget-snapshot.json
         run: bun scripts/ops/read-budget.ts
 
-      # Persist THIS run's reading (the script overwrote the file with the
-      # current usage) so tomorrow's run can diff against it. always() so the
-      # baseline still advances when the monitor trips (exit 1).
+      # Persist this run's history so tomorrow's run can diff against it. always()
+      # so the baseline still advances when the monitor trips (exit 1).
       - name: Save snapshot for next run
         if: always()
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: .read-budget-snapshot.json
-          key: read-budget-snapshot-${{ github.run_id }}
+          key: read-budget-snapshot-${{ github.run_id }}-${{ github.run_attempt }}

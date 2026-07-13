@@ -50,3 +50,6 @@ tmp/
 
 # local DB backups (gzipped JSONL dumps from scripts/ops/db-dump.ts)
 backups/
+
+# read-budget monitor local snapshot (scripts/ops/read-budget.ts)
+.read-budget-snapshot.json
