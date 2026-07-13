@@ -9,10 +9,29 @@
  * chaining can then stretch it well past the point the original verdict
  * covered.
  *
- * WHAT: for verified clusters that GREW since verification and whose max
- * intra-pair cosine distance now exceeds REOPEN_COHESION_DISTANCE, null
- * `verified_at`. The next Stage B tick re-arbitrates them (~1 cheap Haiku call
- * each) and either splits the off-topic members out or re-confirms.
+ * WHAT: for verified clusters that GREW since verification and where some
+ * member has drifted more than REOPEN_COHESION_DISTANCE from the cluster LEAD,
+ * null `verified_at` (and the members' `cluster_verified_at`, see below). The
+ * next Stage B tick re-arbitrates them (~1 cheap Haiku call each) and either
+ * splits the off-topic members out or re-confirms.
+ *
+ * COHESION DEFINITION — member-to-lead, not all-pairs (deliberate):
+ *   Stage A admits a member only when it is within COHESION_MAX_DISTANCE (0.35)
+ *   of the cluster lead. Re-open therefore asks the SAME question, in reverse:
+ *   "has any member drifted beyond that gate?" — max member-to-lead distance >
+ *   REOPEN_COHESION_DISTANCE. Using the lead as the anchor (rather than the
+ *   worst cross-member pair) keeps the metric consistent with the join gate and
+ *   makes the scan O(members), not O(members²), so a fused mega-cluster — the
+ *   exact large-member case re-open targets — can't blow the cron budget.
+ *   REOPEN_COHESION_DISTANCE (0.38) sits a 0.03 hysteresis band ABOVE the 0.35
+ *   join gate, so a member sitting right at the gate boundary can't thrash.
+ *
+ * EMBEDDING SPACE — full `embedding` (3072-dim), NOT `embedding_small`:
+ *   The 0.25 join / 0.35 cohesion / 0.38 re-open thresholds are all calibrated
+ *   in the full-embedding cosine space that Stage A + A.5 use. Swapping in the
+ *   256-dim `embedding_small` would put 0.38 in a DIFFERENT distance
+ *   distribution and silently break that calibration — do NOT "optimize" this
+ *   to the small vector without re-tuning every threshold together.
  *
  * LOOP-SAFETY (the load-bearing invariant): the candidate predicate requires
  * `latest_member_at > verified_at`. Re-arbitration stamps `verified_at = now`;
@@ -21,16 +40,16 @@
  * keeps despite the distance is re-checked only when its membership next
  * changes — never every tick. No re-verify thrash, bounded LLM cost.
  *
- * Bounded (recency window + LIMIT) so the O(members²) pairwise scan per
- * candidate can't blow the cron budget. Idempotent given unchanged data.
+ * Bounded (recency window + LIMIT). Idempotent given unchanged data.
  */
 import type { Client } from "@libsql/client";
 import { libsqlClient } from "@/db/client";
 
 /** Cosine-distance ceiling for a verified cluster to stay "coherent". Above
- *  this, its members are too spread out to be one event — re-arbitrate. Chosen
- *  above the 0.25 Stage-A join threshold and the 0.35 cohesion gate so only a
- *  genuinely stretched cluster trips it, not borderline same-event coverage. */
+ *  this, a member has drifted too far from the lead to be the same event —
+ *  re-arbitrate. Chosen a 0.03 hysteresis band above the 0.35 Stage-A cohesion
+ *  gate (itself above the 0.25 join threshold) so only a genuinely stretched
+ *  cluster trips it, not borderline same-event coverage. */
 export const REOPEN_COHESION_DISTANCE = 0.38;
 
 const DEFAULT_RECENCY_HOURS = 72;
@@ -80,14 +99,14 @@ export async function reopenIncoherentClusters(
   }
   const limitClause = maxPerRun == null ? "" : `LIMIT ${Number(maxPerRun)}`;
 
-  // Find candidate clusters whose worst cross-member pair is too far apart to
-  // still be one event. The self-join is over ONE cluster's members at a time
-  // (ia.cluster_id = ib.cluster_id = cand.id), bounded by the candidate LIMIT.
+  // Find candidate clusters where some member has drifted beyond the cohesion
+  // gate from the LEAD (see "COHESION DEFINITION" above). One distance per
+  // non-lead member vs the single lead embedding — O(members), not O(members²).
   args.push(REOPEN_COHESION_DISTANCE);
   const breached = await client.execute({
     sql: `
       WITH candidates AS (
-        SELECT c.id
+        SELECT c.id, c.lead_item_id
         FROM clusters c
         WHERE ${candidateFilters.join("\n          AND ")}
         ORDER BY c.latest_member_at DESC
@@ -95,11 +114,12 @@ export async function reopenIncoherentClusters(
       )
       SELECT cand.id AS cluster_id
       FROM candidates cand
-      JOIN items ia ON ia.cluster_id = cand.id AND ia.embedding IS NOT NULL
-      JOIN items ib ON ib.cluster_id = cand.id AND ib.embedding IS NOT NULL
-        AND ia.id < ib.id
+      JOIN items lead ON lead.id = cand.lead_item_id
+        AND lead.embedding IS NOT NULL
+      JOIN items m ON m.cluster_id = cand.id AND m.id != cand.lead_item_id
+        AND m.embedding IS NOT NULL
       GROUP BY cand.id
-      HAVING MAX(vector_distance_cos(ia.embedding, ib.embedding)) > ?
+      HAVING MAX(vector_distance_cos(m.embedding, lead.embedding)) > ?
     `,
     args,
   });
@@ -109,17 +129,37 @@ export async function reopenIncoherentClusters(
     return { apply: opts.apply, reopened: ids.length };
   }
 
-  // Null ONLY verified_at — deliberately NOT updated_at. Bumping updated_at
-  // would make Stage C re-title a cluster whose membership hasn't changed yet
-  // (a wasted Haiku call if arbitration then re-confirms it). If arbitration
-  // splits it this tick, applySplitVerdict bumps updated_at itself and Stage C
-  // re-titles then — only when membership actually changed.
+  // Void the verdict atomically at BOTH levels:
+  //  - clusters.verified_at → NULL   (re-triggers Stage B arbitration)
+  //  - members' cluster_verified_at → NULL
+  // The member-level null is what keeps a subsequent lone-survivor split
+  // visible to A.5 (singletons.ts keys off `cluster_verified_at IS NULL`).
+  // Without it, a re-opened cluster re-split down to a single ORIGINAL member
+  // would keep that member's stale stamp from the prior keep verdict and be
+  // orphaned from A.5 forever. batch() runs both in one write transaction so a
+  // crash can't leave the cluster unverified but its members still stamped.
+  //
+  // Deliberately NOT touching updated_at — bumping it would make Stage C
+  // re-title a cluster whose membership hasn't changed yet (a wasted Haiku call
+  // if arbitration then re-confirms it). If arbitration splits it this tick,
+  // applySplitVerdict bumps updated_at itself and Stage C re-titles then.
   const placeholders = ids.map(() => "?").join(", ");
-  const res = await client.execute({
-    sql: `UPDATE clusters SET verified_at = NULL
-          WHERE id IN (${placeholders})`,
-    args: ids,
-  });
+  const [clusterRes] = await client.batch(
+    [
+      {
+        sql: `UPDATE clusters SET verified_at = NULL
+              WHERE id IN (${placeholders})`,
+        args: ids,
+      },
+      {
+        sql: `UPDATE items SET cluster_verified_at = NULL
+              WHERE cluster_id IN (${placeholders})
+                AND cluster_verified_at IS NOT NULL`,
+        args: ids,
+      },
+    ],
+    "write",
+  );
 
-  return { apply: true, reopened: res.rowsAffected };
+  return { apply: true, reopened: clusterRes.rowsAffected };
 }

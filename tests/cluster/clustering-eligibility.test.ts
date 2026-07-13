@@ -17,15 +17,12 @@ import { integer, sqliteTable } from "drizzle-orm/sqlite-core";
 import { asc } from "drizzle-orm";
 import { notClusteringOptedOut } from "@/workers/cluster/clustering-eligibility";
 
-// Minimal inline tables matching the columns the predicate touches. The table
-// name MUST be "items"/"sources" so the alias the helper emits resolves.
+// Minimal inline `items` table. The predicate correlates to `sources` by raw
+// SQL (created in the DDL below), so only `items` needs a drizzle object here;
+// the physical table name MUST be "items" so the helper's alias resolves.
 const items = sqliteTable("items", {
   id: integer("id").primaryKey(),
   sourceId: integer("source_id"),
-});
-const sources = sqliteTable("sources", {
-  id: integer("id").primaryKey(),
-  clusteringOptOut: integer("clustering_opt_out").notNull().default(0),
 });
 
 const DDL = `

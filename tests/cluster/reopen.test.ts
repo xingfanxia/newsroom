@@ -2,8 +2,11 @@
  * Behavioral tests for the tombstone re-open (workers/cluster/reopen.ts, W6a).
  *
  * Runs the REAL reopenIncoherentClusters against a fresh file-backed libSQL DB
- * with actual F32_BLOB embeddings, so the vector_distance_cos self-join and the
- * loop-safety candidate predicate are exercised end to end — no creds, no prod.
+ * with actual F32_BLOB embeddings, so the lead-anchored vector_distance_cos
+ * scan and the loop-safety candidate predicate are exercised end to end — no
+ * creds, no prod. Re-open asks "has any member drifted > 0.38 from the LEAD?"
+ * (the same cohesion metric Stage A's join gate uses), so each seeded cluster's
+ * lead item is the coherent [1,0,0] anchor.
  *
  * Unit vectors make the cosine distances exact:
  *   [1,0,0] vs [1,0,0] → 0.0   (coherent, < 0.38)
@@ -32,6 +35,7 @@ CREATE TABLE clusters (
 CREATE TABLE items (
   id INTEGER PRIMARY KEY,
   cluster_id INTEGER,
+  cluster_verified_at INTEGER,
   embedding F32_BLOB(3)
 );
 `;
@@ -67,11 +71,26 @@ async function seedCluster(c: {
   });
 }
 
-async function seedItem(id: number, clusterId: number, vec: number[]) {
+async function seedItem(
+  id: number,
+  clusterId: number,
+  vec: number[],
+  clusterVerifiedAt: number | null = null,
+) {
   await client.execute({
-    sql: `INSERT INTO items (id, cluster_id, embedding) VALUES (?, ?, ?)`,
-    args: [id, clusterId, embeddingToDriver(vec)],
+    sql: `INSERT INTO items (id, cluster_id, cluster_verified_at, embedding)
+          VALUES (?, ?, ?, ?)`,
+    args: [id, clusterId, clusterVerifiedAt, embeddingToDriver(vec)],
   });
+}
+
+async function memberVerifiedAt(id: number): Promise<number | null> {
+  const r = await client.execute({
+    sql: `SELECT cluster_verified_at FROM items WHERE id = ?`,
+    args: [id],
+  });
+  const v = r.rows[0]?.cluster_verified_at;
+  return v == null ? null : Number(v);
 }
 
 async function verifiedAtOf(id: number): Promise<number | null> {
@@ -85,7 +104,8 @@ async function verifiedAtOf(id: number): Promise<number | null> {
 
 describe("reopenIncoherentClusters (W6a)", () => {
   it("re-opens an incoherent cluster that grew since verification", async () => {
-    // grew: latest_member_at (2000) > verified_at (1000); pair distance 1.0.
+    // grew: latest_member_at (2000) > verified_at (1000); member 11 sits 1.0
+    // from the lead (10). Both members carry the prior keep verdict's stamp.
     await seedCluster({
       id: 1,
       leadItemId: 10,
@@ -93,8 +113,8 @@ describe("reopenIncoherentClusters (W6a)", () => {
       latestMemberAt: 2000,
       verifiedAt: 1000,
     });
-    await seedItem(10, 1, [1, 0, 0]);
-    await seedItem(11, 1, [0, 1, 0]);
+    await seedItem(10, 1, [1, 0, 0], 1000);
+    await seedItem(11, 1, [0, 1, 0], 1000);
 
     const rep = await reopenIncoherentClusters({
       apply: true,
@@ -105,6 +125,10 @@ describe("reopenIncoherentClusters (W6a)", () => {
 
     expect(rep.reopened).toBe(1);
     expect(await verifiedAtOf(1)).toBeNull(); // tombstone cleared → re-arbitrates
+    // Member-level stamps cleared too, so a later lone-survivor split stays
+    // visible to A.5 instead of being orphaned by its stale verdict.
+    expect(await memberVerifiedAt(10)).toBeNull();
+    expect(await memberVerifiedAt(11)).toBeNull();
   });
 
   it("leaves a coherent grown cluster verified", async () => {
@@ -161,8 +185,8 @@ describe("reopenIncoherentClusters (W6a)", () => {
       latestMemberAt: 2000,
       verifiedAt: 1000,
     });
-    await seedItem(40, 4, [1, 0, 0]);
-    await seedItem(41, 4, [0, 1, 0]);
+    await seedItem(40, 4, [1, 0, 0], 1000);
+    await seedItem(41, 4, [0, 1, 0], 1000);
 
     const rep = await reopenIncoherentClusters({
       apply: false,
@@ -172,7 +196,8 @@ describe("reopenIncoherentClusters (W6a)", () => {
     });
 
     expect(rep.reopened).toBe(1); // would re-open
-    expect(await verifiedAtOf(4)).toBe(1000); // but did not write
+    expect(await verifiedAtOf(4)).toBe(1000); // but wrote neither level
+    expect(await memberVerifiedAt(41)).toBe(1000);
   });
 
   it("threshold sanity: the breach ceiling is above the Stage-A join distance", () => {

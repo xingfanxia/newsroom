@@ -410,6 +410,21 @@ describe("resolveJoinOutcome (W5.1 + W4b)", () => {
     ).toBe("join-clustered");
   });
 
+  it("W4b: a strong clustered match beats even a closer twin (invariant is encoded, not caller-dependent)", () => {
+    // The caller never PASSES a real twin distance for a strong match — but if
+    // that fast-path skip were removed, the function must still short-circuit
+    // to join-clustered so twin clusters can't creep back. clustered 0.1 is
+    // strong (≤ 0.25 - 0.05); a 0.0 twin does NOT flip it to promote.
+    expect(
+      resolveJoinOutcome({
+        clusteredDistance: 0.1,
+        leadDistance: 0.2,
+        unclusteredDistance: 0.0,
+        threshold: T,
+      }),
+    ).toBe("join-clustered");
+  });
+
   it("nothing within threshold → singleton", () => {
     expect(
       resolveJoinOutcome({

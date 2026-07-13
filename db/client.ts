@@ -72,11 +72,16 @@ export async function withBusyRetry<T>(
   opts: {
     retries?: number;
     baseDelayMs?: number;
+    /** Ceiling on any single backoff sleep. Keeps the exponential growth from
+     *  turning a large `retries` into a multi-hour hang; the wrapper must fail
+     *  loud, not stall a worker. */
+    maxDelayMs?: number;
     sleep?: (ms: number) => Promise<void>;
   } = {},
 ): Promise<T> {
   const retries = opts.retries ?? 4;
   const baseDelayMs = opts.baseDelayMs ?? 50;
+  const maxDelayMs = opts.maxDelayMs ?? 2_000;
   const sleep =
     opts.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)));
 
@@ -85,7 +90,7 @@ export async function withBusyRetry<T>(
       return await fn();
     } catch (err) {
       if (!isBusyError(err) || attempt >= retries) throw err;
-      await sleep(baseDelayMs * 2 ** attempt);
+      await sleep(Math.min(baseDelayMs * 2 ** attempt, maxDelayMs));
     }
   }
 }

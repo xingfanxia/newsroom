@@ -54,9 +54,25 @@ export function resolveJoinOutcome(input: {
     clusteredWithin &&
     input.leadDistance != null &&
     input.leadDistance <= COHESION_MAX_DISTANCE;
+
+  // A STRONG clustered match — comfortably inside the threshold, not at its
+  // borderline edge — always wins; the W4b twin comparison only applies to a
+  // BORDERLINE clustered match. The caller relies on this by skipping the
+  // unclustered scan entirely for a strong match (passing unclusteredDistance =
+  // null). Encoding the invariant HERE (not only in that scan-skip) means a
+  // strong match yields join-clustered even if a real twin distance is passed,
+  // so dropping the caller's fast-path can never silently re-introduce the twin
+  // clusters W4b/merge exist to kill.
+  const clusteredStrong =
+    clusteredJoinOk &&
+    input.clusteredDistance! <= input.threshold - PREFER_CLUSTERED_SLACK;
+  if (clusteredStrong) return "join-clustered";
+
   const unclusteredWithin =
     input.unclusteredDistance != null &&
     input.unclusteredDistance <= input.threshold;
+  // Only reached for a BORDERLINE clustered match (or none): a within-threshold
+  // twin closer by more than the slack takes the pairing (W4b).
   const unclusteredBeatsClustered =
     clusteredJoinOk &&
     unclusteredWithin &&

@@ -86,11 +86,9 @@ describe("withBusyRetry", () => {
     const record = async (ms: number) => {
       delays.push(ms);
     };
-    let calls = 0;
     await expect(
       withBusyRetry(
         async () => {
-          calls++;
           throw new Error("database is locked");
         },
         { retries: 3, baseDelayMs: 10, sleep: record },
@@ -98,5 +96,22 @@ describe("withBusyRetry", () => {
     ).rejects.toThrow(/database is locked/);
     // one sleep per retry (3), doubling each time from baseDelayMs.
     expect(delays).toEqual([10, 20, 40]);
+  });
+
+  it("caps each backoff sleep at maxDelayMs", async () => {
+    const delays: number[] = [];
+    const record = async (ms: number) => {
+      delays.push(ms);
+    };
+    await expect(
+      withBusyRetry(
+        async () => {
+          throw new Error("database is locked");
+        },
+        { retries: 3, baseDelayMs: 1000, maxDelayMs: 1500, sleep: record },
+      ),
+    ).rejects.toThrow(/database is locked/);
+    // 1000, min(2000,1500)=1500, min(4000,1500)=1500 — growth is ceilinged.
+    expect(delays).toEqual([1000, 1500, 1500]);
   });
 });
