@@ -1,5 +1,10 @@
 import { describe, expect, it } from "bun:test";
-import { TWEAK_DEFAULTS, TWEAK_LANGUAGES } from "@/lib/tweaks";
+import {
+  resolveTweaks,
+  TWEAK_DEFAULTS,
+  TWEAK_LANGUAGES,
+  type Tweaks,
+} from "@/lib/tweaks";
 import { APP_LOCALES } from "@/lib/types";
 
 // The full TweaksProvider requires a DOM; we can't exercise React here. Instead
@@ -68,27 +73,39 @@ describe("TWEAK_DEFAULTS", () => {
   });
 });
 
-describe("localStorage language migration", () => {
-  // Documentation-style assertion: the loader must normalize legacy 'both'
-  // to 'en' or pre-PR#9 saved configs will blow up. `loadFromStorage` is
-  // module-private, so we mirror its migration step here.
-  it("legacy 'both' still parses to a valid Tweaks shape", () => {
-    const parsed = JSON.parse(
-      JSON.stringify({ language: "both", density: "comfy" }),
-    ) as Record<string, unknown>;
-    if (parsed.language === "both") parsed.language = "en";
-    expect(parsed.language).toBe("en");
-    expect(parsed.density).toBe("comfy");
+describe("resolveTweaks — language follows the URL locale, never storage", () => {
+  // The bug this guards: a persisted language "zh" overriding an "/en" URL
+  // desynced Chinese chrome from English (URL-locale) titles. `language` must
+  // always equal the URL locale; every other tweak still persists.
+  it("forces language to the URL locale even when storage disagrees", () => {
+    const r = resolveTweaks("en", { language: "zh", theme: "paper" });
+    expect(r.language).toBe("en");
+    expect(r.theme).toBe("paper"); // non-language overrides still apply
   });
 
-  it("unrecognized language values remain as-is (caller validates downstream)", () => {
-    const parsed = JSON.parse(JSON.stringify({ language: "jp" })) as Record<
-      string,
-      unknown
-    >;
-    if (parsed.language === "both") parsed.language = "en";
-    // The migration ONLY touches 'both'. Unknown values stay and get caught
-    // later by the TypeScript Tweaks union — caller should validate.
-    expect(parsed.language).toBe("jp");
+  it("applies non-language overrides local-then-server (last wins)", () => {
+    const r = resolveTweaks(
+      "zh",
+      { density: "comfy", accent: "blue" },
+      { accent: "red" },
+    );
+    expect(r.language).toBe("zh");
+    expect(r.density).toBe("comfy");
+    expect(r.accent).toBe("red");
+  });
+
+  it("ignores null/undefined overrides and drops legacy 'both'", () => {
+    const r = resolveTweaks(
+      "zh",
+      null,
+      { language: "both" as unknown as Tweaks["language"] },
+      undefined,
+    );
+    expect(r.language).toBe("zh");
+  });
+
+  it("with no overrides returns the defaults carrying the URL locale", () => {
+    expect(resolveTweaks("zh")).toEqual({ ...TWEAK_DEFAULTS, language: "zh" });
+    expect(resolveTweaks("en")).toEqual(TWEAK_DEFAULTS);
   });
 });

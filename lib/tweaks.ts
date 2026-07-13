@@ -63,3 +63,28 @@ export const TWEAK_DEFAULTS: Tweaks = {
   mutedMeta: true,
   language: "en",
 };
+
+/**
+ * Merge persisted tweak overrides (localStorage, then server) over the
+ * defaults — EXCEPT `language`.
+ *
+ * The UI language is the URL `[locale]` segment (the same locale the server
+ * used to resolve story titles), NOT a separately-persisted value. A stale
+ * persisted `language` (e.g. "zh") overriding an "/en" URL is exactly what
+ * desynced Chinese chrome from English titles: chrome reads `tweaks.language`,
+ * titles follow the URL. So `language` is always forced to `urlLanguage` and
+ * any persisted `language` (including legacy "both") is dropped on load.
+ */
+export function resolveTweaks(
+  urlLanguage: AppLocale,
+  ...overrides: Array<Partial<Tweaks> | null | undefined>
+): Tweaks {
+  let out: Tweaks = { ...TWEAK_DEFAULTS, language: urlLanguage };
+  for (const override of overrides) {
+    if (!override) continue;
+    const next: Partial<Tweaks> = { ...override };
+    delete next.language;
+    out = { ...out, ...next };
+  }
+  return out;
+}

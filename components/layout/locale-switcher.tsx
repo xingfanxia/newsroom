@@ -1,6 +1,7 @@
 "use client";
 import { useLocale } from "next-intl";
 import { useTransition } from "react";
+import { useSearchParams } from "next/navigation";
 import { usePathname, useRouter } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 import { APP_LOCALES } from "@/lib/types";
@@ -18,6 +19,7 @@ const options: { value: Locale; label: string }[] = APP_LOCALES.map(
 export function LocaleSwitcher() {
   const locale = useLocale() as Locale;
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
@@ -38,8 +40,11 @@ export function LocaleSwitcher() {
             aria-pressed={active}
             onClick={() => {
               if (active) return;
+              // Preserve the active feed filters (query string) across the
+              // locale switch — a bare pathname replace would drop them.
+              const query = Object.fromEntries(searchParams.entries());
               startTransition(() => {
-                router.replace(pathname, { locale: opt.value });
+                router.replace({ pathname, query }, { locale: opt.value });
               });
             }}
             className={cn(
