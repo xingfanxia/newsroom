@@ -66,9 +66,14 @@ describe("radar stats shell contract", () => {
   it("keeps shell chrome fallbacks on the shared empty object", () => {
     const chromeData = readSource("lib/shell/chrome-data.ts");
 
+    // W8b: the shell reads the cached radar/pulse wrappers (lib/shell/feed-cache)
+    // so the chrome stats dedupe across renders — the empty-object fallback
+    // contract is unchanged.
     expect(chromeData).toContain("@/lib/shell/radar-stats");
-    expect(chromeData).toContain("getRadarStats().catch(() => EMPTY_RADAR_STATS)");
-    expect(chromeData).toContain("getPulseData().catch(() => [])");
+    expect(chromeData).toContain(
+      "getRadarStatsCached().catch(() => EMPTY_RADAR_STATS)",
+    );
+    expect(chromeData).toContain("getPulseDataCached().catch(() => [])");
     expect(chromeData).not.toMatch(INLINE_EMPTY_RADAR_STATS_RE);
   });
 

@@ -14,9 +14,7 @@ import {
   FEED_PAGE_SIZE,
 } from "@/lib/feed/page-query";
 import { getFeaturedStories } from "@/lib/items/live";
-import {
-  getDayCounts,
-} from "@/lib/shell/dashboard-stats";
+import { getDayCountsCached } from "@/lib/shell/feed-cache";
 import { getShellChromeData } from "@/lib/shell/chrome-data";
 import { appLocaleFromParam, type Story } from "@/lib/types";
 
@@ -73,7 +71,7 @@ export default async function CuratedPage({
     getShellChromeData({ pulse: true }),
     // Curated calendar mirrors the feed's curatedOnly filter so cells
     // count only AX-curated leads — same contract as the home page.
-    getDayCounts(60, { curatedOnly: true }).catch(() => []),
+    getDayCountsCached(60, { curatedOnly: true }).catch(() => []),
   ]);
 
   const grouped = groupByDay(sortStoriesNewestFirst(stories));

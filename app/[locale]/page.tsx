@@ -22,12 +22,14 @@ import { groupByDay } from "@/lib/feed/group-by-day";
 import { coerceFeedDateKey, feedPageLimitForDate } from "@/lib/feed/page-query";
 import { getFeaturedStories } from "@/lib/items/live";
 import {
-  getDayCounts,
   getPolicySummary,
-  getTopTopics,
 } from "@/lib/shell/dashboard-stats";
 import { getShellChromeData } from "@/lib/shell/chrome-data";
-import { getRecentTickerItems } from "@/lib/shell/ticker";
+import {
+  getDayCountsCached,
+  getRecentTickerItemsCached,
+  getTopTopicsCached,
+} from "@/lib/shell/feed-cache";
 import { mockStories } from "@/lib/mock/stories";
 import { appLocaleFromParam, type Story } from "@/lib/types";
 
@@ -164,12 +166,12 @@ export default async function HotNewsPage({
 
   const [chrome, topics, policy, tickerItems, days] = await Promise.all([
     getShellChromeData({ pulse: true, signalRatio: "fromRadar" }),
-    getTopTopics().catch(() => []),
+    getTopTopicsCached().catch(() => []),
     getPolicySummary().catch(() => ({ version: "v1", lastIterAt: null })),
-    getRecentTickerItems(appLocale).catch(() => []),
+    getRecentTickerItemsCached(appLocale).catch(() => []),
     // Calendar must apply the SAME filters as the feed — otherwise the cell
     // count can over-promise items that will not render after filtering.
-    getDayCounts(60, {
+    getDayCountsCached(60, {
       tier: DEFAULT_HOME_TIER,
     }).catch(() => []),
   ]);

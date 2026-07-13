@@ -3,8 +3,11 @@
  *
  * Measures the pre-optimization read cost of the clustering hot paths so the
  * post-fix run-rate can be compared against a real number, and confirms (via
- * EXPLAIN QUERY PLAN) that the Stage A / A.5 nearest-neighbour queries do a
- * FULL SCAN of their time window today. EXPLAIN QUERY PLAN does not execute the
+ * EXPLAIN QUERY PLAN) that the Stage A / A.5 nearest-neighbour queries seek the
+ * ±WINDOW_HOURS published_at window via items_published_at_idx — a bounded index
+ * range of a few hundred rows, NOT a full-table scan (the 2026-07-13 audit
+ * confirmed clustering NN is index-assisted; the read-budget hog is uncached
+ * feed renders, not these probes). EXPLAIN QUERY PLAN does not execute the
  * query, so the plan probes read ~0 rows; only the COUNT()s below touch data,
  * and they are bounded/one-shot.
  *
@@ -123,8 +126,9 @@ async function main() {
   console.log(`    total clusters                     = ${totalClusters}`);
   console.log(`    items in ±${WINDOW_HOURS}h window of anchor    = ${windowPop}`);
   console.log(
-    `    → each Stage A/A.5 NN probe scans ~${windowPop} rows today; A.5 does` +
-      ` this for EACH of ~${singletons} singletons per tick.`,
+    `    → each Stage A/A.5 NN probe examines the ~${windowPop} rows in` +
+      ` its ±${WINDOW_HOURS}h index window; A.5 does this for EACH of` +
+      ` ~${singletons} singletons per tick.`,
   );
 
   // ── EXPLAIN the hot NN queries (does NOT execute — ~0 rows read) ────────────
