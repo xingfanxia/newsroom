@@ -13,9 +13,12 @@ type CronRouteOpts<T> = {
    *   - fetch buckets — their fresh (un-enriched) items don't enter the
    *     feed/calendar (those gate on enriched_at) until enrich runs. They DO
    *     count immediately toward radar/pulse (raw created_at counts, no
-   *     enriched_at gate), but the CACHED value only refreshes on enrich's
-   *     15-min heartbeat (or the TTL) — a ≤15-min lag on a coarse 24h counter,
-   *     well inside radar tolerance. Leaving them unset preserves cache life.
+   *     enriched_at gate), but the CACHED value refreshes only when a later
+   *     enrich tick purges. Since W9b that purge is conditional (enriched > 0),
+   *     so a tick that enriches 0 no longer refreshes radar/pulse — worst case
+   *     the fetch-added counts wait out the 30-min FEED_CACHE_TTL rather than the
+   *     ~15-min enrich heartbeat. Still a coarse 24h counter, well inside radar
+   *     tolerance. Leaving them unset preserves cache life.
    *   - commentary / article-body — they write only commentary/body fields that
    *     no cached aggregate reads (the feed shows commentary but is uncached).
    *

@@ -4,7 +4,8 @@ import { runCronJsonRoute } from "../_route";
 // Score-only backfill — picks items that were enriched before HKR was
 // part of the schema (or before the bilingual reasoning columns landed)
 // and re-runs the score stage. Mostly idle once the legacy pool is
-// drained. Hourly cadence is plenty for a backfill worker.
+// drained. Weekly cadence (W9a: 25 6 * * 1) is plenty — the pre-rubric
+// pool is drained, so an hourly full-scan found 0 work every tick.
 export const maxDuration = 800;
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";

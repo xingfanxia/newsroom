@@ -20,6 +20,11 @@ import { describe, expect, it, mock } from "bun:test";
 import { readSource } from "@/tests/helpers/source";
 
 // --- Level 1: behavioral. Mock BEFORE importing the module under test. ---
+//
+// Bun mock hygiene: mock.module is PROCESS-GLOBAL with no reliable per-file
+// restore, so any test importing @/lib/shell/feed-cache (or @/app/api/cron/_route)
+// MUST register its own next/cache mock rather than rely on this one leaking in —
+// otherwise its assertions depend on file load order. See tests/cron/route-purge.
 
 const revalidateTagCalls: Array<[string, unknown]> = [];
 const ucCalls: Array<{ keys: unknown[]; tags?: string[]; revalidate?: number }> = [];

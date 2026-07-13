@@ -11,6 +11,13 @@ import { describe, expect, it, mock } from "bun:test";
 
 const purgedTags: string[] = [];
 
+// Bun mock hygiene: mock.module is PROCESS-GLOBAL and bun 1.3.1 has no reliable
+// per-file restore for a module mock (afterAll(mock.restore()) won't undo it), so
+// any OTHER test importing @/lib/shell/feed-cache or @/app/api/cron/_route MUST
+// register its own next/cache mock — else it silently inherits whichever suite's
+// stub loaded last (load-order-dependent). This stub is a minimal passthrough
+// (extra call args like keys/opts/profile are accepted-and-ignored by JS), so a
+// leaked stub can't throw on a caller that passes them.
 mock.module("next/cache", () => ({
   unstable_cache: (fn: (...a: unknown[]) => unknown) => fn,
   revalidateTag: (tag: string) => {
