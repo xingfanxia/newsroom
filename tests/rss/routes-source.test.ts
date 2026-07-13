@@ -106,7 +106,7 @@ describe("RSS route source contracts", () => {
   test("legacy slug RSS route delegates feed construction to a shared helper", () => {
     expect(dailyFeedRoute).toContain("@/lib/rss/legacy-feeds");
     expect(dailyFeedRoute).toContain("parseLegacyRssSlug");
-    expect(dailyFeedRoute).toContain("renderLegacyRssFeed");
+    expect(dailyFeedRoute).toContain("renderLegacyRssFeedCached");
     expect(dailyFeedRoute).not.toContain("FEED_META");
     expect(dailyFeedRoute).not.toContain("renderDailyFeed");
     expect(dailyFeedRoute).not.toContain("renderLaneFeed");

@@ -1,9 +1,7 @@
 import { rssResponse } from "@/lib/rss/render";
 import { rssRateLimit } from "@/lib/rate-limit/rss";
-import {
-  parseLegacyRssSlug,
-  renderLegacyRssFeed,
-} from "@/lib/rss/legacy-feeds";
+import { parseLegacyRssSlug } from "@/lib/rss/legacy-feeds";
+import { renderLegacyRssFeedCached } from "@/lib/rss/legacy-feeds-cache";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -21,7 +19,7 @@ export async function GET(
     return new Response("not found", { status: 404 });
   }
 
-  const xml = await renderLegacyRssFeed(slug);
+  const xml = await renderLegacyRssFeedCached(slug);
 
   return rssResponse(xml);
 }

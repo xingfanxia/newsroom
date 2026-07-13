@@ -138,7 +138,26 @@ Key details:
   via a mocked advancing clock, no wall-clock flake); spread-mocks avoid the
   process-global export-drop leak. code-reviewer (opus) APPROVE, all LOW/NIT fixed.
 
-This is the LAST unbounded read path. Target after full W9: durable ~70M/mo.
+**W9c-3 — legacy per-source RSS cache (SHIPPED, PR #55, non-breaking).** A sweep for
+any OTHER uncached read path (per AX "add caching wherever necessary") found one: the
+legacy per-source RSS route `/api/rss/[slug]` is `force-dynamic` (it runs a per-request
+rate-limiter `rssRateLimit`, so it can't use route-level revalidate like the main/
+newsletter RSS). Its query (`listLegacyLaneRows`: items JOIN sources ORDER BY
+published_at DESC LIMIT 50) is a cheap top-50 index walk for non-curated lanes, BUT the
+**curated** lane filters post-JOIN to the single curated source (1 of 55 on prod) →
+prod EXPLAIN `SCAN i USING COVERING INDEX items_feed_recent_idx` can walk the FULL
+~21.6k-row items index to fill LIMIT 50 (same unbounded-scan class as the pre-floor main
+RSS). Fix: new module `lib/rss/legacy-feeds-cache.ts` wraps `renderLegacyRssFeed` (kept
+pure) in `unstable_cache` (10-min TTL, own non-cron-purged `legacy-rss` tag); route
+keeps rssRateLimit per-request (runs BEFORE the cached render → no bypass). **Split into
+its own module** so the test stubs renderLegacyRssFeed one level down WITHOUT globally
+mocking `@/db/client` — bun's mock.module is process-global and a db() stub poisons every
+`(real DB)` test (hit + fixed mid-change). Other force-dynamic read routes checked and
+left uncached (items/[id]=PK lookup, sources=55 rows, events/members=per-event,
+daily=one row/day — all light). Completes the RSS surface: main floored, newsletter
+revalidate=600, legacy now cached. code-reviewer (opus) APPROVE, all LOW/NIT fixed.
+
+All unbounded read PATHS are now bounded. Target after full W9: durable ~70M/mo.
 
 **W9 measurement baseline (for the forward run-rate proof).** Billing-period
 cumulative `rows_read` = **597.68M @ 2026-07-13** (over the 500M free cap — but this
