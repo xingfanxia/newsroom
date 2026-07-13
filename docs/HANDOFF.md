@@ -41,10 +41,24 @@ intentionally diverge — do NOT globally rewrite it without validating that sem
 it resets at cycle boundary). W7 success = a lower forward **run-rate**, measured as
 a clean-day delta ×30 over the next full day, NOT a drop in this cumulative number.
 
-**Post-deploy checks still pending a cluster tick (:55 hourly):** A.5 stamping
-(`last_recheck_at > 0`), opt-out holds (contamination stays 0), no "no such column"
-in cron logs. **Follow-ups:** wire A5 monitor as a cron (GH Action needs AX to add
-`TURSO_API_TOKEN` secret); clean-day rows_read re-measurement; A1(ANN)/A6 still deferred.
+**Post-deploy checks — ✅ all verified** (:55 cluster tick): A.5 stamped
+`last_recheck_at` (68 rows first tick), opt-out holds (contamination 0 after the
+tick), cluster cron `GET /api/cron/cluster 200`, no "no such column".
+
+**Follow-ups resolved 2026-07-13:**
+- **A5 monitor cron — WIRED** (daily GitHub Actions `read-budget-monitor.yml`;
+  `TURSO_API_TOKEN` secret set). Rolling-window run-rate projection → fails loud
+  (email) over 60M/mo + cumulative catastrophe backstop. SHA-pinned actions, no
+  npm install, schedule/dispatch-only triggers. ⚠️ SECURITY NOTE: the token can
+  delete Turso DBs and the repo is PUBLIC — Turso has no scoped read-only token
+  for the usage API. Hardened in place; the cleaner alternative is Vercel Cron
+  (token in private Vercel env). See the monitor-cron PR.
+- **A6 CLOSED** — not a read lever (A.5 outer query already `items_tier_idx`-bounded
+  per EXPLAIN; `last_recheck_at` walk is latency-only, not billed rows).
+- **A1 (ANN) CLOSED** — not needed after A2 (negligible marginal cut, approximate,
+  needs a ≥99% recall backtest); reopen only if the monitor's run-rate demands.
+- **Clean-day rows_read re-measurement** — now the cron's ongoing job (baseline
+  556.8M @ 2026-07-13 07:42 UTC seeded).
 
 ---
 

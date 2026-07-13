@@ -3,9 +3,19 @@
 > **STATUS: ✅ DEPLOYED 2026-07-13.** PRs #42 (`feda34a`) + #43 (`ce62ede`) merged
 > to `main`; prod live on `news.ax0x.ai`. P3 executed end-to-end (DDL + A3 index +
 > targeted opt-out + scoped digest-unlink). Post-deploy verified: cluster cron 200,
-> A.5 stamping `last_recheck_at` (68 first tick), 0 digest contamination. A1(ANN)/A6
-> deferred; clean-day rows_read re-measurement + A5 monitor cron still pending.
-> Current status: `docs/HANDOFF.md` top section.
+> A.5 stamping `last_recheck_at` (68 first tick), 0 digest contamination.
+>
+> **A5 monitor cron WIRED** (daily GitHub Actions, `.github/workflows/read-budget-monitor.yml`)
+> — projects the rolling-window run-rate, fails loud (email) over 60M/mo, plus a
+> cumulative catastrophe backstop; SHA-pinned actions, no npm install, schedule-only
+> triggers (public repo). **A6 CLOSED — not a read lever:** post-deploy EXPLAIN shows
+> the A.5 outer candidate query is already index-bounded (`SEARCH i USING items_tier_idx
+> (tier=? AND published_at>?)`, not a 16K scan), and the `last_recheck_at` overflow
+> walk is latency-only (Turso bills rows, not pages). **A1 (ANN) CLOSED — not needed:**
+> steady-state projects well under target after A2; ANN is approximate (recall risk),
+> gated on a ≥99% backtest, negligible marginal cut — reopen only if the measured
+> run-rate ever demands. Remaining: clean-day rows_read re-measurement (the cron does
+> this ongoing). Current status: `docs/HANDOFF.md` top section.
 
 Follow-on to the 2026-07-12 cluster/Turso audit and the read-quota diagnosis
 (`docs/HANDOFF.md` → "Turso read-quota block"). Branch: `ax/w7-read-budget`.
@@ -112,13 +122,16 @@ term). Comfortably beats the <100M target with large margin.
     a recency bound would have orphaned them. Verified by a PLAN_CHECKS entry.
   - Projected after A2+A4+A3: **~15M/mo** — well under the <100M target. Gate:
     `bun run verify` non-live green.
-- **A1 / A6 — DEFERRED to P3, gated on measurement.** A1 (ANN routing) is
-  *approximate*: it can silently drop clustering recall (duplicate events not
-  merging), so it must not ship without a recall backtest (≥99% agreement vs the
-  exact scan) on the now-unblocked prod DB. After A2+A4+A3 (~15M/mo) its marginal
-  cut isn't worth a blind clustering-quality risk. A6 (A.5 outer-query index) is
-  a minor scan whose need is only provable from post-deploy EXPLAIN. Build both
-  only if the measured run-rate demands it.
+- **A1 / A6 — RESOLVED 2026-07-13, both CLOSED as not-needed** (were deferred to
+  post-deploy measurement). **A6:** post-deploy EXPLAIN of the A.5 outer candidate
+  query shows it is already index-bounded (`SEARCH i USING items_tier_idx (tier=?
+  AND published_at>?)` + PK join, not the feared 16K-cluster scan), and the
+  `last_recheck_at` overflow walk is latency-only (Turso bills rows, not overflow
+  pages) — so there is no read lever to build. **A1 (ANN routing):** approximate
+  (can silently drop clustering recall), gated on a ≥99%-agreement recall backtest,
+  and after A2+A4+A3 its marginal cut is negligible vs the target margin — not worth
+  a blind clustering-quality risk. Reopen A1 only if the A5 monitor's measured
+  run-rate ever demands it.
 - **P3 (needs prod):** ordered, confirm-before-apply:
   1. Back up (`scripts/ops/db-dump.ts`).
   2. **Apply `last_recheck_at` DDL BEFORE the deploy** (`bun run
@@ -129,10 +142,12 @@ term). Comfortably beats the <100M target with large margin.
      exists.
   3. Apply the A3 partial index (`bun run db:optimize` — note it also runs a
      `cluster_splits` dedupe DELETE, so honor the back-up-first rule).
-  4. Merge/deploy A2+A4+A3.
+  4. Merge/deploy A2+A4+A3. **(done — #42 `feda34a` + #43 `ce62ede`.)**
   5. Measure clean-day delta × 30 (target ≪ 100M); wire the A5 monitor as a
-     cron/alert (`PREV_ROWS`/`PREV_AT` for the run-rate projection).
-  6. Add A1/A6 iff the measured run-rate demands it.
+     cron/alert. **(cron DONE — daily GitHub Actions, rolling-window projection;
+     clean-day measurement is now the cron's ongoing job.)**
+  6. Add A1/A6 iff the measured run-rate demands it. **(both CLOSED as not-needed —
+     see the A1/A6 RESOLVED note above.)**
 
 ## Review (P2 adversarial passes — all findings fixed)
 

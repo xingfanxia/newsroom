@@ -1,9 +1,17 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, describe, expect, it } from "bun:test";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   assessReadBudget,
   parseUsageTotals,
   projectMonthlyReads,
 } from "@/lib/ops/read-budget";
+import {
+  isReading,
+  loadHistory,
+  RETENTION_DAYS,
+} from "@/scripts/ops/read-budget";
 
 describe("assessReadBudget — cumulative-vs-cap guardrail", () => {
   const cap = 500_000_000; // free-plan safety cap
@@ -94,5 +102,103 @@ describe("projectMonthlyReads — run-rate × 30d", () => {
 
   it("returns 0 for a non-positive elapsed window (avoids divide-by-zero)", () => {
     expect(projectMonthlyReads(1_000, 0)).toBe(0);
+  });
+});
+
+describe("isReading — snapshot entry guard", () => {
+  it("accepts a well-formed reading", () => {
+    expect(isReading({ rows_read: 5, captured_at: "2026-07-13T00:00:00Z" })).toBe(
+      true,
+    );
+  });
+
+  it("rejects missing/invalid fields", () => {
+    expect(isReading({ rows_read: 5 })).toBe(false);
+    expect(isReading({ rows_read: "5", captured_at: "2026-07-13T00:00:00Z" })).toBe(
+      false,
+    );
+    expect(isReading({ rows_read: 5, captured_at: "not-a-date" })).toBe(false);
+    expect(isReading(null)).toBe(false);
+  });
+});
+
+describe("loadHistory — rolling snapshot state", () => {
+  const NOW = Date.parse("2026-07-13T12:00:00Z");
+  const DAY = 86_400_000;
+  const iso = (ms: number) => new Date(ms).toISOString();
+  let dir: string | undefined;
+
+  afterEach(() => {
+    delete process.env.SNAPSHOT_IN;
+    delete process.env.PREV_ROWS;
+    delete process.env.PREV_AT;
+    if (dir) rmSync(dir, { recursive: true, force: true });
+    dir = undefined;
+  });
+
+  function writeSnapshot(content: string): string {
+    dir = mkdtempSync(join(tmpdir(), "rb-"));
+    const path = join(dir, "snap.json");
+    writeFileSync(path, content);
+    process.env.SNAPSHOT_IN = path;
+    return path;
+  }
+
+  it("first run (no file, no env) → empty history, not corrupt", () => {
+    const r = loadHistory(NOW);
+    expect(r.history).toEqual([]);
+    expect(r.corrupt).toBe(false);
+  });
+
+  it("reads a valid array, sorted oldest-first", () => {
+    writeSnapshot(
+      JSON.stringify([
+        { rows_read: 200, captured_at: iso(NOW - 1 * DAY) },
+        { rows_read: 100, captured_at: iso(NOW - 2 * DAY) },
+      ]),
+    );
+    const r = loadHistory(NOW);
+    expect(r.corrupt).toBe(false);
+    expect(r.history.map((h) => h.rows_read)).toEqual([100, 200]);
+  });
+
+  it("prunes readings older than the retention window", () => {
+    writeSnapshot(
+      JSON.stringify([
+        { rows_read: 10, captured_at: iso(NOW - (RETENTION_DAYS + 2) * DAY) },
+        { rows_read: 20, captured_at: iso(NOW - 1 * DAY) },
+      ]),
+    );
+    const r = loadHistory(NOW);
+    expect(r.history.map((h) => h.rows_read)).toEqual([20]);
+  });
+
+  it("accepts a legacy single-object snapshot as a one-entry history", () => {
+    writeSnapshot(JSON.stringify({ rows_read: 42, captured_at: iso(NOW - DAY) }));
+    const r = loadHistory(NOW);
+    expect(r.corrupt).toBe(false);
+    expect(r.history).toEqual([{ rows_read: 42, captured_at: iso(NOW - DAY) }]);
+  });
+
+  // The fail-loud contract: a corrupt baseline is NOT the same as "no baseline".
+  it("flags corrupt=true on unparseable JSON (guardrail was blind)", () => {
+    writeSnapshot("{not json");
+    const r = loadHistory(NOW);
+    expect(r.corrupt).toBe(true);
+    expect(r.history).toEqual([]);
+  });
+
+  it("flags corrupt=true when a file has zero valid readings", () => {
+    writeSnapshot(JSON.stringify([{ nope: 1 }]));
+    const r = loadHistory(NOW);
+    expect(r.corrupt).toBe(true);
+  });
+
+  it("falls back to PREV_ROWS/PREV_AT env when no file", () => {
+    process.env.PREV_ROWS = "555";
+    process.env.PREV_AT = iso(NOW - DAY);
+    const r = loadHistory(NOW);
+    expect(r.corrupt).toBe(false);
+    expect(r.history).toEqual([{ rows_read: 555, captured_at: iso(NOW - DAY) }]);
   });
 });
