@@ -38,7 +38,7 @@ export type IncrementalPublishInput = {
   now?: () => number;
 };
 
-type ObjectMetrics = {
+export type PublicPublisherObjectMetrics = {
   uploaded: number;
   reused: number;
   uploadedBytes: number;
@@ -51,7 +51,7 @@ type ReceiptContext = {
   now: () => number;
   batch: PublisherSourceBatch | null;
   fromWatermark: number;
-  objects: ObjectMetrics;
+  objects: PublicPublisherObjectMetrics;
 };
 
 export async function publishIncrementalSnapshot(
@@ -64,7 +64,7 @@ export async function publishIncrementalSnapshot(
     now,
     batch: null,
     fromWatermark: 0,
-    objects: emptyObjectMetrics(),
+    objects: emptyPublicPublisherObjectMetrics(),
   };
 
   let current: PointerRecord;
@@ -122,13 +122,13 @@ export async function publishIncrementalSnapshot(
   }
 
   try {
-    await uploadChangedArtifacts(input.store, release, context.objects);
+    await uploadChangedReleaseArtifacts(input.store, release, context.objects);
   } catch {
     return receipt(context, "failed", "upload_objects", null);
   }
 
   try {
-    await uploadAndVerifyManifest(input.store, release);
+    await uploadAndVerifyReleaseManifest(input.store, release);
   } catch {
     return receipt(context, "failed", "upload_manifest", null);
   }
@@ -145,7 +145,7 @@ export async function publishIncrementalSnapshot(
     sourceWatermark: context.batch.toWatermark,
   });
   const pointerBytes = canonicalJsonBytes(nextPointer);
-  const committed = await commitPointer(
+  const committed = await commitSnapshotPointer(
     input.store,
     current.etag,
     nextPointer,
@@ -203,10 +203,10 @@ async function readActiveManifest(
   return manifest;
 }
 
-async function uploadChangedArtifacts(
+export async function uploadChangedReleaseArtifacts(
   store: PublisherObjectStore,
   release: BuiltPublicRelease,
-  metrics: ObjectMetrics,
+  metrics: PublicPublisherObjectMetrics,
 ): Promise<void> {
   for (const artifact of release.artifacts) {
     if (artifact.unchanged) {
@@ -240,7 +240,7 @@ async function uploadChangedArtifacts(
   }
 }
 
-async function uploadAndVerifyManifest(
+export async function uploadAndVerifyReleaseManifest(
   store: PublisherObjectStore,
   release: BuiltPublicRelease,
 ): Promise<void> {
@@ -262,9 +262,9 @@ async function uploadAndVerifyManifest(
   }
 }
 
-async function commitPointer(
+export async function commitSnapshotPointer(
   store: PublisherObjectStore,
-  expectedEtag: string,
+  expectedEtag: string | null,
   pointer: SnapshotPointer,
   bytes: Uint8Array,
 ): Promise<boolean> {
@@ -369,7 +369,7 @@ function changeCounts(changes: readonly PublicEntityChange[]) {
   return counts;
 }
 
-function emptyObjectMetrics(): ObjectMetrics {
+export function emptyPublicPublisherObjectMetrics(): PublicPublisherObjectMetrics {
   return { uploaded: 0, reused: 0, uploadedBytes: 0, reusedBytes: 0 };
 }
 

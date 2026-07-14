@@ -73,30 +73,27 @@ artifacts:
   repo_aliases:
     plan: docs/R2-PUBLIC-READ-PLAN-2026-07-14.md
     evidence: docs/reports/r2-public-read/
-iteration: 11
+iteration: 12
 phase: implementation
 current_artifact: docs/superpowers/plans/2026-07-14-r2-public-read-decoupling.md
-current_criterion: AC-003
+current_criterion: AC-005
 last_action: >-
-  Completed Task 10 locally: added stable content-addressed entity shards, a
-  deterministic incremental release builder, an injected conditional object
-  store, pointer-last publisher orchestration, and a pinned R2 S3 adapter using
-  region auto plus If-None-Match/If-Match. Event-log fakes prove content
-  readback precedes manifest, manifest precedes pointer CAS, explicit CAS loss
-  never acks, ambiguous CAS requires matching reread, post-commit ack failure
-  retries without a duplicate release, concurrent later outbox IDs survive,
-  unchanged hashes reuse bytes, and 1/100 changes load exactly 1/100 stable
-  shards despite 2,000 unrelated descriptors. Mocked S3 tests prove command
-  shape and conditional error mapping. The focused suites passed 10/10 with 70
-  assertions, typecheck passed, and focused lint had no remaining findings.
-  AC-003 remains OPEN for Task 11's operational surface. No R2/Turso/Cloudflare
-  mutation, snapshot publish, deploy, bootstrap, or production request ran.
+  Completed Task 11 locally and moved AC-003 to PASS_PENDING_FINAL. The
+  authenticated publish cron, exact 12/27/42/57 schedule, shared operator
+  runtime, immutable run receipts, explicit state-file bootstrap with --apply
+  plus a single-use write-ahead spend ledger, bounded R2-only reconciliation,
+  and conservative 7-release/30-day retention planner are wired. Recurring
+  entrypoints cannot import bootstrap/full materialization and pointer repair
+  always requires an operator pause. The AC-003 verifier passed 6 hermetic
+  suites, 28 tests and 185 assertions under hostile inherited Turso/R2
+  sentinels. No production service, migration, publish, bootstrap, deploy or
+  request was touched.
 next_action: >-
-  Continue AC-003 with Task 11's authenticated cron/operator wiring, explicit
-  one-shot bootstrap guard, bounded reconciliation, and pure retention planner.
-  Keep execution on fakes/local fixtures and do not apply the outbox migration,
-  access production R2, publish/bootstrap, deploy, or cut over routes without
-  AX authorization.
+  Return to deferred Task 7 and implement AC-005's fail-closed snapshot HTTP
+  reader against the now-real manifest/entity-shard contract, including current
+  to previous recovery and warm last-known-good. Keep fetch/store behavior on
+  injected local fakes; do not call the public R2 domain or any production
+  service.
 halt_cause: null
 halt_scan: []
 stuck_counters: {}
@@ -202,6 +199,38 @@ attempts:
       Revert iteration-11 files if immutable object readback, manifest-before-
       pointer ordering, CAS-loss/ambiguity handling, ack retry, deterministic
       reuse, or touched-shard scale bounds cannot be proven entirely on fakes.
+  - iteration: 12
+    criterion: AC-003
+    failing_evidence: >-
+      Atomic publisher primitives exist but no authenticated cron, shared
+      operator runtime, explicit one-shot bootstrap guard, bounded integrity
+      reconciliation, or rollback-safe retention plan invokes them. AC-003 has
+      no deployable operational surface and remains OPEN.
+    hypothesis: >-
+      One shared runtime behind authenticated cron/operator entrypoints, a
+      write-ahead bootstrap ledger, read-only bounded reconciliation and a pure
+      conservative retention planner can make operations runnable without
+      allowing recurring full materialization or automatic pointer repair.
+    edit_surface:
+      - app/api/cron/publish-public/route.ts
+      - lib/public-content/publisher/runtime.ts
+      - lib/public-content/publisher/bootstrap.ts
+      - lib/public-content/publisher/reconcile.ts
+      - lib/public-content/publisher/retention.ts
+      - scripts/ops/publish-public-snapshot.ts
+      - scripts/ops/bootstrap-public-snapshot.ts
+      - scripts/ops/reconcile-public-snapshot.ts
+      - scripts/ops/run-cron.ts
+      - vercel.json
+      - package.json
+      - tests/cron/public-snapshot-publisher.test.ts
+      - tests/public-content/bootstrap-retention.test.ts
+      - loop/STATE.md
+    rollback: >-
+      Revert iteration-12 files if cron/operator parity, exact cadence,
+      bootstrap write-ahead refusal, bounded reconcile, minimum rollback
+      retention, or the absence of a recurring full-materialize import cannot
+      be proved without production execution.
 budget:
   source: loop/PROMPT.md immutable human-authored policy
   r2_object_writes_per_run: 500
@@ -542,6 +571,34 @@ pressure_consulted:
       P-metered-cap: >-
         Dependency metadata lookup is the only network read; R2, Turso,
         Cloudflare, deploy, publish, bootstrap and public HTTP spend stay zero.
+  - iteration: 12
+    consulted_at: 2026-07-14
+    ids:
+      - P-public-db-zero
+      - P-rows-hard
+      - P-rows-ideal
+      - P-safe-tests
+      - P-architecture-api
+      - P-metered-cap
+    influence:
+      P-public-db-zero: >-
+        Limits DB/R2 writer construction to publisher runtime entrypoints and
+        adds no anonymous route import or fallback.
+      P-rows-hard: >-
+        Recurring cron calls only the incremental source; bootstrap state is an
+        explicit one-shot operator input and cannot be reached by cron.
+      P-rows-ideal: >-
+        Keeps reconciliation R2-only and bounded so daily integrity work adds
+        no Turso floor.
+      P-safe-tests: >-
+        Uses injected cron runners, memory object stores and pure planners plus
+        focused source assertions, typecheck and lint.
+      P-architecture-api: >-
+        Shares one runtime between cron and operators while keeping bootstrap,
+        reconcile and retention as separate narrow capabilities.
+      P-metered-cap: >-
+        No script or route is executed against external services; all R2,
+        Turso, Cloudflare, deploy, bootstrap, publish and request spend is zero.
 ```
 
 ## Alignment reviews

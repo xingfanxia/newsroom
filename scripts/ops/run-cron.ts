@@ -17,6 +17,7 @@ import { runFetchCronBucket } from "@/workers/fetcher/pipeline";
 import { runContentPrefetch } from "@/workers/fetcher/content-prefetch";
 import { runYoutubeTranscriptFetch } from "@/workers/fetcher/youtube-transcript";
 import { runDailyColumn, runNewsletterBatch } from "@/workers/newsletter";
+import { runIncrementalPublicPublisher } from "@/lib/public-content/publisher/runtime";
 
 type CronRunner = () => Promise<unknown>;
 
@@ -28,7 +29,7 @@ const youtubeTranscript = async () => ({
   youtube: await runYoutubeTranscriptFetch(),
 });
 
-const CRON_RUNNERS = {
+export const CRON_RUNNERS = {
   "fetch-hourly": fetchHourly,
   "fetch-daily": fetchDaily,
   "fetch-weekly": fetchWeekly,
@@ -42,6 +43,7 @@ const CRON_RUNNERS = {
   "newsletter-monthly": async () => ({
     newsletter: await runNewsletterBatch("monthly"),
   }),
+  "publish-public": runIncrementalPublicPublisher,
   "youtube-transcript": youtubeTranscript,
 } satisfies Record<string, CronRunner>;
 
@@ -62,7 +64,7 @@ const USAGE_KINDS = [
 ].sort();
 const USAGE = `usage: bun scripts/ops/run-cron.ts {${USAGE_KINDS.join("|")}}`;
 
-function resolveCronKind(kind: string): CronKind | null {
+export function resolveCronKind(kind: string): CronKind | null {
   if (kind in CRON_RUNNERS) return kind as CronKind;
   return (CRON_ALIASES as Record<string, CronKind>)[kind] ?? null;
 }
@@ -85,7 +87,9 @@ async function main() {
   console.log(JSON.stringify(report, null, 2));
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+if (import.meta.main) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

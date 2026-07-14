@@ -78,10 +78,18 @@ This inventory is frozen from
     SQL plans; publisher telemetry reports candidate/scanned/returned rows.
   fail_evidence: >-
     Publisher, outbox, immutable manifests, and their fault tests do not exist.
-  status: OPEN
+  status: PASS_PENDING_FINAL
   depends_on: [AC-001, AC-002]
   reopen_condition: Any publish path can advance a partial release, lose a concurrent change, or rescan the corpus on a no-change tick.
-  last_verification: Not run; implementation absent 2026-07-14.
+  last_verification: >-
+    Passed locally 2026-07-14 via `bun run verify:r2-public --criterion
+    AC-003`: 6 hermetic publisher suites, 28 tests and 185 assertions under
+    hostile inherited Turso/R2 credential sentinels. Evidence covers outbox
+    high-water safety, bounded PK/index plans, one batched event-member query,
+    content/manifest readback, pointer-last CAS conflict and ambiguity, ack
+    retry, deterministic shard reuse/scale, one-shot bootstrap ledger, exact
+    cron cadence, bounded reconciliation and conservative retention. No
+    production migration, DB/R2 call, publish or deploy ran.
 
 - id: AC-004
   statement: >-

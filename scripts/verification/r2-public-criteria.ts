@@ -242,6 +242,42 @@ async function verifyAc002(root: string): Promise<CriterionReceipt> {
   return { criterion: "AC-002", ok: true, receipts };
 }
 
+const AC003_TEST_INPUTS = [
+  "tests/public-content/outbox-migration.test.ts",
+  "tests/public-content/publisher-source.test.ts",
+  "tests/public-content/publisher.test.ts",
+  "tests/public-content/r2-store.test.ts",
+  "tests/cron/public-snapshot-publisher.test.ts",
+  "tests/public-content/bootstrap-retention.test.ts",
+] as const;
+
+async function verifyAc003(root: string): Promise<CriterionReceipt> {
+  const exitCode = await runHermeticTests({
+    root,
+    requestedInputs: AC003_TEST_INPUTS,
+    inheritedEnv: {
+      ...process.env,
+      TURSO_DATABASE_URL: "libsql://ac003-production-sentinel.invalid",
+      TURSO_AUTH_TOKEN: "ac003-production-token-sentinel",
+      R2_ENDPOINT: "https://ac003-r2-sentinel.invalid",
+      R2_ACCESS_KEY_ID: "ac003-r2-access-sentinel",
+      R2_SECRET_ACCESS_KEY: "ac003-r2-secret-sentinel",
+    },
+    deadlineMs: 60_000,
+  });
+  assert(exitCode === 0, "AC-003 incremental publisher suite failed");
+  return {
+    criterion: "AC-003",
+    ok: true,
+    receipts: [
+      `${AC003_TEST_INPUTS.length} hermetic publisher suites passed under hostile credential inheritance`,
+      "outbox high-water, bounded PK/index plans and one batched event-member query passed",
+      "content/manifest readback, pointer-last CAS, ambiguity and ack retry fault matrix passed",
+      "stable touched-shard scale, one-shot bootstrap ledger, exact cron cadence and conservative retention passed",
+    ],
+  };
+}
+
 export async function verifyR2PublicCheap(
   root = resolve(join(import.meta.dir, "../..")),
 ): Promise<CriterionReceipt> {
@@ -268,5 +304,6 @@ export async function verifyR2PublicCriterion(
 ): Promise<CriterionReceipt> {
   if (criterion === "AC-001") return verifyAc001(root);
   if (criterion === "AC-002") return verifyAc002(root);
+  if (criterion === "AC-003") return verifyAc003(root);
   throw new Error(`Criterion is not implemented yet: ${criterion}`);
 }
