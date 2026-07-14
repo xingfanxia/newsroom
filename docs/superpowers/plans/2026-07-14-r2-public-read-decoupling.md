@@ -190,9 +190,12 @@ replacement acceptance source.
 
 - Create: `lib/public-content/entrypoints.ts`
 - Create: `scripts/verification/discover-public-entrypoints.ts`
+- Create: `scripts/verification/public-entrypoint-discovery/*.ts`
+- Create: `scripts/verification/request-pathname.ts`
 - Create: `scripts/ops/check-public-db-boundary.ts`
-- Create: `tests/tooling/public-entrypoints.test.ts`
-- Create: `tests/tooling/public-db-boundary.test.ts`
+- Create: `scripts/ops/public-db-boundary/*.ts`
+- Create: `tests/tooling/public-entrypoints-*.test.ts`
+- Create: `tests/tooling/public-db-boundary-*.test.ts`
 - Create: `docs/reports/r2-public-read/source-boundary-known-red-2026-07-14.md`
 
 **Steps:**
@@ -205,6 +208,11 @@ replacement acceptance source.
 3. Write recursive TypeScript import-graph tests that reject `db/**`,
    `@libsql/client`, `drizzle-orm`, publisher modules, DB-owning loaders and
    Turso secret names. Ignore type-only edges only when the target is pure.
+   Resolve executable Next page roots with shared interception-aware request
+   path semantics: normal branch matches suppress `default`; interceptor-only
+   and unmatched branches retain `default` plus wrappers; nested slots are
+   evaluated per branch; and raw nested-slot entries resolve implicit children
+   at every enclosing slot parent.
 4. Prove the guard fails on a synthetic transitive bad import, then passes on a
    pure fixture graph.
 5. Run the guard once against current source/build and record the expected-red
@@ -563,11 +571,20 @@ replacement acceptance source.
 
 1. RED synthetic source mutation and synthetic NFT each fail their guard.
 2. Build with Turso absent/poisoned and local snapshot HTTP fixture. Discover
-   authoritative bundles from `app-paths-manifest.json`; reject libSQL/native DB,
-   Drizzle, publisher, Turso names and unclassified entries.
+   authoritative route bundles from `app-paths-manifest.json`. Scan the compiled
+   bytes (not only NFT dependencies) of every route bundle, the dedicated
+   `server/middleware.js` and `server/instrumentation.js` modules, every
+   selected/global Edge artifact named by `middleware-manifest.json`, and every
+   browser chunk reached by `instrumentation-client`; validate the matching NFT
+   traces and Edge environment keys as additional evidence. Reject libSQL/native
+   DB, Drizzle, publisher, Turso names, unsafe/missing evidence and unclassified
+   entries. Task 4 covers source/NFT structure and marks Edge compiled content
+   `unverified-edge-content`; this task owns authoritative emitted-byte proof.
 3. Start a local recording poison endpoint. Exercise every inventoried GET,
-   implicit HEAD, HTML, RSC, API and RSS route against a cold runtime; require
-   expected status/schema/release and exactly zero poison connections.
+   implicit HEAD, HTML, RSC, API and RSS route against a cold runtime, including
+   browser startup, hydration, client auto-fetch/prefetch behavior, and compiled
+   `instrumentation-client` chunks; require expected status/schema/release and
+   exactly zero poison connections.
 4. Make the clean production build and full corpus pass without weakening the
    known-bad mutations.
 5. Wire source/NFT/poison gates into `verify:r2-public`.
