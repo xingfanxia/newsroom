@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { GET as publicSearchGet } from "@/app/api/public/search/route";
+import { assertProductionIntegrationOptIn } from "@/scripts/verification/run-hermetic-tests";
+import { assertProductionPrecondition } from "@/tests/integration/production/preconditions";
+
+assertProductionIntegrationOptIn();
 
 function req(path: string): Request {
   return new Request(`http://localhost${path}`);
@@ -18,10 +22,10 @@ describe("/api/public/search", () => {
 
     const firstBody = await first.json();
     const widerBody = await wider.json();
-    if (widerBody.items.length < 2) {
-      // Fresh or tiny dev DB: not enough matches to prove pagination totals.
-      return;
-    }
+    assertProductionPrecondition(
+      widerBody.items.length >= 2,
+      "public lexical search must match at least two rows to prove totals",
+    );
 
     expect(firstBody.items.length).toBe(1);
     expect(widerBody.items.length).toBe(2);

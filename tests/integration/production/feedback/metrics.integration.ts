@@ -5,11 +5,12 @@ import {
   getFeedbackCounts,
   getRecentFeedback,
 } from "@/lib/feedback/metrics";
+import { assertProductionIntegrationOptIn } from "@/scripts/verification/run-hermetic-tests";
+import { requireProductionFixture } from "@/tests/integration/production/preconditions";
 
-const hasDb = Boolean(process.env.TURSO_DATABASE_URL);
-const describeOrSkip = hasDb ? describe : describe.skip;
+assertProductionIntegrationOptIn();
 
-describeOrSkip("feedback metrics (real DB)", () => {
+describe("feedback metrics (real DB)", () => {
   const USER_ID = `m3-metrics-${crypto.randomUUID()}`;
   let itemId: number | null = null;
 
@@ -24,7 +25,10 @@ describeOrSkip("feedback metrics (real DB)", () => {
       .from(schema.items)
       .limit(1);
     itemId = rows[0]?.id ?? null;
-    if (itemId === null) return;
+    requireProductionFixture(
+      itemId,
+      "items table must contain a row for feedback metrics coverage",
+    );
 
     await db()
       .insert(schema.users)
@@ -50,7 +54,7 @@ describeOrSkip("feedback metrics (real DB)", () => {
   });
 
   it("counts rise by the inserted votes", async () => {
-    if (itemId === null) return;
+    requireProductionFixture(itemId, "feedback count test requires setup data");
     const { total, agreed, disagreed, saved } = await getFeedbackCounts();
     expect(total).toBeGreaterThanOrEqual(1);
     expect(agreed).toBeGreaterThanOrEqual(1);
@@ -59,7 +63,7 @@ describeOrSkip("feedback metrics (real DB)", () => {
   });
 
   it("recent feedback includes the test user's up vote and skips save", async () => {
-    if (itemId === null) return;
+    requireProductionFixture(itemId, "recent feedback test requires setup data");
     const entries = await getRecentFeedback("zh", 50);
     const mine = entries.filter((e) => e.note === "nice");
     expect(mine.length).toBe(1);

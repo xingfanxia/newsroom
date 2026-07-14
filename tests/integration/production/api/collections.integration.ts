@@ -8,11 +8,12 @@ import {
   updateCollectionRoutePayload,
 } from "@/lib/api/collection-routes";
 import { FEEDBACK_SAVE_VOTE } from "@/lib/types";
+import { assertProductionIntegrationOptIn } from "@/scripts/verification/run-hermetic-tests";
+import { assertProductionPrecondition } from "@/tests/integration/production/preconditions";
 
-const hasDb = Boolean(process.env.TURSO_DATABASE_URL);
-const describeOrSkip = hasDb ? describe : describe.skip;
+assertProductionIntegrationOptIn();
 
-describeOrSkip("collection route payload helpers (real DB)", () => {
+describe("collection route payload helpers (real DB)", () => {
   const ownerUserId = `collection-route-owner-${crypto.randomUUID()}`;
   const otherUserId = `collection-route-other-${crypto.randomUUID()}`;
   const ownerEmail = `${ownerUserId}@example.test`;
@@ -43,7 +44,10 @@ describeOrSkip("collection route payload helpers (real DB)", () => {
   });
 
   test("runs owner-scoped CRUD and reparents saves to inbox on delete", async () => {
-    if (itemId === null) return;
+    assertProductionPrecondition(
+      itemId !== null,
+      "items table must contain a row for collection route coverage",
+    );
 
     const created = await createCollectionRoutePayload({
       userId: ownerUserId,
@@ -52,7 +56,10 @@ describeOrSkip("collection route payload helpers (real DB)", () => {
       pinned: false,
     });
     expect(created.ok).toBe(true);
-    if (!created.ok) return;
+    assertProductionPrecondition(
+      created.ok,
+      "collection creation must succeed before CRUD assertions",
+    );
 
     const collection = created.payload.collection;
     expect(collection).toMatchObject({

@@ -6,22 +6,11 @@ import {
   saveTweaksRoutePayload,
 } from "@/lib/api/tweak-routes";
 import type { SessionUser } from "@/lib/auth/session";
-import { readSource as read } from "@/tests/helpers/source";
+import { assertProductionIntegrationOptIn } from "@/scripts/verification/run-hermetic-tests";
 
-const hasDb = Boolean(process.env.TURSO_DATABASE_URL);
-const describeOrSkip = hasDb ? describe : describe.skip;
+assertProductionIntegrationOptIn();
 
-describe("tweaks route payload source contract", () => {
-  test("types the shared payload as a partial Tweaks contract", () => {
-    const source = read("lib/api/tweak-routes.ts");
-
-    expect(source).toContain('from "@/lib/tweaks"');
-    expect(source).toContain("tweaks: Partial<Tweaks> | null;");
-    expect(source).not.toContain("tweaks: unknown | null;");
-  });
-});
-
-describeOrSkip("tweaks route payload helpers (real DB)", () => {
+describe("tweaks route payload helpers (real DB)", () => {
   const user: SessionUser = {
     id: `tweak-route-${crypto.randomUUID()}`,
     email: `tweak-route-${crypto.randomUUID()}@example.test`,

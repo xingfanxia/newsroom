@@ -73,21 +73,24 @@ artifacts:
   repo_aliases:
     plan: docs/R2-PUBLIC-READ-PLAN-2026-07-14.md
     evidence: docs/reports/r2-public-read/
-iteration: 2
+iteration: 4
 phase: implementation
 current_artifact: docs/superpowers/plans/2026-07-14-r2-public-read-decoupling.md
-current_criterion: AC-001
+current_criterion: AC-007
 last_action: >-
-  Completed Task 1's hermetic command primitive with focused TDD and independent
-  review. The accepted implementation is the single local commit f46cc21; its
-  post-squash diff hash exactly matches the reviewed diff. Focused tests passed
-  16/16 plus typecheck and lint. AC-001 remains OPEN because package test/verify
-  entrypoints are not yet rewired. No production-backed test, network operation,
-  push, or external mutation was run.
+  Completed Task 2 and its independent review fixes with focused TDD. AC-001 is
+  PASS_PENDING_FINAL: production credential sentinels and exit-zero failure/
+  timeout evidence are rejected; Next cannot replace 28 explicit local/fake
+  values; focused input is restricted to the default regular-file allowlist;
+  and every production data prerequisite fails loud without bare early returns.
+  Final verify passed typecheck, zero-warning lint, Next build, three Knip gates,
+  and 1198/1198 tests. Eleven real-Turso suites and the separate live semantic
+  smoke remain explicit. No production integration, cloud request, push, or
+  external mutation was run.
 next_action: >-
-  Execute Task 2 to make package test/verify entrypoints hermetic, convert the
-  three unconditional production-backed API suites into explicit integration
-  entrypoints, and prove AC-001 RED/GREEN without loading .env.local.
+  Execute Task 3 to remove the anonymous saved-data admin fallback and public
+  discovery, add the cookie-only identity boundary, and disable calendar date
+  prefetch amplification under focused local tests.
 halt_cause: null
 halt_scan: []
 stuck_counters: {}
@@ -162,6 +165,8 @@ pressure_objects:
 pressure_ledger:
   - 2026-07-14: seeded six frontload pressures from AX requirements and grep-confirmed repo conventions
   - 2026-07-14: accepted Task 1 only after focused TDD, adversarial review fixes, and reviewed-diff hash preservation
+  - 2026-07-14: made AC-001 pass locally only after Next-loader token shadowing, fail-loud integration inventory, and a pristine default gate
+  - 2026-07-14: closed Task 2 review gaps by regular-file allowlisting focused inputs and eliminating production data-dependent bare returns
 pressure_consulted:
   - iteration: 1
     consulted_at: 2026-07-14
@@ -203,6 +208,39 @@ pressure_consulted:
       P-metered-cap: >-
         Used only local fake fixtures and process probes; performed no DB, R2,
         Cloudflare, deploy, publish, push, or production traffic operation.
+  - iteration: 3
+    consulted_at: 2026-07-14
+    ids:
+      - P-safe-tests
+      - P-metered-cap
+      - P-architecture-api
+    influence:
+      P-safe-tests: >-
+        Reclassified every real-Turso suite as an explicit fail-loud input,
+        shadowed every repo-relevant Next-visible controlled credential with a
+        local/fake value, and required exit status, clean output, and completion
+        sentinels before the default gate could pass.
+      P-metered-cap: >-
+        Ran only file-backed libSQL, in-memory fake R2, temporary dotenv probes,
+        and local test processes; production integration and all cloud mutations
+        remained at zero.
+      P-architecture-api: >-
+        Centralized production-test ownership in one manifest/README and made
+        the newsletter selector accept a typed pure loader so its default test
+        no longer depends on ambient database state.
+  - iteration: 4
+    consulted_at: 2026-07-14
+    ids:
+      - P-safe-tests
+      - P-metered-cap
+    influence:
+      P-safe-tests: >-
+        Converted focused test selection from path validation to strict
+        regular-file allowlisting and replaced every production integration
+        bare return with a named failing data precondition.
+      P-metered-cap: >-
+        Verified the production-directory bypass only as an expected local
+        rejection; no production integration child or external request ran.
 ```
 
 ## Alignment reviews

@@ -7,11 +7,15 @@ import {
   moveItemToCollection,
   userOwnsSavedCollection,
 } from "@/lib/items/collections";
+import { assertProductionIntegrationOptIn } from "@/scripts/verification/run-hermetic-tests";
+import {
+  assertProductionPrecondition,
+  requireProductionFixture,
+} from "@/tests/integration/production/preconditions";
 
-const hasDb = Boolean(process.env.TURSO_DATABASE_URL);
-const describeOrSkip = hasDb ? describe : describe.skip;
+assertProductionIntegrationOptIn();
 
-describeOrSkip("saved collection ownership (real DB)", () => {
+describe("saved collection ownership (real DB)", () => {
   const ownerUserId = `m3-collections-owner-${crypto.randomUUID()}`;
   const otherUserId = `m3-collections-other-${crypto.randomUUID()}`;
   let itemId: number | null = null;
@@ -19,19 +23,22 @@ describeOrSkip("saved collection ownership (real DB)", () => {
   let otherCollectionId: number | null = null;
 
   async function resetSave(collectionId: number | null) {
-    if (itemId === null) return;
+    const fixtureItemId = requireProductionFixture(
+      itemId,
+      "saved collection reset requires the setup item",
+    );
     await db()
       .delete(schema.feedback)
       .where(
         and(
           eq(schema.feedback.userId, ownerUserId),
-          eq(schema.feedback.itemId, itemId),
+          eq(schema.feedback.itemId, fixtureItemId),
           eq(schema.feedback.vote, "save"),
         ),
       );
     await db().insert(schema.feedback).values({
       userId: ownerUserId,
-      itemId,
+      itemId: fixtureItemId,
       vote: "save",
       collectionId,
     });
@@ -43,7 +50,10 @@ describeOrSkip("saved collection ownership (real DB)", () => {
       .from(schema.items)
       .limit(1);
     itemId = items[0]?.id ?? null;
-    if (itemId === null) return;
+    assertProductionPrecondition(
+      itemId !== null,
+      "items table must contain a row for saved collection coverage",
+    );
 
     await db()
       .insert(schema.users)
@@ -86,13 +96,12 @@ describeOrSkip("saved collection ownership (real DB)", () => {
   });
 
   it("rejects another user's collection id and preserves the save", async () => {
-    if (
-      itemId === null ||
-      ownerCollectionId === null ||
-      otherCollectionId === null
-    ) {
-      return;
-    }
+    assertProductionPrecondition(
+      itemId !== null &&
+        ownerCollectionId !== null &&
+        otherCollectionId !== null,
+      "saved collection fixtures must create item and both collections",
+    );
     await resetSave(null);
     expect(
       await userOwnsSavedCollection(ownerUserId, ownerCollectionId),
@@ -127,13 +136,12 @@ describeOrSkip("saved collection ownership (real DB)", () => {
   });
 
   it("move helper also rejects cross-owner collections", async () => {
-    if (
-      itemId === null ||
-      ownerCollectionId === null ||
-      otherCollectionId === null
-    ) {
-      return;
-    }
+    assertProductionPrecondition(
+      itemId !== null &&
+        ownerCollectionId !== null &&
+        otherCollectionId !== null,
+      "saved collection fixtures must create item and both collections",
+    );
     await resetSave(ownerCollectionId);
 
     await expect(

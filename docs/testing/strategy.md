@@ -12,13 +12,27 @@ Run the full local gate before committing a code or docs change:
 bun run verify
 ```
 
-`verify` runs, in order:
+`verify` runs every stage through the checked hermetic command wrapper, in
+order:
 
 1. `bun run typecheck` — standalone `tsc --noEmit`, including tests and Bun runtime APIs.
 2. `bun run lint` — ESLint with zero warnings expected.
 3. `bun run build` — Next production build and route/type generation.
 4. `bun run code:dead`, `bun run code:dead:exports`, and `bun run code:dead:types` — Knip file/dependency/export gates.
-5. `bun run test` — full Bun test suite with `.env.local`.
+5. `bun run test` — the explicitly enumerated hermetic Bun test suite.
+
+The wrapper disables Bun dotenv discovery, removes inherited Turso/R2/AWS/
+Cloudflare credentials, and supplies explicit file-backed libSQL plus `fake-*`
+object-store/control-plane values. Next's own env loader receives those values
+before it reads `.env.production.local` or `.env.local`, so dotenv cannot fill
+in a missing production auth token. Each stage must both exit zero and emit its
+private completion sentinel; visible `(fail)`, timeout, or between-test
+unhandled-error output rejects the gate even when Bun exits zero.
+
+Hermetic here means production Turso/R2 credentials and integration tests are
+unreachable from the default gate. It does not promise an offline build: Next
+font resolution and `bunx knip` may still use their normal package/network
+behavior.
 
 Also run `git diff --check` before committing so whitespace issues are caught
 outside the package script. It is not part of `verify` because agents usually
@@ -29,16 +43,30 @@ run `verify` while there are intentional unstaged edits.
 Use targeted tests while iterating, then finish with `bun run verify`.
 
 ```bash
-bun test --env-file=.env.local path/to/test.ts
+bun run test -- path/to/test.ts
 ```
+
+Focused inputs must be regular files in the default discovered test allowlist.
+Directories, arbitrary source files, and production `.integration.ts`/`.live.ts`
+inputs are rejected before the Bun test child starts.
 
 For source-contract changes, prefer the existing `tests/**/**-source.test.ts`
 pattern. These tests intentionally read runtime files and docs to prevent
 duplicate enum lists, stale routing guidance, or helper drift from returning.
 
-For real-DB tests, keep the `TURSO_DATABASE_URL` skip behavior in
-the test itself. Do not replace DB-backed invariants with source-only checks
-unless the behavior is impossible to exercise locally.
+Real-production DB tests live under `tests/integration/production/` with an
+`.integration.ts` or `.live.ts` suffix and are absent from default discovery.
+They fail loud unless the dedicated command and explicit switch are both used;
+there are no skip/xfail fallbacks:
+
+```bash
+RUN_PRODUCTION_INTEGRATION=1 bun run test:production
+```
+
+The optional Azure semantic smoke additionally requires
+`RUN_LIVE_SEMANTIC_TEST=1` and `bun run test:production:semantic`. See
+`tests/integration/production/README.md` for the complete input and mutation
+inventory. Never run either command during a clean Turso measurement window.
 
 ## Mocking — bun `mock.module` is process-global
 
@@ -65,7 +93,8 @@ each had to re-learn:
    `feed-cache.ts`'s arg-taking readers do).
 
 A targeted single-file run **masks** all three — always cross-check with the full
-`bun run test` (or `bun test tests/`) before declaring a mock-touching change clean.
+`bun run test` before declaring a mock-touching change clean. Do not bypass the
+runner with a raw `bun test tests/` command.
 
 ## Docs Changes
 

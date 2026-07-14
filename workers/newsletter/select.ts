@@ -78,6 +78,20 @@ type RawRow = {
   from_curated: number;
 };
 
+interface DailyColumnSelectionWindow {
+  start: Date;
+  end: Date;
+}
+
+interface DailyColumnCandidates {
+  curated: SelectedRow[];
+  hot: SelectedRow[];
+}
+
+export type DailyColumnCandidateLoader = (
+  window: DailyColumnSelectionWindow,
+) => Promise<DailyColumnCandidates>;
+
 function parseJsonColumn(value: string | null): unknown {
   if (value == null) return null;
   try {
@@ -122,10 +136,10 @@ function rawToSelected(r: RawRow): SelectedRow {
  * highest-importance representative; coverage = cluster.member_count for events,
  * 1 for singletons.
  */
-export async function selectDailyColumnPool(
-  now: Date,
-): Promise<SelectionResult> {
-  const { start, end } = computeDailyNewsletterWindow(now);
+const loadDailyColumnCandidates: DailyColumnCandidateLoader = async ({
+  start,
+  end,
+}) => {
   const client = db();
 
   const curatedRaw = await client.all<RawRow>(sql`
@@ -174,6 +188,16 @@ export async function selectDailyColumnPool(
 
   const curated = curatedRaw.map(rawToSelected);
   const hot = hotRaw.map(rawToSelected);
+
+  return { curated, hot };
+};
+
+export async function selectDailyColumnPool(
+  now: Date,
+  loadCandidates: DailyColumnCandidateLoader = loadDailyColumnCandidates,
+): Promise<SelectionResult> {
+  const { start, end } = computeDailyNewsletterWindow(now);
+  const { curated, hot } = await loadCandidates({ start, end });
 
   // Item-level dedup: curated wins (preserves fromCurated metadata).
   const seenItem = new Set<number>();

@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { GET as publicFeedGet } from "@/app/api/public/feed/route";
+import { assertProductionIntegrationOptIn } from "@/scripts/verification/run-hermetic-tests";
+import { assertProductionPrecondition } from "@/tests/integration/production/preconditions";
+
+assertProductionIntegrationOptIn();
 
 function req(path: string): Request {
   return new Request(`http://localhost${path}`);
@@ -18,10 +22,10 @@ describe("/api/public/feed", () => {
 
     const firstBody = await first.json();
     const widerBody = await wider.json();
-    if (widerBody.items.length < 2) {
-      // Fresh or tiny dev DB: not enough rows to prove pagination totals.
-      return;
-    }
+    assertProductionPrecondition(
+      widerBody.items.length >= 2,
+      "public feed must expose at least two rows to prove pagination totals",
+    );
 
     expect(firstBody.items.length).toBe(1);
     expect(widerBody.items.length).toBe(2);

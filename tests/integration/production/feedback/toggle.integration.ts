@@ -4,59 +4,12 @@ import { closeDb, db, schema } from "@/db/client";
 import {
   applyFeedbackToggle,
   currentVotes,
-  feedbackBodySchema,
 } from "@/lib/feedback/toggle";
+import { assertProductionIntegrationOptIn } from "@/scripts/verification/run-hermetic-tests";
+import { requireProductionFixture } from "@/tests/integration/production/preconditions";
 
-describe("feedbackBodySchema", () => {
-  it("accepts a valid up/on payload", () => {
-    const parsed = feedbackBodySchema.safeParse({
-      itemId: 1,
-      vote: "up",
-      on: true,
-    });
-    expect(parsed.success).toBe(true);
-  });
+assertProductionIntegrationOptIn();
 
-  it("rejects unknown vote values", () => {
-    const parsed = feedbackBodySchema.safeParse({
-      itemId: 1,
-      vote: "love",
-      on: true,
-    });
-    expect(parsed.success).toBe(false);
-  });
-
-  it("rejects non-integer itemId", () => {
-    const parsed = feedbackBodySchema.safeParse({
-      itemId: 1.5,
-      vote: "up",
-      on: true,
-    });
-    expect(parsed.success).toBe(false);
-  });
-
-  it("rejects zero / negative itemId", () => {
-    expect(
-      feedbackBodySchema.safeParse({ itemId: 0, vote: "up", on: true }).success,
-    ).toBe(false);
-    expect(
-      feedbackBodySchema.safeParse({ itemId: -1, vote: "up", on: true }).success,
-    ).toBe(false);
-  });
-
-  it("rejects notes above 500 chars", () => {
-    const parsed = feedbackBodySchema.safeParse({
-      itemId: 1,
-      vote: "down",
-      on: true,
-      note: "x".repeat(501),
-    });
-    expect(parsed.success).toBe(false);
-  });
-});
-
-const hasDb = Boolean(process.env.TURSO_DATABASE_URL);
-const describeOrSkip = hasDb ? describe : describe.skip;
 // Each toggle does several sequential round-trips (upsert user → upsert
 // feedback → clear opposite vote, in an interactive txn). Against a remote
 // Turso primary the default 5s bun timeout is too tight — a transient latency
@@ -64,7 +17,7 @@ const describeOrSkip = hasDb ? describe : describe.skip;
 // tripped it. Generous per-test ceiling; the assertions are unchanged.
 const REAL_DB_TIMEOUT_MS = 20_000;
 
-describeOrSkip("applyFeedbackToggle (real DB)", () => {
+describe("applyFeedbackToggle (real DB)", () => {
   const TEST_USER_ID = `m3-toggle-${crypto.randomUUID()}`;
   const TEST_EMAIL = `m3-toggle-${Date.now()}@example.test`;
   let itemId: number | null = null;
@@ -90,17 +43,24 @@ describeOrSkip("applyFeedbackToggle (real DB)", () => {
   });
 
   it("setting up=on while down exists clears down (mutual exclusion)", async () => {
-    if (itemId === null) return;
+    const fixtureItemId = requireProductionFixture(
+      itemId,
+      "toggle test requires an existing item",
+    );
     await cleanFeedback();
     const user = { id: TEST_USER_ID, email: TEST_EMAIL, isAdmin: false };
 
     // Pre-seed a 'down' vote directly.
-    await applyFeedbackToggle(user, { itemId, vote: "down", on: true });
-    expect((await currentVotes(TEST_USER_ID, itemId)).down).toBe(true);
+    await applyFeedbackToggle(user, {
+      itemId: fixtureItemId,
+      vote: "down",
+      on: true,
+    });
+    expect((await currentVotes(TEST_USER_ID, fixtureItemId)).down).toBe(true);
 
     // Now toggle 'up' on — 'down' should clear.
     const after = await applyFeedbackToggle(user, {
-      itemId,
+      itemId: fixtureItemId,
       vote: "up",
       on: true,
     });
@@ -108,24 +68,42 @@ describeOrSkip("applyFeedbackToggle (real DB)", () => {
   }, REAL_DB_TIMEOUT_MS);
 
   it("save is independent of up/down and persists through them", async () => {
-    if (itemId === null) return;
+    const fixtureItemId = requireProductionFixture(
+      itemId,
+      "toggle test requires an existing item",
+    );
     await cleanFeedback();
     const user = { id: TEST_USER_ID, email: TEST_EMAIL, isAdmin: false };
 
-    await applyFeedbackToggle(user, { itemId, vote: "save", on: true });
-    await applyFeedbackToggle(user, { itemId, vote: "up", on: true });
-    const state = await currentVotes(TEST_USER_ID, itemId);
+    await applyFeedbackToggle(user, {
+      itemId: fixtureItemId,
+      vote: "save",
+      on: true,
+    });
+    await applyFeedbackToggle(user, {
+      itemId: fixtureItemId,
+      vote: "up",
+      on: true,
+    });
+    const state = await currentVotes(TEST_USER_ID, fixtureItemId);
     expect(state).toEqual({ up: true, down: false, save: true });
   }, REAL_DB_TIMEOUT_MS);
 
   it("setting on=false clears the vote", async () => {
-    if (itemId === null) return;
+    const fixtureItemId = requireProductionFixture(
+      itemId,
+      "toggle test requires an existing item",
+    );
     await cleanFeedback();
     const user = { id: TEST_USER_ID, email: TEST_EMAIL, isAdmin: false };
 
-    await applyFeedbackToggle(user, { itemId, vote: "up", on: true });
+    await applyFeedbackToggle(user, {
+      itemId: fixtureItemId,
+      vote: "up",
+      on: true,
+    });
     const after = await applyFeedbackToggle(user, {
-      itemId,
+      itemId: fixtureItemId,
       vote: "up",
       on: false,
     });
@@ -133,12 +111,23 @@ describeOrSkip("applyFeedbackToggle (real DB)", () => {
   }, REAL_DB_TIMEOUT_MS);
 
   it("is idempotent — setting the same vote twice still yields one row", async () => {
-    if (itemId === null) return;
+    const fixtureItemId = requireProductionFixture(
+      itemId,
+      "toggle test requires an existing item",
+    );
     await cleanFeedback();
     const user = { id: TEST_USER_ID, email: TEST_EMAIL, isAdmin: false };
 
-    await applyFeedbackToggle(user, { itemId, vote: "up", on: true });
-    await applyFeedbackToggle(user, { itemId, vote: "up", on: true });
+    await applyFeedbackToggle(user, {
+      itemId: fixtureItemId,
+      vote: "up",
+      on: true,
+    });
+    await applyFeedbackToggle(user, {
+      itemId: fixtureItemId,
+      vote: "up",
+      on: true,
+    });
 
     const rows = await db()
       .select({ id: schema.feedback.id })
@@ -146,7 +135,7 @@ describeOrSkip("applyFeedbackToggle (real DB)", () => {
       .where(
         and(
           eq(schema.feedback.userId, TEST_USER_ID),
-          eq(schema.feedback.itemId, itemId),
+          eq(schema.feedback.itemId, fixtureItemId),
           eq(schema.feedback.vote, "up"),
         ),
       );
@@ -154,12 +143,19 @@ describeOrSkip("applyFeedbackToggle (real DB)", () => {
   }, REAL_DB_TIMEOUT_MS);
 
   it("upserts an app user row on first toggle so the FK resolves", async () => {
-    if (itemId === null) return;
+    const fixtureItemId = requireProductionFixture(
+      itemId,
+      "toggle test requires an existing item",
+    );
     // Ensure no user row exists before this test.
     await db().delete(schema.users).where(eq(schema.users.id, TEST_USER_ID));
     const user = { id: TEST_USER_ID, email: TEST_EMAIL, isAdmin: false };
 
-    await applyFeedbackToggle(user, { itemId, vote: "save", on: true });
+    await applyFeedbackToggle(user, {
+      itemId: fixtureItemId,
+      vote: "save",
+      on: true,
+    });
 
     const rows = await db()
       .select({ email: schema.users.email })

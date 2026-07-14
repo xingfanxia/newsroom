@@ -22,6 +22,10 @@ import { GET as sourcesGet } from "@/app/api/v1/sources/route";
 import { GET as searchGet } from "@/app/api/v1/search/route";
 import { GET as itemGet } from "@/app/api/v1/items/[id]/route";
 import { GET as usageGet } from "@/app/api/v1/usage/summary/route";
+import { assertProductionIntegrationOptIn } from "@/scripts/verification/run-hermetic-tests";
+import { assertProductionPrecondition } from "@/tests/integration/production/preconditions";
+
+assertProductionIntegrationOptIn();
 
 let token: string;
 let tokenId: number;
@@ -56,10 +60,6 @@ function authedReq(path: string): Request {
     headers: { Authorization: `Bearer ${token}` },
   });
 }
-
-const liveSemanticTest =
-  // Semantic mode spends a real embedding call; opt in only for provider smoke tests.
-  process.env.RUN_LIVE_SEMANTIC_TEST === "1" ? test : test.skip;
 
 describe("/api/v1 auth gate", () => {
   test("rejects missing bearer with 401", async () => {
@@ -168,10 +168,10 @@ describe("/api/v1/items/:id", () => {
   test("returns full detail for a real item", async () => {
     const feed = await feedGet(authedReq("/api/v1/feed?limit=1&tier=all"));
     const feedBody = await feed.json();
-    if (feedBody.items.length === 0) {
-      // No items in DB — skip rather than fail (fresh dev DB scenario).
-      return;
-    }
+    assertProductionPrecondition(
+      feedBody.items.length > 0,
+      "v1 feed must expose an item for item-detail coverage",
+    );
     const id = feedBody.items[0].id;
     const res = await itemGet(authedReq(`/api/v1/items/${id}`), {
       params: Promise.resolve({ id }),
@@ -256,28 +256,6 @@ describe("/api/v1/search", () => {
   test("returns 400 when q is missing", async () => {
     const res = await searchGet(authedReq("/api/v1/search"));
     expect(res.status).toBe(400);
-  });
-
-  liveSemanticTest("semantic mode returns ranked items with distance", async () => {
-    const res = await searchGet(
-      authedReq("/api/v1/search?q=autonomous+coding+agent&mode=semantic&limit=5"),
-    );
-    // Can be 200 on success or 500 if AZURE_OPENAI_EMBEDDING_DEPLOYMENT is
-    // missing / rate-limited in the test env. Accept either and only
-    // assert the shape when we got data back.
-    if (res.status === 200) {
-      const body = await res.json();
-      expect(body.mode).toBe("semantic");
-      expect(body.q).toBe("autonomous coding agent");
-      expect(Array.isArray(body.items)).toBe(true);
-      expect(typeof body.embedding_dims).toBe("number");
-      expect(typeof body.latency_ms).toBe("number");
-      if (body.items.length > 0) {
-        expect(typeof body.items[0].distance).toBe("number");
-      }
-    } else {
-      expect(res.status).toBe(500);
-    }
   });
 
   test("lexical search returns shape matching /feed items", async () => {

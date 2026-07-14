@@ -7,11 +7,12 @@ import {
   saveItemRoutePayload,
 } from "@/lib/api/saved-routes";
 import type { SessionUser } from "@/lib/auth/session";
+import { assertProductionIntegrationOptIn } from "@/scripts/verification/run-hermetic-tests";
+import { assertProductionPrecondition } from "@/tests/integration/production/preconditions";
 
-const hasDb = Boolean(process.env.TURSO_DATABASE_URL);
-const describeOrSkip = hasDb ? describe : describe.skip;
+assertProductionIntegrationOptIn();
 
-describeOrSkip("saveItemRoutePayload (real DB)", () => {
+describe("saveItemRoutePayload (real DB)", () => {
   const ownerUserId = `saved-route-owner-${crypto.randomUUID()}`;
   const otherUserId = `saved-route-other-${crypto.randomUUID()}`;
   const ownerUser: SessionUser = {
@@ -60,7 +61,10 @@ describeOrSkip("saveItemRoutePayload (real DB)", () => {
       .from(schema.items)
       .limit(1);
     itemId = item?.id ?? null;
-    if (itemId === null) return;
+    assertProductionPrecondition(
+      itemId !== null,
+      "items table must contain a row for saved-route coverage",
+    );
 
     const [maxItem] = await db()
       .select({
@@ -114,13 +118,12 @@ describeOrSkip("saveItemRoutePayload (real DB)", () => {
   });
 
   it("saves into an owned collection, reports the assignment, and unsaves", async () => {
-    if (
-      itemId === null ||
-      ownerCollectionId === null ||
-      otherCollectionId === null
-    ) {
-      return;
-    }
+    assertProductionPrecondition(
+      itemId !== null &&
+        ownerCollectionId !== null &&
+        otherCollectionId !== null,
+      "saved-route fixtures must create an item and both collections",
+    );
 
     const saved = await saveItemRoutePayload(ownerUser, {
       itemId,
@@ -209,7 +212,10 @@ describeOrSkip("saveItemRoutePayload (real DB)", () => {
   });
 
   it("rejects another user's collection id before creating a save", async () => {
-    if (itemId === null || otherCollectionId === null) return;
+    assertProductionPrecondition(
+      itemId !== null && otherCollectionId !== null,
+      "foreign collection test requires item and collection fixtures",
+    );
 
     const result = await saveItemRoutePayload(ownerUser, {
       itemId,
@@ -226,7 +232,10 @@ describeOrSkip("saveItemRoutePayload (real DB)", () => {
   });
 
   it("maps a missing item foreign-key failure to item_not_found", async () => {
-    if (missingItemId === null) return;
+    assertProductionPrecondition(
+      missingItemId !== null,
+      "missing-item sentinel must be derived during setup",
+    );
 
     const result = await saveItemRoutePayload(ownerUser, {
       itemId: missingItemId,

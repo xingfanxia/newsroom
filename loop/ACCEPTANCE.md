@@ -23,10 +23,17 @@ This inventory is frozen from
   fail_evidence: >-
     package.json currently defines test as `bun test --env-file=.env.local`,
     while docs/HANDOFF.md records production DB access and masked timeout exits.
-  status: OPEN
+  status: PASS_PENDING_FINAL
   depends_on: []
   reopen_condition: Any default test command can load production credentials or mask a failure.
-  last_verification: Not run; known-red source evidence recorded 2026-07-14.
+  last_verification: >-
+    Passed locally 2026-07-14: AC-001 criterion exit 0; hostile Next env-loader
+    probe preserved all 28 explicit local/fake controlled values; exit-zero
+    failure/timeout and controller deadline were rejected; default test passed
+    1198/1198 plus the complete hermetic verify gate with no production
+    integration. Focused requested inputs are regular-file allowlisted, and all
+    production data prerequisites fail loud rather than returning early. Receipt:
+    docs/reports/r2-public-read/ac-001-hermetic-gate-2026-07-14.md.
 
 - id: AC-002
   statement: >-

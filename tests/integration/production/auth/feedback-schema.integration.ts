@@ -1,6 +1,6 @@
 /**
- * Real-DB integration tests for the M3 feedback schema. Skips when
- * TURSO_DATABASE_URL is unset (CI without DB access).
+ * Real-DB integration tests for the M3 feedback schema. The explicit
+ * production-integration runner owns opt-in and credential validation.
  *
  * Uses a throwaway user with a random id so parallel runs + retries don't
  * collide, and cleans up in afterAll even on failure.
@@ -8,10 +8,13 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { and, eq, sql } from "drizzle-orm";
 import { closeDb, db, schema } from "@/db/client";
+import { assertProductionIntegrationOptIn } from "@/scripts/verification/run-hermetic-tests";
+import { requireProductionFixture } from "@/tests/integration/production/preconditions";
+
+assertProductionIntegrationOptIn();
 
 const TEST_USER_ID = `m3-test-${crypto.randomUUID()}`;
 const TEST_EMAIL = `m3-test-${Date.now()}@example.test`;
-const hasDb = Boolean(process.env.TURSO_DATABASE_URL);
 
 async function pickAnyItemId(): Promise<number | null> {
   const rows = await db()
@@ -21,14 +24,15 @@ async function pickAnyItemId(): Promise<number | null> {
   return rows[0]?.id ?? null;
 }
 
-const describeOrSkip = hasDb ? describe : describe.skip;
-
-describeOrSkip("feedback schema round-trip (real DB)", () => {
+describe("feedback schema round-trip (real DB)", () => {
   let itemId: number | null = null;
 
   beforeAll(async () => {
     itemId = await pickAnyItemId();
-    if (itemId === null) return;
+    requireProductionFixture(
+      itemId,
+      "items table must contain a row for feedback schema coverage",
+    );
     await db()
       .insert(schema.users)
       .values({
@@ -50,8 +54,10 @@ describeOrSkip("feedback schema round-trip (real DB)", () => {
   });
 
   it("inserts up + down + save as three distinct rows for the same item+user", async () => {
-    const existingItemId = itemId;
-    if (existingItemId === null) return;
+    const existingItemId = requireProductionFixture(
+      itemId,
+      "feedback insert test requires the setup item",
+    );
     await db()
       .insert(schema.feedback)
       .values([
@@ -68,8 +74,10 @@ describeOrSkip("feedback schema round-trip (real DB)", () => {
   });
 
   it("rejects duplicate (item, user, vote) on the unique index", async () => {
-    const existingItemId = itemId;
-    if (existingItemId === null) return;
+    const existingItemId = requireProductionFixture(
+      itemId,
+      "duplicate feedback test requires the setup item",
+    );
     // drizzle's insert builder is thenable but not a Promise — wrap in an
     // async arrow so `rejects` sees a real Promise.
     await expect(async () => {
@@ -80,7 +88,7 @@ describeOrSkip("feedback schema round-trip (real DB)", () => {
   });
 
   it("counts feedback by vote for the test user", async () => {
-    if (itemId === null) return;
+    requireProductionFixture(itemId, "feedback count test requires the setup item");
     const rows = await db()
       .select({ vote: schema.feedback.vote, n: sql<number>`count(*)` })
       .from(schema.feedback)
@@ -93,8 +101,10 @@ describeOrSkip("feedback schema round-trip (real DB)", () => {
   });
 
   it("cascades feedback deletion when the user is removed", async () => {
-    const existingItemId = itemId;
-    if (existingItemId === null) return;
+    const existingItemId = requireProductionFixture(
+      itemId,
+      "feedback cascade test requires the setup item",
+    );
     // Delete the user; FK cascade should wipe the feedback rows.
     await db().delete(schema.users).where(eq(schema.users.id, TEST_USER_ID));
 

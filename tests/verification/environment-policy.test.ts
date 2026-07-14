@@ -92,7 +92,13 @@ describe("hermetic environment policy", () => {
       inherited: { PATH: process.env.PATH },
       overrides: {
         TURSO_DATABASE_URL: "file:./tmp/hermetic.sqlite",
+        TURSO_AUTH_TOKEN: "test-turso-auth-token",
+        TURSO_API_TOKEN: "test-turso-api-token",
+        TURSO_ORG: "test-turso-org",
         DATABASE_URL: "file:///tmp/hermetic.sqlite",
+        DATABASE_AUTH_TOKEN: "test-database-auth-token",
+        LIBSQL_URL: "file:///tmp/hermetic.sqlite",
+        LIBSQL_AUTH_TOKEN: "test-libsql-auth-token",
         R2_ACCOUNT_ID: "test-account",
         R2_BUCKET: "test-newsroom-public",
         R2_ENDPOINT: "http://127.0.0.1:9000",
@@ -101,8 +107,11 @@ describe("hermetic environment policy", () => {
         R2_SECRET_ACCESS_KEY: "test-secret-key",
         AWS_ACCESS_KEY_ID: "test-access-key",
         AWS_SECRET_ACCESS_KEY: "test-secret-key",
+        AWS_SESSION_TOKEN: "test-session-token",
         AWS_ENDPOINT_URL: "http://[::1]:9000",
         AWS_REGION: "auto",
+        CLOUDFLARE_API_TOKEN: "test-cloudflare-api-token",
+        CF_API_TOKEN: "test-cf-api-token",
       },
     });
 
@@ -110,12 +119,19 @@ describe("hermetic environment policy", () => {
       "file:./tmp/hermetic.sqlite",
     );
     expect(environment.DATABASE_URL).toBe("file:///tmp/hermetic.sqlite");
+    expect(environment.TURSO_AUTH_TOKEN).toBe("test-turso-auth-token");
+    expect(environment.TURSO_API_TOKEN).toBe("test-turso-api-token");
+    expect(environment.LIBSQL_AUTH_TOKEN).toBe("test-libsql-auth-token");
     expect(environment.R2_ENDPOINT).toBe("http://127.0.0.1:9000");
     expect(environment.R2_PUBLIC_BASE_URL).toBe(
       "https://newsroom-snapshots.invalid",
     );
     expect(environment.AWS_ENDPOINT_URL).toBe("http://[::1]:9000");
     expect(environment.R2_SECRET_ACCESS_KEY).toBe("test-secret-key");
+    expect(environment.AWS_SESSION_TOKEN).toBe("test-session-token");
+    expect(environment.CLOUDFLARE_API_TOKEN).toBe(
+      "test-cloudflare-api-token",
+    );
     expect(environment.AWS_REGION).toBe("auto");
   });
 
