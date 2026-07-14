@@ -130,6 +130,39 @@ export const float32Vector = customType<{
 
 // ── Tables ──────────────────────────────────────────────────────
 
+/** Additive raw-SQL migrations applied outside drizzle-kit push. */
+export const schemaMigrations = sqliteTable("schema_migrations", {
+  name: text("name").primaryKey(),
+  checksum: text("checksum").notNull(),
+  appliedAt: integer("applied_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(nowMs),
+});
+
+/**
+ * Append-only public mutation log consumed by the R2 snapshot publisher.
+ * Rows are acknowledged only through a captured ID high-water mark.
+ */
+export const publicContentOutbox = sqliteTable(
+  "public_content_outbox",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    entityType: text("entity_type").notNull(),
+    entityKey: text("entity_key").notNull(),
+    operation: text("operation").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(nowMs),
+  },
+  (table) => ({
+    entityIdx: index("public_content_outbox_entity_idx").on(
+      table.entityType,
+      table.entityKey,
+      table.id,
+    ),
+  }),
+);
+
 export const sources = sqliteTable(
   "sources",
   {
@@ -945,5 +978,7 @@ export type ClusterSplit = typeof clusterSplits.$inferSelect;
 export type NewClusterSplit = typeof clusterSplits.$inferInsert;
 export type ColumnQcLog = typeof columnQcLog.$inferSelect;
 export type NewColumnQcLog = typeof columnQcLog.$inferInsert;
+export type SchemaMigration = typeof schemaMigrations.$inferSelect;
+export type PublicContentOutboxRow = typeof publicContentOutbox.$inferSelect;
 
 export type { TSourceKind, TSourceGroup, TCadence };

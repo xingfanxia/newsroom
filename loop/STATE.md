@@ -73,25 +73,24 @@ artifacts:
   repo_aliases:
     plan: docs/R2-PUBLIC-READ-PLAN-2026-07-14.md
     evidence: docs/reports/r2-public-read/
-iteration: 8
+iteration: 9
 phase: implementation
 current_artifact: docs/superpowers/plans/2026-07-14-r2-public-read-decoupling.md
 current_criterion: AC-003
 last_action: >-
-  Completed Task 6 with a canonical-state-only feed/query, event-member,
-  shell/calendar/source/daily derivation and exact RSS engine. Independent
-  hash-frozen fixtures cover both locales, tier inclusion, event-lead dedup,
-  source precedence, wildcard/date/clock/pagination semantics and exact XML.
-  The AC-002 criterion passed 50/50 tests with 337 assertions across 8
-  hermetic suites; five runtime modules passed the framework/DB/env/I/O source
-  boundary and typecheck passed. AC-002 is PASS_PENDING_FINAL. No production
-  integration, Turso, R2, Cloudflare, deploy, publish, push, migration,
-  bootstrap, or traffic replay was run.
+  Completed Task 8 locally: added the checksummed additive
+  public_content_outbox migration, entity index, 18 public-column-aware
+  triggers, and explicit operator entrypoint. File-libSQL tests prove
+  idempotency, checksum drift rejection, relevant insert/update/delete events,
+  same-value/private no-ops, item OLD+NEW event dependencies, tombstones,
+  concurrent high-water retention, and required outbox/item query plans. The
+  focused suite passed 5/5 with 44 assertions and typecheck passed. AC-003
+  remains OPEN for Tasks 9-11. No production migration or external operation
+  ran.
 next_action: >-
-  Begin the next dependency in topology, AC-003, with Task 8's local
-  checksummed outbox migration and narrow-trigger fault tests. Re-render
-  pressure and record iteration 9 before editing. Do not apply a migration to
-  production or perform any metered integration work.
+  Continue AC-003 with Task 9's bounded publisher source adapter. Re-render
+  pressure and record iteration 10 before editing; keep all database evidence
+  on temporary local libSQL and do not apply the migration to production.
 halt_cause: null
 halt_scan: []
 stuck_counters: {}
@@ -124,6 +123,29 @@ attempts:
       Revert only iteration-8 engine/fixture/state changes if independent
       mutants do not red, parity cannot be sourced from pre-change contracts,
       or the cheap/criterion guards regress.
+  - iteration: 9
+    criterion: AC-003
+    failing_evidence: >-
+      No checksummed schema migration, public_content_outbox table, or narrow
+      public-change triggers exist, so publisher work cannot be bounded by a
+      captured mutation high-water mark and same-value/private-only writes
+      cannot be proven to remain no-ops.
+    hypothesis: >-
+      One additive raw-SQL migration with checksum enforcement, entity-keyed
+      append-only rows, column-scoped UPDATE predicates, OLD+NEW cluster
+      dependency events, and high-water deletion can make no-change work O(1)
+      while preserving every concurrent mutation for a later publisher run.
+    edit_surface:
+      - db/schema.ts
+      - lib/public-content/publisher/outbox-migration.ts
+      - scripts/ops/migrate-public-content-outbox.ts
+      - tests/public-content/outbox-migration.test.ts
+      - loop/STATE.md
+    rollback: >-
+      Revert iteration-9 local files if idempotency, checksum drift, relevant
+      column coverage, same-value/private no-op, high-water retention, or
+      required EXPLAIN plans cannot be proven on file-backed libSQL. Never
+      apply the unaccepted migration to production.
 budget:
   source: loop/PROMPT.md immutable human-authored policy
   r2_object_writes_per_run: 500
@@ -380,6 +402,35 @@ pressure_consulted:
       P-metered-cap: >-
         No cloud or production integration ran; R2 writes, public requests,
         uploaded bytes, bootstraps and intentional Turso spend were zero.
+  - iteration: 9
+    consulted_at: 2026-07-14
+    ids:
+      - P-public-db-zero
+      - P-rows-hard
+      - P-rows-ideal
+      - P-safe-tests
+      - P-architecture-api
+      - P-metered-cap
+    influence:
+      P-public-db-zero: >-
+        Keeps outbox and migration ownership publisher-only; this iteration
+        adds no anonymous reader import, cache-aside path, or DB fallback.
+      P-rows-hard: >-
+        Requires O(1) empty polling and indexed bounded reads/deletes so the
+        publisher cannot replace traffic pressure with corpus-wide cron scans.
+      P-rows-ideal: >-
+        Prefers narrow same-value-aware triggers and entity coalescing to keep
+        steady publisher reads near the <10M/month target rather than merely
+        below the hard cap.
+      P-safe-tests: >-
+        Uses a temporary file-backed libSQL database and no-env focused tests;
+        no default or production-backed suite is authorized.
+      P-architecture-api: >-
+        Places raw additive migration SQL and its injectable runner under the
+        publisher boundary, with a thin explicit operator script.
+      P-metered-cap: >-
+        Local SQL fixtures only; Turso, R2, Cloudflare, public HTTP, deploy,
+        publish, bootstrap and production migration spend remain zero.
 ```
 
 ## Alignment reviews
