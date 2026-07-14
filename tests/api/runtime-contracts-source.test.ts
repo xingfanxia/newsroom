@@ -55,7 +55,9 @@ const navData = read("lib/shell/nav-data.ts");
 const homePage = read("app/[locale]/page.tsx");
 const allPage = read("app/[locale]/all/page.tsx");
 const curatedPage = read("app/[locale]/curated/page.tsx");
-const savedPage = read("app/[locale]/saved/page.tsx");
+const savedPage = `${read("app/[locale]/saved/page.tsx")}\n${read(
+  "lib/auth/saved-page-boundary.ts",
+)}`;
 const podcastsPage = read("app/[locale]/podcasts/page.tsx");
 const podcastDetailPage = read("app/[locale]/podcasts/[id]/page.tsx");
 const xMonitorPage = read("app/[locale]/x-monitor/page.tsx");

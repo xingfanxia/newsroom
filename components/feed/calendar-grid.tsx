@@ -70,7 +70,12 @@ export function CalendarGrid({
       <div className="calendar-head">
         <span className="t">{zh ? "按日期浏览" : "browse by day"}</span>
         {active ? (
-          <Link className="clear" href={build(undefined)} scroll={false}>
+          <Link
+            className="clear"
+            href={build(undefined)}
+            prefetch={false}
+            scroll={false}
+          >
             {zh ? "清除筛选" : "clear filter"} ✕
           </Link>
         ) : (
@@ -126,6 +131,7 @@ export function CalendarGrid({
                     <Link
                       key={i}
                       href={href}
+                      prefetch={false}
                       className="calendar-cell"
                       data-active={isActive ? "true" : "false"}
                       data-empty={count === 0 ? "true" : "false"}

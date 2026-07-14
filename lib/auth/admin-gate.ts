@@ -17,14 +17,32 @@ export type GateInput = {
   hasSession: boolean;
 };
 
-export function decideAdminGate(input: GateInput): AdminGateDecision {
+function decideGateForRoots(
+  input: GateInput,
+  protectedRoots: readonly string[],
+): AdminGateDecision {
   const locale = appLocaleFromPathname(input.pathname);
   if (!locale) return { action: "allow" };
   const rest = stripAppLocalePathPrefix(input.pathname);
-  if (rest !== "/admin" && !rest.startsWith("/admin/")) {
+  if (
+    !protectedRoots.some(
+      (root) => rest === root || rest.startsWith(`${root}/`),
+    )
+  ) {
     return { action: "allow" };
   }
   if (input.hasSession) return { action: "allow" };
   const next = encodeURIComponent(input.pathname);
   return { action: "redirect", to: `/${locale}/login?next=${next}` };
+}
+
+export function decideAdminGate(input: GateInput): AdminGateDecision {
+  return decideGateForRoots(input, ["/admin"]);
+}
+
+/** Optimistic navigation gate only; pages and routes still authorize again. */
+export function decideProtectedSessionGate(
+  input: GateInput,
+): AdminGateDecision {
+  return decideGateForRoots(input, ["/admin", "/saved"]);
 }

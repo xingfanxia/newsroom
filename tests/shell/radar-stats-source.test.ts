@@ -90,9 +90,12 @@ describe("radar stats shell contract", () => {
 
   it("keeps pulse-enabled pages explicit about loading pulse data", () => {
     for (const path of PULSE_CHROME_PAGE_PATHS) {
-      const source = readSource(path);
+      const source =
+        path === "app/[locale]/saved/page.tsx"
+          ? `${readSource(path)}\n${readSource("lib/auth/saved-page-boundary.ts")}`
+          : readSource(path);
 
-      expect(source).toContain("getShellChromeData({ pulse: true");
+      expect(source).toMatch(/getShellChromeData(?:\(|:)\s*\{ pulse: true/);
       expect(source).toContain("pulse={chrome.pulse}");
     }
   });
