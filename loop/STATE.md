@@ -73,26 +73,30 @@ artifacts:
   repo_aliases:
     plan: docs/R2-PUBLIC-READ-PLAN-2026-07-14.md
     evidence: docs/reports/r2-public-read/
-iteration: 10
+iteration: 11
 phase: implementation
 current_artifact: docs/superpowers/plans/2026-07-14-r2-public-read-decoupling.md
 current_criterion: AC-003
 last_action: >-
-  Completed Task 9 locally: added the sole injected libSQL publisher source,
-  pure canonical-state patching, immutable hard caps, plan-backed read
-  telemetry, tombstones, eligibility cascades, and logical-key policy
-  replacement. Temporary-libSQL tests prove empty work is one outbox-only
-  query, changed keys dedupe, two events share one member query, missing rows
-  tombstone, eligibility can remove and restore entities, all named plans use
-  the required PK/indexes, and cap overflow returns no partial batch. The
-  focused suite passed 5/5 with 21 assertions and typecheck passed. AC-003
-  remains OPEN for Tasks 10-11. No production database or external operation
-  ran.
+  Completed Task 10 locally: added stable content-addressed entity shards, a
+  deterministic incremental release builder, an injected conditional object
+  store, pointer-last publisher orchestration, and a pinned R2 S3 adapter using
+  region auto plus If-None-Match/If-Match. Event-log fakes prove content
+  readback precedes manifest, manifest precedes pointer CAS, explicit CAS loss
+  never acks, ambiguous CAS requires matching reread, post-commit ack failure
+  retries without a duplicate release, concurrent later outbox IDs survive,
+  unchanged hashes reuse bytes, and 1/100 changes load exactly 1/100 stable
+  shards despite 2,000 unrelated descriptors. Mocked S3 tests prove command
+  shape and conditional error mapping. The focused suites passed 10/10 with 70
+  assertions, typecheck passed, and focused lint had no remaining findings.
+  AC-003 remains OPEN for Task 11's operational surface. No R2/Turso/Cloudflare
+  mutation, snapshot publish, deploy, bootstrap, or production request ran.
 next_action: >-
-  Continue AC-003 with Task 10's pointer-last publisher core and injected R2
-  object-store adapter. Keep all failure-ordering tests on fakes and local
-  fixtures; do not access production R2, publish a snapshot, or cut over any
-  route without AX authorization.
+  Continue AC-003 with Task 11's authenticated cron/operator wiring, explicit
+  one-shot bootstrap guard, bounded reconciliation, and pure retention planner.
+  Keep execution on fakes/local fixtures and do not apply the outbox migration,
+  access production R2, publish/bootstrap, deploy, or cut over routes without
+  AX authorization.
 halt_cause: null
 halt_scan: []
 stuck_counters: {}
@@ -171,6 +175,33 @@ attempts:
       counts scale per entity/event, malformed/out-of-cap batches partially
       return, tombstones drift, or EXPLAIN cannot prove the named PK/index
       bounds on temporary libSQL.
+  - iteration: 11
+    criterion: AC-003
+    failing_evidence: >-
+      The bounded source can describe changed public entities, but no
+      content-addressed release builder, conditional object-store port, R2 S3
+      adapter, pointer-last commit protocol, or post-CAS acknowledgement retry
+      exists. A publisher therefore cannot yet prove atomicity or idempotency.
+    hypothesis: >-
+      Stable entity shards plus immutable conditional puts, mandatory
+      readback validation, deterministic manifests and one ETag CAS commit can
+      make recurring work proportional to touched shards while preserving
+      outbox rows across every pre-commit failure and ambiguous commit result.
+    edit_surface:
+      - package.json
+      - bun.lock
+      - lib/public-content/canonical.ts
+      - lib/public-content/publisher/object-store.ts
+      - lib/public-content/publisher/r2-store.ts
+      - lib/public-content/publisher/build-release.ts
+      - lib/public-content/publisher/publish.ts
+      - tests/public-content/publisher.test.ts
+      - tests/public-content/r2-store.test.ts
+      - loop/STATE.md
+    rollback: >-
+      Revert iteration-11 files if immutable object readback, manifest-before-
+      pointer ordering, CAS-loss/ambiguity handling, ack retry, deterministic
+      reuse, or touched-shard scale bounds cannot be proven entirely on fakes.
 budget:
   source: loop/PROMPT.md immutable human-authored policy
   r2_object_writes_per_run: 500
@@ -483,6 +514,34 @@ pressure_consulted:
       P-metered-cap: >-
         No production DB, R2, Cloudflare, public request, deploy, publish or
         migration action is permitted; external spend stays zero.
+  - iteration: 11
+    consulted_at: 2026-07-14
+    ids:
+      - P-public-db-zero
+      - P-rows-hard
+      - P-rows-ideal
+      - P-safe-tests
+      - P-architecture-api
+      - P-metered-cap
+    influence:
+      P-public-db-zero: >-
+        Keeps the S3 client and credentials publisher-only; request-side code
+        receives neither writer imports nor a database fallback.
+      P-rows-hard: >-
+        Makes empty work pointer/outbox-only and changed work load only stable
+        touched shards rather than materializing the corpus.
+      P-rows-ideal: >-
+        Reuses identical content hashes and deterministic release bytes so
+        retries do not repeat DB reads or object uploads unnecessarily.
+      P-safe-tests: >-
+        Uses event-log fakes and mocked S3 commands plus typecheck; no cloud
+        integration suite or broad repository gate is needed for this task.
+      P-architecture-api: >-
+        Separates the pure release builder and object-store port from the R2
+        SDK adapter and pointer-last orchestration.
+      P-metered-cap: >-
+        Dependency metadata lookup is the only network read; R2, Turso,
+        Cloudflare, deploy, publish, bootstrap and public HTTP spend stay zero.
 ```
 
 ## Alignment reviews

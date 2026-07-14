@@ -122,7 +122,7 @@ export function canonicalJsonBytes(value: unknown): Uint8Array {
   return encoder.encode(`${emitCanonical(value, new WeakSet(), "$")}\n`);
 }
 
-async function sha256Bytes(bytes: Uint8Array): Promise<string> {
+export async function sha256Hex(bytes: Uint8Array): Promise<string> {
   const digest = await crypto.subtle.digest(
     "SHA-256",
     bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
@@ -133,7 +133,7 @@ async function sha256Bytes(bytes: Uint8Array): Promise<string> {
 }
 
 export function canonicalSha256(value: unknown): Promise<string> {
-  return sha256Bytes(canonicalJsonBytes(value));
+  return sha256Hex(canonicalJsonBytes(value));
 }
 
 function sortedState(state: CanonicalPublicState): CanonicalPublicState {
@@ -160,5 +160,5 @@ export function canonicalPublicStateBytes(value: unknown): Uint8Array {
 }
 
 export function canonicalPublicStateSha256(value: unknown): Promise<string> {
-  return sha256Bytes(canonicalPublicStateBytes(value));
+  return sha256Hex(canonicalPublicStateBytes(value));
 }
