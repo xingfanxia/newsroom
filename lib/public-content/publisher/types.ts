@@ -1,14 +1,10 @@
 import type { CanonicalPublicState } from "@/lib/public-content/contracts";
+import {
+  PUBLIC_ENTITY_TYPES,
+  type PublicEntityType,
+} from "@/lib/public-content/contract-shards";
 
-export const PUBLIC_ENTITY_TYPES = [
-  "item",
-  "event",
-  "source",
-  "newsletter",
-  "policy",
-] as const;
-
-export type PublicEntityType = (typeof PUBLIC_ENTITY_TYPES)[number];
+export { PUBLIC_ENTITY_TYPES, type PublicEntityType };
 
 type PublicItem = CanonicalPublicState["items"][number];
 type PublicEvent = CanonicalPublicState["events"][number];

@@ -73,27 +73,25 @@ artifacts:
   repo_aliases:
     plan: docs/R2-PUBLIC-READ-PLAN-2026-07-14.md
     evidence: docs/reports/r2-public-read/
-iteration: 12
+iteration: 14
 phase: implementation
 current_artifact: docs/superpowers/plans/2026-07-14-r2-public-read-decoupling.md
 current_criterion: AC-005
 last_action: >-
-  Completed Task 11 locally and moved AC-003 to PASS_PENDING_FINAL. The
-  authenticated publish cron, exact 12/27/42/57 schedule, shared operator
-  runtime, immutable run receipts, explicit state-file bootstrap with --apply
-  plus a single-use write-ahead spend ledger, bounded R2-only reconciliation,
-  and conservative 7-release/30-day retention planner are wired. Recurring
-  entrypoints cannot import bootstrap/full materialization and pointer repair
-  always requires an operator pause. The AC-003 verifier passed 6 hermetic
-  suites, 28 tests and 185 assertions under hostile inherited Turso/R2
-  sentinels. No production service, migration, publish, bootstrap, deploy or
-  request was touched.
+  Completed Task 7 locally and moved AC-005 to PASS_PENDING_FINAL. The shared
+  HTTP reader pins the configured HTTPS origin and fixed release namespace,
+  validates pointer/manifest schemas plus release IDs and artifact byte/hash
+  integrity, tries active then previous as whole releases, and serves only a
+  warm in-process last-known-good snapshot before returning a typed controlled
+  unavailable error. Immutable objects are cached by key+hash while current is
+  always re-read. The AC-005 verifier passed 1 hermetic suite, 6 tests and 25
+  assertions, including a recursive no-DB source boundary. No production
+  endpoint or database was contacted.
 next_action: >-
-  Return to deferred Task 7 and implement AC-005's fail-closed snapshot HTTP
-  reader against the now-real manifest/entity-shard contract, including current
-  to previous recovery and warm last-known-good. Keep fetch/store behavior on
-  injected local fakes; do not call the public R2 domain or any production
-  service.
+  Implement Task 12 / AC-006 by moving the anonymous JSON read routes onto the
+  shared snapshot reader plus pure public-content query engine while preserving
+  payload, filter, sort, total, pagination, localization and ETag contracts.
+  Keep tests on injected snapshots and do not add any request-time DB fallback.
 halt_cause: null
 halt_scan: []
 stuck_counters: {}
@@ -231,6 +229,36 @@ attempts:
       bootstrap write-ahead refusal, bounded reconcile, minimum rollback
       retention, or the absence of a recurring full-materialize import cannot
       be proved without production execution.
+  - iteration: 13
+    criterion: AC-005
+    failing_evidence: >-
+      AC-003 now publishes real pointer/manifest/entity-shard contracts, but no
+      request-side HTTP reader validates them, falls back from active to
+      previous or warm last-good, or turns terminal corruption/timeouts into a
+      typed controlled-unavailable result without a database path.
+    hypothesis: >-
+      One HTTPS-origin-pinned injected fetch boundary with content-addressed
+      immutable caches and whole-release validation can serve logical artifacts
+      and canonical state while failing active -> previous -> warm last-good ->
+      typed unavailable, with no writer, DB, filesystem or secret imports.
+    edit_surface:
+      - lib/public-content/contract-shards.ts
+      - lib/public-content/contracts.ts
+      - lib/public-content/publisher/build-release.ts
+      - lib/public-content/publisher/reconcile.ts
+      - lib/public-content/reader/types.ts
+      - lib/public-content/reader/fetch-object.ts
+      - lib/public-content/reader/read-release.ts
+      - lib/public-content/reader/index.ts
+      - lib/public-content/testing/memory-store.ts
+      - tests/public-content/reader.test.ts
+      - scripts/verification/r2-public-criteria.ts
+      - loop/ACCEPTANCE.md
+      - loop/STATE.md
+    rollback: >-
+      Revert iteration-13 files if origin/path pinning, exact hashes, full
+      canonical cross-references, active/previous/LKG ordering, timeout, unknown
+      schemas or recursive DB/publisher-free ownership cannot be proven locally.
 budget:
   source: loop/PROMPT.md immutable human-authored policy
   r2_object_writes_per_run: 500
@@ -599,6 +627,34 @@ pressure_consulted:
       P-metered-cap: >-
         No script or route is executed against external services; all R2,
         Turso, Cloudflare, deploy, bootstrap, publish and request spend is zero.
+  - iteration: 13
+    consulted_at: 2026-07-14
+    ids:
+      - P-public-db-zero
+      - P-rows-hard
+      - P-rows-ideal
+      - P-safe-tests
+      - P-architecture-api
+      - P-metered-cap
+    influence:
+      P-public-db-zero: >-
+        Reader source may import only neutral public contracts/canonical logic
+        and injected fetch; DB, libSQL and publisher modules are forbidden.
+      P-rows-hard: >-
+        Every failure branch terminates at previous/LKG/typed unavailable and
+        cannot request a DB fallback.
+      P-rows-ideal: >-
+        Immutable objects are cached by release/hash so origin misses do not
+        create any Turso or repeated R2 fetch amplification.
+      P-safe-tests: >-
+        Uses an in-memory HTTPS fetch surface, fake timeouts and poison sentinels
+        with one focused reader suite plus source-boundary/typecheck.
+      P-architecture-api: >-
+        Moves shared persisted shard parsing out of publisher ownership before
+        reader use, preserving the recursive import boundary.
+      P-metered-cap: >-
+        No public-domain fetch or cloud request runs; all traffic and external
+        transfer remain zero.
 ```
 
 ## Alignment reviews

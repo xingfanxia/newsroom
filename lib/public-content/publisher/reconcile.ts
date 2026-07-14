@@ -1,11 +1,11 @@
-import { manifestSchema, snapshotPointerSchema } from "@/lib/public-content/contracts";
+import {
+  manifestSchema,
+  parsePublicEntityShardValue,
+  snapshotPointerSchema,
+} from "@/lib/public-content/contracts";
 import { sha256Hex } from "@/lib/public-content/canonical";
 import { CURRENT_POINTER_KEY } from "@/lib/public-content/paths";
-import {
-  parsePublicEntityShard,
-  publicEntityTypeFromShardLogicalName,
-  verifyDescriptorBytes,
-} from "./build-release";
+import { verifyDescriptorBytes } from "./build-release";
 import type { PublisherObjectStore } from "./object-store";
 
 const MAX_RECONCILE_ARTIFACTS = 500;
@@ -89,9 +89,9 @@ export async function reconcilePublicSnapshot(
       try {
         await verifyDescriptorBytes(descriptor, object.bytes);
         if (logicalName.startsWith("state/")) {
-          parsePublicEntityShard(
-            publicEntityTypeFromShardLogicalName(logicalName),
-            object.bytes,
+          parsePublicEntityShardValue(
+            logicalName,
+            parseJson(object.bytes),
           );
         }
       } catch {

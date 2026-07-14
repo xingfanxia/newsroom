@@ -278,6 +278,33 @@ async function verifyAc003(root: string): Promise<CriterionReceipt> {
   };
 }
 
+const AC005_TEST_INPUTS = ["tests/public-content/reader.test.ts"] as const;
+
+async function verifyAc005(root: string): Promise<CriterionReceipt> {
+  const exitCode = await runHermeticTests({
+    root,
+    requestedInputs: AC005_TEST_INPUTS,
+    inheritedEnv: {
+      ...process.env,
+      TURSO_DATABASE_URL: "libsql://ac005-production-sentinel.invalid",
+      TURSO_AUTH_TOKEN: "ac005-production-token-sentinel",
+      R2_SECRET_ACCESS_KEY: "ac005-r2-secret-sentinel",
+    },
+    deadlineMs: 60_000,
+  });
+  assert(exitCode === 0, "AC-005 fail-closed snapshot reader suite failed");
+  return {
+    criterion: "AC-005",
+    ok: true,
+    receipts: [
+      "active, previous-release and warm last-known-good paths passed on injected HTTP storage",
+      "manifest/artifact schema, release identity, byte length and SHA-256 failures remained controlled-unavailable",
+      "timeout, missing objects, unknown schema and arbitrary-key probes never reached a DB path",
+      "recursive reader source boundary contains no DB/libSQL/Turso dependency",
+    ],
+  };
+}
+
 export async function verifyR2PublicCheap(
   root = resolve(join(import.meta.dir, "../..")),
 ): Promise<CriterionReceipt> {
@@ -305,5 +332,6 @@ export async function verifyR2PublicCriterion(
   if (criterion === "AC-001") return verifyAc001(root);
   if (criterion === "AC-002") return verifyAc002(root);
   if (criterion === "AC-003") return verifyAc003(root);
+  if (criterion === "AC-005") return verifyAc005(root);
   throw new Error(`Criterion is not implemented yet: ${criterion}`);
 }

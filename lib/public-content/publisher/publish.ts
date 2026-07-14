@@ -2,6 +2,7 @@ import { z } from "zod";
 import { canonicalJsonBytes, sha256Hex } from "@/lib/public-content/canonical";
 import {
   manifestSchema,
+  parsePublicEntityShardValue,
   runReceiptSchema,
   snapshotPointerSchema,
 } from "@/lib/public-content/contracts";
@@ -11,8 +12,6 @@ import {
 } from "@/lib/public-content/paths";
 import {
   buildPublicRelease,
-  parsePublicEntityShard,
-  publicEntityTypeFromShardLogicalName,
   verifyDescriptorBytes,
   type BuiltPublicRelease,
   type PublicReleaseManifest,
@@ -226,9 +225,9 @@ export async function uploadChangedReleaseArtifacts(
     if (!equalBytes(stored.bytes, artifact.bytes)) {
       throw new Error(`uploaded artifact bytes changed: ${artifact.logicalName}`);
     }
-    parsePublicEntityShard(
-      publicEntityTypeFromShardLogicalName(artifact.logicalName),
-      stored.bytes,
+    parsePublicEntityShardValue(
+      artifact.logicalName,
+      parseJson(stored.bytes),
     );
     if (put.status === "uploaded") {
       metrics.uploaded += 1;

@@ -3,62 +3,16 @@ import { canonicalJsonBytes, canonicalSha256, sha256Hex } from "@/lib/public-con
 import {
   artifactDescriptorSchema,
   manifestSchema,
-  publicEventSchema,
-  publicItemSchema,
-  publicNewsletterSchema,
-  publicPolicySchema,
-  publicSourceSchema,
+  parsePublicEntityShardValue,
+  parsePublicEntityValue,
+  publicEntityKey,
+  publicEntityShardLogicalName,
+  publicEntityShardMetadata,
+  publicEntityShardSchemas,
+  type PublicEntityType,
 } from "@/lib/public-content/contracts";
 import { objectKey } from "@/lib/public-content/paths";
-import type {
-  PublicEntityChange,
-  PublicEntityType,
-} from "./types";
-
-const idBucketSchema = z.strictObject({
-  kind: z.literal("id_bucket"),
-  bucket: z.string().regex(/^[a-f0-9]{2}$/),
-});
-const singletonSchema = z.strictObject({ kind: z.literal("singleton") });
-
-const itemShardSchema = z.strictObject({
-  schemaVersion: z.literal(1),
-  entityType: z.literal("item"),
-  shard: idBucketSchema,
-  entities: z.array(publicItemSchema),
-});
-const eventShardSchema = z.strictObject({
-  schemaVersion: z.literal(1),
-  entityType: z.literal("event"),
-  shard: idBucketSchema,
-  entities: z.array(publicEventSchema),
-});
-const sourceShardSchema = z.strictObject({
-  schemaVersion: z.literal(1),
-  entityType: z.literal("source"),
-  shard: singletonSchema,
-  entities: z.array(publicSourceSchema),
-});
-const newsletterShardSchema = z.strictObject({
-  schemaVersion: z.literal(1),
-  entityType: z.literal("newsletter"),
-  shard: idBucketSchema,
-  entities: z.array(publicNewsletterSchema),
-});
-const policyShardSchema = z.strictObject({
-  schemaVersion: z.literal(1),
-  entityType: z.literal("policy"),
-  shard: singletonSchema,
-  entities: z.array(publicPolicySchema),
-});
-
-const shardSchemas = {
-  item: itemShardSchema,
-  event: eventShardSchema,
-  source: sourceShardSchema,
-  newsletter: newsletterShardSchema,
-  policy: policyShardSchema,
-} as const;
+import type { PublicEntityChange } from "./types";
 
 type ArtifactDescriptor = z.infer<typeof artifactDescriptorSchema>;
 export type PublicReleaseManifest = z.infer<typeof manifestSchema>;
@@ -109,7 +63,10 @@ export async function buildPublicRelease(
 
   for (const [logicalName, changes] of grouped) {
     const entityType = changes[0]!.entityType;
-    const expectedShard = shardFor(entityType, changes[0]!.entityKey);
+    const expectedShard = publicEntityShardMetadata(
+      entityType,
+      changes[0]!.entityKey,
+    );
     const previousDescriptor = previous?.artifacts[logicalName];
     let entities: unknown[] = [];
     if (previousDescriptor) {
@@ -117,11 +74,14 @@ export async function buildPublicRelease(
       const bytes = await input.loadArtifact(logicalName, previousDescriptor);
       loadedArtifactCount += 1;
       await verifyDescriptorBytes(previousDescriptor, bytes);
-      entities = parseShard(entityType, expectedShard, bytes).entities;
+      entities = parsePublicEntityShardValue(
+        logicalName,
+        JSON.parse(new TextDecoder().decode(bytes)) as unknown,
+      ).entities;
     }
 
     const patched = patchEntities(entityType, entities, changes);
-    const shard = shardSchemas[entityType].parse({
+    const shard = publicEntityShardSchemas[entityType].parse({
       schemaVersion: 1,
       entityType,
       shard: expectedShard,
@@ -169,35 +129,6 @@ export async function buildPublicRelease(
   };
 }
 
-export function publicEntityShardLogicalName(
-  entityType: PublicEntityType,
-  entityKey: string,
-): string {
-  if (entityType === "source") return "state/sources";
-  if (entityType === "policy") return "state/policies";
-  const bucket = numericBucket(entityKey, entityType);
-  const plural =
-    entityType === "item"
-      ? "items"
-      : entityType === "event"
-        ? "events"
-        : "newsletters";
-  return `state/${plural}/${bucket}`;
-}
-
-export function publicEntityTypeFromShardLogicalName(
-  logicalName: string,
-): PublicEntityType {
-  if (logicalName === "state/sources") return "source";
-  if (logicalName === "state/policies") return "policy";
-  if (/^state\/items\/[a-f0-9]{2}$/.test(logicalName)) return "item";
-  if (/^state\/events\/[a-f0-9]{2}$/.test(logicalName)) return "event";
-  if (/^state\/newsletters\/[a-f0-9]{2}$/.test(logicalName)) {
-    return "newsletter";
-  }
-  throw new Error(`unknown public entity shard: ${logicalName}`);
-}
-
 export async function verifyDescriptorBytes(
   descriptorValue: unknown,
   bytes: Uint8Array,
@@ -209,16 +140,6 @@ export async function verifyDescriptorBytes(
   if ((await sha256Hex(bytes)) !== descriptor.sha256) {
     throw new Error(`artifact hash mismatch: ${descriptor.key}`);
   }
-}
-
-export function parsePublicEntityShard(
-  entityType: PublicEntityType,
-  bytes: Uint8Array,
-): z.infer<(typeof shardSchemas)[PublicEntityType]> {
-  const value = JSON.parse(new TextDecoder().decode(bytes)) as unknown;
-  return shardSchemas[entityType].parse(value) as z.infer<
-    (typeof shardSchemas)[PublicEntityType]
-  >;
 }
 
 function groupChanges(
@@ -247,7 +168,7 @@ function patchEntities(
 ): unknown[] {
   const entities = new Map<string, unknown>();
   for (const value of previous) {
-    entities.set(entityKey(entityType, value), value);
+    entities.set(publicEntityKey(entityType, value), value);
   }
   for (const change of changes) {
     if (change.entityType !== entityType) {
@@ -255,10 +176,8 @@ function patchEntities(
     }
     if (change.value === null) entities.delete(change.entityKey);
     else {
-      const parsed = shardSchemas[entityType].shape.entities.element.parse(
-        change.value,
-      );
-      if (entityKey(entityType, parsed) !== change.entityKey) {
+      const parsed = parsePublicEntityValue(entityType, change.value);
+      if (publicEntityKey(entityType, parsed) !== change.entityKey) {
         throw new Error(`${entityType} key/value mismatch`);
       }
       entities.set(change.entityKey, parsed);
@@ -267,34 +186,6 @@ function patchEntities(
   return [...entities.entries()]
     .sort(([left], [right]) => compareEntityKeys(entityType, left, right))
     .map(([, value]) => value);
-}
-
-function parseShard(
-  entityType: PublicEntityType,
-  expectedShard: ReturnType<typeof shardFor>,
-  bytes: Uint8Array,
-) {
-  const parsed = parsePublicEntityShard(entityType, bytes);
-  if (JSON.stringify(parsed.shard) !== JSON.stringify(expectedShard)) {
-    throw new Error(`artifact shard mismatch for ${entityType}`);
-  }
-  const seen = new Set<string>();
-  for (const entity of parsed.entities) {
-    const key = entityKey(entityType, entity);
-    if (seen.has(key)) throw new Error(`duplicate ${entityType} in shard`);
-    seen.add(key);
-    if (JSON.stringify(shardFor(entityType, key)) !== JSON.stringify(expectedShard)) {
-      throw new Error(`${entityType} is stored in the wrong shard`);
-    }
-  }
-  return parsed;
-}
-
-function entityKey(entityType: PublicEntityType, value: unknown): string {
-  const record = value as Record<string, unknown>;
-  if (entityType === "source") return String(record.id);
-  if (entityType === "policy") return String(record.skillName);
-  return String(record.id);
 }
 
 function compareEntityKeys(
@@ -308,25 +199,9 @@ function compareEntityKeys(
   return Number(left) - Number(right);
 }
 
-function shardFor(entityType: PublicEntityType, entityKey: string) {
-  return entityType === "source" || entityType === "policy"
-    ? ({ kind: "singleton" } as const)
-    : ({
-        kind: "id_bucket",
-        bucket: numericBucket(entityKey, entityType),
-      } as const);
-}
-
-function numericBucket(value: string, label: string): string {
-  if (!/^[1-9]\d*$/.test(value)) throw new Error(`invalid ${label} key`);
-  const parsed = Number(value);
-  if (!Number.isSafeInteger(parsed)) throw new Error(`invalid ${label} key`);
-  return (parsed % 256).toString(16).padStart(2, "0");
-}
-
 function assertDescriptorShard(
   descriptor: ArtifactDescriptor,
-  expected: ReturnType<typeof shardFor>,
+  expected: ReturnType<typeof publicEntityShardMetadata>,
 ): void {
   if (JSON.stringify(descriptor.shard) !== JSON.stringify(expected)) {
     throw new Error(`manifest descriptor shard mismatch: ${descriptor.key}`);

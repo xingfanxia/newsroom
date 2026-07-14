@@ -129,10 +129,17 @@ This inventory is frozen from
     mismatch and timeout while a poison DB sentinel remains untouched.
   fail_evidence: >-
     Current public readers import DB-owning live loaders and no R2 reader exists.
-  status: OPEN
+  status: PASS_PENDING_FINAL
   depends_on: [AC-001, AC-002, AC-003]
   reopen_condition: Any snapshot-reader failure path can reach a DB module.
-  last_verification: Not run; implementation absent 2026-07-14.
+  last_verification: >-
+    Passed locally 2026-07-14 via `bun run verify:r2-public --criterion
+    AC-005`: 1 hermetic suite, 6 tests and 25 assertions under hostile inherited
+    Turso/R2 credential sentinels. Active success, corrupt active manifest and
+    object fallback to previous, whole-release consistency, warm last-known-good,
+    missing/corrupt/unknown-schema/timeout failure, immutable caching, pinned
+    origin/key validation and the recursive no-DB source boundary all passed.
+    No public R2 endpoint, Turso database or production service was contacted.
 
 - id: AC-006
   statement: >-
