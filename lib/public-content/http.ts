@@ -5,6 +5,17 @@ import {
   toEventMembersListEnvelope,
   toEventMembersPayload,
 } from "@/lib/api/event-member-contract";
+import {
+  feedQueryFromParams,
+  parsePublicFeedQueryRequest,
+  parsePublicSearchQueryRequest,
+  searchFeedQueryFromParams,
+} from "@/lib/api/feed-query-params";
+import {
+  toApiItemCommonFields,
+  toApiItemEventFields,
+  toPublicHkr,
+} from "@/lib/api/story-item-fields";
 import { etagSignal } from "@/lib/api/public-helpers";
 import {
   invalidQueryError,
@@ -24,10 +35,14 @@ import {
   listPublicDailyIndex,
 } from "@/lib/public-content/public-dailies";
 import { createPublicStateIndex } from "@/lib/public-content/public-items";
-import { getPublicEventMembers } from "@/lib/public-content/query";
+import {
+  getPublicEventMembers,
+  queryPublicFeed,
+} from "@/lib/public-content/query";
 import { publicSnapshotReader } from "@/lib/public-content/reader";
 import type { PublicCanonicalStateResult } from "@/lib/public-content/reader/types";
 import { APP_LOCALES, type AppLocale } from "@/lib/types";
+import { PUBLIC_SEMANTIC_SEARCH_ERROR } from "@/lib/search/query-defaults";
 
 type SnapshotCachedResult =
   | { ok: true; signal: string; body: unknown }
@@ -63,6 +78,90 @@ const dailyIndexQuerySchema = z.object({
 
 export async function readPublicSnapshot(): Promise<PublicCanonicalStateResult> {
   return publicSnapshotReader().readCanonicalState();
+}
+
+export async function publicFeedSnapshotRequestResult(
+  req: Request,
+): Promise<SnapshotCachedResult> {
+  const parsed = parsePublicFeedQueryRequest(req);
+  if (!parsed.ok) {
+    return {
+      ok: false,
+      error: invalidQueryError(parsed.issues),
+      status: 400,
+    };
+  }
+  const snapshot = await readPublicSnapshot();
+  const result = queryPublicFeed(
+    snapshot.state,
+    feedQueryFromParams(parsed.data),
+    { nowMs: Date.now() },
+  );
+  return {
+    ok: true,
+    signal: etagSignal({
+      release: snapshot.release.ref.manifestSha256,
+      count: result.items.length,
+      total: result.total,
+      first_id: result.items[0]?.id ?? "",
+      latest_at: result.items[0]?.publishedAt ?? "",
+      qs: parsed.search,
+    }),
+    body: {
+      items: result.items.map((story) =>
+        toSnapshotPublicApiItem(story, parsed.data.locale),
+      ),
+      total: result.total,
+      limit: result.limit,
+      offset: result.offset,
+      view: result.view,
+    },
+  };
+}
+
+export async function publicSearchSnapshotRequestResult(
+  req: Request,
+): Promise<SnapshotCachedResult> {
+  const parsed = parsePublicSearchQueryRequest(req);
+  if (!parsed.ok) {
+    return {
+      ok: false,
+      error: invalidQueryError(parsed.issues),
+      status: 400,
+    };
+  }
+  if (parsed.data.mode === "semantic") {
+    return {
+      ok: false,
+      error: PUBLIC_SEMANTIC_SEARCH_ERROR,
+      status: 422,
+    };
+  }
+  const snapshot = await readPublicSnapshot();
+  const result = queryPublicFeed(
+    snapshot.state,
+    searchFeedQueryFromParams(parsed.data),
+    { nowMs: Date.now() },
+  );
+  return {
+    ok: true,
+    signal: etagSignal({
+      release: snapshot.release.ref.manifestSha256,
+      qs: parsed.search,
+      total: result.total,
+      first: result.items[0]?.id ?? "",
+    }),
+    body: {
+      mode: "lexical",
+      q: parsed.data.q,
+      items: result.items.map((story) =>
+        toSnapshotPublicApiItem(story, parsed.data.locale),
+      ),
+      total: result.total,
+      limit: result.limit,
+      offset: result.offset,
+    },
+  };
 }
 
 export function publicSourcesSnapshotResult(
@@ -311,5 +410,15 @@ function dailyResult(
       generated: body.generated_at,
     }),
     body,
+  };
+}
+
+function toSnapshotPublicApiItem(
+  story: Parameters<typeof toApiItemEventFields>[0],
+  locale: AppLocale,
+) {
+  return {
+    ...toApiItemCommonFields(story, toPublicHkr(story.hkr)),
+    ...toApiItemEventFields(story, locale),
   };
 }

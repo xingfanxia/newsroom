@@ -205,11 +205,17 @@ This inventory is frozen from
   fail_evidence: >-
     Current anonymous semantic search generates an embedding and executes a
     Turso vector query.
-  status: OPEN
+  status: PASS_PENDING_FINAL
   depends_on: [AC-002, AC-005]
   reopen_condition: Anonymous semantic mode reaches embedding/Turso or public docs disagree with runtime.
-  last_verification: Not run; current source is known red 2026-07-14.
-
+  last_verification: >-
+    Passed locally 2026-07-14 via `bun run verify:r2-public --criterion
+    AC-008`: 1 hermetic suite, 6 tests and 50 assertions under hostile inherited
+    Turso, embedding and R2 credential sentinels. Frozen-corpus feed/lexical
+    parity, localization, filters, wildcard LIKE, ordering, totals, pagination,
+    ETag/304, semantic 422-before-I/O, recursive no-DB/no-semantic source graphs,
+    and OpenAPI/skill documentation all passed. V1/MCP live semantic code was
+    not changed and no production service was contacted.
 - id: AC-009
   statement: >-
     A generated anonymous-entrypoint inventory, recursive source import-graph

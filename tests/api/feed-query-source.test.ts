@@ -9,15 +9,28 @@ const routePaths = [
 ] as const;
 
 const feedQueryParams = read("lib/api/feed-query-params.ts");
+const snapshotHttp = read("lib/public-content/http.ts");
 
 describe("feed/search route query parsing source wiring", () => {
-  test("feed/search routes use the shared query schema module", () => {
-    for (const path of routePaths) {
+  test("feed/search surfaces use the shared query schema module", () => {
+    for (const path of [
+      "app/api/v1/feed/route.ts",
+      "app/api/v1/search/route.ts",
+    ] as const) {
       const source = read(path);
 
       expect(source).toContain("@/lib/api/feed-query-params");
       expect(source).not.toContain("const querySchema = z.object");
       expect(source).not.toContain("function parseTagList");
+    }
+    expect(snapshotHttp).toContain("@/lib/api/feed-query-params");
+    expect(snapshotHttp).toContain("parsePublicFeedQueryRequest(req)");
+    expect(snapshotHttp).toContain("parsePublicSearchQueryRequest(req)");
+    for (const path of [
+      "app/api/public/feed/route.ts",
+      "app/api/public/search/route.ts",
+    ] as const) {
+      expect(read(path)).toContain("@/lib/public-content/http");
     }
   });
 
@@ -28,13 +41,13 @@ describe("feed/search route query parsing source wiring", () => {
     expect(v1FeedRoute).toContain(
       "parseV1FeedQueryRequest(req)",
     );
-    expect(read("app/api/public/feed/route.ts")).toContain(
+    expect(snapshotHttp).toContain(
       "parsePublicFeedQueryRequest(req)",
     );
     expect(v1SearchRoute).toContain(
       "parseV1SearchQueryRequest(req)",
     );
-    expect(read("app/api/public/search/route.ts")).toContain(
+    expect(snapshotHttp).toContain(
       "parsePublicSearchQueryRequest(req)",
     );
 
@@ -77,18 +90,18 @@ describe("feed/search route query parsing source wiring", () => {
     }
   });
 
-  test("search routes share execution so lexical totals and semantic options cannot drift", () => {
-    for (const path of [
-      "app/api/v1/search/route.ts",
-      "app/api/public/search/route.ts",
-    ] as const) {
-      const source = read(path);
-
-      expect(source).toContain("@/lib/api/search-results");
+  test("public search uses pure snapshots while v1 retains semantic execution", () => {
+    const v1 = read("app/api/v1/search/route.ts");
+    const publicRoute = read("app/api/public/search/route.ts");
+    expect(v1).toContain("@/lib/api/search-results");
+    expect(publicRoute).toContain("publicSearchSnapshotRequestResult");
+    expect(snapshotHttp).toContain("queryPublicFeed");
+    expect(snapshotHttp).toContain("PUBLIC_SEMANTIC_SEARCH_ERROR");
+    for (const source of [publicRoute, snapshotHttp]) {
       expect(source).not.toContain("@/lib/items/semantic-search");
+      expect(source).not.toContain("runSearchQuery");
       expect(source).not.toContain("getFeaturedStories");
       expect(source).not.toContain("countFeaturedStories");
-      expect(source).not.toContain("total: stories.length");
     }
   });
 
@@ -97,7 +110,7 @@ describe("feed/search route query parsing source wiring", () => {
       "toAgentSearchPayload(result, p.locale)",
     );
     expect(read("app/api/public/search/route.ts")).toContain(
-      "toPublicSearchPayload(result, p.locale)",
+      "publicSearchSnapshotRequestResult(req)",
     );
 
     for (const path of [
@@ -115,14 +128,13 @@ describe("feed/search route query parsing source wiring", () => {
     }
   });
 
-  test("feed routes share execution so totals and defaults cannot drift", () => {
-    for (const path of [
-      "app/api/v1/feed/route.ts",
-      "app/api/public/feed/route.ts",
-    ] as const) {
-      const source = read(path);
-
-      expect(source).toContain("@/lib/api/feed-results");
+  test("public feed uses pure snapshots while v1 retains live execution", () => {
+    const v1 = read("app/api/v1/feed/route.ts");
+    const publicRoute = read("app/api/public/feed/route.ts");
+    expect(v1).toContain("@/lib/api/feed-results");
+    expect(publicRoute).toContain("publicFeedSnapshotRequestResult");
+    expect(snapshotHttp).toContain("queryPublicFeed");
+    for (const source of [publicRoute, snapshotHttp]) {
       expect(source).not.toContain("getFeaturedStories");
       expect(source).not.toContain("countFeaturedStories");
     }
@@ -133,7 +145,7 @@ describe("feed/search route query parsing source wiring", () => {
       "toAgentFeedPayload(result, q.locale)",
     );
     expect(read("app/api/public/feed/route.ts")).toContain(
-      "toPublicFeedPayload(result, q.locale)",
+      "publicFeedSnapshotRequestResult(req)",
     );
 
     for (const path of [

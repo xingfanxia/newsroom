@@ -47,6 +47,7 @@ import {
   DEFAULT_SEARCH_LIMIT,
   DEFAULT_SEARCH_MODE,
   DEFAULT_SEARCH_OFFSET,
+  PUBLIC_SEMANTIC_SEARCH_ERROR,
   PUBLIC_SEARCH_LIMIT_MAX,
   SEARCH_LIMIT_MIN,
 } from "@/lib/search/query-defaults";
@@ -73,7 +74,6 @@ const RATE_LIMIT_ROWS = PUBLIC_RATE_LIMIT_DOC_GROUPS.map(
   (group) =>
     `| ${group.skillEndpoints.join(" ")} | ${publicRateLimitLabel(group.keys[0])} |`,
 ).join("\n");
-const SEARCH_RATE_LIMIT_LABEL = publicRateLimitLabel("search");
 
 const SKILL_MARKDOWN = `---
 name: ax-radar
@@ -111,7 +111,7 @@ Skill 根据用户提问关键词智能分流。默认走 **精选 + view=today*
 | "全部 / 完整 / all" | \`GET /api/public/feed?tier=all\` |
 | "最近 N 天" 时间窗 | \`GET /api/public/feed?date_from={ISO}\` |
 | 关键词搜索 ("OpenAI 最近发的","Anthropic news") | \`GET /api/public/search?q={keyword}\` |
-| 语义检索 ("agentic coding 相关的","semantic search") | \`GET /api/public/search?q={query}&mode=semantic\` |
+| 语义检索 ("agentic coding 相关的","semantic search") | 匿名接口不支持; 使用 bearer v1/MCP |
 | 多源事件全部覆盖 | \`GET /api/public/events/{cluster_id}/members\` |
 | 单条全文 (含 YT transcript + 编辑锐评) | \`GET /api/public/items/{id}\` |
 | 信源目录 ("AX Radar 覆盖了哪些源") | \`GET /api/public/sources\` |
@@ -123,7 +123,7 @@ Skill 根据用户提问关键词智能分流。默认走 **精选 + view=today*
 - "看下精选条目" → feed (default)
 - "最近 OpenAI 有什么发布" → /search?q=OpenAI
 - "AI 模型发布列表" → feed?include_source_tags=ai-model (or filter client-side)
-- "找一下 autonomous coding agent 相关的" → /search?q=...&mode=semantic
+- "找一下 autonomous coding agent 相关的" → /search?q=... (lexical)
 - "AX Radar 都从哪些源拉" → /sources
 
 ## 输出模板 / Output Template
@@ -191,6 +191,7 @@ curl -H 'If-None-Match: W/"public-feed-xxxxxxxxxxxxxxxx"' \\
 \`/api/public/search\` 额外参数:
 
 - \`mode\` = ${SEARCH_MODE_OPTIONS}, default \`${DEFAULT_SEARCH_MODE}\`
+- \`mode=semantic\` returns \`422 {"error":"${PUBLIC_SEMANTIC_SEARCH_ERROR}"}\`; use bearer-authenticated v1/MCP for semantic retrieval
 - \`limit\` = ${SEARCH_LIMIT_MIN}..${PUBLIC_SEARCH_LIMIT_MAX}, default ${DEFAULT_SEARCH_LIMIT}
 - \`offset\` = ≥0, default ${DEFAULT_SEARCH_OFFSET}
 - \`locale\` = ${APP_LOCALE_OPTIONS}, default \`${DEFAULT_API_SEARCH_LOCALE}\`
@@ -228,10 +229,10 @@ curl -H 'If-None-Match: W/"public-feed-xxxxxxxxxxxxxxxx"' \\
 1. **不要并发猛拉** — 端点有限流,翻页用串行 + 自然间隔
 2. **\`date_from\` / \`date_to\` 必须是 ISO 8601** — 用 \`2026-05-01T00:00:00Z\`,不是 unix 时间戳
 3. **\`limit\` 上限按端点不同** — feed max ${PUBLIC_FEED_LIMIT_MAX}, search max ${PUBLIC_SEARCH_LIMIT_MAX}; 想要更多用 \`offset\` 翻页,不要 \`?limit=500\` (返回 400)
-4. **拉日报别在 narrative_md 里搜关键词** — 那是长文,语义关键词用 \`/search?mode=semantic\`
+4. **拉日报别在 narrative_md 里搜关键词** — 那是长文; 匿名关键词检索用 \`/search?q=...\`
 5. **publisher 是显示名,不是 id** — 过滤用 \`source_id\` (e.g. \`dwarkesh-yt\`),不是 \`?publisher=Dwarkesh\`
 6. **cluster_id 来自 feed 响应** — 不要瞎构造,只用 feed 给的值
-7. **\`mode=semantic\` 有 LLM 成本** — 限流更严 (${SEARCH_RATE_LIMIT_LABEL}),不要无脑全切语义模式
+7. **匿名 \`mode=semantic\` 不支持** — 返回 422; 需要语义检索时使用 bearer v1/MCP
 
 ## 使用须知 / Caveats
 

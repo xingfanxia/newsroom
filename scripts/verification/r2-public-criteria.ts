@@ -305,6 +305,36 @@ async function verifyAc005(root: string): Promise<CriterionReceipt> {
   };
 }
 
+const AC008_TEST_INPUTS = [
+  "tests/api/public-snapshot-feed-search.test.ts",
+] as const;
+
+async function verifyAc008(root: string): Promise<CriterionReceipt> {
+  const exitCode = await runHermeticTests({
+    root,
+    requestedInputs: AC008_TEST_INPUTS,
+    inheritedEnv: {
+      ...process.env,
+      TURSO_DATABASE_URL: "libsql://ac008-production-sentinel.invalid",
+      TURSO_AUTH_TOKEN: "ac008-production-token-sentinel",
+      AZURE_OPENAI_API_KEY: "ac008-embedding-sentinel",
+      R2_SECRET_ACCESS_KEY: "ac008-r2-secret-sentinel",
+    },
+    deadlineMs: 60_000,
+  });
+  assert(exitCode === 0, "AC-008 public lexical/semantic split suite failed");
+  return {
+    criterion: "AC-008",
+    ok: true,
+    receipts: [
+      "snapshot lexical feed/search parity matrix passed over the frozen public corpus",
+      "anonymous semantic mode returned documented 422 before snapshot, DB or embedding access",
+      "public feed/search recursive source graphs contain no live DB or semantic-search runtime",
+      "OpenAPI and installable skill document the 422 plus authenticated v1/MCP alternative",
+    ],
+  };
+}
+
 export async function verifyR2PublicCheap(
   root = resolve(join(import.meta.dir, "../..")),
 ): Promise<CriterionReceipt> {
@@ -333,5 +363,6 @@ export async function verifyR2PublicCriterion(
   if (criterion === "AC-002") return verifyAc002(root);
   if (criterion === "AC-003") return verifyAc003(root);
   if (criterion === "AC-005") return verifyAc005(root);
+  if (criterion === "AC-008") return verifyAc008(root);
   throw new Error(`Criterion is not implemented yet: ${criterion}`);
 }

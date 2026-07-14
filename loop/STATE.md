@@ -73,25 +73,24 @@ artifacts:
   repo_aliases:
     plan: docs/R2-PUBLIC-READ-PLAN-2026-07-14.md
     evidence: docs/reports/r2-public-read/
-iteration: 15
+iteration: 16
 phase: implementation
 current_artifact: docs/superpowers/plans/2026-07-14-r2-public-read-decoupling.md
 current_criterion: AC-006
 last_action: >-
-  Completed Task 12 locally. Eight low-complexity anonymous JSON routes now use
-  the shared snapshot reader and pure adapters for sources, item detail, event
-  members and daily columns; v1/MCP live loaders remain unchanged. Response
-  bodies, locale defaults, validation, 404s, public CORS/cache/ETag+304 and
-  legacy envelopes are covered, and cold reader failure maps to a controlled
-  503. Focused compatibility plus route suites passed 94 tests and 546
-  assertions; typecheck, lint and the recursive eight-entrypoint no-DB boundary
-  passed. No production endpoint or database was contacted.
+  Completed Task 13 locally and moved AC-008 to PASS_PENDING_FINAL. Anonymous
+  feed and lexical search now run on the validated snapshot plus the pure query
+  engine, preserving the frozen parity matrix, filters, wildcard LIKE,
+  localization, ordering, totals, pagination and ETag/304. Anonymous semantic
+  mode returns documented HTTP 422 before any snapshot, DB or embedding call;
+  bearer v1/MCP semantic remains unchanged. The AC-008 verifier passed 1
+  hermetic suite, 6 tests and 50 assertions under hostile Turso/embedding/R2
+  sentinels. No production endpoint or database was contacted.
 next_action: >-
-  Implement Task 13 by moving `/api/public/feed` and `/api/public/search` onto
-  the same snapshot reader and pure query engine, preserving lexical filters,
-  sort, total, pagination and ETag contracts while returning the approved 422
-  response for semantic mode. Update its public OpenAPI/skill/docs contract in
-  the same change and keep v1/MCP semantic paths unchanged.
+  Implement Task 14 by publishing and serving every main/newsletter/legacy RSS
+  variant as immutable snapshot XML bytes while preserving exact response bytes,
+  content type, cache behavior, rate limiting, slug/locale behavior and implicit
+  HEAD. Remove request-time DB-owned RSS imports and then complete AC-006.
 halt_cause: null
 halt_scan: []
 stuck_counters: {}

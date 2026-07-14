@@ -1,23 +1,14 @@
 /**
- * GET /api/public/search — Anonymous lexical + semantic search.
+ * GET /api/public/search — Anonymous snapshot-backed lexical search.
  *
  * `mode=lexical` (default) — LIKE substring against title/summary, fast + cheap.
- * `mode=semantic` — embeds q via Azure text-embedding-3-large and ranks by
- *   libSQL vector cosine distance. Each hit gets a `distance` field
- *   (0 = identical, smaller = closer).
+ * `mode=semantic` — returns a documented 422. Semantic search remains on the
+ * bearer-authenticated v1/MCP surfaces and never falls back to Turso here.
  *
  * Same item shape and field stripping as /api/public/feed.
  */
-import {
-  etagSignal,
-  publicCachedRoute,
-  publicInvalidQueryResult,
-} from "@/lib/api/public-helpers";
-import { parsePublicSearchQueryRequest } from "@/lib/api/feed-query-params";
-import {
-  runSearchQuery,
-  toPublicSearchPayload,
-} from "@/lib/api/search-results";
+import { publicCachedRoute } from "@/lib/api/public-helpers";
+import { publicSearchSnapshotRequestResult } from "@/lib/public-content/http";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -27,24 +18,6 @@ export async function GET(req: Request) {
     endpoint: "search",
     etagFamily: "public-search",
     label: "api/public/search",
-    load: async () => {
-      const parsed = parsePublicSearchQueryRequest(req);
-      if (!parsed.ok) return publicInvalidQueryResult(parsed.issues);
-      const p = parsed.data;
-
-      // ETag binds to query — same q + filters produces stable etag while
-      // corpus doesn't grow new matches.
-      const baseSignal = etagSignal({
-        qs: parsed.search,
-        mode: p.mode,
-      });
-      const result = await runSearchQuery(p);
-
-      return {
-        ok: true,
-        signal: `${baseSignal}|total=${result.total}|first=${result.items[0]?.id ?? ""}`,
-        body: toPublicSearchPayload(result, p.locale),
-      };
-    },
+    load: async () => publicSearchSnapshotRequestResult(req),
   });
 }
