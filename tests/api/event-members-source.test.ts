@@ -1,21 +1,21 @@
 import { describe, expect, test } from "bun:test";
 import { readSource as read } from "@/tests/helpers/source";
 
-const routePaths = [
+const snapshotRoutePaths = [
   "app/api/events/[id]/members/route.ts",
   "app/api/public/events/[id]/members/route.ts",
-  "app/api/v1/events/[id]/members/route.ts",
 ] as const;
 const mcpRoutePath = "app/api/mcp/route.ts";
 const defaultsPath = "lib/event-members/query-defaults.ts";
 
 describe("event member route source wiring", () => {
-  test("all HTTP event-member routes share route payload lookup", () => {
-    for (const path of routePaths) {
+  test("anonymous event-member routes share the snapshot adapter", () => {
+    for (const path of snapshotRoutePaths) {
       const source = read(path);
 
-      expect(source).toContain("@/lib/api/event-members");
-      expect(source).toContain("getEventMembersRequestPayload");
+      expect(source).toContain("@/lib/public-content/http");
+      expect(source).toContain("publicEventMembersSnapshotResult");
+      expect(source).toContain("readPublicSnapshot");
       expect(source).not.toContain("getEventMembersRoutePayload");
       expect(source).not.toContain("parseEventMemberRouteParams");
       expect(source).not.toContain("toEventMemberApiItems");
@@ -26,6 +26,9 @@ describe("event member route source wiring", () => {
       expect(source).not.toContain("new URL(req.url)");
       expect(source).not.toContain('searchParams.get("locale")');
     }
+    const v1 = read("app/api/v1/events/[id]/members/route.ts");
+    expect(v1).toContain("@/lib/api/event-members");
+    expect(v1).toContain("getEventMembersRequestPayload");
   });
 
   test("MCP event members shares the same payload builder", () => {
@@ -73,12 +76,11 @@ describe("event member route source wiring", () => {
     const source = read("app/api/events/[id]/members/route.ts");
 
     expect(source).toContain("@/lib/api/plain-response");
-    expect(source).toContain("toEventMembersListEnvelope");
+    expect(source).toContain("listOnly: true");
     expect(source).toContain("plainJson");
-    expect(source).toContain("plainRouteResult");
+    expect(source).toContain("plainError");
     expect(source).toContain("runPlainRoute");
     expect(source).toContain('serverErrorLabel: "api/events/:id/members"');
-    expect(source).not.toContain("plainError(result.error");
     expect(source).not.toContain("plainServerError");
     expect(source).not.toContain("try {");
     expect(source).not.toContain("catch (");
@@ -90,13 +92,12 @@ describe("event member route source wiring", () => {
     const source = read("app/api/public/events/[id]/members/route.ts");
 
     expect(source).toContain("publicCachedRoute");
-    expect(source).toContain("publicRouteResult(");
+    expect(source).toContain("publicEventMembersSnapshotResult");
     expect(source).toContain('endpoint: "eventMembers"');
     expect(source).not.toContain("publicEndpointRateLimit(");
     expect(source).not.toContain("publicCachedJson(req,");
     expect(source).not.toContain("if (!result.ok) return result");
-    expect(source).toContain("eventMembersCacheSignalParts");
-    expect(source).toContain("etagSignal(eventMembersCacheSignalParts(body))");
+    expect(source).toContain("readPublicSnapshot");
     expect(source).not.toContain("body.members[body.members.length");
   });
 

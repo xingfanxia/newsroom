@@ -38,15 +38,17 @@ function inlineEnum(values: readonly (string | null)[]): string {
 }
 
 describe("source catalog source wiring", () => {
-  test("public and v1 routes delegate source serialization to the shared module", () => {
+  test("public sources use snapshots while v1 keeps the live source module", () => {
+    expect(v1SourcesRoute).toContain("@/lib/api/source-catalog");
+    expect(v1SourcesRoute).toContain("listSourceCatalogRows");
+    expect(v1SourcesRoute).toContain("rows.map(toV1SourceApiItem)");
+    expect(publicSourcesRoute).toContain("@/lib/public-content/http");
+    expect(publicSourcesRoute).toContain("publicSourcesSnapshotResult");
+    expect(publicSourcesRoute).toContain("readPublicSnapshot");
     for (const source of [v1SourcesRoute, publicSourcesRoute]) {
-      expect(source).toContain("@/lib/api/source-catalog");
-      expect(source).toContain("listSourceCatalogRows");
       expect(source).not.toContain(".select({");
       expect(source).not.toContain("sourceHealth.");
     }
-    expect(v1SourcesRoute).toContain("rows.map(toV1SourceApiItem)");
-    expect(publicSourcesRoute).toContain("rows.map(toPublicSourceApiItem)");
   });
 
   test("OpenAPI documents the runtime source health enum", () => {
@@ -152,10 +154,9 @@ describe("source catalog source wiring", () => {
   test("source serializers reuse the shared nullable ISO helper", () => {
     expect(sourceCatalog).toContain("@/lib/time/relative");
     expect(sourceCatalog).toContain("toIsoStringOrNull");
-    expect(publicSourcesRoute).toContain("toIsoStringOrNull");
     expect(liveSources).toContain("toIsoStringOrNull");
     expect(sourceCatalog).not.toContain("function iso(");
-    expect(publicSourcesRoute).not.toContain("lastSuccessAt?.toISOString()");
+    expect(publicSourcesRoute).not.toContain("toISOString()");
     expect(liveSources).not.toContain("hLastFetched?.toISOString()");
     expect(liveSources).not.toContain("hLastSuccess?.toISOString()");
   });

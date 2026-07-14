@@ -6,6 +6,7 @@
  * `{ ok: ... }` envelope.
  */
 import type { RequiredPayloadRouteResult } from "@/lib/api/route-result";
+import { isPublicSnapshotUnavailableError } from "@/lib/public-content/reader/types";
 
 type PlainRouteHandler = () => Response | Promise<Response>;
 type PlainRouteOptions = {
@@ -50,6 +51,9 @@ export function plainRouteResult<T>(
 }
 
 export function plainServerError(label: string, err: unknown): Response {
+  if (isPublicSnapshotUnavailableError(err)) {
+    return plainError("snapshot_unavailable", 503);
+  }
   console.error(`[${label}] failed`, err);
   return plainError("server_error", 500);
 }

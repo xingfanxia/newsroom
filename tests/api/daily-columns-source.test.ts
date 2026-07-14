@@ -62,11 +62,12 @@ describe("daily-column API source wiring", () => {
     expect(publicDailiesRoute).toContain("query bounds live in");
   });
 
-  test("public daily routes delegate query parsing and serialization", () => {
+  test("public daily routes delegate snapshot query parsing and serialization", () => {
     for (const path of routePaths) {
       const source = readSource(path);
 
-      expect(source).toContain("@/lib/api/daily-columns");
+      expect(source).toContain("@/lib/public-content/http");
+      expect(source).toContain("readPublicSnapshot");
       expect(source).not.toContain(".select({");
       expect(source).not.toContain("from(newsletters)");
       expect(source).not.toContain("function dateKey");
@@ -79,17 +80,17 @@ describe("daily-column API source wiring", () => {
       expect(source).not.toContain("new URL(req.url)");
       expect(source).not.toContain("queryParamsRecord(req)");
       expect(source).not.toContain('searchParams.get("locale")');
-      expect(source).toContain("publicRouteResult(");
+      expect(source).toContain("SnapshotResult");
       expect(source).not.toContain("if (!result.ok) return result");
     }
     expect(readSource("app/api/public/daily/route.ts")).toContain(
-      "getLatestPublicDailyColumnRequestPayload",
+      "latestDailySnapshotResult",
     );
     expect(readSource("app/api/public/daily/[date]/route.ts")).toContain(
-      "getPublicDailyColumnByDateRequestPayload",
+      "dailyByDateSnapshotResult",
     );
     expect(readSource("app/api/public/dailies/route.ts")).toContain(
-      "getPublicDailyColumnIndexRequestPayload",
+      "dailyIndexSnapshotResult",
     );
   });
 

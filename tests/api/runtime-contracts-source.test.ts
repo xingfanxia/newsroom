@@ -13,7 +13,7 @@ const types = read("lib/types.ts");
 const routing = read("i18n/routing.ts");
 const schema = read("db/schema.ts");
 const feedParams = read("lib/api/feed-query-params.ts");
-const eventMembers = read("lib/api/event-members.ts");
+const eventMemberContract = read("lib/api/event-member-contract.ts");
 const dailyColumns = read("lib/api/daily-columns.ts");
 const routeResult = read("lib/api/route-result.ts");
 const adminRoute = read("lib/api/admin-route.ts");
@@ -128,7 +128,7 @@ describe("runtime contract source wiring", () => {
 
     for (const source of [
       feedParams,
-      eventMembers,
+      eventMemberContract,
       mcpRoute,
       savedRequests,
       sitemap,

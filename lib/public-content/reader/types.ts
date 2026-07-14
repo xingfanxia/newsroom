@@ -46,3 +46,15 @@ export class PublicSnapshotUnavailableError extends Error {
     this.name = "PublicSnapshotUnavailableError";
   }
 }
+
+export function isPublicSnapshotUnavailableError(
+  error: unknown,
+): error is PublicSnapshotUnavailableError {
+  return (
+    error instanceof PublicSnapshotUnavailableError ||
+    (typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === "PUBLIC_SNAPSHOT_UNAVAILABLE")
+  );
+}

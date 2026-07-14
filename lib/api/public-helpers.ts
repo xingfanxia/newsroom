@@ -24,6 +24,7 @@ import type {
   RequiredPayloadRouteResult,
   RouteErrorResult,
 } from "@/lib/api/route-result";
+import { isPublicSnapshotUnavailableError } from "@/lib/public-content/reader/types";
 import { publicRateLimit } from "@/lib/rate-limit/public";
 
 type PublicCachedJsonArgs = {
@@ -162,6 +163,9 @@ export function publicError(message: string, status: number): Response {
 }
 
 export function publicServerError(label: string, err: unknown): Response {
+  if (isPublicSnapshotUnavailableError(err)) {
+    return publicError("snapshot_unavailable", 503);
+  }
   console.error(`[${label}] failed`, err);
   return publicError("server_error", 500);
 }

@@ -73,25 +73,25 @@ artifacts:
   repo_aliases:
     plan: docs/R2-PUBLIC-READ-PLAN-2026-07-14.md
     evidence: docs/reports/r2-public-read/
-iteration: 14
+iteration: 15
 phase: implementation
 current_artifact: docs/superpowers/plans/2026-07-14-r2-public-read-decoupling.md
-current_criterion: AC-005
+current_criterion: AC-006
 last_action: >-
-  Completed Task 7 locally and moved AC-005 to PASS_PENDING_FINAL. The shared
-  HTTP reader pins the configured HTTPS origin and fixed release namespace,
-  validates pointer/manifest schemas plus release IDs and artifact byte/hash
-  integrity, tries active then previous as whole releases, and serves only a
-  warm in-process last-known-good snapshot before returning a typed controlled
-  unavailable error. Immutable objects are cached by key+hash while current is
-  always re-read. The AC-005 verifier passed 1 hermetic suite, 6 tests and 25
-  assertions, including a recursive no-DB source boundary. No production
-  endpoint or database was contacted.
+  Completed Task 12 locally. Eight low-complexity anonymous JSON routes now use
+  the shared snapshot reader and pure adapters for sources, item detail, event
+  members and daily columns; v1/MCP live loaders remain unchanged. Response
+  bodies, locale defaults, validation, 404s, public CORS/cache/ETag+304 and
+  legacy envelopes are covered, and cold reader failure maps to a controlled
+  503. Focused compatibility plus route suites passed 94 tests and 546
+  assertions; typecheck, lint and the recursive eight-entrypoint no-DB boundary
+  passed. No production endpoint or database was contacted.
 next_action: >-
-  Implement Task 12 / AC-006 by moving the anonymous JSON read routes onto the
-  shared snapshot reader plus pure public-content query engine while preserving
-  payload, filter, sort, total, pagination, localization and ETag contracts.
-  Keep tests on injected snapshots and do not add any request-time DB fallback.
+  Implement Task 13 by moving `/api/public/feed` and `/api/public/search` onto
+  the same snapshot reader and pure query engine, preserving lexical filters,
+  sort, total, pagination and ETag contracts while returning the approved 422
+  response for semantic mode. Update its public OpenAPI/skill/docs contract in
+  the same change and keep v1/MCP semantic paths unchanged.
 halt_cause: null
 halt_scan: []
 stuck_counters: {}
