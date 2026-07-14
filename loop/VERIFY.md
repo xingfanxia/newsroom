@@ -19,7 +19,7 @@ required production/cache/load receipts, passing criterion checks remain
 | Criterion | Status | Evidence |
 |---|---|---|
 | AC-001 | PASS_PENDING_FINAL | Local criterion and default gate passed; see `docs/reports/r2-public-read/ac-001-hermetic-gate-2026-07-14.md` |
-| AC-002 | OPEN | Not run |
+| AC-002 | OPEN | Task 5 strict contracts/canonical foundation complete; Task 6 parity/query fixtures and criterion run remain pending |
 | AC-003 | OPEN | Not run |
 | AC-004 | OPEN | Infrastructure probe passes MISS→HIT + Age; real release receipt waits on AC-002/AC-003 |
 | AC-005 | OPEN | Not run |

@@ -73,26 +73,25 @@ artifacts:
   repo_aliases:
     plan: docs/R2-PUBLIC-READ-PLAN-2026-07-14.md
     evidence: docs/reports/r2-public-read/
-iteration: 6
+iteration: 7
 phase: implementation
 current_artifact: docs/superpowers/plans/2026-07-14-r2-public-read-decoupling.md
 current_criterion: AC-002
 last_action: >-
-  Completed Task 4 with strict RED/GREEN fixtures and two independent approvals.
-  The repository now owns an exhaustive 61-entry public-serving inventory,
-  recursive source/import ownership proof, and authoritative App Router/NFT/
-  middleware-manifest artifact guards. Next 16 global conventions, CommonJS and
-  TypeScript runtime export forms, physical paths, Edge evidence, and real
-  parallel-route execution trees are covered fail-closed. Focused hermetic tests
-  passed 101/101 (431 assertions); the full gate passed 1309/1309 (6496
-  assertions). AC-009 remains OPEN until Task 16 removes all 23 known-red DB
-  bundles and proves compiled Edge/browser bytes plus poison runtime. No
-  production integration, network/cloud request, push, deploy, publish, or
-  external mutation was run.
+  Completed Task 5 as commit feda5e4 with strict schema-v1 snapshot/release
+  contracts, fail-closed item/event eligibility, exact safe source locators,
+  deterministic canonical bytes and hashes, safe R2 key grammar, public-only
+  rubric copy, and bounded receipt invariants. Focused tests passed 34/34 (278
+  assertions); the full hermetic gate passed 1343/1343 (6774 assertions), and
+  two independent final audits approved with 0 Critical/High findings. AC-002
+  remains OPEN by design until Task 6 adds independent parity/query fixtures.
+  No production integration, Turso, R2, Cloudflare, deploy, publish, push,
+  migration, or traffic replay was run.
 next_action: >-
-  Execute Task 5 to define strict schema-v1 snapshot contracts, forbidden-field
-  sentinels, eligibility rules, R2 paths, and canonical deterministic bytes as
-  the AC-002 foundation.
+  Paused after Task 5 by explicit AX request. On resume, execute Task 6 to add
+  independent frozen parity fixtures and the pure public query/derivation
+  engine, then run the AC-002 criterion verifier. Do not infer authorization for
+  Task 6 or any production action from this checkpoint.
 halt_cause: null
 halt_scan: []
 stuck_counters: {}
@@ -171,6 +170,7 @@ pressure_ledger:
   - 2026-07-14: closed Task 2 review gaps by regular-file allowlisting focused inputs and eliminating production data-dependent bare returns
   - 2026-07-14: accepted Task 3 after executable zero-loader saved denial, real Proxy locale tests, recursive DB-free import proof, and all-link prefetch coverage
   - 2026-07-14: accepted Task 4 after exhaustive Next 16 source/build inventory, real Edge/parallel-route probes, decomposed fail-closed guards, and dual independent approval
+  - 2026-07-14: accepted Task 5 after strict persisted contracts, canonical-byte adversarial fixtures, fail-closed eligibility/receipt hardening, and dual independent approval
 pressure_consulted:
   - iteration: 1
     consulted_at: 2026-07-14
@@ -295,6 +295,36 @@ pressure_consulted:
       P-metered-cap: >-
         Used temporary local fixtures and bounded local Next probes only; no R2,
         Cloudflare, Turso, deploy, publish, push, or public traffic operation ran.
+  - iteration: 7
+    consulted_at: 2026-07-14
+    ids:
+      - P-public-db-zero
+      - P-rows-hard
+      - P-rows-ideal
+      - P-safe-tests
+      - P-architecture-api
+      - P-metered-cap
+    influence:
+      P-public-db-zero: >-
+        Made persisted public data an explicit strict allowlist and required
+        malformed items/events to fail closed; Task 5 adds no request-time DB
+        fallback or DB-owning import.
+      P-rows-hard: >-
+        No-effect on the numeric threshold: this pure-contract iteration made no
+        Turso request, and AC-012 remains unchanged.
+      P-rows-ideal: >-
+        No-effect on the preferred numeric line: publisher/query work starts in
+        later tasks, while this iteration only freezes safe public bytes.
+      P-safe-tests: >-
+        Used the accepted no-env hermetic focused gate and complete verify gate,
+        with assertion counts and independent adversarial review before acceptance.
+      P-architecture-api: >-
+        Split entities, state, release, primitives, canonicalization,
+        eligibility, paths, and rubric logic into focused typed modules behind a
+        thin public contracts facade.
+      P-metered-cap: >-
+        Used local fixtures and processes only; no Turso, R2, Cloudflare,
+        deploy, publish, push, migration, or production traffic operation ran.
 ```
 
 ## Alignment reviews
@@ -310,7 +340,8 @@ pressure_consulted:
 - Alignment cost: one explicit anonymous API behavior change.
 - Rollback trigger: AX requires anonymous semantic parity and authorizes a
   separately budgeted Vectorize/Worker architecture.
-- Review question: approve, modify, or abort this plan before launching `/goal`.
+- Review result: approved by AX on goal launch; changing this contract requires
+  goal-version re-derivation.
 
 ### AR-002 — publisher cadence
 
@@ -320,7 +351,8 @@ pressure_consulted:
 - Alignment cost: more implementation complexity and trigger/outbox tests.
 - Rollback trigger: measured publisher projection exceeds 5M rows/month or
   outbox correctness cannot be proven.
-- Review question: approve, modify, or abort this plan before launching `/goal`.
+- Review result: approved by AX on goal launch; changing this contract requires
+  goal-version re-derivation.
 
 ### AR-003 — isolated implementation worktree
 

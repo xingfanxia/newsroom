@@ -53,7 +53,14 @@ This inventory is frozen from
   status: OPEN
   depends_on: [AC-001]
   reopen_condition: A persisted schema changes or a forbidden-field sentinel serializes successfully.
-  last_verification: Not run; implementation absent 2026-07-14.
+  last_verification: >-
+    Task 5 foundation passed locally 2026-07-14: strict schema-v1 contracts,
+    forbidden-field sentinels, fail-closed eligibility, canonical byte/hash
+    fixtures, safe R2 paths, and receipt invariants passed 34/34 focused tests
+    and two independent reviews with 0 Critical/High findings. AC-002 remains
+    OPEN and its criterion verifier has not run because Task 6 frozen parity
+    fixtures and pure query/derivation engine are still pending. Receipt:
+    docs/reports/r2-public-read/ac-002-task-5-snapshot-contracts-2026-07-14.md.
 
 - id: AC-003
   statement: >-
