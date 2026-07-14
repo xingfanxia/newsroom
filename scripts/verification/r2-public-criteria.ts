@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -177,10 +177,96 @@ async function verifyAc001(root: string): Promise<CriterionReceipt> {
   }
 }
 
+const AC002_TEST_INPUTS = [
+  "tests/public-content/canonical.test.ts",
+  "tests/public-content/contracts.test.ts",
+  "tests/public-content/derive-parity.test.ts",
+  "tests/public-content/eligibility.test.ts",
+  "tests/public-content/query.test.ts",
+  "tests/public-content/release-contracts.test.ts",
+  "tests/public-content/rss.test.ts",
+  "tests/public-content/source-catalog-contract.test.ts",
+] as const;
+
+const AC002_PURE_MODULES = [
+  "lib/public-content/public-items.ts",
+  "lib/public-content/query.ts",
+  "lib/public-content/derive.ts",
+  "lib/public-content/public-dailies.ts",
+  "lib/public-content/rss.ts",
+] as const;
+
+function verifyPurePublicModules(root: string): string {
+  const forbidden = [
+    { label: "database import", pattern: /from\s+["']@\/db(?:\/|["'])/ },
+    {
+      label: "runtime I/O import",
+      pattern:
+        /from\s+["'](?:next(?:\/|["'])|@libsql\/client|node:(?:fs|http|https|net|tls)(?:\/|["']))/,
+    },
+    { label: "process environment", pattern: /process\.env/ },
+    { label: "request-time fetch", pattern: /\bfetch\s*\(/ },
+  ] as const;
+
+  for (const relativePath of AC002_PURE_MODULES) {
+    const source = readFileSync(resolve(root, relativePath), "utf8");
+    for (const rule of forbidden) {
+      assert(
+        !rule.pattern.test(source),
+        `${relativePath} contains forbidden ${rule.label}`,
+      );
+    }
+  }
+  return `${AC002_PURE_MODULES.length} public query modules are framework/DB/I/O free`;
+}
+
+async function verifyAc002(root: string): Promise<CriterionReceipt> {
+  const receipts: string[] = [verifyPurePublicModules(root)];
+  const exitCode = await runHermeticTests({
+    root,
+    requestedInputs: AC002_TEST_INPUTS,
+    inheritedEnv: {
+      ...process.env,
+      TURSO_DATABASE_URL: "libsql://ac002-production-sentinel.invalid",
+      TURSO_AUTH_TOKEN: "ac002-production-token-sentinel",
+      R2_SECRET_ACCESS_KEY: "ac002-r2-secret-sentinel",
+    },
+    deadlineMs: 60_000,
+  });
+  assert(exitCode === 0, "AC-002 public-content suite failed");
+  receipts.push(
+    `${AC002_TEST_INPUTS.length} hermetic public-content suites passed under hostile credential inheritance`,
+    "hash-frozen canonical/query/RSS fixtures and known-wrong mutants passed",
+    "unknown schema versions and private-field sentinels fail closed",
+  );
+  return { criterion: "AC-002", ok: true, receipts };
+}
+
+export async function verifyR2PublicCheap(
+  root = resolve(join(import.meta.dir, "../..")),
+): Promise<CriterionReceipt> {
+  const exitCode = await runHermeticTests({
+    root,
+    requestedInputs: [
+      "tests/public-content/query.test.ts",
+      "tests/public-content/derive-parity.test.ts",
+      "tests/public-content/rss.test.ts",
+    ],
+    deadlineMs: 30_000,
+  });
+  assert(exitCode === 0, "cheap public-content loop failed");
+  return {
+    criterion: "CHEAP",
+    ok: true,
+    receipts: ["Task 6 query/derivation/RSS loop passed hermetically"],
+  };
+}
+
 export async function verifyR2PublicCriterion(
   criterion: string,
   root = resolve(join(import.meta.dir, "../..")),
 ): Promise<CriterionReceipt> {
   if (criterion === "AC-001") return verifyAc001(root);
+  if (criterion === "AC-002") return verifyAc002(root);
   throw new Error(`Criterion is not implemented yet: ${criterion}`);
 }

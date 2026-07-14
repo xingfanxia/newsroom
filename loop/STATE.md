@@ -73,30 +73,57 @@ artifacts:
   repo_aliases:
     plan: docs/R2-PUBLIC-READ-PLAN-2026-07-14.md
     evidence: docs/reports/r2-public-read/
-iteration: 7
+iteration: 8
 phase: implementation
 current_artifact: docs/superpowers/plans/2026-07-14-r2-public-read-decoupling.md
-current_criterion: AC-002
+current_criterion: AC-003
 last_action: >-
-  Completed Task 5 as commit feda5e4 with strict schema-v1 snapshot/release
-  contracts, fail-closed item/event eligibility, exact safe source locators,
-  deterministic canonical bytes and hashes, safe R2 key grammar, public-only
-  rubric copy, and bounded receipt invariants. Focused tests passed 34/34 (278
-  assertions); the full hermetic gate passed 1343/1343 (6774 assertions), and
-  two independent final audits approved with 0 Critical/High findings. AC-002
-  remains OPEN by design until Task 6 adds independent parity/query fixtures.
-  No production integration, Turso, R2, Cloudflare, deploy, publish, push,
-  migration, or traffic replay was run.
+  Completed Task 6 with a canonical-state-only feed/query, event-member,
+  shell/calendar/source/daily derivation and exact RSS engine. Independent
+  hash-frozen fixtures cover both locales, tier inclusion, event-lead dedup,
+  source precedence, wildcard/date/clock/pagination semantics and exact XML.
+  The AC-002 criterion passed 50/50 tests with 337 assertions across 8
+  hermetic suites; five runtime modules passed the framework/DB/env/I/O source
+  boundary and typecheck passed. AC-002 is PASS_PENDING_FINAL. No production
+  integration, Turso, R2, Cloudflare, deploy, publish, push, migration,
+  bootstrap, or traffic replay was run.
 next_action: >-
-  Paused after Task 5 by explicit AX request. On resume, execute Task 6 to add
-  independent frozen parity fixtures and the pure public query/derivation
-  engine, then run the AC-002 criterion verifier. Do not infer authorization for
-  Task 6 or any production action from this checkpoint.
+  Begin the next dependency in topology, AC-003, with Task 8's local
+  checksummed outbox migration and narrow-trigger fault tests. Re-render
+  pressure and record iteration 9 before editing. Do not apply a migration to
+  production or perform any metered integration work.
 halt_cause: null
 halt_scan: []
 stuck_counters: {}
 final_verify: bun run verify:r2-public --final
 oracle_change_notes: []
+attempts:
+  - iteration: 8
+    criterion: AC-002
+    failing_evidence: >-
+      Strict persisted contracts exist, but AC-002 remains OPEN because no
+      independent pre-change parity corpus or pure query/derivation engine
+      proves the contracts preserve public feed, shell, daily and RSS behavior.
+    hypothesis: >-
+      Hash-frozen hand-authored fixtures plus a framework-free engine over
+      CanonicalPublicState can prove eligibility, filtering, lead deduplication,
+      ordering, pagination and exact RSS bytes without importing DB, Next,
+      process environment, filesystem or network code.
+    edit_surface:
+      - lib/public-content/query.ts
+      - lib/public-content/derive.ts
+      - lib/public-content/public-items.ts
+      - lib/public-content/public-dailies.ts
+      - lib/public-content/rss.ts
+      - lib/rss/render.ts
+      - tests/public-content/query.test.ts
+      - tests/public-content/derive-parity.test.ts
+      - tests/public-content/rss.test.ts
+      - tests/public-content/fixtures/
+    rollback: >-
+      Revert only iteration-8 engine/fixture/state changes if independent
+      mutants do not red, parity cannot be sourced from pre-change contracts,
+      or the cheap/criterion guards regress.
 budget:
   source: loop/PROMPT.md immutable human-authored policy
   r2_object_writes_per_run: 500
@@ -325,6 +352,34 @@ pressure_consulted:
       P-metered-cap: >-
         Used local fixtures and processes only; no Turso, R2, Cloudflare,
         deploy, publish, push, migration, or production traffic operation ran.
+  - iteration: 8
+    consulted_at: 2026-07-14
+    ids:
+      - P-public-db-zero
+      - P-rows-hard
+      - P-rows-ideal
+      - P-safe-tests
+      - P-architecture-api
+      - P-metered-cap
+    influence:
+      P-public-db-zero: >-
+        The Task 6 engine consumes validated canonical state only, enforces
+        public eligibility, and imports no DB-owning or fallback path.
+      P-rows-hard: >-
+        No-effect on the numeric threshold: Task 6 is local pure computation
+        and performs no Turso query or production measurement.
+      P-rows-ideal: >-
+        No-effect on the preferred line: incremental publisher costs remain a
+        later criterion and this iteration adds no recurring read path.
+      P-safe-tests: >-
+        Used only the established hermetic cheap/criterion channels and local
+        fixtures; production-backed default tests remained at zero.
+      P-architecture-api: >-
+        Kept query and derivation ownership in five framework-free typed
+        modules behind the public-content contract instead of route copies.
+      P-metered-cap: >-
+        No cloud or production integration ran; R2 writes, public requests,
+        uploaded bytes, bootstraps and intentional Turso spend were zero.
 ```
 
 ## Alignment reviews

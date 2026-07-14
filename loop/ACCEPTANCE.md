@@ -50,17 +50,18 @@ This inventory is frozen from
   fail_evidence: >-
     No public-content persisted schema exists, and the current item-detail path
     does not itself enforce enriched/non-excluded eligibility.
-  status: OPEN
+  status: PASS_PENDING_FINAL
   depends_on: [AC-001]
   reopen_condition: A persisted schema changes or a forbidden-field sentinel serializes successfully.
   last_verification: >-
-    Task 5 foundation passed locally 2026-07-14: strict schema-v1 contracts,
-    forbidden-field sentinels, fail-closed eligibility, canonical byte/hash
-    fixtures, safe R2 paths, and receipt invariants passed 34/34 focused tests
-    and two independent reviews with 0 Critical/High findings. AC-002 remains
-    OPEN and its criterion verifier has not run because Task 6 frozen parity
-    fixtures and pure query/derivation engine are still pending. Receipt:
-    docs/reports/r2-public-read/ac-002-task-5-snapshot-contracts-2026-07-14.md.
+    Passed locally 2026-07-14: strict schema-v1 contracts, forbidden-field and
+    unknown-version sentinels, canonical serialization, eligibility, release
+    invariants, hash-frozen independent query/RSS parity fixtures, and pure
+    query/derivation behavior passed 50/50 tests with 337 assertions across 8
+    hermetic suites. Five runtime modules passed the framework/DB/env/I/O source
+    boundary under hostile inherited Turso/R2 credential sentinels. Receipts:
+    docs/reports/r2-public-read/ac-002-task-5-snapshot-contracts-2026-07-14.md
+    and docs/reports/r2-public-read/ac-002-task-6-query-parity-2026-07-14.md.
 
 - id: AC-003
   statement: >-

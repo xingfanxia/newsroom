@@ -1,19 +1,26 @@
-import { verifyR2PublicCriterion } from "./r2-public-criteria";
+import {
+  verifyR2PublicCheap,
+  verifyR2PublicCriterion,
+} from "./r2-public-criteria";
 
 interface CliArguments {
   criterion?: string;
+  cheap: boolean;
   final: boolean;
 }
 
 function parseArguments(argv: readonly string[]): CliArguments {
   if (argv.length === 1 && argv[0] === "--final") {
-    return { final: true };
+    return { cheap: false, final: true };
+  }
+  if (argv.length === 1 && argv[0] === "--cheap") {
+    return { cheap: true, final: false };
   }
   if (argv.length === 2 && argv[0] === "--criterion" && argv[1]) {
-    return { criterion: argv[1], final: false };
+    return { criterion: argv[1], cheap: false, final: false };
   }
   throw new Error(
-    "Usage: bun run verify:r2-public --criterion AC-NNN | --final",
+    "Usage: bun run verify:r2-public --cheap | --criterion AC-NNN | --final",
   );
 }
 
@@ -26,7 +33,9 @@ async function main(): Promise<void> {
       );
     }
 
-    const result = await verifyR2PublicCriterion(options.criterion as string);
+    const result = options.cheap
+      ? await verifyR2PublicCheap()
+      : await verifyR2PublicCriterion(options.criterion as string);
     for (const receipt of result.receipts) {
       process.stdout.write(`[${result.criterion}] ${receipt}\n`);
     }
