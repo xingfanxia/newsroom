@@ -73,25 +73,26 @@ artifacts:
   repo_aliases:
     plan: docs/R2-PUBLIC-READ-PLAN-2026-07-14.md
     evidence: docs/reports/r2-public-read/
-iteration: 5
+iteration: 6
 phase: implementation
 current_artifact: docs/superpowers/plans/2026-07-14-r2-public-read-decoupling.md
-current_criterion: AC-009
+current_criterion: AC-002
 last_action: >-
-  Completed Task 3 with focused TDD and independent approval. Anonymous saved
-  page requests now redirect before search params, locale setup, user upsert,
-  or any saved/chrome loader; anonymous export returns the shared 401 before its
-  body callback. The Proxy shares a cookie-only, transitively DB-free identity
-  boundary while page/route authorization remains hard. Sitemap/robots no longer
-  advertise saved, and every CalendarGrid date/clear Link disables prefetch.
-  Focused tests passed 10/10, typecheck passed, and the implementer full hermetic
-  gate passed 1207/1207. AC-007 remains OPEN for snapshot-backed HTML/RSC and
-  eligibility work. No production integration, cloud request, push, deploy,
-  publish, or external mutation was run.
+  Completed Task 4 with strict RED/GREEN fixtures and two independent approvals.
+  The repository now owns an exhaustive 61-entry public-serving inventory,
+  recursive source/import ownership proof, and authoritative App Router/NFT/
+  middleware-manifest artifact guards. Next 16 global conventions, CommonJS and
+  TypeScript runtime export forms, physical paths, Edge evidence, and real
+  parallel-route execution trees are covered fail-closed. Focused hermetic tests
+  passed 101/101 (431 assertions); the full gate passed 1309/1309 (6496
+  assertions). AC-009 remains OPEN until Task 16 removes all 23 known-red DB
+  bundles and proves compiled Edge/browser bytes plus poison runtime. No
+  production integration, network/cloud request, push, deploy, publish, or
+  external mutation was run.
 next_action: >-
-  Execute Task 4 to freeze the exhaustive anonymous HTTP/RSC/follow-up inventory
-  and add source-boundary tests that fail on unclassified routes or forbidden
-  request-time DB ownership before snapshot implementation begins.
+  Execute Task 5 to define strict schema-v1 snapshot contracts, forbidden-field
+  sentinels, eligibility rules, R2 paths, and canonical deterministic bytes as
+  the AC-002 foundation.
 halt_cause: null
 halt_scan: []
 stuck_counters: {}
@@ -169,6 +170,7 @@ pressure_ledger:
   - 2026-07-14: made AC-001 pass locally only after Next-loader token shadowing, fail-loud integration inventory, and a pristine default gate
   - 2026-07-14: closed Task 2 review gaps by regular-file allowlisting focused inputs and eliminating production data-dependent bare returns
   - 2026-07-14: accepted Task 3 after executable zero-loader saved denial, real Proxy locale tests, recursive DB-free import proof, and all-link prefetch coverage
+  - 2026-07-14: accepted Task 4 after exhaustive Next 16 source/build inventory, real Edge/parallel-route probes, decomposed fail-closed guards, and dual independent approval
 pressure_consulted:
   - iteration: 1
     consulted_at: 2026-07-14
@@ -263,6 +265,36 @@ pressure_consulted:
       P-metered-cap: >-
         Used only local request/component tests; no production DB, R2,
         Cloudflare, deploy, publish, push, or traffic replay was performed.
+  - iteration: 6
+    consulted_at: 2026-07-14
+    ids:
+      - P-public-db-zero
+      - P-rows-hard
+      - P-rows-ideal
+      - P-safe-tests
+      - P-architecture-api
+      - P-metered-cap
+    influence:
+      P-public-db-zero: >-
+        Required every ambiguous Next 16 source/build surface to fail closed;
+        NFT-less Edge execution remains explicitly unverified until Task 16
+        proves compiled bytes and poison runtime rather than accepting a false
+        green manifest-only result.
+      P-rows-hard: >-
+        No production Turso measurement was run; the exact AC-012 hard threshold
+        remains unchanged and this local boundary iteration spent zero rows.
+      P-rows-ideal: >-
+        No-effect on the preferred numeric line: Task 4 establishes ownership
+        proof but does not add a recurring reader or publisher database query.
+      P-safe-tests: >-
+        Accepted only no-env-file hermetic focused and full gates, including
+        explicit completion/assertion counts and expected-red source/build exits.
+      P-architecture-api: >-
+        Decomposed the new scanners into typed, acyclic modules with thin facades,
+        files within source/test budgets, and production functions at most 48 lines.
+      P-metered-cap: >-
+        Used temporary local fixtures and bounded local Next probes only; no R2,
+        Cloudflare, Turso, deploy, publish, push, or public traffic operation ran.
 ```
 
 ## Alignment reviews
@@ -368,3 +400,24 @@ pressure_consulted:
   bound cannot be proven from a fixed plan/cap.
 - Review result: stricter-than-actual bound preserves AC-003; no verifier or
   acceptance text is weakened.
+
+### AR-008 — NFT-less Edge content proof
+
+- Problem: Next 16 Edge route/middleware manifests prove artifact ownership and
+  containment but webpack can inline a DB-bearing aliased dependency without
+  listing it in an NFT; treating a structurally valid manifest as content purity
+  would let an anonymous bundle false-green.
+- Options: add a partial compiled-string heuristic in Task 4; accept manifest
+  structure as sufficient; mark all selected/global Edge execution explicitly
+  unverified until Task 16 runs authoritative compiled-byte and poison-runtime
+  proof.
+- Chosen contract: Task 4 validates exact manifest/module/artifact ownership but
+  emits `unverified-edge-content` for every selected/global Edge execution path.
+  Only Task 16 compiled server/Edge/client bytes plus browser/server poison runs
+  may remove that hard-red state.
+- Alignment cost: a valid Edge anonymous bundle cannot pass the boundary gate
+  during the interim between Tasks 4 and 16, even when its manifest is perfect.
+- Rollback trigger: Task 16 lands an independently mutated compiled-byte scanner
+  and poison-runtime corpus that proves inlined dependency absence.
+- Review result: smallest reversible fail-closed choice; preserves the frozen
+  zero-public-DB constraint and avoids a heuristic false green.

@@ -6,6 +6,14 @@ Hardened/decomposed receipt refreshed: `2026-07-14T17:35:43Z`
 
 Base commit: `80424f934231ccb37ca815c978bf9c5fa9ddde3e`
 
+Accepted atomic commit: `a379cd54f1d5f6a46c76ac807d8bf43a8a1356e3`
+
+Independently reviewed base-to-head diff SHA-256:
+`d7f15e3b2941a768f694363b42605b3e0d9cd0a34affc391dbcb346262a0fc8c`
+
+Two independent final audits returned `APPROVED` with no Critical/High
+findings; the atomic squash preserved the reviewed diff hash exactly.
+
 This receipt freezes the pre-migration boundary state. It is expected red and
 is not an accepted end state or a test that blesses libSQL contamination.
 
