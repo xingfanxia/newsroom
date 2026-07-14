@@ -73,24 +73,26 @@ artifacts:
   repo_aliases:
     plan: docs/R2-PUBLIC-READ-PLAN-2026-07-14.md
     evidence: docs/reports/r2-public-read/
-iteration: 9
+iteration: 10
 phase: implementation
 current_artifact: docs/superpowers/plans/2026-07-14-r2-public-read-decoupling.md
 current_criterion: AC-003
 last_action: >-
-  Completed Task 8 locally: added the checksummed additive
-  public_content_outbox migration, entity index, 18 public-column-aware
-  triggers, and explicit operator entrypoint. File-libSQL tests prove
-  idempotency, checksum drift rejection, relevant insert/update/delete events,
-  same-value/private no-ops, item OLD+NEW event dependencies, tombstones,
-  concurrent high-water retention, and required outbox/item query plans. The
-  focused suite passed 5/5 with 44 assertions and typecheck passed. AC-003
-  remains OPEN for Tasks 9-11. No production migration or external operation
+  Completed Task 9 locally: added the sole injected libSQL publisher source,
+  pure canonical-state patching, immutable hard caps, plan-backed read
+  telemetry, tombstones, eligibility cascades, and logical-key policy
+  replacement. Temporary-libSQL tests prove empty work is one outbox-only
+  query, changed keys dedupe, two events share one member query, missing rows
+  tombstone, eligibility can remove and restore entities, all named plans use
+  the required PK/indexes, and cap overflow returns no partial batch. The
+  focused suite passed 5/5 with 21 assertions and typecheck passed. AC-003
+  remains OPEN for Tasks 10-11. No production database or external operation
   ran.
 next_action: >-
-  Continue AC-003 with Task 9's bounded publisher source adapter. Re-render
-  pressure and record iteration 10 before editing; keep all database evidence
-  on temporary local libSQL and do not apply the migration to production.
+  Continue AC-003 with Task 10's pointer-last publisher core and injected R2
+  object-store adapter. Keep all failure-ordering tests on fakes and local
+  fixtures; do not access production R2, publish a snapshot, or cut over any
+  route without AX authorization.
 halt_cause: null
 halt_scan: []
 stuck_counters: {}
@@ -146,6 +148,29 @@ attempts:
       column coverage, same-value/private no-op, high-water retention, or
       required EXPLAIN plans cannot be proven on file-backed libSQL. Never
       apply the unaccepted migration to production.
+  - iteration: 10
+    criterion: AC-003
+    failing_evidence: >-
+      The accepted outbox can bound mutation discovery, but no publisher source
+      adapter deduplicates its keys, returns current rows/tombstones, batches
+      event members, enforces dependent-row caps, or reports plan-backed read
+      telemetry; AC-003 therefore still lacks bounded-read proof.
+    hypothesis: >-
+      A single injected libSQL adapter using PK/declared-index queries and hard
+      caps, paired with a pure canonical-state patcher, can make empty work
+      outbox-only and changed work proportional to deduped entity/dependency
+      rows without an event-member N+1 path.
+    edit_surface:
+      - lib/public-content/publisher/types.ts
+      - lib/public-content/publisher/source.ts
+      - lib/public-content/publisher/patch-state.ts
+      - tests/public-content/publisher-source.test.ts
+      - loop/STATE.md
+    rollback: >-
+      Revert iteration-10 files if empty reads touch content tables, query
+      counts scale per entity/event, malformed/out-of-cap batches partially
+      return, tombstones drift, or EXPLAIN cannot prove the named PK/index
+      bounds on temporary libSQL.
 budget:
   source: loop/PROMPT.md immutable human-authored policy
   r2_object_writes_per_run: 500
@@ -431,6 +456,33 @@ pressure_consulted:
       P-metered-cap: >-
         Local SQL fixtures only; Turso, R2, Cloudflare, public HTTP, deploy,
         publish, bootstrap and production migration spend remain zero.
+  - iteration: 10
+    consulted_at: 2026-07-14
+    ids:
+      - P-public-db-zero
+      - P-rows-hard
+      - P-rows-ideal
+      - P-safe-tests
+      - P-architecture-api
+      - P-metered-cap
+    influence:
+      P-public-db-zero: >-
+        Keeps all DB ownership in publisher/source.ts; the state patcher and
+        existing request-side public engine remain DB-free.
+      P-rows-hard: >-
+        Requires an outbox-only no-change return, fixed query count by entity
+        type, one batched event-member read and hard aborting row caps.
+      P-rows-ideal: >-
+        Uses key deduplication and PK/index seeks so repeated writes coalesce
+        before fetching content rows.
+      P-safe-tests: >-
+        Uses one temporary file-libSQL focused suite plus typecheck only.
+      P-architecture-api: >-
+        Separates the sole SQL adapter from pure canonical-state patch logic
+        through explicit typed changes and telemetry.
+      P-metered-cap: >-
+        No production DB, R2, Cloudflare, public request, deploy, publish or
+        migration action is permitted; external spend stays zero.
 ```
 
 ## Alignment reviews
