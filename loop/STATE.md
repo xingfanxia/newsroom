@@ -73,29 +73,32 @@ artifacts:
   repo_aliases:
     plan: docs/R2-PUBLIC-READ-PLAN-2026-07-14.md
     evidence: docs/reports/r2-public-read/
-iteration: 16
+iteration: 17
 phase: implementation
 current_artifact: docs/superpowers/plans/2026-07-14-r2-public-read-decoupling.md
-current_criterion: AC-006
+current_criterion: AC-007
 last_action: >-
-  Completed Task 13 locally and moved AC-008 to PASS_PENDING_FINAL. Anonymous
-  feed and lexical search now run on the validated snapshot plus the pure query
-  engine, preserving the frozen parity matrix, filters, wildcard LIKE,
-  localization, ordering, totals, pagination and ETag/304. Anonymous semantic
-  mode returns documented HTTP 422 before any snapshot, DB or embedding call;
-  bearer v1/MCP semantic remains unchanged. The AC-008 verifier passed 1
-  hermetic suite, 6 tests and 50 assertions under hostile Turso/embedding/R2
-  sentinels. No production endpoint or database was contacted.
+  Completed Task 14 locally and moved AC-006 to PASS_PENDING_FINAL. Every
+  anonymous metadata/feed/search/RSS consumer now reads the validated snapshot;
+  all main, newsletter and legacy RSS variants preserve frozen bytes, headers,
+  fallbacks, rate-limit ordering and implicit HEAD while their recursive source
+  graphs remain DB-free. The AC-006 verifier passed 5 hermetic suites, 30 tests
+  and 194 assertions under hostile Turso/embedding/R2 sentinels.
 next_action: >-
-  Implement Task 14 by publishing and serving every main/newsletter/legacy RSS
-  variant as immutable snapshot XML bytes while preserving exact response bytes,
-  content type, cache behavior, rate limiting, slug/locale behavior and implicit
-  HEAD. Remove request-time DB-owned RSS imports and then complete AC-006.
+  Implement Task 15 by moving all anonymous HTML/RSC pages and shell follow-up
+  data to snapshot-derived loaders, preserving visibility and controlled
+  unavailable behavior while eliminating request-time DB imports.
 halt_cause: null
 halt_scan: []
 stuck_counters: {}
 final_verify: bun run verify:r2-public --final
-oracle_change_notes: []
+oracle_change_notes:
+  - >-
+    Task 14 derives deterministic RSS bytes from the validated immutable release
+    at the reader boundary and caches them by manifest/publish identity. It does
+    not add cron-side XML derivation because reconstructing the full corpus on
+    every incremental publish would violate AC-003's O(changes) constraint. The
+    accepted no-public-DB invariant and RSS byte contracts are unchanged.
 attempts:
   - iteration: 8
     criterion: AC-002

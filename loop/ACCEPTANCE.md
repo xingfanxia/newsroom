@@ -156,10 +156,19 @@ This inventory is frozen from
     details, event members, dailies, and every RSS variant.
   fail_evidence: >-
     Current public and RSS origin-miss loaders still execute Turso-backed helpers.
-  status: OPEN
+  status: PASS_PENDING_FINAL
   depends_on: [AC-002, AC-005]
   reopen_condition: An inventoried anonymous API/RSS route regains DB ownership or contract parity regresses.
-  last_verification: Not run; current source is known red 2026-07-14.
+  last_verification: >-
+    Passed locally 2026-07-14 via `bun run verify:r2-public --criterion
+    AC-006`: 5 hermetic consumer suites, 30 tests and 194 assertions under
+    hostile inherited Turso, embedding and R2 credential sentinels. Public
+    metadata, feed/search and every main/newsletter/legacy RSS variant preserve
+    their frozen payload/byte/header/error contracts; all migrated recursive
+    source graphs are DB-free and GET retains implicit HEAD coverage. RSS XML
+    is deterministically release-derived at the reader boundary and cached by
+    release, avoiding a full-corpus publisher pass. No production service was
+    contacted.
 
 - id: AC-007
   statement: >-

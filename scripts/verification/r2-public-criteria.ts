@@ -309,6 +309,40 @@ const AC008_TEST_INPUTS = [
   "tests/api/public-snapshot-feed-search.test.ts",
 ] as const;
 
+const AC006_TEST_INPUTS = [
+  "tests/api/public-snapshot-routes.test.ts",
+  "tests/api/public-snapshot-feed-search.test.ts",
+  "tests/rss/snapshot-routes.test.ts",
+  "tests/public-content/query.test.ts",
+  "tests/public-content/rss.test.ts",
+] as const;
+
+async function verifyAc006(root: string): Promise<CriterionReceipt> {
+  const exitCode = await runHermeticTests({
+    root,
+    requestedInputs: AC006_TEST_INPUTS,
+    inheritedEnv: {
+      ...process.env,
+      TURSO_DATABASE_URL: "libsql://ac006-production-sentinel.invalid",
+      TURSO_AUTH_TOKEN: "ac006-production-token-sentinel",
+      AZURE_OPENAI_API_KEY: "ac006-embedding-sentinel",
+      R2_SECRET_ACCESS_KEY: "ac006-r2-secret-sentinel",
+    },
+    deadlineMs: 60_000,
+  });
+  assert(exitCode === 0, "AC-006 snapshot consumer suite failed");
+  return {
+    criterion: "AC-006",
+    ok: true,
+    receipts: [
+      `${AC006_TEST_INPUTS.length} hermetic consumer suites passed under hostile credential inheritance`,
+      "public JSON/feed/search payload, localization, filters, ordering, totals, pagination and ETag parity passed",
+      "main, newsletter and legacy RSS variants matched frozen bytes, headers, fallback and failure contracts",
+      "every migrated API/RSS source graph is recursively free of DB ownership and retains implicit HEAD coverage",
+    ],
+  };
+}
+
 async function verifyAc008(root: string): Promise<CriterionReceipt> {
   const exitCode = await runHermeticTests({
     root,
@@ -363,6 +397,7 @@ export async function verifyR2PublicCriterion(
   if (criterion === "AC-002") return verifyAc002(root);
   if (criterion === "AC-003") return verifyAc003(root);
   if (criterion === "AC-005") return verifyAc005(root);
+  if (criterion === "AC-006") return verifyAc006(root);
   if (criterion === "AC-008") return verifyAc008(root);
   throw new Error(`Criterion is not implemented yet: ${criterion}`);
 }
