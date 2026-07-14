@@ -158,7 +158,13 @@ This inventory is frozen from
   status: OPEN
   depends_on: [AC-005, AC-006]
   reopen_condition: Any anonymous HTML/RSC/follow-up route can touch Turso, saved data, or a non-public item.
-  last_verification: Not run; current source is known red 2026-07-14.
+  last_verification: >-
+    Partial local evidence 2026-07-14: Task 3 removed the anonymous saved admin
+    fallback, proved page/export denial before DB/body loaders, removed saved
+    from sitemap and disallowed all locale variants in robots, and disabled all
+    CalendarGrid Link prefetch. AC-007 remains OPEN for snapshot-backed HTML/RSC,
+    browser poison-Turso corpus, and item-eligibility proof. Receipt:
+    docs/reports/r2-public-read/ac-007-task-3-saved-boundary-2026-07-14.md.
 
 - id: AC-008
   statement: >-

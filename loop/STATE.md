@@ -73,24 +73,25 @@ artifacts:
   repo_aliases:
     plan: docs/R2-PUBLIC-READ-PLAN-2026-07-14.md
     evidence: docs/reports/r2-public-read/
-iteration: 4
+iteration: 5
 phase: implementation
 current_artifact: docs/superpowers/plans/2026-07-14-r2-public-read-decoupling.md
-current_criterion: AC-007
+current_criterion: AC-009
 last_action: >-
-  Completed Task 2 and its independent review fixes with focused TDD. AC-001 is
-  PASS_PENDING_FINAL: production credential sentinels and exit-zero failure/
-  timeout evidence are rejected; Next cannot replace 28 explicit local/fake
-  values; focused input is restricted to the default regular-file allowlist;
-  and every production data prerequisite fails loud without bare early returns.
-  Final verify passed typecheck, zero-warning lint, Next build, three Knip gates,
-  and 1198/1198 tests. Eleven real-Turso suites and the separate live semantic
-  smoke remain explicit. No production integration, cloud request, push, or
-  external mutation was run.
+  Completed Task 3 with focused TDD and independent approval. Anonymous saved
+  page requests now redirect before search params, locale setup, user upsert,
+  or any saved/chrome loader; anonymous export returns the shared 401 before its
+  body callback. The Proxy shares a cookie-only, transitively DB-free identity
+  boundary while page/route authorization remains hard. Sitemap/robots no longer
+  advertise saved, and every CalendarGrid date/clear Link disables prefetch.
+  Focused tests passed 10/10, typecheck passed, and the implementer full hermetic
+  gate passed 1207/1207. AC-007 remains OPEN for snapshot-backed HTML/RSC and
+  eligibility work. No production integration, cloud request, push, deploy,
+  publish, or external mutation was run.
 next_action: >-
-  Execute Task 3 to remove the anonymous saved-data admin fallback and public
-  discovery, add the cookie-only identity boundary, and disable calendar date
-  prefetch amplification under focused local tests.
+  Execute Task 4 to freeze the exhaustive anonymous HTTP/RSC/follow-up inventory
+  and add source-boundary tests that fail on unclassified routes or forbidden
+  request-time DB ownership before snapshot implementation begins.
 halt_cause: null
 halt_scan: []
 stuck_counters: {}
@@ -167,6 +168,7 @@ pressure_ledger:
   - 2026-07-14: accepted Task 1 only after focused TDD, adversarial review fixes, and reviewed-diff hash preservation
   - 2026-07-14: made AC-001 pass locally only after Next-loader token shadowing, fail-loud integration inventory, and a pristine default gate
   - 2026-07-14: closed Task 2 review gaps by regular-file allowlisting focused inputs and eliminating production data-dependent bare returns
+  - 2026-07-14: accepted Task 3 after executable zero-loader saved denial, real Proxy locale tests, recursive DB-free import proof, and all-link prefetch coverage
 pressure_consulted:
   - iteration: 1
     consulted_at: 2026-07-14
@@ -241,6 +243,26 @@ pressure_consulted:
       P-metered-cap: >-
         Verified the production-directory bypass only as an expected local
         rejection; no production integration child or external request ran.
+  - iteration: 5
+    consulted_at: 2026-07-14
+    ids:
+      - P-public-db-zero
+      - P-safe-tests
+      - P-architecture-api
+      - P-metered-cap
+    influence:
+      P-public-db-zero: >-
+        Removed anonymous saved fallback before any DB-capable dependency and
+        disabled automatic CalendarGrid follow-up requests at their Link source.
+      P-safe-tests: >-
+        Used injectable poison dependencies and real Proxy requests without
+        process-global mocks; the accepted hermetic gate stayed green.
+      P-architecture-api: >-
+        Split cookie identity from DB-owning session persistence and made the
+        saved hard-auth/data boundary explicit and typed for future agents.
+      P-metered-cap: >-
+        Used only local request/component tests; no production DB, R2,
+        Cloudflare, deploy, publish, push, or traffic replay was performed.
 ```
 
 ## Alignment reviews
