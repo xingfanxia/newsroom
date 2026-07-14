@@ -20,6 +20,14 @@ Read these first for current architecture and operational behavior:
 Runtime source files still outrank docs. If a doc conflicts with current code,
 trust code and update the doc in the same change.
 
+## Active Implementation Plan
+
+- [`R2-PUBLIC-READ-PLAN-2026-07-14.md`](./R2-PUBLIC-READ-PLAN-2026-07-14.md) —
+  approved public-read decoupling authority. Its R2/custom-domain/cache-rule
+  infrastructure is provisioned and local implementation is active; production
+  publish/deploy/cutover remains gated, so this does not describe shipped runtime
+  behavior yet.
+
 ## Archived Historical Context
 
 These documents preserve design history, but they are not current
