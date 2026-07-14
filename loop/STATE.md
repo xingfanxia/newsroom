@@ -73,20 +73,21 @@ artifacts:
   repo_aliases:
     plan: docs/R2-PUBLIC-READ-PLAN-2026-07-14.md
     evidence: docs/reports/r2-public-read/
-iteration: 1
+iteration: 2
 phase: implementation
 current_artifact: docs/superpowers/plans/2026-07-14-r2-public-read-decoupling.md
 current_criterion: AC-001
 last_action: >-
-  Launched the approved goal, confirmed the known-red unsafe test and anonymous
-  libSQL bundle baselines, read the applicable Next.js 16.2.4 and Bun environment
-  authority, created the feature branch, wrote the 18-task TDD execution plan,
-  and passed independent plan review after resolving all dependency/oracle
-  findings. No production-backed test or external mutation was run.
+  Completed Task 1's hermetic command primitive with focused TDD and independent
+  review. The accepted implementation is the single local commit f46cc21; its
+  post-squash diff hash exactly matches the reviewed diff. Focused tests passed
+  16/16 plus typecheck and lint. AC-001 remains OPEN because package test/verify
+  entrypoints are not yet rewired. No production-backed test, network operation,
+  push, or external mutation was run.
 next_action: >-
-  Commit the canonical goal bootstrap, move the feature branch into the external
-  isolated worktree, initialize the SDD ledger, and execute Task 1 for AC-001
-  red-to-green before any package-wide test command.
+  Execute Task 2 to make package test/verify entrypoints hermetic, convert the
+  three unconditional production-backed API suites into explicit integration
+  entrypoints, and prove AC-001 RED/GREEN without loading .env.local.
 halt_cause: null
 halt_scan: []
 stuck_counters: {}
@@ -160,6 +161,7 @@ pressure_objects:
     status: active
 pressure_ledger:
   - 2026-07-14: seeded six frontload pressures from AX requirements and grep-confirmed repo conventions
+  - 2026-07-14: accepted Task 1 only after focused TDD, adversarial review fixes, and reviewed-diff hash preservation
 pressure_consulted:
   - iteration: 1
     consulted_at: 2026-07-14
@@ -188,6 +190,19 @@ pressure_consulted:
       P-metered-cap: >-
         Limited this iteration to local/read-only work; no production publish,
         deploy, migration, traffic replay, or additional Cloudflare mutation.
+  - iteration: 2
+    consulted_at: 2026-07-14
+    ids:
+      - P-safe-tests
+      - P-metered-cap
+    influence:
+      P-safe-tests: >-
+        Kept all verification focused and explicitly no-env-file, added hostile
+        exit-zero, ANSI, secret-leak, timeout, and descendant-process cases, and
+        left AC-001 open until Task 2 rewires the default package commands.
+      P-metered-cap: >-
+        Used only local fake fixtures and process probes; performed no DB, R2,
+        Cloudflare, deploy, publish, push, or production traffic operation.
 ```
 
 ## Alignment reviews
