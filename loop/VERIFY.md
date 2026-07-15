@@ -26,8 +26,8 @@ required production/cache/load receipts, passing criterion checks remain
 | AC-006 | OPEN | Not run |
 | AC-007 | PASS_PENDING_FINAL | 4 hermetic page/privacy suites passed (16 tests, 88 assertions); compiled/browser poison proof remains Task 16 |
 | AC-008 | OPEN | Not run |
-| AC-009 | OPEN | Existing anonymous NFT bundles are known red |
-| AC-010 | OPEN | Not run |
+| AC-009 | PASS_PENDING_FINAL | Fresh no-Turso build; 136 source and 265 compiled/NFT artifacts DB-free; mutation suites red correctly |
+| AC-010 | PASS_PENDING_FINAL | Full 30-entry GET/HEAD + page RSC + real Chrome hydration passed with zero poison-Turso connections |
 | AC-011 | OPEN | Not run |
 | AC-012 | OPEN | Current observed projection exceeds hard target |
 | AC-013 | OPEN | Not run |

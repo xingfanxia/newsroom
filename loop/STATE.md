@@ -73,21 +73,20 @@ artifacts:
   repo_aliases:
     plan: docs/R2-PUBLIC-READ-PLAN-2026-07-14.md
     evidence: docs/reports/r2-public-read/
-iteration: 18
+iteration: 19
 phase: implementation
 current_artifact: docs/superpowers/plans/2026-07-14-r2-public-read-decoupling.md
-current_criterion: AC-009
+current_criterion: AC-011
 last_action: >-
-  Completed Task 15 locally and moved AC-007 to PASS_PENDING_FINAL. All ten
-  anonymous HTML/RSC page variants and shell follow-up reads now derive from one
-  validated snapshot per render; unavailable snapshots reach a controlled
-  locale error boundary, raw reasoning remains unpublished, calendar prefetch
-  stays disabled and saved data remains private. The AC-007 verifier passed 4
-  hermetic suites, 16 tests and 88 assertions under hostile Turso/R2 sentinels.
+  Completed Task 16 locally and moved AC-009/AC-010 to PASS_PENDING_FINAL. A
+  fresh production build succeeds with Turso absent; recursive source plus 265
+  compiled server/client/Proxy/NFT artifacts are DB-free; all 30 anonymous
+  entries pass GET/HEAD, public pages pass RSC, and real Chrome hydrates /en/all
+  without calendar prefetch while a recording poison Turso endpoint receives
+  zero connections.
 next_action: >-
-  Implement Task 16 by scanning authoritative Next build artifacts/NFTs and
-  exercising the full anonymous runtime/browser corpus against a local snapshot
-  fixture plus a recording poison Turso endpoint.
+  Implement Task 17's bounded local load/cache/Turso-window/cutover evidence
+  tooling without publishing, deploying, loading or modifying production.
 halt_cause: null
 halt_scan: []
 stuck_counters: {}

@@ -133,6 +133,14 @@ describe("hermetic environment policy", () => {
       "test-cloudflare-api-token",
     );
     expect(environment.AWS_REGION).toBe("auto");
+
+    const poison = createHermeticEnvironment({
+      inherited: {},
+      overrides: {
+        TURSO_DATABASE_URL: "http://127.0.0.1:43123",
+      },
+    });
+    expect(poison.TURSO_DATABASE_URL).toBe("http://127.0.0.1:43123");
   });
 
   test("rejects unsafe explicit overrides without rendering their values", () => {

@@ -1,9 +1,12 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createClient } from "@libsql/client";
+import { ANONYMOUS_SERVING_ENTRYPOINTS } from "@/lib/public-content/entrypoints";
+import { checkSourcePublicDbBoundary } from "@/scripts/ops/check-public-db-boundary";
+import { checkPublicNftBoundary } from "./check-public-nft";
 import {
   EnvironmentPolicyError,
   createHermeticEnvironment,
@@ -14,6 +17,8 @@ import {
   discoverTursoGatedTestInputs,
   runHermeticTests,
 } from "./run-hermetic-tests";
+
+let cleanPublicBuild: Promise<string> | null = null;
 
 export interface CriterionReceipt {
   criterion: string;
@@ -401,6 +406,106 @@ async function verifyAc007(root: string): Promise<CriterionReceipt> {
   };
 }
 
+async function ensureCleanPublicBuild(root: string): Promise<string> {
+  if (cleanPublicBuild) return cleanPublicBuild;
+  cleanPublicBuild = (async () => {
+    const sentinel = `PUBLIC_CLEAN_BUILD_${randomUUID()}`;
+    const result = await runCheckedCommand({
+      command: [
+        process.execPath,
+        "--no-env-file",
+        resolve(root, "scripts/verification/checked-stage.ts"),
+        "--sentinel",
+        sentinel,
+        "--",
+        process.execPath,
+        "--no-env-file",
+        "run",
+        "build",
+      ],
+      completionSentinel: sentinel,
+      cwd: root,
+      deadlineMs: 600_000,
+      env: {
+        NODE_ENV: "production",
+        NEXT_TELEMETRY_DISABLED: "1",
+        R2_PUBLIC_BASE_URL: "https://content.invalid",
+      },
+    });
+    if (!result.ok) {
+      throw new Error(
+        `clean public build failed (${result.reason})\n${result.stdout}\n${result.stderr}`,
+      );
+    }
+    return "fresh production build passed with Turso credentials absent";
+  })();
+  return cleanPublicBuild;
+}
+
+const AC009_TEST_INPUTS = [
+  "tests/tooling/public-nft-boundary.test.ts",
+  "tests/tooling/public-db-boundary-source-security.test.ts",
+  "tests/tooling/public-entrypoints-inventory.test.ts",
+] as const;
+
+async function verifyAc009(root: string): Promise<CriterionReceipt> {
+  const exitCode = await runHermeticTests({
+    root,
+    requestedInputs: AC009_TEST_INPUTS,
+    inheritedEnv: {
+      ...process.env,
+      TURSO_DATABASE_URL: "libsql://ac009-production-sentinel.invalid",
+      TURSO_AUTH_TOKEN: "ac009-production-token-sentinel",
+    },
+    deadlineMs: 60_000,
+  });
+  assert(exitCode === 0, "AC-009 mutation/inventory suites failed");
+  const buildReceipt = await ensureCleanPublicBuild(root);
+  const source = checkSourcePublicDbBoundary({
+    rootDir: root,
+    entrypointSources: ANONYMOUS_SERVING_ENTRYPOINTS.flatMap((entrypoint) =>
+      entrypoint.sourcePath ? [entrypoint.sourcePath] : [],
+    ),
+  });
+  assert(source.ok, `anonymous source graph is contaminated: ${JSON.stringify(source.violations)}`);
+  const compiled = checkPublicNftBoundary({ rootDir: root });
+  assert(compiled.ok, `anonymous compiled graph is contaminated: ${JSON.stringify(compiled.violations)}`);
+  return {
+    criterion: "AC-009",
+    ok: true,
+    receipts: [
+      `${AC009_TEST_INPUTS.length} hermetic mutation/inventory suites passed`,
+      buildReceipt,
+      `${source.visitedFiles.length} recursively reached anonymous source files are DB-free`,
+      `${compiled.visitedFiles.length} selected server/client/Proxy/NFT artifacts contain no DB client, publisher or Turso marker`,
+    ],
+  };
+}
+
+async function verifyAc010(root: string): Promise<CriterionReceipt> {
+  const buildReceipt = await ensureCleanPublicBuild(root);
+  const exitCode = await runHermeticTests({
+    root,
+    requestedInputs: ["tests/e2e/public-poison-turso.test.ts"],
+    inheritedEnv: {
+      ...process.env,
+      PUBLIC_POISON_BUILD_READY: "1",
+    },
+    deadlineMs: 90_000,
+  });
+  assert(exitCode === 0, "AC-010 poison-Turso runtime/browser suite failed");
+  return {
+    criterion: "AC-010",
+    ok: true,
+    receipts: [
+      buildReceipt,
+      "all 30 anonymous entries passed GET/HEAD and every public page passed RSC from the fixture release",
+      "real Chrome loaded and hydrated /en/all with client chunks and no calendar-date prefetch",
+      "recording poison Turso endpoint observed exactly zero connection attempts",
+    ],
+  };
+}
+
 export async function verifyR2PublicCheap(
   root = resolve(join(import.meta.dir, "../..")),
 ): Promise<CriterionReceipt> {
@@ -432,5 +537,7 @@ export async function verifyR2PublicCriterion(
   if (criterion === "AC-006") return verifyAc006(root);
   if (criterion === "AC-007") return verifyAc007(root);
   if (criterion === "AC-008") return verifyAc008(root);
+  if (criterion === "AC-009") return verifyAc009(root);
+  if (criterion === "AC-010") return verifyAc010(root);
   throw new Error(`Criterion is not implemented yet: ${criterion}`);
 }

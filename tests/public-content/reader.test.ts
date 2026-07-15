@@ -13,6 +13,18 @@ import { canonicalState } from "./contract-fixtures";
 const PUBLISHED_AT = "2026-07-14T12:00:00.000Z";
 
 describe("public snapshot reader", () => {
+  test("allows loopback HTTP fixtures without permitting remote plaintext origins", () => {
+    expect(
+      () => new PublicSnapshotReader({ baseUrl: "http://127.0.0.1:43123" }),
+    ).not.toThrow();
+    expect(
+      () => new PublicSnapshotReader({ baseUrl: "http://localhost:43123" }),
+    ).not.toThrow();
+    expect(
+      () => new PublicSnapshotReader({ baseUrl: "http://example.com" }),
+    ).toThrow("HTTPS origin or loopback HTTP origin");
+  });
+
   test("reads the active release, pins one origin, and caches immutable objects", async () => {
     const fixture = await snapshotFixture();
     const reader = fixture.reader();

@@ -242,10 +242,16 @@ This inventory is frozen from
     anonymous GET/HEAD/RSC entrypoints.
   fail_evidence: >-
     Existing home/all/public-feed NFT manifests include @libsql/client.
-  status: OPEN
+  status: PASS_PENDING_FINAL
   depends_on: [AC-005, AC-006, AC-007, AC-008]
   reopen_condition: A new anonymous entrypoint is absent from inventory or an existing bundle/import graph reaches a forbidden module.
-  last_verification: Known-red build-artifact evidence recorded 2026-07-14.
+  last_verification: >-
+    Passed locally 2026-07-14 via `bun run verify:r2-public --criterion
+    AC-009`: 3 hermetic mutation/inventory suites, 26 tests and 248 assertions;
+    a fresh production build with Turso credentials absent; 136 recursively
+    reached anonymous source files and 265 selected server/client/Proxy/NFT
+    artifacts free of DB client, publisher and Turso markers. Synthetic NFT,
+    compiled-byte and browser-chunk contamination all failed as expected.
 
 - id: AC-010
   statement: >-
@@ -261,10 +267,17 @@ This inventory is frozen from
     records zero connection attempts.
   fail_evidence: >-
     Current anonymous pages require Turso and cannot satisfy this deployment contract.
-  status: OPEN
+  status: PASS_PENDING_FINAL
   depends_on: [AC-006, AC-007, AC-008, AC-009]
   reopen_condition: Any anonymous route requires Turso env or attempts a DB connection.
-  last_verification: Not run; current architecture is known red 2026-07-14.
+  last_verification: >-
+    Passed locally 2026-07-14 via `bun run verify:r2-public --criterion
+    AC-010`: a fresh production build with Turso credentials absent, followed
+    by 2 runtime/browser tests and 163 assertions. All 30 anonymous inventory
+    entries passed GET/HEAD, every public page passed RSC, real Chrome hydrated
+    `/en/all` without calendar-date prefetch, and the recording poison Turso
+    endpoint observed exactly zero connection attempts. No production service
+    was contacted.
 
 - id: AC-011
   statement: >-

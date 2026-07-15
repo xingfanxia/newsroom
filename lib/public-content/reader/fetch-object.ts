@@ -111,15 +111,22 @@ export function isAllowedPublicReadKey(key: string): boolean {
 
 function parseBaseUrl(value: string): URL {
   const url = new URL(value);
+  const localHttp =
+    url.protocol === "http:" &&
+    ["127.0.0.1", "localhost", "[::1]", "::1"].includes(
+      url.hostname.toLowerCase(),
+    );
   if (
-    url.protocol !== "https:" ||
+    (url.protocol !== "https:" && !localHttp) ||
     url.username ||
     url.password ||
     url.search ||
     url.hash ||
     (url.pathname !== "/" && url.pathname !== "")
   ) {
-    throw new TypeError("snapshot base URL must be an HTTPS origin");
+    throw new TypeError(
+      "snapshot base URL must be an HTTPS origin or loopback HTTP origin",
+    );
   }
   url.pathname = "/";
   return url;

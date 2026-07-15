@@ -88,13 +88,18 @@ export function isPolicyControlledEnvironmentKey(key: string): boolean {
 }
 
 function isLocalDatabaseUrl(value: string): boolean {
-  if (!value.startsWith("file:") || /[\r\n]/.test(value)) return false;
+  if (/[\r\n]/.test(value)) return false;
 
   try {
     const url = new URL(value);
+    if (url.protocol === "file:") {
+      return url.hostname === "" || url.hostname.toLowerCase() === "localhost";
+    }
     return (
-      url.protocol === "file:" &&
-      (url.hostname === "" || url.hostname.toLowerCase() === "localhost")
+      (url.protocol === "http:" || url.protocol === "https:") &&
+      ["127.0.0.1", "localhost", "[::1]", "::1"].includes(
+        url.hostname.toLowerCase(),
+      )
     );
   } catch {
     return false;
