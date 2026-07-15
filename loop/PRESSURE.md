@@ -1,7 +1,7 @@
 # R2 Public-Read Pressure Weather
 
 This file is a rendered view of `loop/STATE.md` `pressure_objects`; STATE is the
-source of truth. Rendered for iteration 21 on 2026-07-14. Re-render and read it
+source of truth. Rendered for iteration 22 on 2026-07-15. Re-render and read it
 before every iteration, then record `pressure_consulted` before making a
 decision.
 

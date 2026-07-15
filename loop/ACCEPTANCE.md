@@ -118,7 +118,10 @@ This inventory is frozen from
     positive Age. The 2026-07-14 final-verifier attempt passed the hermetic
     repository gate and AC-001..AC-003, then failed closed here because no
     production manifest exists. Real release objects require the still-missing
-    production migration/bootstrap/deploy authorization.
+    production migration/bootstrap/deploy authorization. A budgeted public HEAD
+    at 2026-07-15T01:14:46Z confirmed the real `current.json` is HTTP 404 with
+    `CF-Cache-Status: MISS`; no first release exists. Receipt:
+    docs/reports/r2-public-read/ac-004-current-pointer-preflight-2026-07-15.md.
 
 - id: AC-005
   statement: >-

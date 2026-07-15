@@ -23,7 +23,7 @@ written and no production operation ran.
 | AC-001 | PASS_PENDING_FINAL | Passed in this final attempt; hermetic credential and failure-sentinel gate remains intact. |
 | AC-002 | PASS_PENDING_FINAL | Passed in this final attempt; strict contracts and independent hash-frozen parity remain green. |
 | AC-003 | PASS_PENDING_FINAL | Passed in this final attempt; bounded publisher/outbox/atomic release fault suites remain green. |
-| AC-004 | BLOCKED_EXTERNAL | Final attempt stopped here: a real production release cache receipt manifest is required. |
+| AC-004 | BLOCKED_EXTERNAL | Final attempt stopped here; a budgeted 2026-07-15 public HEAD additionally proved the real current.json is HTTP 404/MISS, so bootstrap/cutover has not occurred. |
 | AC-005 | PASS_PENDING_FINAL | Current reader criterion receipt proves active/previous/LKG and fail-closed no-DB behavior. |
 | AC-006 | PASS_PENDING_FINAL | Current JSON/RSS/feed/search parity and recursive no-DB receipt remains valid. |
 | AC-007 | PASS_PENDING_FINAL | Current anonymous page/privacy/calendar/saved receipt remains valid. |

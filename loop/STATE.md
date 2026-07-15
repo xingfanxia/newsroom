@@ -73,19 +73,17 @@ artifacts:
   repo_aliases:
     plan: docs/R2-PUBLIC-READ-PLAN-2026-07-14.md
     evidence: docs/reports/r2-public-read/
-iteration: 21
+iteration: 22
 phase: external-gate
 current_artifact: docs/superpowers/plans/2026-07-14-r2-public-read-decoupling.md
 current_criterion: AC-004
 last_action: >-
-  Completion audit found and repaired the missing terminal verifier and AC-013
-  implementation. `verify:r2-public --final` now runs the hermetic repository
-  gate plus all 13 frozen criteria, writes PASS only after complete success, and
-  requires cache/load/budget, >=48h stability, rollback and measured shipped-doc
-  evidence. The real final attempt passed typecheck/lint/build/dead-code and
-  1,443 tests (1,441 pass, 2 production-only skips), then failed closed at
-  AC-004 because no production evidence manifest exists. No external request,
-  publish, deploy or database mutation ran.
+  Ran one write-ahead-budgeted read-only HEAD against the public R2 pointer.
+  `https://content.ax0x.ai/newsroom/v1/current.json` returned HTTP 404 and
+  `CF-Cache-Status: MISS` at 2026-07-15T01:14:46Z, proving the first production
+  release/bootstrap has not happened. Actual spend was one public request, zero
+  response-body bytes, and zero writes/bootstraps/Turso windows. No token,
+  publish, deploy, cache mutation or database access ran.
 next_action: >-
   Await explicit production authorization before the outbox migration, one
   metered bootstrap, real cache probe, deploy/canary/cutover, bounded load and
@@ -93,7 +91,7 @@ next_action: >-
 halt_cause: genuine-escalate
 halt_scan:
   - AC-001..AC-003 pass their local criterion paths in the current final attempt.
-  - AC-004 is BLOCKED_EXTERNAL on a real release/cache receipt after authorized cutover.
+  - AC-004 is BLOCKED_EXTERNAL: the budgeted public preflight proves current.json is HTTP 404 until authorized bootstrap/cutover.
   - AC-005..AC-010 retain current local criterion receipts and have no remaining legal local action.
   - AC-011 is BLOCKED_EXTERNAL on paired production load/control receipts.
   - AC-012 is BLOCKED_EXTERNAL on publisher receipts and a clean exact >=24h Turso window.
@@ -303,7 +301,26 @@ budget:
   bootstrap_snapshots_total: 1
   production_backed_default_tests: 0
   intentional_turso_windows: named-only
-  spend_ledger: []
+  spend_ledger:
+    - run_id: ac004-current-head-20260715t011411z
+      operation: HEAD https://content.ax0x.ai/newsroom/v1/current.json
+      planned_at: 2026-07-15T01:14:11Z
+      status: completed
+      planned:
+        r2_object_writes: 0
+        public_http_requests: 1
+        transfer_bytes: 65536
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 0
+      actual:
+        captured_at: 2026-07-15T01:14:46Z
+        r2_object_writes: 0
+        public_http_requests: 1
+        response_body_bytes: 0
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 0
+        http_status: 404
+        cf_cache_status: MISS
 pressure_objects:
   - id: P-public-db-zero
     source: authored
@@ -369,6 +386,7 @@ pressure_ledger:
   - 2026-07-14: accepted Task 3 after executable zero-loader saved denial, real Proxy locale tests, recursive DB-free import proof, and all-link prefetch coverage
   - 2026-07-14: accepted Task 4 after exhaustive Next 16 source/build inventory, real Edge/parallel-route probes, decomposed fail-closed guards, and dual independent approval
   - 2026-07-14: accepted Task 5 after strict persisted contracts, canonical-byte adversarial fixtures, fail-closed eligibility/receipt hardening, and dual independent approval
+  - 2026-07-15: budgeted AC-004 public pointer HEAD returned 404/MISS with one request and zero body bytes, confirming no production bootstrap
 pressure_consulted:
   - iteration: 1
     consulted_at: 2026-07-14
@@ -720,6 +738,30 @@ pressure_consulted:
         This resumed pass is local/read-only. No R2 write, public replay, Turso
         window, migration, bootstrap, deploy, cutover, DNS, or cache mutation is
         authorized by goal invocation alone.
+  - iteration: 22
+    consulted_at: 2026-07-15
+    ids:
+      - P-public-db-zero
+      - P-rows-hard
+      - P-rows-ideal
+      - P-safe-tests
+      - P-architecture-api
+      - P-metered-cap
+    influence:
+      P-public-db-zero: >-
+        Limits this pass to observing whether the public R2 pointer exists; no
+        application route, database path, or fallback is exercised.
+      P-rows-hard: >-
+        No-effect: the HEAD probe does not access Turso or claim a budget result.
+      P-rows-ideal: >-
+        No-effect: no publisher or database work is run.
+      P-safe-tests: >-
+        No test suite is repeated; the probe records only response metadata.
+      P-architecture-api: >-
+        No-effect: no source or bundle ownership changes in this pass.
+      P-metered-cap: >-
+        Reserves exactly one public HEAD request and 64 KiB transfer before the
+        request; all writes, bootstraps and Turso windows remain zero.
 ```
 
 ## Alignment reviews
