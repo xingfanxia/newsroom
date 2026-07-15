@@ -173,7 +173,7 @@ describe("public API endpoint contract", () => {
       expect(skillText).toContain(group.skillEndpoints.join(" "));
     }
     expect(openApiText).toContain(
-      `(${publicRateLimitPerIpLabel("search")}) due to LLM cost`,
+      `Anonymous lexical search (${publicRateLimitPerIpLabel("search")}).`,
     );
   });
 

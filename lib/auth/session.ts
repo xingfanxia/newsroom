@@ -12,19 +12,13 @@ import { cookies } from "next/headers";
 import { db, schema } from "@/db/client";
 import {
   ADMIN_SESSION_COOKIE,
-  verifySessionCookie,
-} from "./password";
+  sessionIdentityFromCookie,
+  type SessionUser,
+} from "./session-identity";
 import { USER_ADMIN_ROLE, USER_READER_ROLE } from "@/lib/types";
 
-export const ADMIN_USER_ID = "admin-local";
-const ADMIN_USER_EMAIL = "admin@local";
-
-export type SessionUser = {
-  id: string;
-  email: string;
-  /** Always true when a session exists in the password-gate model. */
-  isAdmin: boolean;
-};
+export { ADMIN_USER_ID } from "./session-identity";
+export type { SessionUser } from "./session-identity";
 
 /**
  * Returns the fixed admin user when a valid session cookie is present,
@@ -38,12 +32,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     return null;
   }
   const value = store.get(ADMIN_SESSION_COOKIE)?.value;
-  if (!verifySessionCookie(value)) return null;
-  return {
-    id: ADMIN_USER_ID,
-    email: ADMIN_USER_EMAIL,
-    isAdmin: true,
-  };
+  return sessionIdentityFromCookie(value);
 }
 
 export class UnauthorizedError extends Error {

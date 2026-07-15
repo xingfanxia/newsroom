@@ -2,11 +2,7 @@ import Link from "next/link";
 import { setRequestLocale } from "next-intl/server";
 import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
-import { getShellChromeData } from "@/lib/shell/chrome-data";
-import {
-  dailyColumnDateKey,
-  listDailyColumnRows,
-} from "@/lib/api/daily-columns";
+import { readDailyIndexPageModel } from "@/lib/public-content/page-models";
 import {
   DAILY_COLUMN_INDEX_ROUTE,
   dailyColumnIssueRoute,
@@ -56,12 +52,11 @@ export default async function DailyLandingPage({
   const offset = (page - 1) * PAGE_SIZE;
   const isDailyColumnLocale = appLocale === DAILY_COLUMN_LOCALE;
 
-  const [rows, chrome] = await Promise.all([
-    isDailyColumnLocale
-      ? listDailyColumnRows({ locale: DAILY_COLUMN_LOCALE, take: PAGE_SIZE, offset })
-      : Promise.resolve([]),
-    getShellChromeData({ pulse: true }),
-  ]);
+  const { rows, chrome } = await readDailyIndexPageModel({
+    locale: appLocale,
+    take: PAGE_SIZE,
+    offset,
+  });
 
   return (
     <ViewShell
@@ -104,8 +99,9 @@ export default async function DailyLandingPage({
           <>
             <div className="feed">
               {rows.map((r) => {
-                const dk = dailyColumnDateKey(r.periodStart);
-                const preview = summaryPreview(r.columnSummaryMd ?? "");
+                const dk = r.date;
+                const periodStart = new Date(r.window_start);
+                const preview = summaryPreview(r.summary_md ?? "");
                 return (
                   <Link
                     href={dailyColumnIssueRoute(dk)}
@@ -117,20 +113,20 @@ export default async function DailyLandingPage({
                     }}
                   >
                     <div className="i-time">
-                      <div className="hh">{shortDate(r.periodStart)}</div>
+                      <div className="hh">{shortDate(periodStart)}</div>
                       <div className="ago">
-                        {formatCoarseRelativeTime(r.periodStart)}
+                        {formatCoarseRelativeTime(periodStart)}
                       </div>
                     </div>
                     <div className="i-body">
                       <div className="i-meta">
                         <span className="src">每日 AI 日报</span>
                         <span className="chan">· {dk}</span>
-                        {r.columnThemeTag ? (
-                          <span className="tier-f">{r.columnThemeTag}</span>
+                        {r.theme_tag ? (
+                          <span className="tier-f">{r.theme_tag}</span>
                         ) : null}
                       </div>
-                      <div className="i-title">{r.columnTitle}</div>
+                      <div className="i-title">{r.title}</div>
                       {preview ? <div className="i-sum">{preview}</div> : null}
                     </div>
                     <div />

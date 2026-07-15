@@ -188,28 +188,30 @@ describe("content-mutating crons opt into feed-cache invalidation (W9b: conditio
   });
 });
 
-describe("feed call sites use the cached variants", () => {
-  it("chrome shell caches radar + pulse", () => {
+describe("public page call sites derive from snapshots", () => {
+  it("chrome shell derives radar + pulse from the snapshot reader", () => {
     const src = readSource("lib/shell/chrome-data.ts");
-    expect(src).toContain("getRadarStatsCached");
-    expect(src).toContain("getPulseDataCached");
-    expect(src).not.toMatch(/\bgetRadarStats\(\)/);
-    expect(src).not.toMatch(/\bgetPulseData\(\)/);
+    expect(src).toContain("publicSnapshotReader");
+    expect(src).toContain("deriveRadarStats");
+    expect(src).toContain("derivePulseData");
+    expect(src).not.toContain("@/lib/shell/feed-cache");
   });
 
-  it("home caches day counts + topics + ticker", () => {
+  it("home derives day counts + topics + ticker from one snapshot", () => {
     const src = readSource("app/[locale]/page.tsx");
-    expect(src).toContain("getDayCountsCached");
-    expect(src).toContain("getTopTopicsCached");
-    expect(src).toContain("getRecentTickerItemsCached");
+    expect(src).toContain("readPublicPageSnapshot");
+    expect(src).toContain("deriveDayCounts");
+    expect(src).toContain("deriveTopTopics");
+    expect(src).toContain("deriveRecentTickerItems");
+    expect(src).not.toContain("@/lib/shell/feed-cache");
   });
 
-  it("/all + /curated cache their day counts", () => {
+  it("/all + /curated derive their day counts from snapshots", () => {
     expect(readSource("app/[locale]/all/page.tsx")).toContain(
-      "getDayCountsCached",
+      "deriveDayCounts",
     );
     expect(readSource("app/[locale]/curated/page.tsx")).toContain(
-      "getDayCountsCached",
+      "deriveDayCounts",
     );
   });
 });

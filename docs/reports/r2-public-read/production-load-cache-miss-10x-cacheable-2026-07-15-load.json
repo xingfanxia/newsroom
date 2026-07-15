@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "kind": "anonymous-load",
+  "runId": "production-load-cache-miss-10x-cacheable-20260715t061100z",
+  "scenario": "cache-miss",
+  "multiplier": 10,
+  "fixtures": {
+    "dailyDate": "2026-07-13",
+    "eventId": 12181,
+    "itemId": 4,
+    "podcastId": 4
+  },
+  "baseOrigin": "https://news.ax0x.ai",
+  "startedAt": "2026-07-15T06:11:15.747Z",
+  "finishedAt": "2026-07-15T06:12:18.248Z",
+  "plannedRequests": 710,
+  "completedRequests": 710,
+  "receivedBytes": 50459180,
+  "statusMismatchCount": 0,
+  "unexpected5xxCount": 0,
+  "mismatches": []
+}

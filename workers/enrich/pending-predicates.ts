@@ -1,5 +1,5 @@
 import { sql, type SQL, type SQLWrapper } from "drizzle-orm";
-import { enrichBodyPrefetchReadySql } from "@/lib/urls/media";
+import { enrichBodyPrefetchReadySql } from "@/lib/urls/media-sql";
 
 const ENRICH_CLAIM_STALE_MINUTES = 45;
 export const ENRICH_MAX_ATTEMPTS = 3;

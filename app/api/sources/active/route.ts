@@ -1,5 +1,8 @@
 import { plainJson, runPlainRoute } from "@/lib/api/plain-response";
-import { getActiveSourcesRoutePayload } from "@/lib/api/source-catalog";
+import {
+  activeSourcesSnapshotBody,
+  readPublicSnapshot,
+} from "@/lib/public-content/http";
 
 export const revalidate = 300;
 
@@ -11,6 +14,6 @@ export const revalidate = 300;
  */
 export async function GET() {
   return runPlainRoute(async () => {
-    return plainJson(await getActiveSourcesRoutePayload());
+    return plainJson(activeSourcesSnapshotBody(await readPublicSnapshot()));
   }, { serverErrorLabel: "api/sources/active" });
 }

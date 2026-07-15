@@ -82,15 +82,15 @@ describe("required session route source wiring", () => {
     expect(source).not.toContain("upsertAppUser");
   });
 
-  test("optional saved export keeps its fallback-user semantics explicit", () => {
+  test("saved export requires a session before invoking export body logic", () => {
     const source = read("app/api/saved/export/route.ts");
     const helper = read("lib/api/saved-export.ts");
 
-    expect(source).toContain("getSessionUser");
-    expect(source).toContain("ADMIN_USER_ID");
+    expect(source).toContain("runSessionRoute");
     expect(source).toContain("@/lib/api/saved-export");
-    expect(source).toContain("savedExportResponse(req, userId)");
-    expect(source).not.toContain("requireSessionForRoute");
+    expect(source).toContain("savedExportResponse(req, user.id)");
+    expect(source).not.toContain("ADMIN_USER_ID");
+    expect(source).not.toContain("getSessionUser");
     expect(source).not.toContain("new URL(req.url)");
     expect(source).not.toContain("searchParams.get");
     expect(source).not.toContain("@/lib/items/saved");

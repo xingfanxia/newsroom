@@ -8,8 +8,9 @@
     "proxy.ts",
     "app/**/{default,error,global-error,layout,loading,not-found,page,route,sitemap,robots}.{ts,tsx}",
     "scripts/**/*.ts",
-    "tests/**/*.test.ts",
-    "workers/**/*.test.ts"
+    "tests/**/*.{test,spec,integration,live}.{ts,tsx}",
+    "tests/fixtures/verification/*.ts",
+    "workers/**/*.{test,spec}.{ts,tsx}"
   ],
   "project": [
     "**/*.{js,cjs,mjs,jsx,ts,tsx}",

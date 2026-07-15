@@ -11,7 +11,10 @@ describe("standalone TypeScript tooling source contract", () => {
   test("typecheck and verify are first-class quality gates", () => {
     expect(packageJson.scripts?.typecheck).toBe("tsc --noEmit");
     expect(packageJson.scripts?.verify).toBe(
-      "bun run typecheck && bun run lint && bun run build && bun run code:dead && bun run code:dead:exports && bun run code:dead:types && bun run test",
+      "bun scripts/verification/run-hermetic-verify.ts",
+    );
+    expect(packageJson.scripts?.test).toBe(
+      "bun scripts/verification/run-hermetic-tests.ts",
     );
     expect(packageJson.devDependencies).toHaveProperty("@types/bun");
 

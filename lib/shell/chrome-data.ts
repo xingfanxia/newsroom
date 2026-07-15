@@ -1,9 +1,10 @@
-import type { PulsePoint } from "@/components/shell/pulse-box";
 import {
-  getPulseDataCached,
-  getRadarStatsCached,
-} from "@/lib/shell/feed-cache";
-import { EMPTY_RADAR_STATS, type RadarStats } from "@/lib/shell/radar-stats";
+  derivePulseData,
+  deriveRadarStats,
+  type PublicPulsePoint,
+} from "@/lib/public-content/derive";
+import { publicSnapshotReader } from "@/lib/public-content/reader";
+import type { RadarStats } from "@/lib/shell/radar-stats";
 import {
   signalRatioFromRadar,
   topBarStatsFromRadar,
@@ -18,19 +19,16 @@ type ShellChromeOptions = {
 export type ShellChromeData = {
   radarStats: RadarStats;
   topBarStats: TopBarStats;
-  pulse?: PulsePoint[];
+  pulse?: PublicPulsePoint[];
 };
 
-export async function getShellChromeData(
+export function shellChromeDataFromSnapshot(
+  value: unknown,
+  nowMs: number,
   opts: ShellChromeOptions = {},
-): Promise<ShellChromeData> {
-  const [radarStats, pulse] = await Promise.all([
-    getRadarStatsCached().catch(() => EMPTY_RADAR_STATS),
-    opts.pulse
-      ? getPulseDataCached().catch(() => [])
-      : Promise.resolve(undefined),
-  ]);
-
+): ShellChromeData {
+  const radarStats = deriveRadarStats(value, nowMs);
+  const pulse = opts.pulse ? derivePulseData(value, nowMs) : undefined;
   const signalRatio =
     opts.signalRatio === "fromRadar"
       ? signalRatioFromRadar(radarStats)
@@ -44,4 +42,11 @@ export async function getShellChromeData(
         : topBarStatsFromRadar(radarStats, signalRatio),
     pulse,
   };
+}
+
+export async function getShellChromeData(
+  opts: ShellChromeOptions = {},
+): Promise<ShellChromeData> {
+  const snapshot = await publicSnapshotReader().readCanonicalState();
+  return shellChromeDataFromSnapshot(snapshot.state, Date.now(), opts);
 }

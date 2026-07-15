@@ -20,6 +20,7 @@ const dailyColumnRegenSrc = read("scripts/ops/regen-daily-column.ts");
 const dailyColumnWeekBackfillSrc = read("scripts/ops/backfill-daily-week.ts");
 const dailyColumnApiSrc = read("lib/api/daily-columns.ts");
 const newsletterRssFeedSrc = read("lib/rss/newsletter-feed.ts");
+const newsletterRssMetaSrc = read("lib/rss/newsletter-feed-meta.ts");
 
 describe("newsletter runtime contracts", () => {
   test("newsletter kind and locale labels have one runtime source of truth", () => {
@@ -61,7 +62,7 @@ describe("newsletter runtime contracts", () => {
     expect(dailyColumnApiSrc).toContain("DAILY_NEWSLETTER_KIND");
     expect(dailyColumnApiSrc).toContain("NEWSLETTER_LOCALES");
     expect(dailyColumnApiSrc).toContain(".enum(NEWSLETTER_LOCALES)");
-    expect(newsletterRssFeedSrc).toContain("NEWSLETTER_LOCALES");
+    expect(newsletterRssMetaSrc).toContain("NEWSLETTER_LOCALES");
     expect(newsletterRssFeedSrc).not.toContain('raw === "en" ? "en" : "zh"');
   });
 

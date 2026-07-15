@@ -1,102 +1,30 @@
-import { z } from "zod";
-import {
-  INVALID_ROUTE_ID_ERROR,
-  parsePositiveRouteId,
-} from "@/lib/api/route-params";
 import { getEventMembers } from "@/lib/items/live";
-import { APP_LOCALES, type Story } from "@/lib/types";
+import type { AppLocale } from "@/lib/types";
+import {
+  parseEventMemberRouteParams,
+  toEventMembersPayload,
+  type EventMembersPayload,
+} from "./event-member-contract";
 
-type EventMember = NonNullable<Story["members"]>[number];
-
-const eventMemberLocaleSchema = z.enum(APP_LOCALES);
-
-type EventMemberLocale = z.infer<typeof eventMemberLocaleSchema>;
-
-type EventMemberRouteParams =
-  | { ok: true; clusterId: number; locale: EventMemberLocale }
-  | { ok: false; error: "invalid_id" | "invalid_locale" };
-
-export type EventMemberApiItem = {
-  source_id: string;
-  source_name: string;
-  title: string;
-  url: string;
-  published_at: string;
-  importance: number;
-};
-
-export type EventMembersPayload = {
-  cluster_id: number;
-  members: EventMemberApiItem[];
-  total: number;
-};
-
-export type EventMembersListEnvelope = Pick<
+export {
+  eventMembersCacheSignalParts,
+  parseEventMemberRouteParams,
+  toEventMemberApiItem,
+  toEventMemberApiItems,
+  toEventMembersListEnvelope,
+  toEventMembersPayload,
+} from "./event-member-contract";
+export type {
   EventMembersPayload,
-  "members" | "total"
->;
+} from "./event-member-contract";
 
 type EventMembersRoutePayloadResult =
   | { ok: true; payload: EventMembersPayload }
   | { ok: false; error: "invalid_id" | "invalid_locale"; status: 400 };
 
-export function parseEventMemberRouteParams({
-  rawId,
-  rawLocale,
-  defaultLocale,
-}: {
-  rawId: string;
-  rawLocale: string | null;
-  defaultLocale: EventMemberLocale;
-}): EventMemberRouteParams {
-  const parsedId = parsePositiveRouteId(rawId);
-  if (!parsedId.ok) return { ok: false, error: INVALID_ROUTE_ID_ERROR };
-
-  const parsedLocale = eventMemberLocaleSchema.safeParse(
-    rawLocale ?? defaultLocale,
-  );
-  if (!parsedLocale.success) {
-    return { ok: false, error: "invalid_locale" };
-  }
-
-  return {
-    ok: true,
-    clusterId: parsedId.id,
-    locale: parsedLocale.data,
-  };
-}
-
-export function toEventMemberApiItem(member: EventMember): EventMemberApiItem {
-  return {
-    source_id: member.sourceId,
-    source_name: member.sourceName,
-    title: member.title,
-    url: member.url,
-    published_at: member.publishedAt,
-    importance: member.importance,
-  };
-}
-
-export function toEventMemberApiItems(
-  members: EventMember[],
-): EventMemberApiItem[] {
-  return members.map(toEventMemberApiItem);
-}
-
-export function toEventMembersPayload(
-  clusterId: number,
-  members: EventMember[],
-): EventMembersPayload {
-  return {
-    cluster_id: clusterId,
-    members: toEventMemberApiItems(members),
-    total: members.length,
-  };
-}
-
 export async function getEventMembersPayload(
   clusterId: number,
-  locale: EventMemberLocale,
+  locale: AppLocale,
 ): Promise<EventMembersPayload> {
   const members = await getEventMembers(clusterId, locale);
   return toEventMembersPayload(clusterId, members);
@@ -109,7 +37,7 @@ export async function getEventMembersRoutePayload({
 }: {
   rawId: string;
   rawLocale: string | null;
-  defaultLocale: EventMemberLocale;
+  defaultLocale: AppLocale;
 }): Promise<EventMembersRoutePayloadResult> {
   const parsed = parseEventMemberRouteParams({
     rawId,
@@ -133,7 +61,7 @@ export async function getEventMembersRequestPayload(
     defaultLocale,
   }: {
     rawId: string;
-    defaultLocale: EventMemberLocale;
+    defaultLocale: AppLocale;
   },
 ): Promise<EventMembersRoutePayloadResult> {
   const url = new URL(req.url);
@@ -142,23 +70,4 @@ export async function getEventMembersRequestPayload(
     rawLocale: url.searchParams.get("locale"),
     defaultLocale,
   });
-}
-
-export function toEventMembersListEnvelope(
-  payload: EventMembersPayload,
-): EventMembersListEnvelope {
-  return {
-    members: payload.members,
-    total: payload.total,
-  };
-}
-
-export function eventMembersCacheSignalParts(
-  payload: EventMembersPayload,
-): Record<string, string | number | null> {
-  return {
-    cluster_id: payload.cluster_id,
-    n: payload.total,
-    last_at: payload.members[payload.members.length - 1]?.published_at ?? "",
-  };
 }

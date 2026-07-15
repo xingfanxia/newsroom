@@ -7,14 +7,11 @@
  *   - HKR booleans only (no per-axis reasonsZh/reasonsEn)
  *   - body_md kept (transcript / article text); body_rss (raw HTML) dropped
  */
+import { publicCachedRoute } from "@/lib/api/public-helpers";
 import {
-  publicCachedRoute,
-} from "@/lib/api/public-helpers";
-import {
-  getItemDetailRouteRow,
-  publicItemDetailEtagSignal,
-  toPublicItemDetail,
-} from "@/lib/api/item-detail";
+  publicItemSnapshotResult,
+  readPublicSnapshot,
+} from "@/lib/public-content/http";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -29,14 +26,7 @@ export async function GET(
     label: "api/public/items/:id",
     load: async () => {
       const { id: idRaw } = await ctx.params;
-      const found = await getItemDetailRouteRow(idRaw);
-      if (!found.ok) return found;
-
-      return {
-        ok: true,
-        signal: publicItemDetailEtagSignal(found.row),
-        body: toPublicItemDetail(found.row),
-      };
+      return publicItemSnapshotResult(await readPublicSnapshot(), idRaw);
     },
   });
 }

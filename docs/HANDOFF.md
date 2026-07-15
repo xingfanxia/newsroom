@@ -1,5 +1,38 @@
 # AX's AI RADAR — Current Handoff
 
+## 2026-07-14 — R2 public-read decoupling implemented locally; production gate pending
+
+The feature branch now separates anonymous traffic from Turso by construction.
+Public-relevant DB writes enqueue bounded outbox work; the authenticated
+`publish-public` cron builds content-addressed releases in the
+`newsroom-public` R2 bucket; anonymous HTML, RSC, public JSON, event/source/daily
+routes, and every RSS family read the validated release from
+`https://content.ax0x.ai`. Bearer v1/MCP, admin, saved data, feedback, tokens,
+and ingestion remain authenticated Turso consumers.
+
+Local evidence is strong but is not a production claim:
+
+- A fresh production build succeeds with Turso absent. Recursive source and
+  compiled/NFT/client/Proxy artifacts for the anonymous inventory contain no DB
+  client, publisher, or Turso marker.
+- All 30 anonymous entries pass GET/HEAD; public pages pass RSC; real Chrome
+  hydrates `/en/all`; a recording poison-Turso endpoint sees zero connections.
+- Bounded 1x/10x/100x load plans, cache contracts, paired Turso-window math, and
+  the cutover receipt aggregator pass locally. The verifier refuses AC-004,
+  AC-011, and AC-012 without a production receipt manifest.
+- No production migration, R2 release, deploy, traffic replay, or cutover has
+  run from this branch. The last measured production rate therefore remains the
+  pre-snapshot known-red result; do not claim the monthly target yet.
+
+The next step is the explicit production gate: apply the checksummed outbox
+migration, perform the single metered bootstrap, probe real release caching,
+deploy/canary without public dual-read, drill pointer/application rollback, run
+bounded traffic/control windows, and capture one clean >=24h Turso window. The
+authoritative command order, caps, monitoring, rollback, and credential cleanup
+are in [`docs/operations/public-snapshots.md`](./operations/public-snapshots.md).
+Older W8/W9 sections below explain the previous DB-cache approach; they are
+historical for anonymous ownership once the R2 cutover ships.
+
 ## 2026-07-13 — W9 read-budget: cron cadence + cache-purge + scale (all read paths bounded; forward run-rate measurement pending)
 
 W8 shipped but a full decomposition (6-agent workflow + a clean 22.9-min prod
@@ -76,18 +109,18 @@ visible-tier row (measured **8,926**) 2×/day to find the ~27 commentary-pending
 (both hardening findings applied). AX granted STANDING authorization for prod
 index/cache ops via db-optimize.ts, so no per-index confirm.
 
-**Gate-hygiene follow-up (found during W9b):** the local `bun run test` gate is
-NON-hermetic — a CLASS of `(real DB)` tests run whenever `TURSO_DATABASE_URL` is set
-(`.env.local` points at PROD): the feedback writes (`tests/feedback/toggle.test.ts`)
-AND the search-API reads (`/api/public/search`, `/api/v1/search` — seen timing out at
-20s/5s in the W9b verify run). They hit the live prod DB and intermittently time out
-under Turso's global write-lock contention with the running production crons. Worse, a bun **timeout** failure does NOT reliably
-propagate a non-zero exit (`VERIFY_EXIT=0` seen with a visible `(fail)`) — synchronous
-assertion fails DO exit 1 (gate-probe verified), only async timeouts mask. Mitigation
-in use: always cross-check `VERIFY_EXIT` with `grep -c "(fail)"`. Real fix (separate
-PR): gate the `(real DB)` writes behind an explicit opt-in env (not bare
-`TURSO_DATABASE_URL`) so the default gate is hermetic. **Vercel CI is unaffected — it
-runs only `next build`, never `bun run test`.**
+**Gate-hygiene follow-up (found during W9b; RESOLVED locally by R2 Task 2):**
+the old `bun run test` loaded `.env.local`, so a class of `(real DB)` tests hit
+production and Bun async timeouts could visibly print `(fail)` while returning
+exit zero. The default `test` and `verify` entrypoints now run through a
+credential-scrubbing checked-command wrapper, shadow all Next-visible
+Turso/libSQL/R2/AWS/Cloudflare keys with local or `fake-*` values, require a
+completion sentinel, and reject failure/timeout output independently of exit
+status. Eleven real-Turso suites moved to explicit fail-loud integration inputs;
+they require both `RUN_PRODUCTION_INTEGRATION=1` and `bun run test:production`.
+The live semantic provider smoke has a second explicit switch/command. Full
+inventory: `tests/integration/production/README.md`. **Vercel CI is unaffected —
+it runs only `next build`, never `bun run test`.**
 
 **W9c-1 — main RSS recency floor (SHIPPED, PR #53, squash 46f264d, non-breaking).**
 The decisive finding: the routes split by caching. `/api/feed/[locale]/rss.xml` is
@@ -573,7 +606,9 @@ write path, then deleted). Supabase is decommissioned. What changed:
 Current maintenance direction:
 - Start docs navigation from `docs/README.md`; historical plans/handoffs are useful context, not current implementation instructions.
 - `bun run verify` is the one-command local quality gate for agents before
-  committing: typecheck, lint, build, Knip gates, and the full Bun test suite.
+  committing: the hermetic wrapper runs typecheck, lint, build, Knip gates, and
+  the full non-production Bun test suite, grading both process status and
+  failure/timeout output.
 - `bun run lint` is expected to be clean with zero warnings.
 - `bun run typecheck` is expected to run standalone `tsc --noEmit` cleanly,
   including tests and Bun runtime APIs.

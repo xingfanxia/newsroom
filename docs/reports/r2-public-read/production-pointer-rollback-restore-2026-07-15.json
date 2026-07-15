@@ -1,0 +1,13 @@
+{
+  "kind": "rollback-public",
+  "at": "2026-07-15T07:55:38.856Z",
+  "receipt": {
+    "fromReleaseId": "r65-a7414bd51615a2889cae",
+    "rollbackReleaseId": "r75-62e05a8ff5c8f6ccabef",
+    "pointerEtagBefore": "\"96d5f2797283a3099754ee217c58ff07\"",
+    "pointerEtagAfter": "\"b150b8d2f7ad934b5b39dbcc4aee51c5\"",
+    "conditionalPointerReplace": true,
+    "sourceWatermark": 75,
+    "capturedAt": "2026-07-15T07:55:38.557Z"
+  }
+}

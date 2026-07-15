@@ -1,5 +1,5 @@
-import { ADMIN_USER_ID, getSessionUser } from "@/lib/auth/session";
 import { savedExportResponse } from "@/lib/api/saved-export";
+import { runSessionRoute } from "@/lib/api/session-route";
 
 /**
  * GET /api/saved/export?collection=<id|inbox|all> — dumps the user's saved
@@ -8,7 +8,8 @@ import { savedExportResponse } from "@/lib/api/saved-export";
  * present.
  */
 export async function GET(req: Request) {
-  const user = await getSessionUser();
-  const userId = user?.id ?? ADMIN_USER_ID;
-  return savedExportResponse(req, userId);
+  return runSessionRoute(
+    async (user) => savedExportResponse(req, user.id),
+    { serverErrorLabel: "api/saved/export GET" },
+  );
 }

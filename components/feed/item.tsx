@@ -36,7 +36,7 @@ export function Item({ story, locale }: Props) {
       <span className="tier-f">FEATURED</span>
     ) : null;
 
-  const reason = story.reasoning;
+  const reason = story.whyFeatured ?? story.reasoning;
   // Render 一句话点评 (note) + 锐评 (analysis) separately so the one-liner
   // stance doesn't mask the 200-字 sharp take. Previously `note || analysis`
   // meant a present note always hid the longer take behind it.

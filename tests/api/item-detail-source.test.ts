@@ -9,17 +9,19 @@ const publicItemsModule = readSource("lib/api/public-items.ts");
 const storyItemFieldsModule = readSource("lib/api/story-item-fields.ts");
 
 describe("item detail route source wiring", () => {
-  test("public detail route delegates route id parsing, DB lookup, and serialization", () => {
-    expect(publicItemRoute).toContain("@/lib/api/item-detail");
-    expect(publicItemRoute).toContain("getItemDetailRouteRow");
+  test("public detail route delegates snapshot lookup and serialization", () => {
+    expect(publicItemRoute).toContain("@/lib/public-content/http");
+    expect(publicItemRoute).toContain("publicItemSnapshotResult");
+    expect(publicItemRoute).toContain("readPublicSnapshot");
     expect(publicItemRoute).not.toContain("parseItemDetailRouteId");
     expect(publicItemRoute).not.toContain("getItemDetailRow");
+    expect(publicItemRoute).not.toContain("getItemDetailRouteRow");
     expect(publicItemRoute).not.toContain(".select({");
     expect(publicItemRoute).not.toContain("leftJoin(clusters");
     expect(publicItemRoute).not.toContain("innerJoin(sources");
     expect(publicItemRoute).not.toContain("const idSchema = z.coerce");
-    expect(publicItemRoute).toContain("toPublicItemDetail(found.row)");
-    expect(publicItemRoute).toContain("publicItemDetailEtagSignal(found.row)");
+    expect(publicItemRoute).not.toContain("toPublicItemDetail(found.row)");
+    expect(publicItemRoute).not.toContain("publicItemDetailEtagSignal(found.row)");
   });
 
   test("bearer agent item detail surfaces share the v1 payload helper", () => {

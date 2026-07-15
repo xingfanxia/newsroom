@@ -8,11 +8,11 @@
  * Daily-column public query bounds live in
  * `lib/daily-column/query-defaults.ts`. Strict 400 on out-of-range.
  */
+import { publicCachedRoute } from "@/lib/api/public-helpers";
 import {
-  publicCachedRoute,
-  publicRouteResult,
-} from "@/lib/api/public-helpers";
-import { getPublicDailyColumnIndexRequestPayload } from "@/lib/api/daily-columns";
+  dailyIndexSnapshotResult,
+  readPublicSnapshot,
+} from "@/lib/public-content/http";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -22,12 +22,7 @@ export async function GET(req: Request) {
     endpoint: "dailies",
     etagFamily: "public-dailies",
     label: "api/public/dailies",
-    load: async () => {
-      const result = await getPublicDailyColumnIndexRequestPayload(req);
-      return publicRouteResult(result, (payload) => ({
-        signal: payload.etagSignal,
-        body: payload.body,
-      }));
-    },
+    load: async () =>
+      dailyIndexSnapshotResult(await readPublicSnapshot(), req),
   });
 }

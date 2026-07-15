@@ -2,7 +2,44 @@ import { describe, expect, it } from "bun:test";
 import {
   computeColumnWindow,
   selectDailyColumnPool,
+  type DailyColumnCandidateLoader,
+  type SelectedRow,
 } from "./select";
+
+function selectedRow(
+  id: number,
+  overrides: Partial<SelectedRow> = {},
+): SelectedRow {
+  return {
+    id,
+    clusterId: null,
+    coverage: 1,
+    publishedAt: new Date("2026-07-14T10:00:00Z"),
+    enrichedAt: new Date("2026-07-14T10:01:00Z"),
+    titleZh: null,
+    titleEn: `Item ${id}`,
+    title: `Item ${id}`,
+    canonicalTitleZh: null,
+    canonicalTitleEn: null,
+    summaryZh: null,
+    summaryEn: null,
+    noteZh: null,
+    noteEn: null,
+    importance: 80 - id,
+    tier: "featured",
+    tags: null,
+    sourceTags: null,
+    fromCurated: false,
+    ...overrides,
+  };
+}
+
+function candidateLoader(
+  curated: SelectedRow[],
+  hot: SelectedRow[],
+): DailyColumnCandidateLoader {
+  return async () => ({ curated, hot });
+}
 
 describe("computeColumnWindow", () => {
   it("snaps end to the hour and start to 24h before", () => {
@@ -23,7 +60,10 @@ describe("computeColumnWindow", () => {
 describe("selectDailyColumnPool", () => {
   it("returns insufficient-signal for far-future window", async () => {
     const future = new Date("2099-01-01T12:00:00Z");
-    const result = await selectDailyColumnPool(future);
+    const result = await selectDailyColumnPool(
+      future,
+      candidateLoader([], []),
+    );
     expect(result.rows.length).toBe(0);
     expect(result.skipReason).toBe("insufficient-signal");
     expect(result.windowEnd.toISOString()).toBe("2099-01-01T12:00:00.000Z");
@@ -31,8 +71,13 @@ describe("selectDailyColumnPool", () => {
 
   it("returns source tags for callers that need to inspect source mix", async () => {
     const now = new Date();
-    const result = await selectDailyColumnPool(now);
-    if (result.rows.length === 0) return; // skip if dev DB has no signal
+    const rows = Array.from({ length: 5 }, (_, index) =>
+      selectedRow(index + 1, { sourceTags: ["official"] }),
+    );
+    const result = await selectDailyColumnPool(
+      now,
+      candidateLoader(rows, []),
+    );
     for (const row of result.rows) {
       expect(row.sourceTags == null || Array.isArray(row.sourceTags)).toBe(true);
     }
@@ -40,7 +85,13 @@ describe("selectDailyColumnPool", () => {
 
   it("caps at 20 unique items", async () => {
     const now = new Date();
-    const result = await selectDailyColumnPool(now);
+    const rows = Array.from({ length: 25 }, (_, index) =>
+      selectedRow(index + 1),
+    );
+    const result = await selectDailyColumnPool(
+      now,
+      candidateLoader([], rows),
+    );
     expect(result.rows.length).toBeLessThanOrEqual(20);
     const ids = result.rows.map((r) => r.id);
     expect(new Set(ids).size).toBe(ids.length);
@@ -48,11 +99,17 @@ describe("selectDailyColumnPool", () => {
 
   it("preserves curated metadata when an item appears in both pools", async () => {
     const now = new Date();
-    const result = await selectDailyColumnPool(now);
-    // Sanity: curated items should be marked as such
-    const curatedRows = result.rows.filter((r) => r.fromCurated);
-    for (const r of curatedRows) {
-      expect(r.fromCurated).toBe(true);
-    }
+    const curated = selectedRow(1, { fromCurated: true });
+    const hot = [
+      selectedRow(1, { fromCurated: false }),
+      ...Array.from({ length: 4 }, (_, index) => selectedRow(index + 2)),
+    ];
+    const result = await selectDailyColumnPool(
+      now,
+      candidateLoader([curated], hot),
+    );
+
+    expect(result.rows).toHaveLength(5);
+    expect(result.rows.find((row) => row.id === 1)?.fromCurated).toBe(true);
   });
 });

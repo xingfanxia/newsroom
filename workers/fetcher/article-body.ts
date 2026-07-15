@@ -24,10 +24,8 @@ import pLimit from "p-limit";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items } from "@/db/schema";
-import {
-  articleBodyFetchUrlSql,
-  isYouTubeVideoUrl,
-} from "@/lib/urls/media";
+import { isYouTubeVideoUrl } from "@/lib/urls/media";
+import { articleBodyFetchUrlSql } from "@/lib/urls/media-sql";
 
 const JINA_BASE = "https://r.jina.ai/";
 const TIMEOUT_MS = 20_000;

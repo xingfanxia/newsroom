@@ -11,49 +11,40 @@ import { SavedMetaStrip } from "@/components/saved/saved-meta-strip";
 import { SavedTags } from "@/components/saved/saved-tags";
 import { getSavedStories, getSavedTags, getSavedTotals } from "@/lib/items/saved";
 import { getInboxCount, listCollections } from "@/lib/items/collections";
-import { resolveSavedCollectionSelection } from "@/lib/items/saved-collection-selection";
 import { getShellChromeData } from "@/lib/shell/chrome-data";
-import { ADMIN_USER_ID, getSessionUser, upsertAppUser } from "@/lib/auth/session";
-import { appLocaleFromParam } from "@/lib/types";
+import { getSessionUser, upsertAppUser } from "@/lib/auth/session";
+import {
+  loadSavedPageRequest,
+  type SavedPageDependencies,
+  type SavedPageProps,
+} from "@/lib/auth/saved-page-boundary";
 
 export const dynamic = "force-dynamic";
 
-export default async function SavedPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ locale: string }>;
-  searchParams: Promise<{ collection?: string }>;
-}) {
-  const [{ locale }, sp] = await Promise.all([params, searchParams]);
-  const appLocale = appLocaleFromParam(locale);
-  setRequestLocale(appLocale);
+const savedPageDependencies: SavedPageDependencies = {
+  getSessionUser,
+  upsertAppUser,
+  listCollections,
+  getInboxCount,
+  getSavedTotals,
+  getShellChromeData,
+  getSavedStories,
+  getSavedTags,
+  setRequestLocale,
+  redirect,
+};
 
-  const user = await getSessionUser();
-  const userId = user?.id ?? ADMIN_USER_ID;
-  if (user) await upsertAppUser(user);
-
-  const [
+export default async function SavedPage(props: SavedPageProps) {
+  const {
+    appLocale,
     collections,
     inboxCount,
     totals,
     chrome,
-  ] = await Promise.all([
-    listCollections(userId).catch(() => []),
-    getInboxCount(userId).catch(() => 0),
-    getSavedTotals(userId).catch(() => ({ total: 0, thisWeek: 0, thisMonth: 0 })),
-    getShellChromeData({ pulse: true }),
-  ]);
-  const selection = resolveSavedCollectionSelection(sp.collection, collections);
-  if (selection.shouldRedirect) redirect(`/${appLocale}/saved`);
-
-  const { activeId, collectionFilter } = selection;
-  const [stories, tags] = await Promise.all([
-    getSavedStories(userId, appLocale, { collection: collectionFilter }).catch(
-      () => [],
-    ),
-    getSavedTags(userId, { collection: collectionFilter }).catch(() => []),
-  ]);
+    activeId,
+    stories,
+    tags,
+  } = await loadSavedPageRequest(props, savedPageDependencies);
 
   const grouped = groupByDay(sortStoriesNewestFirst(stories));
   const activeCollectionName = (() => {

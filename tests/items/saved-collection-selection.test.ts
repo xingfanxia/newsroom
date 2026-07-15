@@ -34,12 +34,14 @@ describe("saved collection URL selection", () => {
     });
   });
 
-  test("saved page uses the shared resolver before querying saved stories", () => {
-    const source = read("app/[locale]/saved/page.tsx");
+  test("saved page boundary uses the shared resolver before querying stories", () => {
+    const source = read("lib/auth/saved-page-boundary.ts");
 
     expect(source).toContain("resolveSavedCollectionSelection");
     expect(source).toContain("const appLocale = appLocaleFromParam(locale)");
-    expect(source).toContain("redirect(`/${appLocale}/saved`)");
+    expect(source).toContain(
+      "dependencies.redirect(`/${appLocale}/saved`)",
+    );
     expect(source).not.toContain("function parseCollection");
   });
 

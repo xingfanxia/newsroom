@@ -18,7 +18,6 @@ const PRIMARY_ROUTES = [
   "/podcasts",
   "/all",
   "/sources",
-  "/saved",
   "/x-monitor",
 ] as const;
 

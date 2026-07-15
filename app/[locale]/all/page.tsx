@@ -9,20 +9,16 @@ import { DayBreak } from "../_day-break";
 import { HomeFilters } from "../_home-filters";
 import {
   coerceSourcePreset,
-  sourcePresetToFeedFilter,
 } from "@/lib/feed/source-presets";
 import { groupByDay, sortStoriesNewestFirst } from "@/lib/feed/group-by-day";
 import { DEFAULT_HOME_TIER } from "@/lib/feed/home-filters";
 import {
   coerceFeedDateKey,
   coerceFeedOffset,
-  feedPageLimitForDate,
   FEED_PAGE_SIZE,
 } from "@/lib/feed/page-query";
-import { getFeaturedStories } from "@/lib/items/live";
-import { getDayCountsCached } from "@/lib/shell/feed-cache";
-import { getShellChromeData } from "@/lib/shell/chrome-data";
-import { appLocaleFromParam, type Story } from "@/lib/types";
+import { readAllPageModel } from "@/lib/public-content/page-models";
+import { appLocaleFromParam } from "@/lib/types";
 
 export const revalidate = 60;
 
@@ -43,38 +39,17 @@ export default async function AllPostsPage({
   setRequestLocale(appLocale);
   const sourceId = sp.source_id?.trim() || undefined;
   const sourcePreset = coerceSourcePreset(sp.source);
-  const sourceFilter = sourceId
-    ? { sourceId }
-    : sourcePresetToFeedFilter(sourcePreset);
   const activeDate = coerceFeedDateKey(sp.date);
   // When a day is picked, show everything from that day uncapped (500 is
   // the safety ceiling). Otherwise paginate in shared page-size chunks.
   const offset = coerceFeedOffset(sp.offset);
-  const limit = feedPageLimitForDate(activeDate);
-
-  let stories: Story[] = [];
-  try {
-    stories = await getFeaturedStories({
-      tier: "all",
+  const { stories, chrome, days } = await readAllPageModel({
       locale: appLocale,
-      limit,
+      sourceId,
+      sourcePreset,
+      activeDate,
       offset,
-      date: activeDate,
-      // W8: bound the default /all scan to 30d (seeks items_feed_recent_idx).
-      // Skipped when a source filter is active (source views stay unbounded);
-      // ignored when a date is picked — the calendar reaches any older day.
-      recencyFloorDays:
-        sourceId || sourcePreset !== "all" ? undefined : 30,
-      ...sourceFilter,
     });
-  } catch {
-    stories = [];
-  }
-
-  const [chrome, days] = await Promise.all([
-    getShellChromeData({ pulse: true }),
-    getDayCountsCached(60).catch(() => []),
-  ]);
 
   // /all is a chronological full-feed view — sort by publishedAt DESC
   // before grouping (the SQL already does this, but the explicit sort

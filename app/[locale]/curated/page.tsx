@@ -10,13 +10,10 @@ import { groupByDay, sortStoriesNewestFirst } from "@/lib/feed/group-by-day";
 import {
   coerceFeedDateKey,
   coerceFeedOffset,
-  feedPageLimitForDate,
   FEED_PAGE_SIZE,
 } from "@/lib/feed/page-query";
-import { getFeaturedStories } from "@/lib/items/live";
-import { getDayCountsCached } from "@/lib/shell/feed-cache";
-import { getShellChromeData } from "@/lib/shell/chrome-data";
-import { appLocaleFromParam, type Story } from "@/lib/types";
+import { readCuratedPageModel } from "@/lib/public-content/page-models";
+import { appLocaleFromParam } from "@/lib/types";
 
 export const revalidate = 60;
 
@@ -47,32 +44,12 @@ export default async function CuratedPage({
   const sourceId = sp.source_id?.trim() || undefined;
   const activeDate = coerceFeedDateKey(sp.date);
   const offset = coerceFeedOffset(sp.offset);
-  const limit = feedPageLimitForDate(activeDate);
-
-  let stories: Story[] = [];
-  try {
-    stories = await getFeaturedStories({
-      tier: "all",
+  const { stories, chrome, days } = await readCuratedPageModel({
       locale: appLocale,
-      limit,
-      offset,
-      date: activeDate,
-      curatedOnly: true,
       sourceId,
-      // W8: bound the default /curated scan to 30d (seeks items_feed_recent_idx).
-      // Skipped when pinned to a single source; ignored when a date is picked.
-      recencyFloorDays: sourceId ? undefined : 30,
+      activeDate,
+      offset,
     });
-  } catch {
-    stories = [];
-  }
-
-  const [chrome, days] = await Promise.all([
-    getShellChromeData({ pulse: true }),
-    // Curated calendar mirrors the feed's curatedOnly filter so cells
-    // count only AX-curated leads — same contract as the home page.
-    getDayCountsCached(60, { curatedOnly: true }).catch(() => []),
-  ]);
 
   const grouped = groupByDay(sortStoriesNewestFirst(stories));
   const zh = appLocale === "zh";

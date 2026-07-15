@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "kind": "turso-usage-snapshot",
+  "windowName": "production-load-cold-100x-reader-retry-20260715t072130z",
+  "lane": "load",
+  "phase": "from",
+  "database": "newsroom-v2",
+  "capturedAt": "2026-07-15T07:21:30.332Z",
+  "rowsRead": 615316169,
+  "rowsWritten": 4310719
+}

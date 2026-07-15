@@ -13,19 +13,8 @@
  *   tier / view / hot_window_hours / date{,_from,_to} / source_{id,group,kind}
  *   curated_only / include_source_tags / exclude_source_tags / limit / offset / locale
  */
-import {
-  etagSignal,
-  publicCachedRoute,
-  publicInvalidQueryResult,
-} from "@/lib/api/public-helpers";
-import {
-  runFeedQuery,
-  toPublicFeedPayload,
-} from "@/lib/api/feed-results";
-import {
-  feedQueryFromParams,
-  parsePublicFeedQueryRequest,
-} from "@/lib/api/feed-query-params";
+import { publicCachedRoute } from "@/lib/api/public-helpers";
+import { publicFeedSnapshotRequestResult } from "@/lib/public-content/http";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -35,24 +24,6 @@ export async function GET(req: Request) {
     endpoint: "feed",
     etagFamily: "public-feed",
     label: "api/public/feed",
-    load: async () => {
-      const parsed = parsePublicFeedQueryRequest(req);
-      if (!parsed.ok) return publicInvalidQueryResult(parsed.issues);
-      const q = parsed.data;
-      const feedQuery = feedQueryFromParams(q);
-      const result = await runFeedQuery(feedQuery);
-
-      return {
-        ok: true,
-        signal: etagSignal({
-          count: result.items.length,
-          total: result.total,
-          first_id: result.items[0]?.id ?? "",
-          latest_at: result.items[0]?.publishedAt ?? "",
-          qs: parsed.search,
-        }),
-        body: toPublicFeedPayload(result, q.locale),
-      };
-    },
+    load: async () => publicFeedSnapshotRequestResult(req),
   });
 }

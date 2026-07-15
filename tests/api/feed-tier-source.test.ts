@@ -25,7 +25,6 @@ const recomputeClusterLeads = readSource(
 const homePage = readSource("app/[locale]/page.tsx");
 const allPage = readSource("app/[locale]/all/page.tsx");
 const liveItems = readSource("lib/items/live.ts");
-const itemDetail = readSource("lib/items/detail.ts");
 const savedItems = readSource("lib/items/saved.ts");
 const semanticSearch = readSource("lib/items/semantic-search.ts");
 const storyMapper = readSource("lib/items/story-mapper.ts");
@@ -127,7 +126,11 @@ describe("feed tier/view source wiring", () => {
   });
 
   test("UI source preset filters map through one typed helper", () => {
-    expect(sourcePresets).toContain('Pick<FeedQuery, "sourceGroup" | "sourceKind">');
+    expect(sourcePresets).toContain(
+      'Pick<PublicFeedQuery, "sourceGroup" | "sourceKind">',
+    );
+    expect(sourcePresets).toContain("@/lib/public-content/query");
+    expect(sourcePresets).not.toContain("@/lib/items/live");
     expect(sourcePresets).toContain("SOURCE_PRESETS");
     expect(sourcePresets).toContain("DEFAULT_SOURCE_PRESET");
     expect(sourcePresets).toContain("SOURCE_PRESET_LABELS");
@@ -229,7 +232,6 @@ describe("feed tier/view source wiring", () => {
 
     for (const source of [
       liveItems,
-      itemDetail,
       savedItems,
       semanticSearch,
     ]) {

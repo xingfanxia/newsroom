@@ -5,15 +5,11 @@
  * `last_fetched_at` (operational; not interesting publicly). Useful for
  * "does AX Radar cover X publisher?" before issuing a filtered feed query.
  */
+import { publicCachedRoute } from "@/lib/api/public-helpers";
 import {
-  etagSignal,
-  publicCachedRoute,
-} from "@/lib/api/public-helpers";
-import {
-  listSourceCatalogRows,
-  toPublicSourceApiItem,
-} from "@/lib/api/source-catalog";
-import { toIsoStringOrNull } from "@/lib/time/relative";
+  publicSourcesSnapshotResult,
+  readPublicSnapshot,
+} from "@/lib/public-content/http";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -23,22 +19,6 @@ export async function GET(req: Request) {
     endpoint: "sources",
     etagFamily: "public-sources",
     label: "api/public/sources",
-    load: async () => {
-      const rows = await listSourceCatalogRows("priority");
-      return {
-        ok: true,
-        signal: etagSignal({
-          count: rows.length,
-          latest_success: rows
-            .map((r) => toIsoStringOrNull(r.lastSuccessAt) ?? "")
-            .sort()
-            .pop() ?? "",
-        }),
-        body: {
-          sources: rows.map(toPublicSourceApiItem),
-          total: rows.length,
-        },
-      };
-    },
+    load: async () => publicSourcesSnapshotResult(await readPublicSnapshot()),
   });
 }

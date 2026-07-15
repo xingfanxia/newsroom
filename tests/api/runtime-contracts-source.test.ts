@@ -13,7 +13,7 @@ const types = read("lib/types.ts");
 const routing = read("i18n/routing.ts");
 const schema = read("db/schema.ts");
 const feedParams = read("lib/api/feed-query-params.ts");
-const eventMembers = read("lib/api/event-members.ts");
+const eventMemberContract = read("lib/api/event-member-contract.ts");
 const dailyColumns = read("lib/api/daily-columns.ts");
 const routeResult = read("lib/api/route-result.ts");
 const adminRoute = read("lib/api/admin-route.ts");
@@ -41,7 +41,6 @@ const savedExport = read("lib/api/saved-export.ts");
 const newsletterRssFeed = read("lib/rss/newsletter-feed.ts");
 const sitemap = read("app/sitemap.ts");
 const liveItems = read("lib/items/live.ts");
-const itemDetail = read("lib/items/detail.ts");
 const publicItems = read("lib/api/public-items.ts");
 const v1Items = read("lib/api/v1-items.ts");
 const storyItemFields = read("lib/api/story-item-fields.ts");
@@ -55,7 +54,9 @@ const navData = read("lib/shell/nav-data.ts");
 const homePage = read("app/[locale]/page.tsx");
 const allPage = read("app/[locale]/all/page.tsx");
 const curatedPage = read("app/[locale]/curated/page.tsx");
-const savedPage = read("app/[locale]/saved/page.tsx");
+const savedPage = `${read("app/[locale]/saved/page.tsx")}\n${read(
+  "lib/auth/saved-page-boundary.ts",
+)}`;
 const podcastsPage = read("app/[locale]/podcasts/page.tsx");
 const podcastDetailPage = read("app/[locale]/podcasts/[id]/page.tsx");
 const xMonitorPage = read("app/[locale]/x-monitor/page.tsx");
@@ -126,7 +127,7 @@ describe("runtime contract source wiring", () => {
 
     for (const source of [
       feedParams,
-      eventMembers,
+      eventMemberContract,
       mcpRoute,
       savedRequests,
       sitemap,
@@ -155,7 +156,6 @@ describe("runtime contract source wiring", () => {
 
     for (const source of [
       liveItems,
-      itemDetail,
       savedItems,
       publicItems,
       v1Items,

@@ -1,66 +1,29 @@
-import { desc, sql } from "drizzle-orm";
-import { db } from "@/db/client";
-import { newsletters, type Newsletter } from "@/db/schema";
 import {
   escapeXml,
   renderMarkdownishHtml,
-  renderRssFeed,
   type RssItem,
 } from "@/lib/rss/render";
 import { publicUrl } from "@/lib/site";
 import {
   appLocaleLanguageTag,
   MONTHLY_NEWSLETTER_KIND,
-  NEWSLETTER_LOCALES,
+  type NewsletterKind,
   type NewsletterLocale,
 } from "@/lib/types";
+export { parseNewsletterRssLocale } from "@/lib/rss/newsletter-feed-meta";
 
-const NEWSLETTER_RSS_BRAND: Record<NewsletterLocale, string> = {
-  en: "AX's AI RADAR — Daily + Monthly Brief",
-  zh: "AX 的 AI 雷达 · 每日/每月 速递",
+type StructuredNewsletterRssRow = {
+  id: number;
+  kind: NewsletterKind;
+  headline: string | null;
+  overview: string | null;
+  highlights: string | null;
+  commentary: string | null;
+  storyCount: number;
+  periodStart: Date;
+  periodEnd: Date;
+  publishedAt: Date;
 };
-
-const NEWSLETTER_RSS_DESCRIPTION: Record<NewsletterLocale, string> = {
-  en: "Editorial digest synthesized from the radar's featured stories — daily at 09:00 UTC, plus a monthly recap.",
-  zh: "雷达精选的编辑摘要 — 每天 UTC 09:00 出品，附加每月综合。",
-};
-
-const NEWSLETTER_RSS_LOCALE_SET = new Set<string>(NEWSLETTER_LOCALES);
-
-type StructuredNewsletterRssRow = Pick<
-  Newsletter,
-  | "id"
-  | "kind"
-  | "headline"
-  | "overview"
-  | "highlights"
-  | "commentary"
-  | "storyCount"
-  | "periodStart"
-  | "periodEnd"
-  | "publishedAt"
->;
-
-export function parseNewsletterRssLocale(raw: string): NewsletterLocale {
-  return NEWSLETTER_RSS_LOCALE_SET.has(raw) ? (raw as NewsletterLocale) : "zh";
-}
-
-export async function renderStructuredNewsletterRssFeed(
-  locale: NewsletterLocale,
-): Promise<string> {
-  const rows = await listStructuredNewsletterRows(locale);
-  const items = rows.map((row) => structuredNewsletterRssItem(row, locale));
-
-  return renderRssFeed({
-    title: NEWSLETTER_RSS_BRAND[locale],
-    link: publicUrl(`/${locale}`),
-    description: NEWSLETTER_RSS_DESCRIPTION[locale],
-    language: appLocaleLanguageTag(locale),
-    lastBuildDate: items[0]?.pubDate ?? new Date(),
-    selfLink: publicUrl(`/api/feed/newsletter/${locale}/rss.xml`),
-    items,
-  });
-}
 
 export function structuredNewsletterRssItem(
   row: StructuredNewsletterRssRow,
@@ -74,8 +37,8 @@ export function structuredNewsletterRssItem(
       : locale === "zh"
         ? "日报"
         : "Daily";
-  // The DB query filters headline IS NOT NULL, but the column is nullable
-  // because daily-column rows share the newsletters table.
+  // Legacy structured-digest rows require a headline, but the shared table
+  // type is nullable because daily-column rows use different fields.
   const headline = row.headline ?? "";
   const overview = row.overview ?? "";
   const highlights = row.highlights ?? "";
@@ -99,22 +62,6 @@ export function structuredNewsletterRssItem(
     }),
     category: kindLabel,
   };
-}
-
-async function listStructuredNewsletterRows(
-  locale: NewsletterLocale,
-): Promise<StructuredNewsletterRssRow[]> {
-  // Legacy structured-digest only — new daily column ships at /api/rss/daily.xml.
-  // Filter out new daily-column rows (which have NULL headline + non-NULL column_title).
-  return db()
-    .select()
-    .from(newsletters)
-    .where(
-      sql`${newsletters.locale} = ${locale}
-        AND ${newsletters.headline} IS NOT NULL`,
-    )
-    .orderBy(desc(newsletters.publishedAt))
-    .limit(60);
 }
 
 function structuredNewsletterContentHtml(args: {

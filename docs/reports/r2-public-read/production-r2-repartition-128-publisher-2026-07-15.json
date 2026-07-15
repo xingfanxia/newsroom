@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "runId": "p-20260715060836516-4d0e0577-e3a3-4f8a-a05d-747743e93fc7",
+  "mode": "incremental",
+  "status": "succeeded",
+  "startedAt": "2026-07-15T06:08:36.519Z",
+  "finishedAt": "2026-07-15T06:09:38.651Z",
+  "durationMs": 62132,
+  "sourceWatermark": {
+    "from": 34,
+    "to": 49
+  },
+  "rows": {
+    "candidate": 15,
+    "deduped": 15,
+    "returned": 15,
+    "scannedRows": 30,
+    "scanMeasurementKind": "plan_upper_bound",
+    "queryCount": 3,
+    "verifiedIndexes": [
+      "public_content_outbox:integer-primary-key-range",
+      "items:integer-primary-key",
+      "clusters:integer-primary-key",
+      "items:items_cluster_idx",
+      "sources:primary-key",
+      "items:items_source_idx",
+      "newsletters:integer-primary-key",
+      "policy_versions:policy_versions_latest_idx"
+    ]
+  },
+  "changed": {
+    "items": 15,
+    "events": 0,
+    "sources": 0,
+    "newsletters": 0,
+    "policies": 0,
+    "tombstones": 0
+  },
+  "objects": {
+    "uploaded": 15,
+    "reused": 293,
+    "uploadedBytes": 11209051,
+    "reusedBytes": 83320283
+  },
+  "releaseId": "r49-c0d0ff3e7a4fb1c9efe5",
+  "failureStage": null
+}

@@ -2,9 +2,8 @@ import { setRequestLocale } from "next-intl/server";
 import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
 import { SOURCE_GROUP_LABELS, SOURCE_GROUPS } from "@/lib/sources/groups";
-import { getLiveSources, liveSourcesByGroup } from "@/lib/sources/live";
 import { coerceSourcesView } from "@/lib/sources/view";
-import { getShellChromeData } from "@/lib/shell/chrome-data";
+import { readSourcesPageModel } from "@/lib/public-content/page-models";
 import { SourcesViewToggle } from "./_view-toggle";
 import { appLocaleFromParam } from "@/lib/types";
 
@@ -22,15 +21,17 @@ export default async function SourcesPage({
   setRequestLocale(appLocale);
   const view = coerceSourcesView(sp.view);
 
-  const [live, chrome] = await Promise.all([
-    getLiveSources(),
-    getShellChromeData({ pulse: true }),
-  ]);
+  const { live, chrome } = await readSourcesPageModel();
 
   const totalItems = live.reduce((a, b) => a + b.health.totalItemsCount, 0);
   const okCount = live.filter((s) => s.health.status === "ok").length;
   const errorCount = live.filter((s) => s.health.status === "error").length;
-  const byGroup = liveSourcesByGroup(live);
+  const byGroup = new Map<string, (typeof live)[number][]>();
+  for (const source of live) {
+    const group = byGroup.get(source.group) ?? [];
+    group.push(source);
+    byGroup.set(source.group, group);
+  }
 
   return (
     <ViewShell

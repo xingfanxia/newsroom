@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "kind": "anonymous-load",
+  "runId": "production-load-missing-object-1x-20260715t074300z",
+  "scenario": "missing-object",
+  "multiplier": 1,
+  "fixtures": {
+    "dailyDate": "2026-07-13",
+    "eventId": 12181,
+    "itemId": 4,
+    "podcastId": 4
+  },
+  "baseOrigin": "https://news.ax0x.ai",
+  "startedAt": "2026-07-15T07:53:48.026Z",
+  "finishedAt": "2026-07-15T07:53:50.644Z",
+  "plannedRequests": 60,
+  "completedRequests": 60,
+  "attemptedRequests": 60,
+  "receivedBytes": 76699,
+  "statusMismatchCount": 0,
+  "unexpected5xxCount": 0,
+  "networkErrorCount": 0,
+  "networkRetryCount": 0,
+  "mismatches": []
+}

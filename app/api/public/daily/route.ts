@@ -8,11 +8,11 @@
  *
  * locale=zh default. The daily-column worker currently writes zh rows.
  */
+import { publicCachedRoute } from "@/lib/api/public-helpers";
 import {
-  publicCachedRoute,
-  publicRouteResult,
-} from "@/lib/api/public-helpers";
-import { getLatestPublicDailyColumnRequestPayload } from "@/lib/api/daily-columns";
+  latestDailySnapshotResult,
+  readPublicSnapshot,
+} from "@/lib/public-content/http";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -22,12 +22,7 @@ export async function GET(req: Request) {
     endpoint: "daily",
     etagFamily: "public-daily",
     label: "api/public/daily",
-    load: async () => {
-      const result = await getLatestPublicDailyColumnRequestPayload(req);
-      return publicRouteResult(result, (payload) => ({
-        signal: payload.etagSignal,
-        body: payload.body,
-      }));
-    },
+    load: async () =>
+      latestDailySnapshotResult(await readPublicSnapshot(), req),
   });
 }

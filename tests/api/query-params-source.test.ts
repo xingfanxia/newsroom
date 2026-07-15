@@ -11,16 +11,17 @@ describe("query param source wiring", () => {
     expect(savedRequests).toContain("parseV1SavedQueryRequest");
 
     const dailies = read("app/api/public/dailies/route.ts");
-    const dailyColumns = read("lib/api/daily-columns.ts");
-    expect(dailies).toContain("getPublicDailyColumnIndexRequestPayload");
+    const publicContentHttp = read("lib/public-content/http.ts");
+    expect(dailies).toContain("dailyIndexSnapshotResult");
     expect(dailies).not.toContain("@/lib/api/query-params");
-    expect(dailyColumns).toContain("@/lib/api/query-params");
-    expect(dailyColumns).toContain("queryParamsRecord(req)");
+    expect(publicContentHttp).toContain("@/lib/api/query-params");
+    expect(publicContentHttp).toContain("queryParamsRecord(req)");
 
     const publicFeed = read("app/api/public/feed/route.ts");
     const feedQueryParams = read("lib/api/feed-query-params.ts");
-    expect(publicFeed).toContain("parsePublicFeedQueryRequest");
+    expect(publicFeed).toContain("publicFeedSnapshotRequestResult");
     expect(publicFeed).not.toContain("@/lib/api/query-params");
+    expect(publicContentHttp).toContain("parsePublicFeedQueryRequest");
     expect(feedQueryParams).toContain("@/lib/api/query-params");
     expect(feedQueryParams).toContain("parseFeedRequestQuery");
 
@@ -34,7 +35,7 @@ describe("query param source wiring", () => {
     for (const source of [
       savedRoute,
       savedRequests,
-      dailyColumns,
+      publicContentHttp,
       feedQueryParams,
       usageSummary,
     ]) {
@@ -45,11 +46,11 @@ describe("query param source wiring", () => {
 
   test("public invalid-query messages use the shared formatter", () => {
     const publicHelpers = read("lib/api/public-helpers.ts");
-    const dailyColumns = read("lib/api/daily-columns.ts");
+    const publicContentHttp = read("lib/public-content/http.ts");
 
     expect(publicHelpers).toContain("publicInvalidQuery");
     expect(publicHelpers).toContain("invalidQueryError(issues)");
-    expect(dailyColumns).toContain("invalidQueryError(parsed.error.issues)");
-    expect(dailyColumns).not.toContain("parsed.error.issues.map");
+    expect(publicContentHttp).toContain("invalidQueryError(parsed.error.issues)");
+    expect(publicContentHttp).not.toContain("parsed.error.issues.map");
   });
 });

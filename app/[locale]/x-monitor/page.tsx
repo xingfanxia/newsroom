@@ -6,10 +6,8 @@ import { FeedEmptyState } from "@/components/feed/empty-state";
 import { DayBreak } from "../_day-break";
 import { groupByDay, sortStoriesNewestFirst } from "@/lib/feed/group-by-day";
 import { XHandlesSidebar } from "@/components/x-monitor/handles-sidebar";
-import { getFeaturedStories } from "@/lib/items/live";
-import { getShellChromeData } from "@/lib/shell/chrome-data";
-import { getXHandles } from "@/lib/shell/x-handles";
-import { appLocaleFromParam, type Story } from "@/lib/types";
+import { readXMonitorPageModel } from "@/lib/public-content/page-models";
+import { appLocaleFromParam } from "@/lib/types";
 
 export const revalidate = 60;
 
@@ -24,23 +22,16 @@ export default async function XMonitorPage({
   const appLocale = appLocaleFromParam(locale);
   setRequestLocale(appLocale);
 
-  const [handles, chrome] = await Promise.all([
-    getXHandles().catch(() => []),
-    getShellChromeData({ pulse: true }),
-  ]);
-
   const activeHandle = sp.handle ?? null;
-  const activeIsValid = activeHandle
-    ? handles.some((h) => h.id === activeHandle)
-    : false;
-
-  const narrowedStories = await getFeaturedStories({
-    tier: "all",
-    locale: appLocale,
-    sourceId: activeIsValid && activeHandle ? activeHandle : undefined,
-    sourceKind: activeIsValid ? undefined : "x-api",
-    limit: activeIsValid ? 200 : 80,
-  }).catch((): Story[] => []);
+  const {
+    handles,
+    activeIsValid,
+    stories: narrowedStories,
+    chrome,
+  } = await readXMonitorPageModel({
+      locale: appLocale,
+      handle: activeHandle ?? undefined,
+    });
 
   const grouped = groupByDay(sortStoriesNewestFirst(narrowedStories));
   const activeLabel: string = activeIsValid

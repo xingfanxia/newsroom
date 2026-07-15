@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "kind": "anonymous-load",
+  "runId": "production-load-cold-100x-no-cron-20260715t065130z",
+  "scenario": "cold-deploy",
+  "multiplier": 100,
+  "fixtures": {
+    "dailyDate": "2026-07-13",
+    "eventId": 12181,
+    "itemId": 4,
+    "podcastId": 4
+  },
+  "baseOrigin": "https://news.ax0x.ai",
+  "startedAt": "2026-07-15T06:51:30.602Z",
+  "finishedAt": "2026-07-15T06:56:11.123Z",
+  "plannedRequests": 7100,
+  "completedRequests": 7100,
+  "receivedBytes": 504536492,
+  "statusMismatchCount": 5,
+  "unexpected5xxCount": 0,
+  "networkErrorCount": 5,
+  "mismatches": [
+    {
+      "expected": 404,
+      "method": "HEAD",
+      "path": "/en/__global-error-fallback-probe",
+      "received": 0,
+      "session": 35
+    },
+    {
+      "expected": 200,
+      "method": "GET",
+      "path": "/en/podcasts/4",
+      "received": 0,
+      "session": 66
+    },
+    {
+      "expected": 200,
+      "method": "HEAD",
+      "path": "/zh/daily/2026-07-13",
+      "received": 0,
+      "session": 81
+    },
+    {
+      "expected": 200,
+      "method": "HEAD",
+      "path": "/api/public/events/12181/members?locale=en",
+      "received": 0,
+      "session": 82
+    },
+    {
+      "expected": 200,
+      "method": "HEAD",
+      "path": "/api/feed/newsletter/en/rss.xml",
+      "received": 0,
+      "session": 84
+    }
+  ]
+}

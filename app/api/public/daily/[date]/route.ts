@@ -4,11 +4,11 @@
  * Returns the column written for the 24h window whose period_start falls on
  * the requested UTC date. 404 if no column for that date.
  */
+import { publicCachedRoute } from "@/lib/api/public-helpers";
 import {
-  publicCachedRoute,
-  publicRouteResult,
-} from "@/lib/api/public-helpers";
-import { getPublicDailyColumnByDateRequestPayload } from "@/lib/api/daily-columns";
+  dailyByDateSnapshotResult,
+  readPublicSnapshot,
+} from "@/lib/public-content/http";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -23,13 +23,11 @@ export async function GET(
     label: "api/public/daily/:date",
     load: async () => {
       const { date: rawDate } = await ctx.params;
-      const result = await getPublicDailyColumnByDateRequestPayload(req, {
+      return dailyByDateSnapshotResult(
+        await readPublicSnapshot(),
+        req,
         rawDate,
-      });
-      return publicRouteResult(result, (payload) => ({
-        signal: payload.etagSignal,
-        body: payload.body,
-      }));
+      );
     },
   });
 }

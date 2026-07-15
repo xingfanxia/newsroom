@@ -26,7 +26,7 @@ import {
   SEARCH_LIMIT_MIN,
   V1_SEARCH_LIMIT_MAX,
 } from "@/lib/search/query-defaults";
-import type { FeedQuery } from "@/lib/items/live";
+import type { PublicFeedQuery as FeedQuery } from "@/lib/public-content/query";
 import {
   APP_LOCALES,
   FEED_VIEWS,

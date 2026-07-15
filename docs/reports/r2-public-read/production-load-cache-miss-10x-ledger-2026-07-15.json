@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "goalVersion": "r2-public-read-v1-ec57c55fe111",
+  "runId": "production-load-cache-miss-10x-20260715t051700z",
+  "plannedAt": "2026-07-15T05:17:00.000Z",
+  "planned": {
+    "bootstrapSnapshots": 0,
+    "publicHttpRequests": 710,
+    "r2ObjectWrites": 0,
+    "transferBytes": 268435456
+  },
+  "tursoWindowName": "production-load-cache-miss-10x-20260715t051700z"
+}

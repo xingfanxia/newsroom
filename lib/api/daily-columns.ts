@@ -121,7 +121,7 @@ export async function listDailyColumnRows({
     .offset(offset);
 }
 
-export async function getDailyColumnRowByDate(
+async function getDailyColumnRowByDate(
   date: string,
   locale: DailyColumnLocale,
 ) {

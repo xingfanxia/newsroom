@@ -12,10 +12,8 @@ import {
   type PodcastTier,
 } from "@/lib/feed/podcast-filters";
 import { PodcastChannelPills } from "./_channel-pills";
-import { getFeaturedStories } from "@/lib/items/live";
-import { getShellChromeData } from "@/lib/shell/chrome-data";
-import { getPodcastChannels } from "@/lib/shell/podcast-channels";
-import { appLocaleFromParam, type AppLocale, type Story } from "@/lib/types";
+import { readPodcastsPageModel } from "@/lib/public-content/page-models";
+import { appLocaleFromParam, type AppLocale } from "@/lib/types";
 
 export const revalidate = 60;
 
@@ -41,25 +39,16 @@ export default async function PodcastsPage({
   setRequestLocale(appLocale);
   const activeTier: PodcastTier = coercePodcastTier(sp.tier);
 
-  const [channels, chrome] = await Promise.all([
-    getPodcastChannels().catch(() => []),
-    getShellChromeData({ pulse: true }),
-  ]);
-
-  const activeChannel =
-    sp.source && channels.some((c) => c.id === sp.source) ? sp.source : null;
-
-  // `tier='all'` surfaces excluded episodes too — lets the user catch low-
-  // score YT videos (usually off-topic history/crypto stuff) that score
-  // filters out of the default featured view.
-  const filtered = await getFeaturedStories({
-    tier: activeTier,
-    locale: appLocale,
-    sourceGroup: activeChannel ? undefined : "podcast",
-    sourceId: activeChannel ?? undefined,
-    includeSourceGroup: true,
-    limit: activeChannel ? 300 : 120,
-  }).catch((): Story[] => []);
+  const {
+    channels,
+    activeChannel,
+    stories: filtered,
+    chrome,
+  } = await readPodcastsPageModel({
+      locale: appLocale,
+      source: sp.source,
+      tier: activeTier,
+    });
 
   const grouped = groupByDay(sortStoriesNewestFirst(filtered));
   const activeLabel = activeChannel

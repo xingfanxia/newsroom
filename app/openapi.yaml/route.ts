@@ -17,7 +17,6 @@ import {
   SOURCE_LOCALES,
   VISIBLE_ITEM_TIERS,
 } from "@/lib/types";
-import { publicRateLimitPerIpLabel } from "@/lib/api/public-endpoint-config";
 import {
   DAILY_COLUMN_INDEX_TAKE_MAX,
   DAILY_COLUMN_INDEX_TAKE_MIN,
@@ -42,10 +41,12 @@ import {
   DEFAULT_SEARCH_MODE,
   DEFAULT_SEARCH_OFFSET,
   DEFAULT_SEARCH_TIER,
+  PUBLIC_SEMANTIC_SEARCH_ERROR,
   PUBLIC_SEARCH_LIMIT_MAX,
   SEARCH_LIMIT_MIN,
 } from "@/lib/search/query-defaults";
 import { DEFAULT_PUBLIC_EVENT_MEMBERS_LOCALE } from "@/lib/event-members/query-defaults";
+import { publicRateLimitPerIpLabel } from "@/lib/api/public-endpoint-config";
 import { PUBLIC_SITE_URL, publicUrl } from "@/lib/site";
 
 function yamlInlineEnum(values: readonly (string | null)[]): string {
@@ -94,7 +95,7 @@ tags:
   - name: items
     description: Full item detail
   - name: search
-    description: Keyword + semantic search
+    description: Anonymous lexical search
   - name: events
     description: Multi-source event coverage
   - name: daily
@@ -171,12 +172,14 @@ paths:
   /api/public/search:
     get:
       tags: [search]
-      summary: Keyword (lexical) or semantic search
+      summary: Keyword (lexical) search
       description: |
+        Anonymous lexical search (${SEARCH_RATE_LIMIT_PER_IP}).
         \`mode=lexical\` (default) does LIKE substring against title/summary;
-        \`mode=semantic\` embeds q via Azure text-embedding-3-large and ranks by
-        libSQL vector cosine distance. Semantic mode is rate-limited tighter
-        (${SEARCH_RATE_LIMIT_PER_IP}) due to LLM cost.
+        \`mode=semantic\` returns HTTP 422 with
+        \`{"error":"${PUBLIC_SEMANTIC_SEARCH_ERROR}"}\`. Semantic search remains
+        available only on bearer-authenticated v1/MCP surfaces; the anonymous
+        route never queries Turso or invokes an embedding provider.
       parameters:
         - { name: q, in: query, required: true, schema: { type: string, minLength: 1 } }
         - { name: mode, in: query, schema: { type: string, enum: ${SEARCH_MODE_ENUM}, default: ${DEFAULT_SEARCH_MODE} } }
@@ -197,6 +200,12 @@ paths:
               schema: { $ref: '#/components/schemas/SearchResponse' }
         '304': { description: Not modified }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '422':
+          description: Anonymous semantic search is not supported
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: ${PUBLIC_SEMANTIC_SEARCH_ERROR} }
         '429': { $ref: '#/components/responses/RateLimited' }
         '500': { $ref: '#/components/responses/ServerError' }
 
@@ -438,20 +447,14 @@ components:
       type: object
       required: [mode, q, items, total, limit]
       properties:
-        mode: { type: string, enum: ${SEARCH_MODE_ENUM} }
+        mode: { type: string, enum: [lexical] }
         q: { type: string }
         items:
           type: array
-          items:
-            allOf:
-              - $ref: '#/components/schemas/FeedItem'
-              - type: object
-                properties:
-                  distance: { type: number, description: "Cosine distance — semantic mode only. 0 = identical, smaller = closer." }
-        total: { type: integer, description: "Total matches for the filtered query; lexical mode keeps this stable across limit/offset pages." }
+          items: { $ref: '#/components/schemas/FeedItem' }
+        total: { type: integer, description: "Total matches for the filtered query; stable across limit/offset pages." }
         limit: { type: integer }
         offset: { type: integer }
-        latency_ms: { type: integer, description: "Semantic mode only" }
 
     EventMembersResponse:
       type: object

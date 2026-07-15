@@ -1,7 +1,7 @@
 # AI·HOT — Data Ingestion & AI Pipeline Architecture
 
 > Blueprint for how raw feeds become curated, scored, summarized, tagged stories — and how editor feedback rewrites the curation policy.
-> **Status as of 2026-06-19**: ingestion, enrich/score/cluster, feedback, editorial agent, public API/MCP, AI HOT daily columns, DeepSeek treatment routing, and paper-source retirement have shipped. See Section 6 for milestone progress and deviations from the original blueprint.
+> **Status as of 2026-07-14**: ingestion, enrich/score/cluster, feedback, editorial agent, public API/MCP, AI HOT daily columns, DeepSeek treatment routing, and paper-source retirement have shipped. R2 public-read decoupling is implemented locally but its migration, first publish, deploy, and production cutover remain gated. See Section 6 for milestone progress and deviations from the original blueprint.
 
 ---
 
@@ -231,7 +231,14 @@ policy_versions  (id, skill_name, version, content, reasoning, feedback_sample, 
 iteration_runs   (id, skill_name, status from ITERATION_STATUSES, base_version, proposed_content,
                   reasoning_summary, agent_output, feedback_sample, feedback_count, requested_by, created_at, completed_at)
 users            (id, email, role from USER_ROLES)
+schema_migrations (name, checksum, applied_at)
+public_content_outbox (id, entity_type, entity_key, operation, created_at)
 ```
+
+`public_content_outbox` is append-only publication work, not a public serving
+database. Checksummed triggers enqueue only public-relevant item, event, source,
+newsletter, and policy changes. The migration is implemented but has not been
+applied to production at the time of this handoff.
 
 ### 2.8 Editorial Agent
 The star of the system. Runs when an editor clicks `开始生成新草稿`.
@@ -249,6 +256,41 @@ The star of the system. Runs when an editor clicks `开始生成新草稿`.
 6. New or explicitly reset/backfilled enrich work reads the latest policy row.
    Existing enriched rows are not automatically re-scored solely because a new
    policy row exists.
+
+### 2.9 Public snapshot publisher and anonymous serving
+
+The anonymous serving plane is deliberately downstream of Turso:
+
+```text
+content workers -> Turso + public_content_outbox
+                -> authenticated publish-public cron (12,27,42,57 * * * *)
+                -> immutable Cloudflare R2 release + current.json pointer
+                -> anonymous HTML/RSC/JSON/RSS readers
+```
+
+- `lib/public-content/publisher/*` is the only public-content code allowed to
+  read Turso. It captures an outbox high-water mark, coalesces entity keys,
+  fetches only changed and bounded dependent rows, reuses unchanged shards,
+  validates uploaded bytes, writes the manifest, and advances the pointer last
+  with ETag CAS. A failed publish leaves the pointer and outbox retryable.
+- `lib/public-content/reader/*` needs only `R2_PUBLIC_BASE_URL`. It validates the
+  pointer, manifest and content hashes and falls back only to the pointer's
+  previous release or an in-memory last-known-good release. Missing/corrupt R2
+  content yields controlled unavailable behavior, never a Turso query. There is
+  no DB fallback.
+- Anonymous pages load one canonical snapshot per render. Public REST, source
+  picker, event members, daily columns and every RSS family use the same pure
+  snapshot query/derivation layer. Anonymous lexical search remains available;
+  anonymous semantic mode returns 422. Bearer v1/MCP and admin/private surfaces
+  retain their authenticated live DB paths.
+- `content.ax0x.ai/newsroom/` is the R2 custom-domain namespace. Cloudflare
+  respects origin cache headers: the mutable pointer is short-lived and
+  content-addressed objects are one-year immutable.
+
+The code path is locally verified with absent/poison Turso credentials and a
+real browser. Production migration/bootstrap/deploy/cutover and the clean 24h
+budget proof are still external gates. The current operator sequence is in
+[`../operations/public-snapshots.md`](../operations/public-snapshots.md).
 
 **Why this architecture**: the policy is human-readable Markdown, so editors can read + hand-edit it. The agent is only one of multiple authors. Rollback = commit or restore a prior policy body as a new `policy_versions` row; targeted resets/backfills decide which historical items should be reprocessed.
 
@@ -340,7 +382,7 @@ A curated set of enabled X handles stored as normal `sources` rows.
 - **Scoring model (§2.5)**: "Sonnet 4.6" placeholder → shipped first as Azure GPT, then moved on 2026-06-10 to **Azure AI Foundry DeepSeek V4 Pro/Flash**. High-value items use Pro; lower-value items use Flash to avoid spending heavy tokens on throwaway content.
 - **LLM SDK choice**: original plan assumed direct vendor SDKs — migrated to **Vercel AI SDK v6** + `@ai-sdk/{anthropic,google,azure,openai}` for unified `generateText` / `generateObject` / `embed` across providers.
 - **Prompt injection defense** (not in original §2): XML-fence untrusted content + system-prompt framing + control-sequence neutralization (added per security review).
-- **Cron timing**: `vercel.json` owns the schedule. Current production routes are fetch-hourly, fetch-daily, fetch-weekly, normalize, article-body, enrich, commentary, score-backfill, cluster, newsletter-daily, and newsletter-monthly. Article-body, enrich, commentary, score-backfill, and cluster are split so one slow/spendy stage cannot starve the others. Local operator cron commands mirror every production cron slug and reuse the same worker helpers instead of reassembling production steps by hand; legacy short aliases stay as wrappers only. Newsletter and daily-column workers share snapped UTC window helpers in `workers/newsletter/windows.ts` so cron runs, replay/backfill scripts, and AI HOT history placeholders agree on period boundaries. Inside the cluster pipeline, scheduled Stage D event commentary is limited to `EVENT_COMMENTARY_CRON_RECENCY_HOURS` (24h) using `latest_member_at` with `first_seen_at` fallback; wider historical commentary sweeps belong in cost-bounded operator backfill scripts.
+- **Cron timing**: `vercel.json` owns the schedule. Current branch routes are fetch-hourly, fetch-daily, fetch-weekly, normalize, article-body, enrich, commentary, score-backfill, cluster, newsletter-daily, newsletter-monthly, and the incremental `publish-public` route at `12,27,42,57 * * * *`. The publisher schedule is not active in production until the gated deployment. Article-body, enrich, commentary, score-backfill, and cluster are split so one slow/spendy stage cannot starve the others. Local operator cron commands mirror every production cron slug and reuse the same worker helpers instead of reassembling production steps by hand; legacy short aliases stay as wrappers only. Newsletter and daily-column workers share snapped UTC window helpers in `workers/newsletter/windows.ts` so cron runs, replay/backfill scripts, and AI HOT history placeholders agree on period boundaries. Inside the cluster pipeline, scheduled Stage D event commentary is limited to `EVENT_COMMENTARY_CRON_RECENCY_HOURS` (24h) using `latest_member_at` with `first_seen_at` fallback; wider historical commentary sweeps belong in cost-bounded operator backfill scripts.
 - **Enrich claim/backoff guardrail (2026-06-11)**: the enrich cron now claims work in the DB before LLM calls and stores retry state on `items`. This closes the gap where overlapping cron/manual backfill runs could all select the same `enriched_at IS NULL` rows and waste spend even if the final write was idempotent.
 - **AI HOT integration (2026-05-08, voice refreshed 2026-06-10)**: added pre-curated source `aihot-selected` (kind `aihot-api`) ingesting hourly from https://aihot.virxact.com; merge their structured `/api/public/daily` report into our daily column generator as a must-cover baseline (`newsletters.aihot_daily_payload` + `aihot_daily_date`). Voice prompts now target a friend-sharing style: plain, useful, accurate, and low on AI/memo flavor. Historical design record: [`docs/aihot-integration/PLAN.md`](../aihot-integration/PLAN.md); this section is the current runtime summary. New env vars: `AIHOT_API_BASE_URL` + `AIHOT_API_USER_AGENT` (both with safe defaults). Operator scripts: `scripts/ops/backfill-style.ts` (cost-bounded re-enrich), `scripts/ops/import-aihot-daily-history.ts` (180-day daily history import), and `scripts/ops/repair-aihot-daily-windows.ts` (dry-run-first cleanup for legacy placeholder rows whose period windows predate the shared 05:00Z helper).
 - **Tier-gated commentary (2026-05-08, PR #34)**: Stage-4 commentary now branches by tier instead of running the full schema for every non-excluded item. `editor_note_*` (一句话点评) runs for every non-excluded item / event; `editor_analysis_*` **only** runs for the `HIGHLIGHT_ITEM_TIERS` subset (`featured` / `p1`). Tier `all` items take the lighter `commentaryNoteSchema` LLM call (`COMMENTARY_NOTE_ONLY_SYSTEM`, ~85% smaller output). Cluster commentary path also extended to cover `event_tier='all'`. Worker dispatch in `workers/enrich/commentary.ts` + `workers/cluster/commentary.ts`; backfill mirror in `scripts/ops/backfill-style.ts`.

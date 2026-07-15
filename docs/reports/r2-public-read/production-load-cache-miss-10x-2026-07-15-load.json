@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "kind": "anonymous-load",
+  "runId": "production-load-cache-miss-10x-20260715t051700z",
+  "scenario": "cache-miss",
+  "multiplier": 10,
+  "fixtures": {
+    "dailyDate": "2026-07-13",
+    "eventId": 12181,
+    "itemId": 4,
+    "podcastId": 4
+  },
+  "baseOrigin": "https://news.ax0x.ai",
+  "startedAt": "2026-07-15T05:25:42.974Z",
+  "finishedAt": "2026-07-15T05:26:30.794Z",
+  "plannedRequests": 710,
+  "completedRequests": 710,
+  "receivedBytes": 47507361,
+  "statusMismatchCount": 6,
+  "unexpected5xxCount": 6,
+  "mismatches": [
+    {
+      "expected": 200,
+      "method": "GET",
+      "path": "/en/all?offset=1",
+      "received": 500,
+      "session": 3
+    },
+    {
+      "expected": 200,
+      "method": "HEAD",
+      "path": "/en/agents",
+      "received": 500,
+      "session": 3
+    },
+    {
+      "expected": 200,
+      "method": "GET",
+      "path": "/en/podcasts?source=alpha-podcast",
+      "received": 500,
+      "session": 4
+    },
+    {
+      "expected": 200,
+      "method": "HEAD",
+      "path": "/en/x-monitor?handle=beta-x",
+      "received": 500,
+      "session": 5
+    },
+    {
+      "expected": 200,
+      "method": "GET",
+      "path": "/en/agents",
+      "received": 500,
+      "session": 6
+    },
+    {
+      "expected": 200,
+      "method": "GET",
+      "path": "/en/all?offset=1",
+      "received": 500,
+      "session": 7
+    }
+  ]
+}

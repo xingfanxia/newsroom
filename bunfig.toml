@@ -1,0 +1,3 @@
+# Test and verification commands must opt in to every environment value they use.
+# In particular, Bun must never discover the production-backed `.env.local`.
+env = false
