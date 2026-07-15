@@ -300,10 +300,21 @@ budget:
   production_backed_default_tests: 0
   intentional_turso_windows: named-only
   spend_ledger:
+    - run_id: production-vercel-noop-repartition-hotfix-20260715t055300z
+      operation: deploy the no-change migration reachability fix and verify the publisher route is live
+      planned_at: 2026-07-15T05:53:00Z
+      status: planned
+      planned:
+        r2_object_writes: 0
+        public_http_requests: 5
+        transfer_bytes: 5242880
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 0
+        previous_production_deployment: dpl_4zPFdTxx9LsAa3r72Yo9tCC9GMth
     - run_id: production-vercel-repartition-20260715t053700z
       operation: deploy the backward-compatible 16-bucket reader/writer and verify representative production paths
       planned_at: 2026-07-15T05:37:00Z
-      status: planned
+      status: succeeded
       planned:
         r2_object_writes: 0
         public_http_requests: 10
@@ -311,6 +322,33 @@ budget:
         bootstrap_snapshots: 0
         intentional_turso_windows: 0
         previous_production_deployment: dpl_6K4t8Zy9fDLJuJJAdt9xnPQEXSHL
+      actual:
+        completed_at: 2026-07-15T05:40:34Z
+        deployment_id: dpl_4zPFdTxx9LsAa3r72Yo9tCC9GMth
+        deployment_url: newsroom-4f15ggq79-panpanmao.vercel.app
+        production_origin: https://news.ax0x.ai
+        public_http_requests: 9
+        transfer_bytes: 931314
+        r2_object_writes: 0
+        intentional_turso_windows: 0
+        html_status: 200
+        rsc_status: 200
+        json_status: 200
+        rss_status: 200
+    - run_id: production-r2-repartition-publisher-20260715t054600z
+      operation: allow one normal incremental publisher tick to migrate the active numeric layout from 128 buckets to 16, then verify the committed pointer and manifest
+      planned_at: 2026-07-15T05:46:00Z
+      status: planned
+      planned:
+        r2_object_writes: 60
+        public_http_requests: 5
+        transfer_bytes: 10485760
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 0
+        deployment_id: dpl_4zPFdTxx9LsAa3r72Yo9tCC9GMth
+        prior_release_id: r34-25092d7f5022cc16d278
+        expected_manifest_artifacts: 50
+        maximum_numeric_bucket: 0f
     - run_id: production-r2-repartition-preflight-20260715t053300z
       operation: read-only reconstruction of the active 128-bucket release into the planned 16-bucket layout
       planned_at: 2026-07-15T05:33:00Z
@@ -358,6 +396,19 @@ budget:
         decoupled: true
         receipt: docs/reports/r2-public-read/production-load-warm-1x-retry-2026-07-15-load.json
         turso_comparison: docs/reports/r2-public-read/production-load-warm-1x-retry-2026-07-15-turso-comparison.json
+    - run_id: production-load-cache-miss-10x-repartition-20260715t054400z
+      operation: 10x cache-miss anonymous corpus against the 16-bucket release with an equal named Turso control
+      planned_at: 2026-07-15T05:44:00Z
+      status: planned
+      planned:
+        r2_object_writes: 0
+        public_http_requests: 710
+        transfer_bytes: 268435456
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 2
+        deployment_id: dpl_4zPFdTxx9LsAa3r72Yo9tCC9GMth
+        required_release_layout: 16-bucket
+        turso_window: production-load-cache-miss-10x-repartition-20260715t054400z
     - run_id: production-load-cold-100x-20260715t051700z
       operation: 100x cold-deploy anonymous corpus with equal named Turso control
       planned_at: 2026-07-15T05:17:00Z

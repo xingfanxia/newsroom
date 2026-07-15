@@ -12,6 +12,7 @@ import {
 } from "@/lib/public-content/paths";
 import {
   buildPublicRelease,
+  requiresNumericShardMigration,
   verifyDescriptorBytes,
   type BuiltPublicRelease,
   type PublicReleaseManifest,
@@ -83,7 +84,17 @@ export async function publishIncrementalSnapshot(
     return receipt(context, "failed", "read_outbox", null);
   }
 
-  if (context.batch.changes.length === 0) {
+  let previousManifest: PublicReleaseManifest;
+  try {
+    previousManifest = await readActiveManifest(input.store, current.pointer);
+  } catch {
+    return receipt(context, "failed", "build_state", null);
+  }
+
+  if (
+    context.batch.changes.length === 0 &&
+    !requiresNumericShardMigration(previousManifest)
+  ) {
     try {
       await input.source.acknowledgeThrough(context.batch.toWatermark);
       return receipt(context, "noop", null, null);
@@ -97,13 +108,6 @@ export async function publishIncrementalSnapshot(
     }
   }
 
-  let previousManifest: PublicReleaseManifest;
-  try {
-    previousManifest = await readActiveManifest(input.store, current.pointer);
-  } catch {
-    return receipt(context, "failed", "build_state", null);
-  }
-
   let release: BuiltPublicRelease;
   try {
     release = await buildPublicRelease({
@@ -112,7 +116,8 @@ export async function publishIncrementalSnapshot(
       changes: context.batch.changes,
       loadArtifact: async (_logicalName, descriptor) => {
         const stored = await input.store.readObject(descriptor.key);
-        if (!stored) throw new Error(`missing prior artifact: ${descriptor.key}`);
+        if (!stored)
+          throw new Error(`missing prior artifact: ${descriptor.key}`);
         return stored.bytes;
       },
     });
@@ -157,12 +162,7 @@ export async function publishIncrementalSnapshot(
   try {
     await input.source.acknowledgeThrough(context.batch.toWatermark);
   } catch {
-    return receipt(
-      context,
-      "failed",
-      "ack_outbox",
-      release.releaseId,
-    );
+    return receipt(context, "failed", "ack_outbox", release.releaseId);
   }
   return receipt(context, "succeeded", null, release.releaseId);
 }
@@ -220,15 +220,15 @@ export async function uploadChangedReleaseArtifacts(
       cacheControl: IMMUTABLE_PUBLIC_CACHE_CONTROL,
     });
     const stored = await store.readObject(artifact.descriptor.key);
-    if (!stored) throw new Error(`uploaded artifact is missing: ${artifact.logicalName}`);
+    if (!stored)
+      throw new Error(`uploaded artifact is missing: ${artifact.logicalName}`);
     await verifyDescriptorBytes(artifact.descriptor, stored.bytes);
     if (!equalBytes(stored.bytes, artifact.bytes)) {
-      throw new Error(`uploaded artifact bytes changed: ${artifact.logicalName}`);
+      throw new Error(
+        `uploaded artifact bytes changed: ${artifact.logicalName}`,
+      );
     }
-    parsePublicEntityShardValue(
-      artifact.logicalName,
-      parseJson(stored.bytes),
-    );
+    parsePublicEntityShardValue(artifact.logicalName, parseJson(stored.bytes));
     if (put.status === "uploaded") {
       metrics.uploaded += 1;
       metrics.uploadedBytes += artifact.bytes.byteLength;
@@ -303,7 +303,10 @@ function pointerMatches(
   );
 }
 
-function validateBatch(batch: PublisherSourceBatch, expectedFrom: number): void {
+function validateBatch(
+  batch: PublisherSourceBatch,
+  expectedFrom: number,
+): void {
   if (
     batch.fromWatermark !== expectedFrom ||
     batch.toWatermark < batch.fromWatermark
@@ -385,6 +388,7 @@ function equalBytes(left: Uint8Array, right: Uint8Array): boolean {
 
 function iso(value: number): string {
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) throw new TypeError("invalid publisher clock");
+  if (Number.isNaN(date.getTime()))
+    throw new TypeError("invalid publisher clock");
   return date.toISOString();
 }

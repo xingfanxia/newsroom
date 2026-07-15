@@ -264,7 +264,7 @@ async function buildShardArtifact(
   };
 }
 
-function requiresNumericShardMigration(
+export function requiresNumericShardMigration(
   manifest: PublicReleaseManifest,
 ): boolean {
   return Object.keys(manifest.artifacts).some((logicalName) => {

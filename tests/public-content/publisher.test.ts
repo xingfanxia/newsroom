@@ -292,7 +292,7 @@ describe("pointer-last incremental publisher", () => {
     ).toBe(false);
   });
 
-  test("no-change work reads no manifest or content and emits no release", async () => {
+  test("no-change work checks the manifest layout but emits no release", async () => {
     const fixture = await seededFixture();
     const source = new FakeSource(batch(10, 10, []), fixture.events);
     source.outboxIds = [10];
@@ -304,6 +304,7 @@ describe("pointer-last incremental publisher", () => {
     expect(fixture.events).toEqual([
       `read:${CURRENT_POINTER_KEY}`,
       "source:10",
+      `read:${fixture.pointer.active.manifestKey}`,
       "ack:10",
     ]);
   });
@@ -437,6 +438,7 @@ describe("pointer-last incremental publisher", () => {
     expect(fixture.events).toEqual([
       `read:${CURRENT_POINTER_KEY}`,
       "source:11",
+      `read:${committedPointer.active.manifestKey}`,
       "ack:11",
     ]);
     const after = snapshotPointerSchema.parse(
