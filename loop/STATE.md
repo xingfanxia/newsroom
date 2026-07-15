@@ -73,20 +73,19 @@ artifacts:
   repo_aliases:
     plan: docs/R2-PUBLIC-READ-PLAN-2026-07-14.md
     evidence: docs/reports/r2-public-read/
-iteration: 19
+iteration: 20
 phase: implementation
 current_artifact: docs/superpowers/plans/2026-07-14-r2-public-read-decoupling.md
-current_criterion: AC-011
+current_criterion: AC-013
 last_action: >-
-  Completed Task 16 locally and moved AC-009/AC-010 to PASS_PENDING_FINAL. A
-  fresh production build succeeds with Turso absent; recursive source plus 265
-  compiled server/client/Proxy/NFT artifacts are DB-free; all 30 anonymous
-  entries pass GET/HEAD, public pages pass RSC, and real Chrome hydrates /en/all
-  without calendar prefetch while a recording poison Turso endpoint receives
-  zero connections.
+  Completed Task 17's local evidence harness. Deterministic bounded anonymous
+  replays, R2 cache-contract probes, exact paired Turso windows and production
+  cutover receipt aggregation pass locally; AC-004/AC-011/AC-012 remain OPEN
+  until the verifier receives real production receipts. No external request,
+  publish, deploy or database mutation ran.
 next_action: >-
-  Implement Task 17's bounded local load/cache/Turso-window/cutover evidence
-  tooling without publishing, deploying, loading or modifying production.
+  Synchronize current architecture, testing and operator documentation for Task
+  18, keeping AC-013 OPEN until the production evidence gate is complete.
 halt_cause: null
 halt_scan: []
 stuck_counters: {}

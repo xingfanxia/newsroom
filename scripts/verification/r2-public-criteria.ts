@@ -7,6 +7,7 @@ import { createClient } from "@libsql/client";
 import { ANONYMOUS_SERVING_ENTRYPOINTS } from "@/lib/public-content/entrypoints";
 import { checkSourcePublicDbBoundary } from "@/scripts/ops/check-public-db-boundary";
 import { checkPublicNftBoundary } from "./check-public-nft";
+import { assertPublicEvidenceCriterion } from "@/scripts/ops/verify-public-cutover";
 import {
   EnvironmentPolicyError,
   createHermeticEnvironment,
@@ -506,6 +507,28 @@ async function verifyAc010(root: string): Promise<CriterionReceipt> {
   };
 }
 
+function verifyProductionEvidence(
+  criterion: "AC-004" | "AC-011" | "AC-012",
+  root: string,
+): CriterionReceipt {
+  const manifest = process.env.R2_PUBLIC_EVIDENCE_MANIFEST;
+  assert(
+    manifest,
+    `${criterion} requires R2_PUBLIC_EVIDENCE_MANIFEST with production receipts`,
+  );
+  const manifestPath = resolve(root, manifest);
+  const verdict = assertPublicEvidenceCriterion(criterion, manifestPath);
+  return {
+    criterion,
+    ok: true,
+    receipts: [
+      `validated production receipt manifest ${manifestPath}`,
+      `cache=${verdict.ac004} load-decoupled=${verdict.ac011} 24h-budget=${verdict.ac012}`,
+      `Turso projection ${Math.round(verdict.totalTursoProjectedMonthlyRows)} rows/month; publisher ${Math.round(verdict.publisherProjectedMonthlyRows)} rows/month`,
+    ],
+  };
+}
+
 export async function verifyR2PublicCheap(
   root = resolve(join(import.meta.dir, "../..")),
 ): Promise<CriterionReceipt> {
@@ -533,11 +556,14 @@ export async function verifyR2PublicCriterion(
   if (criterion === "AC-001") return verifyAc001(root);
   if (criterion === "AC-002") return verifyAc002(root);
   if (criterion === "AC-003") return verifyAc003(root);
+  if (criterion === "AC-004") return verifyProductionEvidence("AC-004", root);
   if (criterion === "AC-005") return verifyAc005(root);
   if (criterion === "AC-006") return verifyAc006(root);
   if (criterion === "AC-007") return verifyAc007(root);
   if (criterion === "AC-008") return verifyAc008(root);
   if (criterion === "AC-009") return verifyAc009(root);
   if (criterion === "AC-010") return verifyAc010(root);
+  if (criterion === "AC-011") return verifyProductionEvidence("AC-011", root);
+  if (criterion === "AC-012") return verifyProductionEvidence("AC-012", root);
   throw new Error(`Criterion is not implemented yet: ${criterion}`);
 }

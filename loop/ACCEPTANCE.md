@@ -113,7 +113,9 @@ This inventory is frozen from
     max-age=60 and immutable max-age=31536000 JSON each produced MISS -> HIT,
     preserved CORS/ETag/Cache-Control, and returned Age=22 on the same Origin
     variant. Receipt: docs/reports/r2-public-read/cache-rule-2026-07-14.md.
-    Remains OPEN until real release objects pass after AC-002/AC-003.
+    Task 17 added a strict receipt parser that rejects non-production origins,
+    missing CORS/ETag, collapsed TTLs and anything other than a second HIT with
+    positive Age. Remains OPEN until real release objects pass after cutover.
 
 - id: AC-005
   statement: >-
@@ -296,7 +298,11 @@ This inventory is frozen from
   status: OPEN
   depends_on: [AC-004, AC-010]
   reopen_condition: Turso read delta becomes positively correlated with anonymous traffic or a cold/failure path queries DB.
-  last_verification: Not run; current architecture is known red 2026-07-14.
+  last_verification: >-
+    Local harness passed 2026-07-14 for bounded deterministic 1x/10x/100x
+    corpora and warm/cache-miss/cold-deploy/missing-object scenarios. The
+    criterion verifier requires matching production load/control Turso receipts
+    and therefore remains OPEN; no production load was run.
 
 - id: AC-012
   statement: >-
@@ -317,7 +323,11 @@ This inventory is frozen from
   status: OPEN
   depends_on: [AC-003, AC-011]
   reopen_condition: A later clean window projects >=100M/month, publisher >=5M/month, or the residual attribution is invalidated.
-  last_verification: Known-red production-rate evidence recorded 2026-07-14.
+  last_verification: >-
+    Exact-window and publisher receipt aggregation passed locally 2026-07-14,
+    including rejection of inconsistent derived counters. The last production
+    rate remains known-red and no new production measurement was run, so this
+    criterion remains OPEN.
 
 - id: AC-013
   statement: >-

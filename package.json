@@ -47,7 +47,11 @@
     "cron:publish-public": "bun scripts/ops/run-cron.ts publish-public",
     "snapshot:publish": "bun scripts/ops/publish-public-snapshot.ts",
     "snapshot:bootstrap": "bun scripts/ops/bootstrap-public-snapshot.ts",
-    "snapshot:reconcile": "bun scripts/ops/reconcile-public-snapshot.ts"
+    "snapshot:reconcile": "bun scripts/ops/reconcile-public-snapshot.ts",
+    "evidence:load-public": "bun scripts/ops/load-anonymous.ts",
+    "evidence:r2-cache": "bun scripts/ops/verify-r2-cache.ts",
+    "evidence:turso-window": "bun scripts/ops/measure-turso-window.ts",
+    "evidence:public-cutover": "bun scripts/ops/verify-public-cutover.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.71",

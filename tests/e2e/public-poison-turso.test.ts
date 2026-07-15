@@ -9,8 +9,11 @@ import {
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { ANONYMOUS_SERVING_ENTRYPOINTS } from "@/lib/public-content/entrypoints";
 import { createHermeticEnvironment } from "@/scripts/verification/environment-policy";
+import {
+  assertPublicRuntimeCorpusComplete,
+  PUBLIC_RUNTIME_CASES,
+} from "@/scripts/verification/public-runtime-corpus";
 import {
   startPublicSnapshotFixture,
   type PublicSnapshotFixtureServer,
@@ -20,46 +23,6 @@ const enabled = process.env.PUBLIC_POISON_BUILD_READY === "1";
 const integrationTest = enabled ? test : test.skip;
 const rootDir = resolve(join(import.meta.dir, "../.."));
 setDefaultTimeout(60_000);
-
-type RuntimeCase = {
-  readonly appPath: string;
-  readonly expectedStatus: number;
-  readonly kind: "page" | "route";
-  readonly path: string;
-};
-
-const RUNTIME_CASES: readonly RuntimeCase[] = [
-  { appPath: "/[locale]/agents/page", expectedStatus: 200, kind: "page", path: "/en/agents" },
-  { appPath: "/[locale]/all/page", expectedStatus: 200, kind: "page", path: "/en/all?offset=1" },
-  { appPath: "/[locale]/curated/page", expectedStatus: 200, kind: "page", path: "/en/curated" },
-  { appPath: "/[locale]/daily/[date]/page", expectedStatus: 200, kind: "page", path: "/zh/daily/2026-07-14" },
-  { appPath: "/[locale]/daily/page", expectedStatus: 200, kind: "page", path: "/zh/daily" },
-  { appPath: "/[locale]/page", expectedStatus: 200, kind: "page", path: "/en" },
-  { appPath: "/[locale]/podcasts/[id]/page", expectedStatus: 200, kind: "page", path: "/en/podcasts/1" },
-  { appPath: "/[locale]/podcasts/page", expectedStatus: 200, kind: "page", path: "/en/podcasts?source=alpha-podcast" },
-  { appPath: "/[locale]/sources/page", expectedStatus: 200, kind: "page", path: "/en/sources" },
-  { appPath: "/[locale]/x-monitor/page", expectedStatus: 200, kind: "page", path: "/en/x-monitor?handle=beta-x" },
-  { appPath: "/api/events/[id]/members/route", expectedStatus: 200, kind: "route", path: "/api/events/100/members?locale=en" },
-  { appPath: "/api/feed/[locale]/rss.xml/route", expectedStatus: 200, kind: "route", path: "/api/feed/en/rss.xml" },
-  { appPath: "/api/feed/newsletter/[locale]/rss.xml/route", expectedStatus: 200, kind: "route", path: "/api/feed/newsletter/en/rss.xml" },
-  { appPath: "/api/public/dailies/route", expectedStatus: 200, kind: "route", path: "/api/public/dailies?locale=zh&take=10" },
-  { appPath: "/api/public/daily/[date]/route", expectedStatus: 200, kind: "route", path: "/api/public/daily/2026-07-14?locale=zh" },
-  { appPath: "/api/public/daily/route", expectedStatus: 200, kind: "route", path: "/api/public/daily?locale=zh" },
-  { appPath: "/api/public/events/[id]/members/route", expectedStatus: 200, kind: "route", path: "/api/public/events/100/members?locale=en" },
-  { appPath: "/api/public/feed/route", expectedStatus: 200, kind: "route", path: "/api/public/feed?locale=en&limit=10" },
-  { appPath: "/api/public/items/[id]/route", expectedStatus: 200, kind: "route", path: "/api/public/items/1?locale=en" },
-  { appPath: "/api/public/search/route", expectedStatus: 200, kind: "route", path: "/api/public/search?q=Alpha&locale=en" },
-  { appPath: "/api/public/sources/route", expectedStatus: 200, kind: "route", path: "/api/public/sources?locale=en" },
-  { appPath: "/api/rss/[slug]/route", expectedStatus: 200, kind: "route", path: "/api/rss/today.xml" },
-  { appPath: "/api/sources/active/route", expectedStatus: 200, kind: "route", path: "/api/sources/active" },
-  { appPath: "/[locale]/login/page", expectedStatus: 200, kind: "page", path: "/en/login" },
-  { appPath: "/_global-error/page", expectedStatus: 404, kind: "page", path: "/en/__global-error-fallback-probe" },
-  { appPath: "/_not-found/page", expectedStatus: 404, kind: "page", path: "/en/__not-found-probe" },
-  { appPath: "/openapi.yaml/route", expectedStatus: 200, kind: "route", path: "/openapi.yaml" },
-  { appPath: "/robots.txt/route", expectedStatus: 200, kind: "route", path: "/robots.txt" },
-  { appPath: "/sitemap.xml/route", expectedStatus: 200, kind: "route", path: "/sitemap.xml" },
-  { appPath: "/skill.md/route", expectedStatus: 200, kind: "route", path: "/skill.md" },
-] as const;
 
 let snapshot: PublicSnapshotFixtureServer;
 let poison: ReturnType<typeof recordingServer>;
@@ -82,11 +45,9 @@ afterAll(async () => {
 
 describe("cold anonymous runtime with poison Turso", () => {
   integrationTest("covers the complete anonymous inventory with GET, HEAD and RSC", async () => {
-    expect(RUNTIME_CASES.map(({ appPath }) => appPath).sort()).toEqual(
-      ANONYMOUS_SERVING_ENTRYPOINTS.map(({ appPath }) => appPath).sort(),
-    );
+    expect(assertPublicRuntimeCorpusComplete).not.toThrow();
 
-    for (const runtimeCase of RUNTIME_CASES) {
+    for (const runtimeCase of PUBLIC_RUNTIME_CASES) {
       const url = `${next.baseUrl}${runtimeCase.path}`;
       const get = await fetch(url, { redirect: "manual" });
       expect(get.status, `GET ${runtimeCase.path}`).toBe(runtimeCase.expectedStatus);
