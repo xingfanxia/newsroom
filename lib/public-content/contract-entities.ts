@@ -115,6 +115,7 @@ const sourceItemCountsSchema = z.strictObject({
 const INTERNAL_SOURCE_LOCATORS: Readonly<Record<string, string>> = {
   "aihot-selected": "internal://aihot-selected",
   "crunchbase-ai": "internal://crunchbase",
+  "x-ai-watchlist": "internal://x-watchlist",
 };
 
 export const publicSourceSchema = z

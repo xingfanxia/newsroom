@@ -2,9 +2,12 @@
 
 Status: implementation and local verification are complete on the R2
 public-read feature branch. The Cloudflare R2 bucket `newsroom-public`, custom
-domain `content.ax0x.ai`, and scoped `/newsroom/` cache rule are provisioned.
-The production outbox migration, first release, Vercel deployment, traffic
-replay, and cutover have not run and require explicit AX authorization.
+domain `content.ax0x.ai`, scoped `/newsroom/` cache rule, production outbox
+migration, first release, and real cache proof are complete. Vercel deployment,
+traffic replay, cutover, rollback, and the stability windows remain in progress
+under AX's explicit production authorization.
+Those remaining deployment, replay, rollback, and observation steps have not run
+yet; the receipts below distinguish completed work from pending gates.
 
 ## Ownership and invariants
 
@@ -72,6 +75,10 @@ directory before running any command. Per run, cap R2 writes at 500, public
 requests at 10,000, transfer at 1 GiB, bootstrap at one, and intentional Turso
 access to the named exact window.
 
+Future production runs continue to require explicit AX authorization. This run
+received that authorization at `2026-07-15T04:16:32Z`; it does not create a
+standing authorization for later migrations, bootstraps, or cutovers.
+
 Execute in this order; do not combine steps or infer success from a later one:
 
 1. **Preflight.** Run the final local gate once on the unchanged diff. Confirm
@@ -86,8 +93,12 @@ Execute in this order; do not combine steps or infer success from a later one:
    readers before a valid first pointer exists. The branch schedules
    `publish-public` at `12,27,42,57 * * * *` once deployed.
 4. **Bootstrap once.** Prepare a schema-v1 canonical public-state JSON and its
-   outbox high-water mark using the approved one-shot production export. Review
-   that it contains no private fields. Create a mode-0600 bootstrap ledger:
+   outbox high-water mark using the approved one-shot production export. The
+   operator command is `bun run snapshot:export-bootstrap -- --apply --output
+   <state.json> --page-size 500`; it creates the output exclusively with mode
+   `0600`, validates the strict public schema, and reports only counts, hash,
+   watermark, and query telemetry. Review that it contains no private fields.
+   Create a mode-0600 bootstrap ledger:
 
    ```json
    {
@@ -102,11 +113,22 @@ Execute in this order; do not combine steps or infer success from a later one:
    refuses a second reservation. Save the run receipt and verify current,
    manifest, and object readback before continuing. The repeating cron must
    never be used as a hidden full materializer.
+
+   The completed production run exported 8,730 items and produced release
+   `r0-8c1c86004a59bbcb8eed` with 128 numeric buckets, 309 immutable artifacts,
+   and 312 total writes. See
+   `docs/reports/r2-public-read/production-bootstrap-export-2026-07-15.md` and
+   `docs/reports/r2-public-read/production-r2-bootstrap-2026-07-15.md`.
 5. **Probe real cache behavior.** Use a fresh Task-17 spend ledger and
    `bun run evidence:r2-cache -- --apply ...` against the real `current.json`
    and one immutable object. Require HTTPS, CORS, stable ETag, distinct pointer
    versus immutable TTLs, and second-request `CF-Cache-Status: HIT` with
    positive `Age`.
+
+   The completed cache receipt is
+   `docs/reports/r2-public-read/production-r2-cache-2026-07-15.json`: both the
+   pointer and immutable manifest proved `MISS -> HIT`, stable ETags, positive
+   `Age`, CORS, and distinct TTLs.
 6. **Deploy, canary, and cut over.** Deploy after the valid first pointer exists,
    observe the scheduled incremental publisher in producer/shadow mode, and
    compare representative HTML, RSC, JSON and RSS outputs. Then switch

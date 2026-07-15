@@ -46,6 +46,7 @@
     "cron:newsletter-monthly": "bun scripts/ops/run-cron.ts newsletter-monthly",
     "cron:publish-public": "bun scripts/ops/run-cron.ts publish-public",
     "snapshot:publish": "bun scripts/ops/publish-public-snapshot.ts",
+    "snapshot:export-bootstrap": "bun scripts/ops/export-public-bootstrap.ts",
     "snapshot:bootstrap": "bun scripts/ops/bootstrap-public-snapshot.ts",
     "snapshot:reconcile": "bun scripts/ops/reconcile-public-snapshot.ts",
     "evidence:load-public": "bun scripts/ops/load-anonymous.ts",

@@ -41,6 +41,7 @@ type FetchLike = (
 export async function verifyR2Cache(options: {
   readonly fetch?: FetchLike;
   readonly immutableUrl: string;
+  readonly betweenProbeDelayMs?: number;
   readonly ledger: PublicSpendLedger;
   readonly now?: () => number;
   readonly origin: string;
@@ -60,6 +61,14 @@ export async function verifyR2Cache(options: {
     transferBytes: options.ledger.planned.transferBytes,
   });
   const request = options.fetch ?? fetch;
+  const betweenProbeDelayMs = options.betweenProbeDelayMs ?? 0;
+  if (
+    !Number.isSafeInteger(betweenProbeDelayMs) ||
+    betweenProbeDelayMs < 0 ||
+    betweenProbeDelayMs > 10_000
+  ) {
+    throw new Error("betweenProbeDelayMs must be 0..10000");
+  }
   let receivedBytes = 0;
   const probe = async (url: string) => {
     const response = await request(url, {
@@ -88,15 +97,20 @@ export async function verifyR2Cache(options: {
     origin: options.origin,
     pointerUrl: pointer.toString(),
     immutableUrl: immutable.toString(),
-    pointer: [await probe(pointer.toString()), await probe(pointer.toString())],
-    immutable: [
-      await probe(immutable.toString()),
-      await probe(immutable.toString()),
-    ],
+    pointer: await probePair(pointer.toString()),
+    immutable: await probePair(immutable.toString()),
     receivedBytes,
   });
   assertR2CacheReceipt(receipt);
   return receipt;
+
+  async function probePair(url: string) {
+    const first = await probe(url);
+    if (betweenProbeDelayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, betweenProbeDelayMs));
+    }
+    return [first, await probe(url)] as const;
+  }
 }
 
 export function assertR2CacheReceipt(receiptValue: unknown): R2CacheReceipt {
@@ -153,6 +167,7 @@ async function main(argv: readonly string[]): Promise<void> {
     requiredFlagValue(argv, "--spend-ledger"),
   );
   const receipt = await verifyR2Cache({
+    betweenProbeDelayMs: 1_100,
     immutableUrl: requiredFlagValue(argv, "--immutable-url"),
     ledger,
     origin: requiredFlagValue(argv, "--origin"),

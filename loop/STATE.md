@@ -56,13 +56,13 @@ frontload:
     - hermetic-test prerequisite and known false-green zone
     - metered integration-run caps
     - tier-2 programmatic consult availability
+    - explicit production authorization for the R2 public-read gate
   defaulted:
     - incremental outbox publisher at 12,27,42,57 minutes
     - immutable content-addressed releases with current/previous pointers
     - local focused Conventional Commits allowed; no push
     - production cutover and user-visible semantic change require external authorization
-  open_gaps:
-    - external-gate: production deploy/publish/cutover authorization after local and preview gates
+  open_gaps: []
 artifacts:
   canonical:
     - loop/PROMPT.md
@@ -73,29 +73,27 @@ artifacts:
   repo_aliases:
     plan: docs/R2-PUBLIC-READ-PLAN-2026-07-14.md
     evidence: docs/reports/r2-public-read/
-iteration: 22
-phase: external-gate
+iteration: 23
+phase: production-gate
 current_artifact: docs/superpowers/plans/2026-07-14-r2-public-read-decoupling.md
 current_criterion: AC-004
 last_action: >-
-  Ran one write-ahead-budgeted read-only HEAD against the public R2 pointer.
-  `https://content.ax0x.ai/newsroom/v1/current.json` returned HTTP 404 and
-  `CF-Cache-Status: MISS` at 2026-07-15T01:14:46Z, proving the first production
-  release/bootstrap has not happened. Actual spend was one public request, zero
-  response-body bytes, and zero writes/bootstraps/Turso windows. No token,
-  publish, deploy, cache mutation or database access ran.
+  AX explicitly authorized the R2 public-read production gate at
+  2026-07-15T04:16:32Z, including the Turso outbox migration, exactly one R2
+  bootstrap, Vercel deploy/cutover, Cloudflare/cache/load/rollback validation,
+  and the existing immutable spend caps.
 next_action: >-
-  Await explicit production authorization before the outbox migration, one
-  metered bootstrap, real cache probe, deploy/canary/cutover, bounded load and
-  rollback drills, 48h stability, and an exact clean >=24h Turso window.
-halt_cause: genuine-escalate
+  Verify production env injection, write-ahead reserve the named Turso migration
+  and bootstrap operations, then execute migration -> one bootstrap -> cache
+  probe -> Vercel deploy/cutover -> bounded load/rollback evidence in order.
+halt_cause: null
 halt_scan:
   - AC-001..AC-003 pass their local criterion paths in the current final attempt.
-  - AC-004 is BLOCKED_EXTERNAL: the budgeted public preflight proves current.json is HTTP 404 until authorized bootstrap/cutover.
+  - AC-004 is authorized and pending the first production bootstrap/cache proof.
   - AC-005..AC-010 retain current local criterion receipts and have no remaining legal local action.
-  - AC-011 is BLOCKED_EXTERNAL on paired production load/control receipts.
-  - AC-012 is BLOCKED_EXTERNAL on publisher receipts and a clean exact >=24h Turso window.
-  - AC-013 is BLOCKED_EXTERNAL on >=48h stability, rollback, final metrics and shipped-doc evidence.
+  - AC-011 is authorized and pending paired production load/control receipts.
+  - AC-012 is authorized and pending publisher receipts and a clean exact >=24h Turso window.
+  - AC-013 is authorized and pending >=48h stability, rollback, final metrics and shipped-doc evidence.
   - Oracle is intact: plan SHA-256 still starts ec57c55fe111 and all 13 criteria remain enforced.
 stuck_counters: {}
 final_verify: bun run verify:r2-public --final
@@ -302,6 +300,226 @@ budget:
   production_backed_default_tests: 0
   intentional_turso_windows: named-only
   spend_ledger:
+    - run_id: production-r2-bootstrap-20260715t044216z
+      operation: exactly one conditional R2 bootstrap through an ephemeral Wrangler remote-dev bridge
+      planned_at: 2026-07-15T04:42:16Z
+      status: completed
+      planned:
+        r2_object_writes: 312
+        public_http_requests: 1000
+        transfer_bytes: 1073741824
+        bootstrap_snapshots: 1
+        intentional_turso_windows: 0
+        release_id: r0-8c1c86004a59bbcb8eed
+        note: >-
+          Local prebuild produced 309 immutable artifacts; manifest, pointer and
+          run receipt bring the exact expected write count to 312. The bridge
+          uses R2 binding conditional headers and is removed after the run.
+      actual:
+        started_at: 2026-07-15T04:44:33Z
+        finished_at: 2026-07-15T04:47:36Z
+        r2_object_writes: 312
+        public_http_requests: 0
+        bridge_http_requests: 625
+        transfer_bytes: 188504614
+        uploaded_bytes: 94252307
+        bootstrap_snapshots: 1
+        intentional_turso_windows: 0
+        release_id: r0-8c1c86004a59bbcb8eed
+        run_id: p-20260715044433559-f7a9a028-3b75-4e1f-8320-2905c7e471c9
+        pointer_bytes: 305
+        manifest_bytes: 96947
+        receipt_bytes: 636
+        immutable_artifacts_uploaded: 309
+        immutable_artifact_bytes: 94154419
+        spend_ledger_used: 1
+        bridge_removed: true
+        receipt: docs/reports/r2-public-read/production-r2-bootstrap-2026-07-15.md
+    - run_id: production-r2-cache-20260715t044900z
+      operation: public Cloudflare pointer and immutable manifest MISS/HIT probe
+      planned_at: 2026-07-15T04:49:00Z
+      status: completed
+      planned:
+        r2_object_writes: 0
+        public_http_requests: 4
+        transfer_bytes: 1048576
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 0
+      actual:
+        captured_at: 2026-07-15T04:50:31.149Z
+        r2_object_writes: 0
+        public_http_requests: 4
+        transfer_bytes: 194504
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 0
+        pointer_cache_sequence: MISS-HIT
+        pointer_second_age: 1
+        immutable_cache_sequence: MISS-HIT
+        immutable_second_age: 1
+        stable_etags: true
+        cors: "*"
+        receipt: docs/reports/r2-public-read/production-r2-cache-2026-07-15.json
+    - run_id: production-bootstrap-export-retry2-20260715t043413z
+      operation: canonical public-state export after narrow historical locator allowlist fix
+      planned_at: 2026-07-15T04:34:13Z
+      status: completed
+      planned:
+        r2_object_writes: 0
+        public_http_requests: 0
+        transfer_bytes: 1073741824
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 1
+        turso_scope: >-
+          one exact usage-before/usage-after window containing only the
+          paginated public-schema bootstrap export
+      actual:
+        started_at: 2026-07-15T04:34:38Z
+        finished_at: 2026-07-15T04:37:40Z
+        r2_object_writes: 0
+        public_http_requests: 0
+        transfer_bytes: 94124402
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 1
+        rows_read_before: 615049007
+        rows_read_after: 615114307
+        rows_read_delta: 65300
+        rows_written_before: 4305154
+        rows_written_after: 4305154
+        rows_written_delta: 0
+        source_watermark: 0
+        state_sha256: ea6036d17022e3c04febe0b542adc6eef09e9928aa902f519766d30f240442ed
+        counts:
+          items: 8730
+          events: 462
+          sources: 55
+          newsletters: 70
+          policies: 1
+        query_count: 81
+        returned_rows: 37358
+        output_mode: "0600"
+        receipt: docs/reports/r2-public-read/production-bootstrap-export-2026-07-15.md
+    - run_id: production-bootstrap-export-20260715t042454z
+      operation: one-shot canonical public-state export from production Turso
+      planned_at: 2026-07-15T04:24:54Z
+      status: failed
+      planned:
+        r2_object_writes: 0
+        public_http_requests: 0
+        transfer_bytes: 1073741824
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 1
+        turso_scope: >-
+          one exact usage-before/usage-after window containing only the
+          paginated public-schema bootstrap export
+      actual:
+        observed_through: 2026-07-15T04:28:44Z
+        r2_object_writes: 0
+        public_http_requests: 0
+        output_transfer_bytes: 0
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 1
+        output_file_created: false
+        rows_read_nearest_prior: 614852565
+        rows_read_observed_after: 614942391
+        rows_read_upper_bound_delta: 89826
+        rows_written_nearest_prior: 4304222
+        rows_written_observed_after: 4305149
+        note: >-
+          The exporter failed closed before writing its exclusive output. Its
+          detached tool session lost the exact error and exact in-command
+          before/after values; the recorded delta is a conservative upper bound
+          that includes concurrent background production work and is not used
+          as a clean-window measurement.
+    - run_id: production-bootstrap-export-retry1-20260715t042844z
+      operation: retry one-shot canonical public-state export with attached output capture
+      planned_at: 2026-07-15T04:28:44Z
+      status: failed
+      planned:
+        r2_object_writes: 0
+        public_http_requests: 0
+        transfer_bytes: 1073741824
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 1
+        turso_scope: >-
+          one exact usage-before/usage-after window containing only the
+          paginated public-schema bootstrap export retry
+      actual:
+        started_at: 2026-07-15T04:29:26Z
+        finished_at: 2026-07-15T04:32:52Z
+        r2_object_writes: 0
+        public_http_requests: 0
+        output_transfer_bytes: 0
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 1
+        rows_read_before: 614942391
+        rows_read_after: 615030507
+        rows_read_delta: 88116
+        rows_written_before: 4305149
+        rows_written_after: 4305149
+        rows_written_delta: 0
+        output_file_created: false
+        failure: public source internal locator is not allowlisted
+    - run_id: production-internal-source-diagnostic-20260715t043252z
+      operation: identify production internal source locators rejected by public schema
+      planned_at: 2026-07-15T04:32:52Z
+      status: completed
+      planned:
+        r2_object_writes: 0
+        public_http_requests: 0
+        transfer_bytes: 65536
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 1
+        turso_scope: >-
+          one read-only indexed source query limited to internal:// locators
+      actual:
+        started_at: 2026-07-15T04:33:26Z
+        finished_at: 2026-07-15T04:33:27Z
+        r2_object_writes: 0
+        public_http_requests: 0
+        transfer_bytes: 191
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 1
+        rows_read_before: 615048942
+        rows_read_after: 615048942
+        rows_read_delta: 0
+        rows_written_before: 4305149
+        rows_written_after: 4305149
+        rows_written_delta: 0
+        result: >-
+          Found the two existing allowlisted locators plus disabled historical
+          source x-ai-watchlist -> internal://x-watchlist. The latter is now
+          narrowly allowlisted; arbitrary internal:// URLs remain rejected.
+    - run_id: production-outbox-migration-20260715t042356z
+      operation: checksummed production Turso public-content outbox migration
+      planned_at: 2026-07-15T04:23:56Z
+      status: completed
+      planned:
+        r2_object_writes: 0
+        public_http_requests: 0
+        transfer_bytes: 0
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 1
+        turso_scope: >-
+          one exact usage-before/usage-after window containing only the
+          idempotent 20260714_public_content_outbox_v1 migration
+      actual:
+        started_at: 2026-07-15T04:24:24Z
+        finished_at: 2026-07-15T04:24:26Z
+        r2_object_writes: 0
+        public_http_requests: 0
+        transfer_bytes: 0
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 1
+        rows_read_before: 614852565
+        rows_read_after: 614852565
+        rows_read_delta: 0
+        rows_written_before: 4304222
+        rows_written_after: 4304222
+        rows_written_delta: 0
+        migration_name: 20260714_public_content_outbox_v1
+        migration_checksum: 10137a90e335ad8ae8e62e47df1b5e7e5b99c73a811d3ef897ce301eea946bfe
+        applied: true
+        receipt: docs/reports/r2-public-read/production-outbox-migration-2026-07-15.md
     - run_id: ac004-current-head-20260715t011411z
       operation: HEAD https://content.ax0x.ai/newsroom/v1/current.json
       planned_at: 2026-07-15T01:14:11Z
@@ -321,6 +539,13 @@ budget:
         intentional_turso_windows: 0
         http_status: 404
         cf_cache_status: MISS
+external_authorizations:
+  - authorized_at: 2026-07-15T04:16:32Z
+    scope: >-
+      R2 public-read production gate, including Turso outbox migration, exactly
+      one R2 bootstrap, Vercel deploy/cutover, Cloudflare/cache/load/rollback
+      validation, under the existing immutable budget caps.
+    source: explicit AX user message
 pressure_objects:
   - id: P-public-db-zero
     source: authored
@@ -762,6 +987,35 @@ pressure_consulted:
       P-metered-cap: >-
         Reserves exactly one public HEAD request and 64 KiB transfer before the
         request; all writes, bootstraps and Turso windows remain zero.
+  - iteration: 23
+    consulted_at: 2026-07-15
+    ids:
+      - P-public-db-zero
+      - P-rows-hard
+      - P-rows-ideal
+      - P-safe-tests
+      - P-architecture-api
+      - P-metered-cap
+    influence:
+      P-public-db-zero: >-
+        Keeps the production cutover fail-closed on R2 with no anonymous Turso
+        fallback during bootstrap, deploy, cache-miss, load, or rollback paths.
+      P-rows-hard: >-
+        Requires an exact named clean window of at least 24 hours after cutover
+        before the hard <100M/month criterion can pass.
+      P-rows-ideal: >-
+        Preserves residual attribution and the preferred <10M/month verdict
+        after anonymous traffic is decoupled.
+      P-safe-tests: >-
+        Reuses the unchanged passing local gate and runs only production-specific
+        evidence commands until the deployed diff changes.
+      P-architecture-api: >-
+        No source-boundary change is planned; any bootstrap exporter must remain
+        an operator-only DB-owning surface and emit the frozen public contract.
+      P-metered-cap: >-
+        Requires a write-ahead ledger before each Turso/R2/public integration
+        run and enforces one bootstrap, <=500 writes, <=10000 requests, and
+        <=1 GiB transfer per run.
 ```
 
 ## Alignment reviews

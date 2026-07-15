@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "kind": "r2-cache",
+  "runId": "production-r2-cache-20260715t044900z",
+  "capturedAt": "2026-07-15T04:50:31.149Z",
+  "origin": "https://news.ax0x.ai",
+  "pointerUrl": "https://content.ax0x.ai/newsroom/v1/current.json",
+  "immutableUrl": "https://content.ax0x.ai/newsroom/v1/releases/r0-8c1c86004a59bbcb8eed/manifest.json",
+  "pointer": [
+    {
+      "age": null,
+      "cacheControl": "public, max-age=15, s-maxage=30, stale-while-revalidate=300, stale-if-error=86400",
+      "cfCacheStatus": "MISS",
+      "cors": "*",
+      "etag": "W/\"25a3d2c24bda7f1d6eabd6ce033348b4\"",
+      "status": 200
+    },
+    {
+      "age": 1,
+      "cacheControl": "public, max-age=15, s-maxage=30, stale-while-revalidate=300, stale-if-error=86400",
+      "cfCacheStatus": "HIT",
+      "cors": "*",
+      "etag": "W/\"25a3d2c24bda7f1d6eabd6ce033348b4\"",
+      "status": 200
+    }
+  ],
+  "immutable": [
+    {
+      "age": null,
+      "cacheControl": "public, max-age=31536000, immutable",
+      "cfCacheStatus": "MISS",
+      "cors": "*",
+      "etag": "W/\"70f39002f4263dec686b5abc6ec2ddec\"",
+      "status": 200
+    },
+    {
+      "age": 1,
+      "cacheControl": "public, max-age=31536000, immutable",
+      "cfCacheStatus": "HIT",
+      "cors": "*",
+      "etag": "W/\"70f39002f4263dec686b5abc6ec2ddec\"",
+      "status": 200
+    }
+  ],
+  "receivedBytes": 194504
+}

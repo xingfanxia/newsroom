@@ -16,6 +16,8 @@ export const PUBLIC_ENTITY_TYPES = [
 ] as const;
 export type PublicEntityType = (typeof PUBLIC_ENTITY_TYPES)[number];
 
+export const PUBLIC_NUMERIC_SHARD_COUNT = 128;
+
 const idBucketShardSchema = z.strictObject({
   kind: z.literal("id_bucket"),
   bucket: z.string().regex(/^[a-f0-9]{2}$/),
@@ -162,5 +164,7 @@ function numericBucket(value: string, label: string): string {
   if (!/^[1-9]\d*$/.test(value)) throw new Error(`invalid ${label} key`);
   const parsed = Number(value);
   if (!Number.isSafeInteger(parsed)) throw new Error(`invalid ${label} key`);
-  return (parsed % 256).toString(16).padStart(2, "0");
+  return (parsed % PUBLIC_NUMERIC_SHARD_COUNT)
+    .toString(16)
+    .padStart(2, "0");
 }

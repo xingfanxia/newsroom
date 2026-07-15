@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { createClient, type Client } from "@libsql/client";
 import { patchCanonicalPublicState } from "@/lib/public-content/publisher/patch-state";
 import {
+  exportCanonicalPublicState,
   LibsqlPublicContentSource,
   PUBLISHER_SOURCE_VERIFIED_PLANS,
   verifyPublisherSourcePlans,
@@ -175,6 +176,28 @@ const EMPTY_STATE = {
 } as const;
 
 describe("bounded publisher source", () => {
+  test("exports a canonical bootstrap state from public fields and captures the starting watermark", async () => {
+    const client = await database();
+    await seedPublicData(client);
+
+    const exported = await exportCanonicalPublicState(client, {
+      now: () => NOW,
+      pageSize: 2,
+    });
+
+    expect(exported.sourceWatermark).toBe(8);
+    expect(exported.state.items.map(({ id }) => id)).toEqual([1, 2, 3, 4]);
+    expect(exported.state.events.map(({ id }) => id)).toEqual([10, 11]);
+    expect(exported.state.sources.map(({ id }) => id)).toEqual(["source-a"]);
+    expect(exported.state.newsletters.map(({ id }) => id)).toEqual([20]);
+    expect(exported.state.policies.map(({ version }) => version)).toEqual(["v2"]);
+    expect(exported.state.sources[0]?.itemCounts).toEqual({
+      allTime: 4,
+      last24h: 4,
+    });
+    expect(exported.telemetry.queryCount).toBeGreaterThanOrEqual(9);
+  });
+
   test("does only one outbox watermark read when nothing changed", async () => {
     const client = await database([
       `CREATE TABLE public_content_outbox (

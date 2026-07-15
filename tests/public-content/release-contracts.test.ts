@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test";
 import {
   artifactDescriptorSchema,
   manifestSchema,
+  PUBLIC_NUMERIC_SHARD_COUNT,
+  publicEntityShardLogicalName,
   runReceiptSchema,
   snapshotPointerSchema,
 } from "@/lib/public-content/contracts";
@@ -23,6 +25,17 @@ import {
 } from "./contract-fixtures";
 
 describe("pointer, manifest, and receipt contracts", () => {
+  test("bounds numeric entity shards below the bootstrap write cap", () => {
+    expect(PUBLIC_NUMERIC_SHARD_COUNT).toBe(128);
+    expect(publicEntityShardLogicalName("item", "1")).toBe("state/items/01");
+    expect(publicEntityShardLogicalName("item", "129")).toBe(
+      "state/items/01",
+    );
+    expect(publicEntityShardLogicalName("event", "128")).toBe(
+      "state/events/00",
+    );
+  });
+
   test("reject unknown schema versions on otherwise valid records", () => {
     for (const { schema, valid } of [
       { schema: snapshotPointerSchema, valid: snapshotPointer() },

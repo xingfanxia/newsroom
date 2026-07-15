@@ -1,16 +1,19 @@
 import type { Client, InValue, Row } from "@libsql/client";
 import {
+  canonicalStateSchema,
   publicEventSchema,
   publicItemSchema,
   publicNewsletterSchema,
   publicPolicySchema,
   publicSourceSchema,
+  type CanonicalPublicState,
 } from "@/lib/public-content/contracts";
 import {
   isEligiblePublicEvent,
   isEligiblePublicItem,
 } from "@/lib/public-content/eligibility";
 import { isVisibleItemTier } from "@/lib/types";
+import { patchCanonicalPublicState } from "./patch-state";
 import {
   DEFAULT_PUBLISHER_SOURCE_CAPS,
   PUBLIC_ENTITY_TYPES,
@@ -34,6 +37,15 @@ export const PUBLISHER_SOURCE_VERIFIED_PLANS = [
   "newsletters:integer-primary-key",
   "policy_versions:policy_versions_latest_idx",
 ] as const;
+
+const EMPTY_CANONICAL_STATE = canonicalStateSchema.parse({
+  schemaVersion: 1,
+  items: [],
+  events: [],
+  sources: [],
+  newsletters: [],
+  policies: [],
+});
 
 const ITEM_SELECT = `
   i.id, i.source_id, i.cluster_id,
@@ -353,6 +365,200 @@ export async function verifyPublisherSourcePlans(client: Client): Promise<string
     if (!pattern.test(detail)) throw new Error(`publisher source plan failed: ${name}: ${detail}`);
   }
   return [...PUBLISHER_SOURCE_VERIFIED_PLANS];
+}
+
+export type PublicBootstrapExport = {
+  state: CanonicalPublicState;
+  sourceWatermark: number;
+  telemetry: {
+    queryCount: number;
+    returnedRows: number;
+  };
+};
+
+/**
+ * One-shot, operator-only full export for the first snapshot. The outbox high
+ * water is captured before paging, so any concurrent write is either reflected
+ * in the export or replayed by the incremental publisher after bootstrap.
+ */
+export async function exportCanonicalPublicState(
+  client: Client,
+  options: { now?: () => number; pageSize?: number } = {},
+): Promise<PublicBootstrapExport> {
+  const now = options.now ?? Date.now;
+  const pageSize = options.pageSize ?? 250;
+  if (!Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 500) {
+    throw new RangeError("bootstrap export pageSize must be 1..500");
+  }
+
+  let queryCount = 0;
+  let returnedRows = 0;
+  const execute = async (sql: string, args: readonly InValue[] = []) => {
+    queryCount += 1;
+    const result = await client.execute({ sql, args: [...args] });
+    returnedRows += result.rows.length;
+    return result;
+  };
+
+  const watermarkResult = await execute(
+    "SELECT COALESCE(MAX(id), 0) AS high_water FROM public_content_outbox",
+  );
+  const sourceWatermark = numeric(
+    watermarkResult.rows[0]?.high_water,
+    "bootstrap outbox high water",
+  );
+
+  const recentResult = await execute(
+    `SELECT source_id, COUNT(*) AS recent_count
+     FROM items INDEXED BY items_source_idx
+     WHERE published_at >= ?
+     GROUP BY source_id`,
+    [now() - DAY_MS],
+  );
+  const recentCounts = new Map(
+    recentResult.rows.map((row) => [
+      text(row.source_id, "source recent id"),
+      numeric(row.recent_count, "source recent count"),
+    ]),
+  );
+  const sourceRows = (
+    await execute(
+      `SELECT s.id, s.name_en, s.name_zh, s.url, s.kind, s."group",
+              s.locale, s.cadence, s.priority, s.tags, s.enabled, s.curated,
+              h.status, h.last_success_at, h.consecutive_failures,
+              h.total_items_count
+       FROM sources s
+       LEFT JOIN source_health h ON h.source_id = s.id
+       ORDER BY s.id`,
+    )
+  ).rows;
+
+  const itemRows = await readNumericPages(
+    execute,
+    `SELECT ${ITEM_SELECT}
+     FROM items i
+     LEFT JOIN clusters c ON c.id = i.cluster_id
+     WHERE i.id > ?
+     ORDER BY i.id
+     LIMIT ?`,
+    pageSize,
+  );
+  const eventRows = await readNumericPages(
+    execute,
+    `SELECT id, lead_item_id, member_count, coverage,
+            first_seen_at, latest_member_at,
+            canonical_title_zh, canonical_title_en,
+            editor_note_zh, editor_note_en,
+            editor_analysis_zh, editor_analysis_en,
+            importance, event_tier, hkr, no_content
+     FROM clusters
+     WHERE id > ?
+     ORDER BY id
+     LIMIT ?`,
+    pageSize,
+  );
+  const newsletterRows = await readNumericPages(
+    execute,
+    `SELECT id, kind, locale, period_start, period_end, published_at,
+            story_count, item_ids, headline, overview, highlights,
+            commentary, column_title, column_theme_tag, column_summary_md,
+            column_narrative_md, column_featured_item_ids
+     FROM newsletters
+     WHERE id > ?
+     ORDER BY id
+     LIMIT ?`,
+    pageSize,
+  );
+  const policyRows = (
+    await execute(
+      `SELECT skill_name, version, committed_at
+       FROM policy_versions INDEXED BY policy_versions_latest_idx
+       WHERE skill_name = 'editorial'
+       ORDER BY committed_at DESC
+       LIMIT 1`,
+    )
+  ).rows;
+
+  const changes: PublicEntityChange[] = [];
+  for (const row of sourceRows) {
+    const key = text(row.id, "source id");
+    changes.push({
+      entityType: "source",
+      entityKey: key,
+      value: publicSourceFromRow(row, recentCounts.get(key) ?? 0),
+    });
+  }
+  for (const row of itemRows) {
+    const value = publicItemFromRow(row);
+    if (value) {
+      changes.push({
+        entityType: "item",
+        entityKey: String(value.id),
+        value,
+      });
+    }
+  }
+  const membersByEvent = new Map<number, Row[]>();
+  for (const row of itemRows) {
+    const eventId = nullableNumeric(row.cluster_id, "member event id");
+    if (eventId === null) continue;
+    const members = membersByEvent.get(eventId) ?? [];
+    members.push(row);
+    membersByEvent.set(eventId, members);
+  }
+  for (const row of eventRows) {
+    const eventId = numeric(row.id, "event id");
+    const value = publicEventFromRows(row, membersByEvent.get(eventId) ?? []);
+    if (value) {
+      changes.push({
+        entityType: "event",
+        entityKey: String(value.id),
+        value,
+      });
+    }
+  }
+  for (const row of newsletterRows) {
+    const value = publicNewsletterFromRow(row);
+    changes.push({
+      entityType: "newsletter",
+      entityKey: String(value.id),
+      value,
+    });
+  }
+  for (const row of policyRows) {
+    const value = publicPolicyFromRow(row);
+    changes.push({
+      entityType: "policy",
+      entityKey: value.skillName,
+      value,
+    });
+  }
+
+  return {
+    state: patchCanonicalPublicState(EMPTY_CANONICAL_STATE, changes).state,
+    sourceWatermark,
+    telemetry: { queryCount, returnedRows },
+  };
+}
+
+async function readNumericPages(
+  execute: (
+    sql: string,
+    args?: readonly InValue[],
+  ) => Promise<Awaited<ReturnType<Client["execute"]>>>,
+  sql: string,
+  pageSize: number,
+): Promise<Row[]> {
+  const rows: Row[] = [];
+  let cursor = 0;
+  for (;;) {
+    const page = await execute(sql, [cursor, pageSize]);
+    rows.push(...page.rows);
+    if (page.rows.length < pageSize) return rows;
+    const nextCursor = numeric(page.rows.at(-1)?.id, "bootstrap page cursor");
+    if (nextCursor <= cursor) throw new Error("bootstrap page cursor did not advance");
+    cursor = nextCursor;
+  }
 }
 
 function sourceBatch(args: {

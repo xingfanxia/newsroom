@@ -18,6 +18,7 @@ export {
 export {
   parsePublicEntityShardValue,
   parsePublicEntityValue,
+  PUBLIC_NUMERIC_SHARD_COUNT,
   publicEntityKey,
   publicEntityShardLogicalName,
   publicEntityShardMetadata,

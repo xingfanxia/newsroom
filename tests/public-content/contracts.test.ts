@@ -200,6 +200,13 @@ describe("schema-v1 persisted contracts", () => {
     expect(
       publicSourceSchema.safeParse({
         ...source(),
+        id: "x-ai-watchlist",
+        url: "internal://x-watchlist",
+      }).success,
+    ).toBe(true);
+    expect(
+      publicSourceSchema.safeParse({
+        ...source(),
         url: "internal://private/path",
       }).success,
     ).toBe(false);
