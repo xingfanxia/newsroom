@@ -300,10 +300,46 @@ budget:
   production_backed_default_tests: 0
   intentional_turso_windows: named-only
   spend_ledger:
+    - run_id: production-load-cold-100x-20260715t051700z
+      operation: 100x cold-deploy anonymous corpus with equal named Turso control
+      planned_at: 2026-07-15T05:17:00Z
+      status: planned
+      planned:
+        r2_object_writes: 0
+        public_http_requests: 7100
+        transfer_bytes: 1073741824
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 2
+        deployment_id: dpl_6K4t8Zy9fDLJuJJAdt9xnPQEXSHL
+        turso_window: production-load-cold-100x-20260715t051700z
+    - run_id: production-load-cache-miss-10x-20260715t051700z
+      operation: 10x cache-miss anonymous corpus with equal named Turso control
+      planned_at: 2026-07-15T05:17:00Z
+      status: planned
+      planned:
+        r2_object_writes: 0
+        public_http_requests: 710
+        transfer_bytes: 268435456
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 2
+        deployment_id: dpl_6K4t8Zy9fDLJuJJAdt9xnPQEXSHL
+        turso_window: production-load-cache-miss-10x-20260715t051700z
+    - run_id: production-load-warm-1x-20260715t051700z
+      operation: 1x warm anonymous corpus with equal named Turso control
+      planned_at: 2026-07-15T05:17:00Z
+      status: planned
+      planned:
+        r2_object_writes: 0
+        public_http_requests: 71
+        transfer_bytes: 33554432
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 2
+        deployment_id: dpl_6K4t8Zy9fDLJuJJAdt9xnPQEXSHL
+        turso_window: production-load-warm-1x-20260715t051700z
     - run_id: production-vercel-cutover-20260715t051149z
       operation: production Vercel deployment, public-origin cutover, representative probes, and bounded rollback if needed
       planned_at: 2026-07-15T05:11:49Z
-      status: planned
+      status: succeeded
       planned:
         r2_object_writes: 0
         public_http_requests: 10
@@ -312,6 +348,20 @@ budget:
         intentional_turso_windows: 0
         commit: e2e80f4753b175934910ebeeb073dd9c4845b514
         previous_production_deployment: dpl_CzkjVD8GwsiX5HhhZd7LTxWdL91h
+      actual:
+        deployment_id: dpl_6K4t8Zy9fDLJuJJAdt9xnPQEXSHL
+        deployment_url: newsroom-8w3zc1lb1-panpanmao.vercel.app
+        deployed_commit: ab753d7
+        public_http_requests: 4
+        transfer_bytes: 457880
+        statuses:
+          html: 200
+          rsc: 200
+          json: 200
+          rss: 200
+        cutover_performed: true
+        rollback_performed: false
+        receipt: docs/reports/r2-public-read/production-vercel-cutover-2026-07-15.md
     - run_id: production-vercel-preview-canary-20260715t050741z
       operation: deploy and probe a protected Vercel preview against the production public R2 origin
       planned_at: 2026-07-15T05:07:41Z
