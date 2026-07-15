@@ -10,8 +10,15 @@ export const materializedPageLogicalName = {
   xMonitor: (locale: AppLocale) => `views/x-monitor/${locale}`,
   daily: (locale: AppLocale) => `views/daily/${locale}`,
   agents: "views/agents",
-  podcastDetail: (id: number) => `views/podcast-detail/${id}`,
+  podcastDetails: (id: number) =>
+    `views/podcast-details/${podcastDetailBucket(id)}`,
 } as const;
+
+export const MATERIALIZED_PODCAST_DETAIL_BUCKET_COUNT = 16;
+export const MATERIALIZED_PODCAST_DETAIL_LOGICAL_NAMES = Array.from(
+  { length: MATERIALIZED_PODCAST_DETAIL_BUCKET_COUNT },
+  (_, bucket) => `views/podcast-details/${bucket.toString(16).padStart(2, "0")}`,
+);
 
 export const REQUIRED_MATERIALIZED_PAGE_LOGICAL_NAMES = [
   materializedPageLogicalName.home("en"),
@@ -28,7 +35,17 @@ export const REQUIRED_MATERIALIZED_PAGE_LOGICAL_NAMES = [
   materializedPageLogicalName.daily("en"),
   materializedPageLogicalName.daily("zh"),
   materializedPageLogicalName.agents,
+  ...MATERIALIZED_PODCAST_DETAIL_LOGICAL_NAMES,
 ] as const;
+
+function podcastDetailBucket(id: number): string {
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    throw new TypeError("podcast detail ID must be a positive safe integer");
+  }
+  return (id % MATERIALIZED_PODCAST_DETAIL_BUCKET_COUNT)
+    .toString(16)
+    .padStart(2, "0");
+}
 
 export type MaterializedPageArtifact<T = unknown> = {
   schemaVersion: 1;

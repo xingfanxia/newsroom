@@ -161,8 +161,11 @@ export async function readPodcastsPageModel(
   return readCachedPodcastsPageModel(input);
 }
 
-type PublishedPodcastDetailModel = {
-  detailByLocale: Record<AppLocale, NonNullable<PodcastDetailPageModel["detail"]>>;
+type PublishedPodcastDetailBucket = {
+  detailsById: Record<
+    string,
+    Record<AppLocale, NonNullable<PodcastDetailPageModel["detail"]>>
+  >;
   chrome: PodcastDetailPageModel["chrome"];
 };
 
@@ -170,11 +173,12 @@ export async function readPodcastDetailPageModel(input: {
   locale: AppLocale;
   id: number;
 }): Promise<PodcastDetailPageModel> {
-  const published = await readMaterializedPageModel<PublishedPodcastDetailModel>(
-    materializedPageLogicalName.podcastDetail(input.id),
+  const published = await readMaterializedPageModel<PublishedPodcastDetailBucket>(
+    materializedPageLogicalName.podcastDetails(input.id),
   );
-  if (published) {
-    return { detail: published.detailByLocale[input.locale], chrome: published.chrome };
+  const entry = published?.detailsById[String(input.id)];
+  if (entry) {
+    return { detail: entry[input.locale], chrome: published.chrome };
   }
   return readCachedPodcastDetailPageModel(input);
 }

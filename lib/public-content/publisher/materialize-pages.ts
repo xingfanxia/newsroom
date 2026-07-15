@@ -1,6 +1,7 @@
 import {
   materializedPageArtifact,
   materializedPageLogicalName,
+  MATERIALIZED_PODCAST_DETAIL_BUCKET_COUNT,
 } from "@/lib/public-content/materialized-artifact";
 import {
   buildAgentsPageModel,
@@ -89,21 +90,35 @@ export function buildMaterializedPageModels(
     ),
   );
 
-  const podcastStories = buildPodcastsPageModel(state, nowMs, {
-    locale: "en",
-    tier: DEFAULT_PODCAST_TIER,
-  }).stories;
   const stateIndex = createPublicStateIndex(state);
   const detailChrome = shellChromeDataFromSnapshot(state, nowMs);
-  for (const story of podcastStories.slice(0, 120)) {
-    const id = Number.parseInt(story.id, 10);
-    if (!Number.isSafeInteger(id) || id <= 0) continue;
+  const podcastSourceIds = new Set(
+    state.sources
+      .filter((source) => source.group === "podcast")
+      .map((source) => source.id),
+  );
+  const detailBuckets = Array.from(
+    { length: MATERIALIZED_PODCAST_DETAIL_BUCKET_COUNT },
+    () => ({} as Record<string, { en: unknown; zh: unknown }>),
+  );
+  for (const item of state.items) {
+    if (!podcastSourceIds.has(item.sourceId)) continue;
+    const id = item.id;
     const en = publicPageItemDetailFromIndex(stateIndex, id, "en", nowMs);
     const zh = publicPageItemDetailFromIndex(stateIndex, id, "zh", nowMs);
     if (!en || !zh) continue;
+    detailBuckets[id % MATERIALIZED_PODCAST_DETAIL_BUCKET_COUNT]![String(id)] = {
+      en,
+      zh,
+    };
+  }
+  for (let bucket = 0; bucket < detailBuckets.length; bucket += 1) {
+    const representativeId = bucket === 0
+      ? MATERIALIZED_PODCAST_DETAIL_BUCKET_COUNT
+      : bucket;
     artifacts.push(
-      model(materializedPageLogicalName.podcastDetail(id), {
-        detailByLocale: { en, zh },
+      model(materializedPageLogicalName.podcastDetails(representativeId), {
+        detailsById: detailBuckets[bucket],
         chrome: detailChrome,
       }),
     );
