@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "goalVersion": "r2-public-read-v1-ec57c55fe111",
+  "runId": "production-load-missing-object-1x-20260715t074300z",
+  "plannedAt": "2026-07-15T07:43:00.000Z",
+  "planned": {
+    "bootstrapSnapshots": 0,
+    "publicHttpRequests": 60,
+    "r2ObjectWrites": 0,
+    "transferBytes": 33554432
+  },
+  "tursoWindowName": "production-load-missing-object-1x-20260715t074300z"
+}

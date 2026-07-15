@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "kind": "turso-load-comparison",
+  "windowName": "production-load-cold-100x-reader-retry-20260715t072130z",
+  "database": "newsroom-v2",
+  "durationHours": 0.08824333333333333,
+  "loadDeltaRowsRead": 0,
+  "controlDeltaRowsRead": 0,
+  "netDeltaRowsRead": 0,
+  "decoupled": true
+}

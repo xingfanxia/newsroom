@@ -8,7 +8,7 @@ import {
 import { GET as exportSaved } from "@/app/api/saved/export/route";
 import robots from "@/app/robots";
 import sitemap from "@/app/sitemap";
-import proxy from "@/proxy";
+import proxy, { isSnapshotBackedPublicPagePath } from "@/proxy";
 import { NextRequest } from "next/server";
 import { sessionIdentityFromCookie } from "@/lib/auth/session-identity";
 import { mintSessionCookie } from "@/lib/auth/password";
@@ -147,6 +147,35 @@ describe("saved-data privacy boundary", () => {
     );
     expect(falsePositive.status).toBe(200);
     expect(falsePositive.headers.get("location")).toBeNull();
+  });
+
+  test("proxy maps a missing public snapshot pointer to a controlled 503 for HTML", async () => {
+    const originalFetch = globalThis.fetch;
+    const originalBaseUrl = process.env.R2_PUBLIC_BASE_URL;
+    globalThis.fetch = Object.assign(
+      async () => new Response(null, { status: 404 }),
+      { preconnect: () => undefined },
+    );
+    process.env.R2_PUBLIC_BASE_URL = "https://missing-content.test";
+    try {
+      const response = await proxy(
+        new NextRequest("https://news.ax0x.ai/en"),
+      );
+      expect(response.status).toBe(503);
+      expect(response.headers.get("retry-after")).toBe("30");
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (originalBaseUrl === undefined) delete process.env.R2_PUBLIC_BASE_URL;
+      else process.env.R2_PUBLIC_BASE_URL = originalBaseUrl;
+    }
+  });
+
+  test("snapshot availability gate covers only snapshot-backed locale pages", () => {
+    expect(isSnapshotBackedPublicPagePath("/en")).toBeTrue();
+    expect(isSnapshotBackedPublicPagePath("/zh/daily/2026-07-14")).toBeTrue();
+    expect(isSnapshotBackedPublicPagePath("/en/podcasts/4")).toBeTrue();
+    expect(isSnapshotBackedPublicPagePath("/en/login")).toBeFalse();
+    expect(isSnapshotBackedPublicPagePath("/en/saved")).toBeFalse();
   });
 
   test("saved page delegates all body loading through the hard boundary", () => {

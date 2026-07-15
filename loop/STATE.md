@@ -300,10 +300,43 @@ budget:
   production_backed_default_tests: 0
   intentional_turso_windows: named-only
   spend_ledger:
+    - run_id: production-application-pointer-rollback-drill-20260715t074300z
+      operation: roll the intentionally bad deployment back to the good deployment, conditionally swap the R2 pointer to previous and restore it, then revalidate representative/cache paths
+      planned_at: 2026-07-15T07:43:00Z
+      status: planned
+      planned:
+        r2_object_writes: 2
+        public_http_requests: 20
+        transfer_bytes: 20971520
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 0
+        good_deployment_id: dpl_2Lsx5kxkAQ5Q5aNyoQZ1Cp2dyVhe
+    - run_id: production-load-missing-object-1x-20260715t074300z
+      operation: 1x missing-object anonymous corpus on the intentionally unavailable public snapshot origin with an equal Turso control
+      planned_at: 2026-07-15T07:43:00Z
+      status: planned
+      planned:
+        r2_object_writes: 0
+        public_http_requests: 60
+        transfer_bytes: 33554432
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 2
+        turso_window: production-load-missing-object-1x-20260715t074300z
+    - run_id: production-vercel-missing-object-20260715t074300z
+      operation: deploy one intentionally unavailable R2 public origin for the bounded missing-object and application rollback drill
+      planned_at: 2026-07-15T07:43:00Z
+      status: planned
+      planned:
+        r2_object_writes: 0
+        public_http_requests: 2
+        transfer_bytes: 2097152
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 0
+        previous_production_deployment: dpl_2Lsx5kxkAQ5Q5aNyoQZ1Cp2dyVhe
     - run_id: production-load-cold-100x-reader-retry-20260715t072130z
       operation: 100x anonymous replay on the transient-R2-retry reader in matched cron-free load/control slots
       planned_at: 2026-07-15T07:14:00Z
-      status: planned
+      status: succeeded
       planned:
         r2_object_writes: 0
         public_http_requests: 10000
@@ -314,10 +347,24 @@ budget:
         concurrency: 32
         load_target_start: 2026-07-15T07:21:30Z
         control_target_start: 2026-07-15T07:36:30Z
+      actual:
+        public_http_requests: 7100
+        attempted_requests: 7100
+        transfer_bytes: 504057403
+        status_mismatches: 0
+        unexpected_5xx: 0
+        network_errors: 0
+        network_retries: 0
+        load_delta_rows_read: 0
+        control_delta_rows_read: 0
+        net_delta_rows_read: 0
+        decoupled: true
+        receipt: docs/reports/r2-public-read/production-load-cold-100x-reader-retry-2026-07-15-load.json
+        turso_comparison: docs/reports/r2-public-read/production-load-cold-100x-reader-retry-2026-07-15-turso-comparison.json
     - run_id: production-vercel-reader-retry-20260715t071400z
       operation: deploy one bounded transient R2 fetch retry before the final 100x replay
       planned_at: 2026-07-15T07:14:00Z
-      status: planned
+      status: succeeded
       planned:
         r2_object_writes: 0
         public_http_requests: 2
@@ -325,6 +372,14 @@ budget:
         bootstrap_snapshots: 0
         intentional_turso_windows: 0
         previous_production_deployment: dpl_tEFkTiZ5RYV67UP8eak4p1gsVeX6
+      actual:
+        completed_at: 2026-07-15T07:15:06Z
+        deployment_id: dpl_2Lsx5kxkAQ5Q5aNyoQZ1Cp2dyVhe
+        deployment_url: newsroom-cvfipnh2f-panpanmao.vercel.app
+        deployed_commit: c125b66
+        public_http_requests: 0
+        transfer_bytes: 0
+        r2_object_writes: 0
     - run_id: production-load-cold-100x-budgeted-retry-20260715t070630z
       operation: 100x anonymous replay with one bounded network-only retry in matched cron-free load/control slots
       planned_at: 2026-07-15T06:58:00Z

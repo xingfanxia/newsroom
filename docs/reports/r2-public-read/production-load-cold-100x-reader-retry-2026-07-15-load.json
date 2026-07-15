@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "kind": "anonymous-load",
+  "runId": "production-load-cold-100x-reader-retry-20260715t072130z",
+  "scenario": "cold-deploy",
+  "multiplier": 100,
+  "fixtures": {
+    "dailyDate": "2026-07-13",
+    "eventId": 12181,
+    "itemId": 4,
+    "podcastId": 4
+  },
+  "baseOrigin": "https://news.ax0x.ai",
+  "startedAt": "2026-07-15T07:21:30.369Z",
+  "finishedAt": "2026-07-15T07:26:47.614Z",
+  "plannedRequests": 7100,
+  "completedRequests": 7100,
+  "attemptedRequests": 7100,
+  "receivedBytes": 504057403,
+  "statusMismatchCount": 0,
+  "unexpected5xxCount": 0,
+  "networkErrorCount": 0,
+  "networkRetryCount": 0,
+  "mismatches": []
+}
