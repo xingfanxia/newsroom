@@ -300,10 +300,35 @@ budget:
   production_backed_default_tests: 0
   intentional_turso_windows: named-only
   spend_ledger:
+    - run_id: production-load-cold-100x-reader-retry-20260715t072130z
+      operation: 100x anonymous replay on the transient-R2-retry reader in matched cron-free load/control slots
+      planned_at: 2026-07-15T07:14:00Z
+      status: planned
+      planned:
+        r2_object_writes: 0
+        public_http_requests: 10000
+        transfer_bytes: 1073741824
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 2
+        turso_window: production-load-cold-100x-reader-retry-20260715t072130z
+        concurrency: 32
+        load_target_start: 2026-07-15T07:21:30Z
+        control_target_start: 2026-07-15T07:36:30Z
+    - run_id: production-vercel-reader-retry-20260715t071400z
+      operation: deploy one bounded transient R2 fetch retry before the final 100x replay
+      planned_at: 2026-07-15T07:14:00Z
+      status: planned
+      planned:
+        r2_object_writes: 0
+        public_http_requests: 2
+        transfer_bytes: 2097152
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 0
+        previous_production_deployment: dpl_tEFkTiZ5RYV67UP8eak4p1gsVeX6
     - run_id: production-load-cold-100x-budgeted-retry-20260715t070630z
       operation: 100x anonymous replay with one bounded network-only retry in matched cron-free load/control slots
       planned_at: 2026-07-15T06:58:00Z
-      status: planned
+      status: failed-runtime-500
       planned:
         r2_object_writes: 0
         public_http_requests: 10000
@@ -315,6 +340,19 @@ budget:
         concurrency: 32
         load_target_start: 2026-07-15T07:06:30Z
         control_target_start: 2026-07-15T07:21:30Z
+      actual:
+        public_http_requests: 7100
+        attempted_requests: 7100
+        transfer_bytes: 504591639
+        status_mismatches: 1
+        unexpected_5xx: 1
+        network_errors: 0
+        network_retries: 0
+        load_delta_rows_read: 2420
+        reason: one platform/runtime 500 remained and the prior enrich job continued into the nominal gap; reader retry and a later matched slot are required
+        receipt: docs/reports/r2-public-read/production-load-cold-100x-budgeted-retry-2026-07-15-load.json
+        load_from: docs/reports/r2-public-read/production-load-cold-100x-budgeted-retry-2026-07-15-load-from.json
+        load_to: docs/reports/r2-public-read/production-load-cold-100x-budgeted-retry-2026-07-15-load-to.json
     - run_id: production-load-cold-100x-no-cron-20260715t065130z
       operation: final 100x fresh-deploy replay in matched cron-free slots with an equal named Turso control
       planned_at: 2026-07-15T06:47:00Z

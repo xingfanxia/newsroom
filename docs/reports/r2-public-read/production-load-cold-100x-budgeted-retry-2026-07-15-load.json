@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "kind": "anonymous-load",
+  "runId": "production-load-cold-100x-budgeted-retry-20260715t070630z",
+  "scenario": "cold-deploy",
+  "multiplier": 100,
+  "fixtures": {
+    "dailyDate": "2026-07-13",
+    "eventId": 12181,
+    "itemId": 4,
+    "podcastId": 4
+  },
+  "baseOrigin": "https://news.ax0x.ai",
+  "startedAt": "2026-07-15T07:06:30.466Z",
+  "finishedAt": "2026-07-15T07:11:44.504Z",
+  "plannedRequests": 7100,
+  "completedRequests": 7100,
+  "attemptedRequests": 7100,
+  "receivedBytes": 504591639,
+  "statusMismatchCount": 1,
+  "unexpected5xxCount": 1,
+  "networkErrorCount": 0,
+  "networkRetryCount": 0,
+  "mismatches": [
+    {
+      "expected": 200,
+      "method": "HEAD",
+      "path": "/en/podcasts/4",
+      "received": 500,
+      "session": 10
+    }
+  ]
+}

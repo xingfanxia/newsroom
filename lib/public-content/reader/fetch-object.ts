@@ -18,7 +18,10 @@ export type FetchedPublicObject = {
 };
 
 class PublicSnapshotFetchError extends Error {
-  constructor(readonly reason: "invalid_key" | "network" | "status" | "size") {
+  constructor(
+    readonly reason: "invalid_key" | "network" | "status" | "size",
+    readonly retryable = false,
+  ) {
     super(`public snapshot fetch failed: ${reason}`);
     this.name = "PublicSnapshotFetchError";
   }
@@ -56,6 +59,26 @@ export class PublicSnapshotHttpFetcher {
     if (url.origin !== this.#baseUrl.origin) {
       throw new PublicSnapshotFetchError("invalid_key");
     }
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        return await this.#readOnce(url, options);
+      } catch (error) {
+        if (
+          !(error instanceof PublicSnapshotFetchError) ||
+          !error.retryable ||
+          attempt === 1
+        ) {
+          throw error;
+        }
+      }
+    }
+    throw new PublicSnapshotFetchError("network");
+  }
+
+  async #readOnce(
+    url: URL,
+    options: { immutable: boolean; maxBytes: number },
+  ): Promise<FetchedPublicObject> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.#timeoutMs);
     try {
@@ -74,7 +97,7 @@ export class PublicSnapshotHttpFetcher {
         throw new PublicSnapshotFetchError("invalid_key");
       }
       if (response.status !== 200) {
-        throw new PublicSnapshotFetchError("status");
+        throw new PublicSnapshotFetchError("status", response.status >= 500);
       }
       const declaredLength = Number(response.headers.get("content-length"));
       if (
@@ -94,7 +117,7 @@ export class PublicSnapshotHttpFetcher {
       };
     } catch (error) {
       if (error instanceof PublicSnapshotFetchError) throw error;
-      throw new PublicSnapshotFetchError("network");
+      throw new PublicSnapshotFetchError("network", true);
     } finally {
       clearTimeout(timeout);
     }

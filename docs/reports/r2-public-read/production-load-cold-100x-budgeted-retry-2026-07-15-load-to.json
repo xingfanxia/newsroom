@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "kind": "turso-usage-snapshot",
+  "windowName": "production-load-cold-100x-budgeted-retry-20260715t070630z",
+  "lane": "load",
+  "phase": "to",
+  "database": "newsroom-v2",
+  "capturedAt": "2026-07-15T07:11:44.819Z",
+  "rowsRead": 615315779,
+  "rowsWritten": 4310610
+}

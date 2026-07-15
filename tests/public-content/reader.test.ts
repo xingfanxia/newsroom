@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { canonicalJsonBytes, sha256Hex } from "@/lib/public-content/canonical";
 import { snapshotPointerSchema } from "@/lib/public-content/contracts";
-import { CURRENT_POINTER_KEY, releaseManifestKey } from "@/lib/public-content/paths";
+import {
+  CURRENT_POINTER_KEY,
+  releaseManifestKey,
+} from "@/lib/public-content/paths";
 import { buildPublicRelease } from "@/lib/public-content/publisher/build-release";
 import type { PublicEntityChange } from "@/lib/public-content/publisher/types";
 import { PublicSnapshotReader } from "@/lib/public-content/reader";
@@ -32,15 +35,19 @@ describe("public snapshot reader", () => {
     const first = await reader.readCanonicalState();
     expect(first.release.source).toBe("active");
     expect(first.state.items[0]?.title.en).toBe("Changed title");
-    expect(fixture.http.requests.every(({ key }) => !key.startsWith("/"))).toBeTrue();
     expect(
-      fixture.http.requests.find(({ key }) => key === CURRENT_POINTER_KEY)?.cache,
+      fixture.http.requests.every(({ key }) => !key.startsWith("/")),
+    ).toBeTrue();
+    expect(
+      fixture.http.requests.find(({ key }) => key === CURRENT_POINTER_KEY)
+        ?.cache,
     ).toBe("no-store");
     expect(
       fixture.http.requests
         .filter(({ key }) => key !== CURRENT_POINTER_KEY)
-        .every(({ cache, redirect }) =>
-          cache === "force-cache" && redirect === "error"
+        .every(
+          ({ cache, redirect }) =>
+            cache === "force-cache" && redirect === "error",
         ),
     ).toBeTrue();
 
@@ -71,7 +78,9 @@ describe("public snapshot reader", () => {
 
   test("falls back as a whole release when an active artifact is corrupt", async () => {
     const fixture = await snapshotFixture();
-    const changed = fixture.active.artifacts.find(({ unchanged }) => !unchanged);
+    const changed = fixture.active.artifacts.find(
+      ({ unchanged }) => !unchanged,
+    );
     expect(changed).toBeDefined();
     fixture.http.put(
       changed!.descriptor.key,
@@ -83,7 +92,9 @@ describe("public snapshot reader", () => {
     expect(result.state.items[0]?.title.en).toBe(
       fixture.previousState.items[0]?.title.en,
     );
-    expect(result.state.items.some(({ title }) => title.en === "Changed title")).toBeFalse();
+    expect(
+      result.state.items.some(({ title }) => title.en === "Changed title"),
+    ).toBeFalse();
   });
 
   test("serves only a warm last-known-good release when current becomes unavailable", async () => {
@@ -101,8 +112,10 @@ describe("public snapshot reader", () => {
   test("fails closed for missing, corrupt, unknown-schema, and timed-out snapshots", async () => {
     const missing = new MemoryPublicSnapshotHttp();
     await expect(
-      new PublicSnapshotReader({ baseUrl: missing.baseUrl, fetch: missing.fetch })
-        .readCanonicalState(),
+      new PublicSnapshotReader({
+        baseUrl: missing.baseUrl,
+        fetch: missing.fetch,
+      }).readCanonicalState(),
     ).rejects.toBeInstanceOf(PublicSnapshotUnavailableError);
 
     const unknownPointer = new MemoryPublicSnapshotHttp();
@@ -153,6 +166,25 @@ describe("public snapshot reader", () => {
         timeoutMs: 5,
       }).readCanonicalState(),
     ).rejects.toBeInstanceOf(PublicSnapshotUnavailableError);
+  });
+
+  test("retries one transient snapshot network failure", async () => {
+    const fixture = await snapshotFixture();
+    let failed = false;
+    const reader = new PublicSnapshotReader({
+      baseUrl: fixture.http.baseUrl,
+      fetch: async (input, init) => {
+        if (!failed) {
+          failed = true;
+          throw new Error("injected transient network failure");
+        }
+        return fixture.http.fetch(input, init);
+      },
+      timeoutMs: 100,
+    });
+    const result = await reader.readCanonicalState();
+    expect(failed).toBeTrue();
+    expect(result.release.source).toBe("active");
   });
 
   test("rejects arbitrary keys and has no runtime DB path", async () => {
