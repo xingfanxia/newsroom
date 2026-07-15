@@ -9,6 +9,7 @@ import {
   manifestSchema,
   parsePublicEntityShardValue,
   parsePublicEntityValue,
+  PUBLIC_NUMERIC_SHARD_COUNT,
   publicEntityKey,
   publicEntityShardLogicalName,
   publicEntityShardMetadata,
@@ -121,6 +122,7 @@ export async function buildPublicRelease(
   const identity = await canonicalSha256({
     schemaVersion: 1,
     sourceWatermark: input.sourceWatermark,
+    numericShardCount: PUBLIC_NUMERIC_SHARD_COUNT,
     artifacts: nextDescriptors,
   });
   const releaseId = `r${input.sourceWatermark}-${identity.slice(0, 20)}`;
@@ -128,6 +130,7 @@ export async function buildPublicRelease(
     schemaVersion: 1,
     releaseId,
     sourceWatermark: input.sourceWatermark,
+    numericShardCount: PUBLIC_NUMERIC_SHARD_COUNT,
     artifacts: nextDescriptors,
   });
   const manifestBytes = canonicalJsonBytes(manifest);
@@ -267,10 +270,15 @@ async function buildShardArtifact(
 export function requiresNumericShardMigration(
   manifest: PublicReleaseManifest,
 ): boolean {
-  return Object.keys(manifest.artifacts).some((logicalName) => {
-    if (!isNumericShardLogicalName(logicalName)) return false;
-    return Number.parseInt(logicalName.slice(-2), 16) >= 16;
-  });
+  if (manifest.numericShardCount !== undefined) {
+    return manifest.numericShardCount !== PUBLIC_NUMERIC_SHARD_COUNT;
+  }
+  const buckets = Object.keys(manifest.artifacts)
+    .filter(isNumericShardLogicalName)
+    .map((logicalName) => Number.parseInt(logicalName.slice(-2), 16));
+  if (buckets.length === 0) return false;
+  const inferredShardCount = Math.max(...buckets) >= 16 ? 128 : 16;
+  return inferredShardCount !== PUBLIC_NUMERIC_SHARD_COUNT;
 }
 
 function isNumericShardLogicalName(logicalName: string): boolean {

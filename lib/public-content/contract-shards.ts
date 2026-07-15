@@ -16,8 +16,8 @@ export const PUBLIC_ENTITY_TYPES = [
 ] as const;
 export type PublicEntityType = (typeof PUBLIC_ENTITY_TYPES)[number];
 
-export const PUBLIC_NUMERIC_SHARD_COUNT = 16;
-const PUBLIC_READABLE_NUMERIC_SHARD_COUNTS = [16, 128] as const;
+export const PUBLIC_NUMERIC_SHARD_COUNT = 128;
+const PUBLIC_READABLE_NUMERIC_SHARD_COUNTS = [128, 16] as const;
 
 const idBucketShardSchema = z.strictObject({
   kind: z.literal("id_bucket"),

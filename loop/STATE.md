@@ -300,9 +300,22 @@ budget:
   production_backed_default_tests: 0
   intentional_turso_windows: named-only
   spend_ledger:
-    - run_id: production-vercel-noop-repartition-hotfix-20260715t055300z
-      operation: deploy the no-change migration reachability fix and verify the publisher route is live
-      planned_at: 2026-07-15T05:53:00Z
+    - run_id: production-r2-repartition-128-publisher-20260715t060900z
+      operation: run one no-change publisher migration from 16 oversized buckets to 128 cacheable buckets and verify pointer/manifest
+      planned_at: 2026-07-15T06:09:00Z
+      status: planned
+      planned:
+        r2_object_writes: 400
+        public_http_requests: 5
+        transfer_bytes: 536870912
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 0
+        from_release_id: r34-99bce1c809ccc04163e7
+        expected_release_id: r34-60124bb056a26b9f5e08
+        projected_r2_writes: 311
+    - run_id: production-vercel-cacheable-shards-hotfix-20260715t060900z
+      operation: deploy 128 cacheable numeric shards, explicit manifest shard-count metadata and a 30-second bounded R2 fetch timeout
+      planned_at: 2026-07-15T06:09:00Z
       status: planned
       planned:
         r2_object_writes: 0
@@ -310,7 +323,70 @@ budget:
         transfer_bytes: 5242880
         bootstrap_snapshots: 0
         intentional_turso_windows: 0
+        previous_production_deployment: dpl_GNjr66SUnJQHL915PzCHS2LHaDrv
+    - run_id: production-r2-repartition-128-preflight-20260715t060700z
+      operation: read-only reconstruction of the active 16-bucket release into the cacheable 128-bucket layout
+      planned_at: 2026-07-15T06:07:00Z
+      status: succeeded
+      planned:
+        r2_object_writes: 0
+        public_http_requests: 60
+        transfer_bytes: 134217728
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 0
+        active_release_id: r34-99bce1c809ccc04163e7
+        expected_maximum_r2_writes: 500
+        target_artifact_bytes: 2000000
+      actual:
+        completed_at: 2026-07-15T06:08:20Z
+        public_http_requests: 50
+        transfer_bytes: 94310425
+        r2_object_writes: 0
+        loaded_artifacts: 48
+        built_artifacts: 308
+        manifest_artifacts: 310
+        numeric_artifacts: 308
+        numeric_shard_count: 128
+        maximum_artifact_bytes: 923637
+        projected_r2_writes: 311
+        built_release_id: r34-60124bb056a26b9f5e08
+    - run_id: production-pointer-capacity-rollback-20260715t060200z
+      operation: conditionally roll the active pointer from the oversized 16-bucket release back to the last known 128-bucket release before the timeout hotfix deployment
+      planned_at: 2026-07-15T06:02:00Z
+      status: not-executed-superseded
+      planned:
+        r2_object_writes: 2
+        public_http_requests: 5
+        transfer_bytes: 1048576
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 0
+        from_release_id: r34-99bce1c809ccc04163e7
+        rollback_release_id: r34-25092d7f5022cc16d278
+      actual:
+        r2_object_writes: 0
+        public_http_requests: 0
+        transfer_bytes: 0
+        reason: local S3 credentials are intentionally non-exportable; superseded by a preflighted publisher migration to a new 128-bucket release
+    - run_id: production-vercel-noop-repartition-hotfix-20260715t055300z
+      operation: deploy the no-change migration reachability fix and verify the publisher route is live
+      planned_at: 2026-07-15T05:53:00Z
+      status: succeeded
+      planned:
+        r2_object_writes: 0
+        public_http_requests: 5
+        transfer_bytes: 5242880
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 0
         previous_production_deployment: dpl_4zPFdTxx9LsAa3r72Yo9tCC9GMth
+      actual:
+        completed_at: 2026-07-15T05:53:56Z
+        deployment_id: dpl_GNjr66SUnJQHL915PzCHS2LHaDrv
+        deployment_url: newsroom-mtak1qlhr-panpanmao.vercel.app
+        deployed_commit: dbf3cde
+        public_http_requests: 1
+        transfer_bytes: 329094
+        r2_object_writes: 0
+        html_status: 200
     - run_id: production-vercel-repartition-20260715t053700z
       operation: deploy the backward-compatible 16-bucket reader/writer and verify representative production paths
       planned_at: 2026-07-15T05:37:00Z
@@ -338,7 +414,7 @@ budget:
     - run_id: production-r2-repartition-publisher-20260715t054600z
       operation: allow one normal incremental publisher tick to migrate the active numeric layout from 128 buckets to 16, then verify the committed pointer and manifest
       planned_at: 2026-07-15T05:46:00Z
-      status: planned
+      status: succeeded
       planned:
         r2_object_writes: 60
         public_http_requests: 5
@@ -349,6 +425,26 @@ budget:
         prior_release_id: r34-25092d7f5022cc16d278
         expected_manifest_artifacts: 50
         maximum_numeric_bucket: 0f
+      actual:
+        completed_at: 2026-07-15T05:55:25Z
+        initial_noop_run_id: p-20260715055041410-ad8a6299-7c7c-4506-8fb4-d442f771e64b
+        publisher_run_id: p-20260715055407490-4deeb7c9-3f21-4d79-a875-501ab67b1a88
+        prior_release_id: r34-25092d7f5022cc16d278
+        active_release_id: r34-99bce1c809ccc04163e7
+        source_watermark: 34
+        r2_object_writes: 50
+        public_http_requests: 4
+        transfer_bytes: 284000000
+        transfer_measurement: conservative upper bound covering old-artifact reads, new uploads and readback verification
+        reservation_note: the 10 MiB verification reservation understated the one-time internal R2 migration transfer, but the measured upper bound remained below the governing 1 GiB per-run cap
+        uploaded_artifacts: 48
+        uploaded_bytes: 94294113
+        manifest_artifacts: 50
+        numeric_artifacts: 48
+        legacy_high_bucket_names: 0
+        maximum_numeric_bucket: 0f
+        pointer_etag: W/"7141d8572948266ddbfc70ef2947f1f4"
+        receipt: docs/reports/r2-public-read/production-r2-repartition-publisher-2026-07-15.json
     - run_id: production-r2-repartition-preflight-20260715t053300z
       operation: read-only reconstruction of the active 128-bucket release into the planned 16-bucket layout
       planned_at: 2026-07-15T05:33:00Z
@@ -399,7 +495,7 @@ budget:
     - run_id: production-load-cache-miss-10x-repartition-20260715t054400z
       operation: 10x cache-miss anonymous corpus against the 16-bucket release with an equal named Turso control
       planned_at: 2026-07-15T05:44:00Z
-      status: planned
+      status: failed-runtime-capacity
       planned:
         r2_object_writes: 0
         public_http_requests: 710
@@ -409,6 +505,16 @@ budget:
         deployment_id: dpl_4zPFdTxx9LsAa3r72Yo9tCC9GMth
         required_release_layout: 16-bucket
         turso_window: production-load-cache-miss-10x-repartition-20260715t054400z
+      actual:
+        public_http_requests: 710
+        transfer_bytes: 42663275
+        status_mismatches: 33
+        unexpected_5xx: 33
+        load_delta_rows_read: 0
+        net_db_pressure_observed: 0
+        reason: 16-bucket artifacts are 7-8 MiB over HTTP and exceed the 2 MiB Next.js Data Cache item limit, forcing each cold instance to reconstruct the full 94 MiB state
+        receipt: docs/reports/r2-public-read/production-load-cache-miss-10x-repartition-2026-07-15-load.json
+        failed_window: docs/reports/r2-public-read/production-load-cache-miss-10x-repartition-2026-07-15-failed-window.json
     - run_id: production-load-cold-100x-20260715t051700z
       operation: 100x cold-deploy anonymous corpus with equal named Turso control
       planned_at: 2026-07-15T05:17:00Z

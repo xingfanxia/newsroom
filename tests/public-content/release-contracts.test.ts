@@ -26,10 +26,12 @@ import {
 
 describe("pointer, manifest, and receipt contracts", () => {
   test("bounds numeric entity shards below the bootstrap write cap", () => {
-    expect(PUBLIC_NUMERIC_SHARD_COUNT).toBe(16);
+    expect(PUBLIC_NUMERIC_SHARD_COUNT).toBe(128);
     expect(publicEntityShardLogicalName("item", "1")).toBe("state/items/01");
-    expect(publicEntityShardLogicalName("item", "17")).toBe("state/items/01");
-    expect(publicEntityShardLogicalName("event", "16")).toBe("state/events/00");
+    expect(publicEntityShardLogicalName("item", "17")).toBe("state/items/11");
+    expect(publicEntityShardLogicalName("event", "128")).toBe(
+      "state/events/00",
+    );
   });
 
   test("reject unknown schema versions on otherwise valid records", () => {

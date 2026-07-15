@@ -1,9 +1,5 @@
 import { z } from "zod";
-import {
-  isSafeLogicalName,
-  parseObjectKey,
-  releaseManifestKey,
-} from "./paths";
+import { isSafeLogicalName, parseObjectKey, releaseManifestKey } from "./paths";
 import {
   nonNegativeSafeIntegerSchema,
   schemaVersionSchema,
@@ -11,9 +7,7 @@ import {
   utcIsoTimestampSchema,
 } from "./contract-primitives";
 
-const safeRuntimeIdSchema = z
-  .string()
-  .regex(/^[a-z0-9][a-z0-9._-]{0,127}$/);
+const safeRuntimeIdSchema = z.string().regex(/^[a-z0-9][a-z0-9._-]{0,127}$/);
 
 const releaseRefSchema = z
   .strictObject({
@@ -122,6 +116,7 @@ export const manifestSchema = z.strictObject({
   schemaVersion: schemaVersionSchema,
   releaseId: safeRuntimeIdSchema,
   sourceWatermark: nonNegativeSafeIntegerSchema,
+  numericShardCount: z.union([z.literal(16), z.literal(128)]).optional(),
   artifacts: z
     .record(logicalNameSchema, artifactDescriptorSchema)
     .refine((artifacts) => Object.keys(artifacts).length > 0, {
@@ -241,21 +236,45 @@ export const runReceiptSchema = z
       receipt.status === "failed" && receipt.failureStage === "ack_outbox";
     if (receipt.status === "noop") {
       if (receipt.failureStage !== null || receipt.releaseId !== null) {
-        context.addIssue({ code: "custom", message: "noop cannot commit or fail" });
+        context.addIssue({
+          code: "custom",
+          message: "noop cannot commit or fail",
+        });
       }
     } else if (receipt.status === "succeeded") {
       if (receipt.failureStage !== null) {
-        context.addIssue({ code: "custom", message: "success cannot have failure stage" });
+        context.addIssue({
+          code: "custom",
+          message: "success cannot have failure stage",
+        });
       }
-      if ((isDryRunSuccess && receipt.releaseId !== null) || (!isDryRunSuccess && receipt.releaseId === null)) {
-        context.addIssue({ code: "custom", path: ["releaseId"], message: "release ID contradicts successful run mode" });
+      if (
+        (isDryRunSuccess && receipt.releaseId !== null) ||
+        (!isDryRunSuccess && receipt.releaseId === null)
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["releaseId"],
+          message: "release ID contradicts successful run mode",
+        });
       }
     } else {
       if (receipt.failureStage === null) {
-        context.addIssue({ code: "custom", path: ["failureStage"], message: "failed run requires a failure stage" });
+        context.addIssue({
+          code: "custom",
+          path: ["failureStage"],
+          message: "failed run requires a failure stage",
+        });
       }
-      if ((isCommittedAckFailure && receipt.releaseId === null) || (!isCommittedAckFailure && receipt.releaseId !== null)) {
-        context.addIssue({ code: "custom", path: ["releaseId"], message: "release ID contradicts commit stage" });
+      if (
+        (isCommittedAckFailure && receipt.releaseId === null) ||
+        (!isCommittedAckFailure && receipt.releaseId !== null)
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["releaseId"],
+          message: "release ID contradicts commit stage",
+        });
       }
     }
   });

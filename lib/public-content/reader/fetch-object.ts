@@ -36,7 +36,7 @@ export class PublicSnapshotHttpFetcher {
   }) {
     this.#baseUrl = parseBaseUrl(options.baseUrl);
     this.#fetch = options.fetch ?? fetch;
-    this.#timeoutMs = options.timeoutMs ?? 5_000;
+    this.#timeoutMs = options.timeoutMs ?? 30_000;
     if (!Number.isSafeInteger(this.#timeoutMs) || this.#timeoutMs < 1) {
       throw new TypeError("snapshot fetch timeout must be a positive integer");
     }

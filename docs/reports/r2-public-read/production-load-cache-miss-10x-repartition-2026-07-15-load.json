@@ -1,0 +1,254 @@
+{
+  "schemaVersion": 1,
+  "kind": "anonymous-load",
+  "runId": "production-load-cache-miss-10x-repartition-20260715t054400z",
+  "scenario": "cache-miss",
+  "multiplier": 10,
+  "fixtures": {
+    "dailyDate": "2026-07-13",
+    "eventId": 12181,
+    "itemId": 4,
+    "podcastId": 4
+  },
+  "baseOrigin": "https://news.ax0x.ai",
+  "startedAt": "2026-07-15T05:57:34.684Z",
+  "finishedAt": "2026-07-15T05:59:02.634Z",
+  "plannedRequests": 710,
+  "completedRequests": 710,
+  "receivedBytes": 42663275,
+  "statusMismatchCount": 33,
+  "unexpected5xxCount": 33,
+  "mismatches": [
+    {
+      "expected": 200,
+      "method": "HEAD",
+      "path": "/en",
+      "received": 500,
+      "session": 2
+    },
+    {
+      "expected": 200,
+      "method": "HEAD",
+      "path": "/zh/daily/2026-07-13",
+      "received": 500,
+      "session": 2
+    },
+    {
+      "expected": 200,
+      "method": "GET",
+      "path": "/en/podcasts?source=alpha-podcast",
+      "received": 500,
+      "session": 2
+    },
+    {
+      "expected": 200,
+      "method": "GET",
+      "path": "/en/x-monitor?handle=beta-x",
+      "received": 500,
+      "session": 2
+    },
+    {
+      "expected": 200,
+      "method": "GET",
+      "path": "/en/all?offset=1",
+      "received": 500,
+      "session": 4
+    },
+    {
+      "expected": 200,
+      "method": "GET",
+      "path": "/api/sources/active",
+      "received": 503,
+      "session": 4
+    },
+    {
+      "expected": 200,
+      "method": "GET",
+      "path": "/api/events/12181/members?locale=en",
+      "received": 503,
+      "session": 4
+    },
+    {
+      "expected": 200,
+      "method": "HEAD",
+      "path": "/en",
+      "received": 500,
+      "session": 5
+    },
+    {
+      "expected": 200,
+      "method": "GET",
+      "path": "/en/sources",
+      "received": 500,
+      "session": 5
+    },
+    {
+      "expected": 200,
+      "method": "HEAD",
+      "path": "/en/sources",
+      "received": 500,
+      "session": 4
+    },
+    {
+      "expected": 200,
+      "method": "HEAD",
+      "path": "/en/podcasts/4",
+      "received": 500,
+      "session": 5
+    },
+    {
+      "expected": 200,
+      "method": "HEAD",
+      "path": "/en/agents",
+      "received": 500,
+      "session": 4
+    },
+    {
+      "expected": 200,
+      "method": "GET",
+      "path": "/en/podcasts/4",
+      "received": 500,
+      "session": 4
+    },
+    {
+      "expected": 200,
+      "method": "GET",
+      "path": "/en/agents",
+      "received": 500,
+      "session": 5
+    },
+    {
+      "expected": 200,
+      "method": "GET",
+      "path": "/en/agents",
+      "received": 500,
+      "session": 6
+    },
+    {
+      "expected": 200,
+      "method": "HEAD",
+      "path": "/en/sources",
+      "received": 500,
+      "session": 3
+    },
+    {
+      "expected": 200,
+      "method": "HEAD",
+      "path": "/en/x-monitor?handle=beta-x",
+      "received": 500,
+      "session": 3
+    },
+    {
+      "expected": 200,
+      "method": "HEAD",
+      "path": "/en/all?offset=1",
+      "received": 500,
+      "session": 6
+    },
+    {
+      "expected": 200,
+      "method": "HEAD",
+      "path": "/en/agents",
+      "received": 500,
+      "session": 5
+    },
+    {
+      "expected": 200,
+      "method": "HEAD",
+      "path": "/en/curated",
+      "received": 500,
+      "session": 3
+    },
+    {
+      "expected": 200,
+      "method": "GET",
+      "path": "/en/x-monitor?handle=beta-x",
+      "received": 500,
+      "session": 5
+    },
+    {
+      "expected": 200,
+      "method": "GET",
+      "path": "/en/x-monitor?handle=beta-x",
+      "received": 500,
+      "session": 3
+    },
+    {
+      "expected": 200,
+      "method": "HEAD",
+      "path": "/en/all?offset=1",
+      "received": 500,
+      "session": 4
+    },
+    {
+      "expected": 200,
+      "method": "HEAD",
+      "path": "/en/agents",
+      "received": 500,
+      "session": 7
+    },
+    {
+      "expected": 200,
+      "method": "HEAD",
+      "path": "/zh/daily",
+      "received": 500,
+      "session": 7
+    },
+    {
+      "expected": 200,
+      "method": "HEAD",
+      "path": "/en/podcasts/4",
+      "received": 500,
+      "session": 7
+    },
+    {
+      "expected": 200,
+      "method": "HEAD",
+      "path": "/en/sources",
+      "received": 500,
+      "session": 7
+    },
+    {
+      "expected": 200,
+      "method": "GET",
+      "path": "/en/curated",
+      "received": 500,
+      "session": 7
+    },
+    {
+      "expected": 200,
+      "method": "GET",
+      "path": "/en/sources",
+      "received": 500,
+      "session": 8
+    },
+    {
+      "expected": 200,
+      "method": "GET",
+      "path": "/en/all?offset=1",
+      "received": 500,
+      "session": 10
+    },
+    {
+      "expected": 200,
+      "method": "GET",
+      "path": "/en",
+      "received": 500,
+      "session": 10
+    },
+    {
+      "expected": 200,
+      "method": "GET",
+      "path": "/en/podcasts/4",
+      "received": 500,
+      "session": 9
+    },
+    {
+      "expected": 200,
+      "method": "GET",
+      "path": "/en/podcasts?source=alpha-podcast",
+      "received": 500,
+      "session": 10
+    }
+  ]
+}

@@ -453,12 +453,12 @@ describe("pointer-last incremental publisher", () => {
 });
 
 describe("incremental release scale", () => {
-  test("repartitions a legacy 128-bucket release before applying incremental work", async () => {
+  test("repartitions a legacy 16-bucket release before applying incremental work", async () => {
     const legacyItem = item(17);
     const legacyBytes = canonicalJsonBytes({
       schemaVersion: 1,
       entityType: "item",
-      shard: { kind: "id_bucket", bucket: "11" },
+      shard: { kind: "id_bucket", bucket: "01" },
       entities: [legacyItem],
     });
     const legacySha = await sha256Hex(legacyBytes);
@@ -468,13 +468,14 @@ describe("incremental release scale", () => {
       byteLength: legacyBytes.byteLength,
       mediaType: "application/json" as const,
       encoding: "utf-8" as const,
-      shard: { kind: "id_bucket" as const, bucket: "11" },
+      shard: { kind: "id_bucket" as const, bucket: "01" },
     };
     const previous = manifestSchema.parse({
       schemaVersion: 1,
       releaseId: "r20-legacy",
       sourceWatermark: 20,
-      artifacts: { "state/items/11": legacyDescriptor },
+      numericShardCount: 16,
+      artifacts: { "state/items/01": legacyDescriptor },
     });
     const migrated = await buildPublicRelease({
       previousManifest: previous,
@@ -484,7 +485,7 @@ describe("incremental release scale", () => {
     });
     expect(migrated.loadedArtifactCount).toBe(1);
     expect(Object.keys(migrated.manifest.artifacts)).toEqual([
-      "state/items/01",
+      "state/items/11",
     ]);
     expect(migrated.artifacts).toHaveLength(1);
     expect(
@@ -561,9 +562,9 @@ describe("incremental release scale", () => {
         },
       })),
     );
-    expect(hundred.loadedArtifactCount).toBe(16);
-    expect(hundred.artifacts).toHaveLength(16);
-    expect(loadCounts[0]).toBe(16);
+    expect(hundred.loadedArtifactCount).toBe(100);
+    expect(hundred.artifacts).toHaveLength(100);
+    expect(loadCounts[0]).toBe(100);
 
     const repeated = await build(
       initialChanges.map((change) => ({

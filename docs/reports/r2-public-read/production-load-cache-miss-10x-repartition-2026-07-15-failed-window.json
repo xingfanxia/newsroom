@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "kind": "turso-window",
+  "windowName": "production-load-cache-miss-10x-repartition-20260715t054400z",
+  "lane": "load",
+  "database": "newsroom-v2",
+  "fromAt": "2026-07-15T05:57:34.649Z",
+  "toAt": "2026-07-15T05:59:18.737Z",
+  "durationHours": 0.028913333333333333,
+  "deltaRowsRead": 0,
+  "rowsPerHour": 0,
+  "projectedMonthlyRows": 0,
+  "hardTargetMet": true,
+  "preferredTargetMet": true
+}
