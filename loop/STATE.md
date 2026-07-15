@@ -306,7 +306,7 @@ budget:
     - run_id: production-materialized-page-artifacts-cutover-20260715t220839z
       operation: deploy publisher-built immutable page artifacts, run the one-time view migration publish, verify anonymous TTFB without prewarming, merge, and redeploy the merged main branch
       planned_at: 2026-07-15T22:08:39Z
-      status: planned
+      status: succeeded-with-deploy-upload-overrun-within-global-ceiling
       planned:
         r2_object_writes: 150
         public_http_requests: 100
@@ -314,6 +314,45 @@ budget:
         bootstrap_snapshots: 0
         intentional_turso_windows: 0
         previous_production_deployment: dpl_4yeVjBJ3nkznozqEKaZEF8wpQpmD
+      actual:
+        completed_at: 2026-07-15T22:23:24Z
+        merged_main_sha: 9ae3596bf56eb4c9fade99e966dd597cfdfceb3e
+        deployment_id: dpl_uTYCxxymEjp2H9p7PC8uJeGTzQdk
+        release_id: r457-28ad1215f3a0fd05dbc7
+        r2_object_writes: 117
+        public_http_requests_approx: 100
+        deployment_upload_bytes_approx: 688000000
+        bootstrap_snapshots: 0
+        publisher_migrations:
+          initial_views:
+            duration_ms: 60898
+            uploaded_objects: 95
+            uploaded_bytes: 6748442
+          all_podcast_detail_buckets:
+            duration_ms: 28771
+            uploaded_objects: 16
+            reused_objects: 14
+            uploaded_bytes: 5269805
+        materialized_view_artifacts: 30
+        canonical_state_artifacts: 313
+        sequential_ttfb_seconds:
+          homepage_en:
+            min: 0.237991
+            max: 0.633731
+          all_en:
+            min: 0.281343
+            max: 0.361060
+          curated_en:
+            min: 0.279263
+            max: 0.358979
+          podcast_detail_4:
+            min: 0.273586
+            max: 0.352128
+        eight_way_cold_ttfb_seconds:
+          min: 0.266681
+          max: 2.508147
+        unexpected_5xx: 0
+        conclusion: anonymous default pages and all podcast details read publisher-built immutable artifacts; the 95 MB canonical reconstruction is confined to the publisher cron
     - run_id: production-materialized-page-artifacts-diagnostic-20260715t215425z
       operation: measure the active canonical snapshot field/shape size before replacing request-time reconstruction with publisher-built materialized page artifacts
       planned_at: 2026-07-15T21:54:25Z
