@@ -47,6 +47,7 @@ export const anonymousLoadReceiptSchema = z.strictObject({
   receivedBytes: z.number().int().nonnegative(),
   statusMismatchCount: z.number().int().nonnegative(),
   unexpected5xxCount: z.number().int().nonnegative(),
+  networkErrorCount: z.number().int().nonnegative().default(0),
   mismatches: z.array(
     z.strictObject({
       expected: z.number().int(),
@@ -106,6 +107,7 @@ export async function runAnonymousLoad(options: {
   let completedRequests = 0;
   let receivedBytes = 0;
   let unexpected5xxCount = 0;
+  let networkErrorCount = 0;
   let statusMismatchCount = 0;
   const mismatches: AnonymousLoadReceipt["mismatches"] = [];
 
@@ -113,14 +115,31 @@ export async function runAnonymousLoad(options: {
     while (cursor < plan.length) {
       const item = plan[cursor++] as AnonymousLoadRequest;
       const url = new URL(item.path, baseUrl);
-      const response = await request(url, {
-        method: item.method === "HEAD" ? "HEAD" : "GET",
-        redirect: "manual",
-        headers:
-          item.method === "RSC"
-            ? { RSC: "1", "Next-Router-Prefetch": "1" }
-            : undefined,
-      });
+      let response: Response;
+      try {
+        response = await request(url, {
+          method: item.method === "HEAD" ? "HEAD" : "GET",
+          redirect: "manual",
+          headers:
+            item.method === "RSC"
+              ? { RSC: "1", "Next-Router-Prefetch": "1" }
+              : undefined,
+        });
+      } catch {
+        completedRequests += 1;
+        networkErrorCount += 1;
+        statusMismatchCount += 1;
+        if (mismatches.length < 100) {
+          mismatches.push({
+            expected: item.expectedStatus,
+            method: item.method,
+            path: item.path,
+            received: 0,
+            session: item.session,
+          });
+        }
+        continue;
+      }
       let bytes = 0;
       if (item.method !== "HEAD") {
         bytes = (await response.arrayBuffer()).byteLength;
@@ -165,6 +184,7 @@ export async function runAnonymousLoad(options: {
     receivedBytes,
     statusMismatchCount,
     unexpected5xxCount,
+    networkErrorCount,
     mismatches,
   });
 }

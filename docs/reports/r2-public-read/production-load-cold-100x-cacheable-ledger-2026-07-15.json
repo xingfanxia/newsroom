@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "goalVersion": "r2-public-read-v1-ec57c55fe111",
+  "runId": "production-load-cold-100x-cacheable-20260715t061800z",
+  "plannedAt": "2026-07-15T06:18:00.000Z",
+  "planned": {
+    "bootstrapSnapshots": 0,
+    "publicHttpRequests": 7100,
+    "r2ObjectWrites": 0,
+    "transferBytes": 1073741824
+  },
+  "tursoWindowName": "production-load-cold-100x-cacheable-20260715t061800z"
+}

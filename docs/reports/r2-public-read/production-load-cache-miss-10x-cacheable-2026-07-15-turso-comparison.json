@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "kind": "turso-load-comparison",
+  "windowName": "production-load-cache-miss-10x-cacheable-20260715t061100z",
+  "database": "newsroom-v2",
+  "durationHours": 0.017413333333333333,
+  "loadDeltaRowsRead": 0,
+  "controlDeltaRowsRead": 2,
+  "netDeltaRowsRead": -2,
+  "decoupled": false
+}

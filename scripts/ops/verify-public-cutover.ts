@@ -284,7 +284,8 @@ function loadEvidenceIsComplete(
       load.plannedRequests !== expectedRequests ||
       load.completedRequests !== load.plannedRequests ||
       load.statusMismatchCount !== 0 ||
-      load.unexpected5xxCount !== 0
+      load.unexpected5xxCount !== 0 ||
+      load.networkErrorCount !== 0
     ) {
       issues.push(`load receipt ${load.runId} did not complete cleanly`);
     }

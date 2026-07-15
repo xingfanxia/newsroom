@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "kind": "turso-usage-snapshot",
+  "windowName": "production-load-cold-100x-cacheable-20260715t061800z",
+  "lane": "load",
+  "phase": "from",
+  "database": "newsroom-v2",
+  "capturedAt": "2026-07-15T06:19:01.625Z",
+  "rowsRead": 615309221,
+  "rowsWritten": 4309069
+}

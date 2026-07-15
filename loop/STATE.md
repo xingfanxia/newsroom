@@ -300,10 +300,124 @@ budget:
   production_backed_default_tests: 0
   intentional_turso_windows: named-only
   spend_ledger:
+    - run_id: production-load-cold-100x-cacheable-retry-20260715t062500z
+      operation: retry the 100x fresh-deploy anonymous corpus at concurrency 32 with durable network-error receipts and an equal named Turso control
+      planned_at: 2026-07-15T06:25:00Z
+      status: planned
+      planned:
+        r2_object_writes: 0
+        public_http_requests: 7100
+        transfer_bytes: 1073741824
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 2
+        release_id: r49-c0d0ff3e7a4fb1c9efe5
+        turso_window: production-load-cold-100x-cacheable-retry-20260715t062500z
+        concurrency: 32
+    - run_id: production-vercel-cold-100x-retry-redeploy-20260715t062500z
+      operation: force one fresh production deployment before the concurrency-32 100x retry
+      planned_at: 2026-07-15T06:25:00Z
+      status: planned
+      planned:
+        r2_object_writes: 0
+        public_http_requests: 2
+        transfer_bytes: 2097152
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 0
+        previous_production_deployment: dpl_9ckMiFAjNdbWGnQT7v9bPowbQJ8R
+    - run_id: production-load-cold-100x-cacheable-20260715t061800z
+      operation: 100x anonymous corpus immediately after a fresh production deployment with an equal named Turso control
+      planned_at: 2026-07-15T06:18:00Z
+      status: failed-runtime-and-harness
+      planned:
+        r2_object_writes: 0
+        public_http_requests: 7100
+        transfer_bytes: 1073741824
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 2
+        release_id: r49-c0d0ff3e7a4fb1c9efe5
+        turso_window: production-load-cold-100x-cacheable-20260715t061800z
+        concurrency: 64
+      actual:
+        public_http_requests: bounded-at-most-7100
+        transfer_bytes: bounded-at-most-1073741824
+        unexpected_5xx_observed: 1
+        client_network_errors_observed: 1
+        load_delta_rows_read: 45
+        turso_window_valid_for_decoupling: false
+        reason: concurrency 64 produced one real snapshot-unavailable response and one client connection failure; the old harness aborted before writing a load receipt
+        load_from: docs/reports/r2-public-read/production-load-cold-100x-cacheable-2026-07-15-load-from.json
+        load_to: docs/reports/r2-public-read/production-load-cold-100x-cacheable-2026-07-15-load-to.json
+    - run_id: production-vercel-cold-100x-redeploy-20260715t061800z
+      operation: redeploy the validated cacheable-shard commit to create fresh production compute before the 100x cold-deploy corpus
+      planned_at: 2026-07-15T06:18:00Z
+      status: succeeded
+      planned:
+        r2_object_writes: 0
+        public_http_requests: 2
+        transfer_bytes: 2097152
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 0
+        commit: 80bf408
+        previous_production_deployment: dpl_HVpNDseKUt39C54JnAhqSmGDdGeQ
+      actual:
+        completed_at: 2026-07-15T06:18:51Z
+        deployment_id: dpl_9ckMiFAjNdbWGnQT7v9bPowbQJ8R
+        deployment_url: newsroom-r5rduffdm-panpanmao.vercel.app
+        public_http_requests: 0
+        transfer_bytes: 0
+        r2_object_writes: 0
+    - run_id: production-load-cache-miss-10x-cacheable-retry-20260715t061500z
+      operation: retry the clean 10x cache-miss anonymous corpus and equal Turso control away from publisher cadence
+      planned_at: 2026-07-15T06:15:00Z
+      status: succeeded
+      planned:
+        r2_object_writes: 0
+        public_http_requests: 710
+        transfer_bytes: 268435456
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 2
+        deployment_id: dpl_HVpNDseKUt39C54JnAhqSmGDdGeQ
+        release_id: r49-c0d0ff3e7a4fb1c9efe5
+        turso_window: production-load-cache-miss-10x-cacheable-retry-20260715t061500z
+      actual:
+        public_http_requests: 710
+        transfer_bytes: 50459180
+        status_mismatches: 0
+        unexpected_5xx: 0
+        load_delta_rows_read: 0
+        control_delta_rows_read: 0
+        net_delta_rows_read: 0
+        decoupled: true
+        receipt: docs/reports/r2-public-read/production-load-cache-miss-10x-cacheable-retry-2026-07-15-load.json
+        turso_comparison: docs/reports/r2-public-read/production-load-cache-miss-10x-cacheable-retry-2026-07-15-turso-comparison.json
+    - run_id: production-load-cache-miss-10x-cacheable-20260715t061100z
+      operation: 10x anonymous cache-miss corpus against the 128-bucket cacheable release with an equal named Turso control
+      planned_at: 2026-07-15T06:11:00Z
+      status: inconclusive-control-noise
+      planned:
+        r2_object_writes: 0
+        public_http_requests: 710
+        transfer_bytes: 268435456
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 2
+        deployment_id: dpl_HVpNDseKUt39C54JnAhqSmGDdGeQ
+        release_id: r49-c0d0ff3e7a4fb1c9efe5
+        turso_window: production-load-cache-miss-10x-cacheable-20260715t061100z
+      actual:
+        public_http_requests: 710
+        transfer_bytes: 50459180
+        status_mismatches: 0
+        unexpected_5xx: 0
+        load_delta_rows_read: 0
+        control_delta_rows_read: 2
+        net_delta_rows_read: -2
+        reason: the load was DB-zero but the equal control overlapped a background publisher; exact-zero acceptance requires a fresh pair
+        receipt: docs/reports/r2-public-read/production-load-cache-miss-10x-cacheable-2026-07-15-load.json
+        turso_comparison: docs/reports/r2-public-read/production-load-cache-miss-10x-cacheable-2026-07-15-turso-comparison.json
     - run_id: production-r2-repartition-128-publisher-20260715t060900z
       operation: run one no-change publisher migration from 16 oversized buckets to 128 cacheable buckets and verify pointer/manifest
       planned_at: 2026-07-15T06:09:00Z
-      status: planned
+      status: succeeded
       planned:
         r2_object_writes: 400
         public_http_requests: 5
@@ -313,10 +427,30 @@ budget:
         from_release_id: r34-99bce1c809ccc04163e7
         expected_release_id: r34-60124bb056a26b9f5e08
         projected_r2_writes: 311
+      actual:
+        completed_at: 2026-07-15T06:09:39Z
+        publisher_run_id: p-20260715060836516-4d0e0577-e3a3-4f8a-a05d-747743e93fc7
+        from_release_id: r34-99bce1c809ccc04163e7
+        active_release_id: r49-c0d0ff3e7a4fb1c9efe5
+        source_watermark: 49
+        r2_object_write_attempts: 311
+        uploaded_artifacts: 15
+        reused_artifacts: 293
+        uploaded_bytes: 11209051
+        reused_bytes: 83320283
+        public_http_requests: 3
+        transfer_bytes: 220000000
+        transfer_measurement: conservative upper bound below the reserved 512 MiB
+        manifest_artifacts: 310
+        numeric_artifacts: 308
+        numeric_shard_count: 128
+        maximum_artifact_bytes: 923637
+        pointer_etag: W/"871d48f06ea7a62ffed4d7eaf85575e2"
+        receipt: docs/reports/r2-public-read/production-r2-repartition-128-publisher-2026-07-15.json
     - run_id: production-vercel-cacheable-shards-hotfix-20260715t060900z
       operation: deploy 128 cacheable numeric shards, explicit manifest shard-count metadata and a 30-second bounded R2 fetch timeout
       planned_at: 2026-07-15T06:09:00Z
-      status: planned
+      status: succeeded
       planned:
         r2_object_writes: 0
         public_http_requests: 5
@@ -324,6 +458,16 @@ budget:
         bootstrap_snapshots: 0
         intentional_turso_windows: 0
         previous_production_deployment: dpl_GNjr66SUnJQHL915PzCHS2LHaDrv
+      actual:
+        completed_at: 2026-07-15T06:10:20Z
+        deployment_id: dpl_HVpNDseKUt39C54JnAhqSmGDdGeQ
+        deployment_url: newsroom-gslux1qth-panpanmao.vercel.app
+        deployed_commit: 80bf408
+        public_http_requests: 1
+        transfer_bytes: 363364
+        r2_object_writes: 0
+        html_status: 200
+        html_seconds: 8.116781
     - run_id: production-r2-repartition-128-preflight-20260715t060700z
       operation: read-only reconstruction of the active 16-bucket release into the cacheable 128-bucket layout
       planned_at: 2026-07-15T06:07:00Z
@@ -518,7 +662,7 @@ budget:
     - run_id: production-load-cold-100x-20260715t051700z
       operation: 100x cold-deploy anonymous corpus with equal named Turso control
       planned_at: 2026-07-15T05:17:00Z
-      status: planned
+      status: not-executed-superseded
       planned:
         r2_object_writes: 0
         public_http_requests: 7100
@@ -527,6 +671,10 @@ budget:
         intentional_turso_windows: 2
         deployment_id: dpl_6K4t8Zy9fDLJuJJAdt9xnPQEXSHL
         turso_window: production-load-cold-100x-20260715t051700z
+      actual:
+        public_http_requests: 0
+        transfer_bytes: 0
+        reason: superseded after the old 128-shard reader failed its prerequisite 10x capacity test; replacement run targets the cacheable timeout-fixed deployment
     - run_id: production-load-cache-miss-10x-20260715t051700z
       operation: 10x cache-miss anonymous corpus with equal named Turso control
       planned_at: 2026-07-15T05:17:00Z
