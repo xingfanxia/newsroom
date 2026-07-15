@@ -300,6 +300,24 @@ budget:
   production_backed_default_tests: 0
   intentional_turso_windows: named-only
   spend_ledger:
+    - run_id: production-vercel-staged-canary-20260715t045942z
+      operation: authenticated staged-deployment HTML/RSC/JSON/RSS probes
+      planned_at: 2026-07-15T04:59:42Z
+      status: blocked-before-canary
+      planned:
+        r2_object_writes: 0
+        public_http_requests: 10
+        transfer_bytes: 10485760
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 0
+        deployment_id: dpl_2Ny68n8xMWXDfKXArahoNw4pVpGZ
+        commit: d7361185c304fbd463ed3a7e4593205b3b0462f5
+        previous_production_deployment: dpl_CzkjVD8GwsiX5HhhZd7LTxWdL91h
+      actual:
+        public_http_requests: 3
+        transfer_bytes: 21879
+        cutover_performed: false
+        reason: Vercel blocked the deployment because the local-only Git author email was not associated with the team account
     - run_id: production-r2-bootstrap-20260715t044216z
       operation: exactly one conditional R2 bootstrap through an ephemeral Wrangler remote-dev bridge
       planned_at: 2026-07-15T04:42:16Z
