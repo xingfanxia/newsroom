@@ -300,6 +300,41 @@ budget:
   production_backed_default_tests: 0
   intentional_turso_windows: named-only
   spend_ledger:
+    - run_id: production-vercel-cutover-20260715t051149z
+      operation: production Vercel deployment, public-origin cutover, representative probes, and bounded rollback if needed
+      planned_at: 2026-07-15T05:11:49Z
+      status: planned
+      planned:
+        r2_object_writes: 0
+        public_http_requests: 10
+        transfer_bytes: 10485760
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 0
+        commit: e2e80f4753b175934910ebeeb073dd9c4845b514
+        previous_production_deployment: dpl_CzkjVD8GwsiX5HhhZd7LTxWdL91h
+    - run_id: production-vercel-preview-canary-20260715t050741z
+      operation: deploy and probe a protected Vercel preview against the production public R2 origin
+      planned_at: 2026-07-15T05:07:41Z
+      status: succeeded
+      planned:
+        r2_object_writes: 0
+        public_http_requests: 10
+        transfer_bytes: 10485760
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 0
+        commit: e2e80f4753b175934910ebeeb073dd9c4845b514
+        previous_production_deployment: dpl_CzkjVD8GwsiX5HhhZd7LTxWdL91h
+      actual:
+        deployment_id: dpl_2Lmw4rcCwASKHrQSWQRsucUFdTxj
+        deployment_url: newsroom-kuvrq817i-panpanmao.vercel.app
+        public_http_requests: 4
+        transfer_bytes: 457880
+        statuses:
+          html: 200
+          rsc: 200
+          json: 200
+          rss: 200
+        cutover_performed: false
     - run_id: production-vercel-staged-canary-20260715t045942z
       operation: authenticated staged-deployment HTML/RSC/JSON/RSS probes
       planned_at: 2026-07-15T04:59:42Z
