@@ -9,32 +9,15 @@ import { RightRail } from "@/components/feed/right-rail";
 import { CalendarGrid } from "@/components/feed/calendar-grid";
 import { DayBreak } from "./_day-break";
 import { HomeFilters, type HomeTier, type HomeView } from "./_home-filters";
-import {
-  coerceSourcePreset,
-  sourcePresetToFeedFilter,
-} from "@/lib/feed/source-presets";
+import { coerceSourcePreset } from "@/lib/feed/source-presets";
 import {
   coerceHomeTier,
   coerceHomeView,
-  DEFAULT_HOME_TIER,
 } from "@/lib/feed/home-filters";
 import { groupByDay } from "@/lib/feed/group-by-day";
-import { coerceFeedDateKey, feedPageLimitForDate } from "@/lib/feed/page-query";
-import {
-  deriveDayCounts,
-  deriveRecentTickerItems,
-  deriveTopTopics,
-} from "@/lib/public-content/derive";
-import {
-  publicPolicySummary,
-  readPublicPageSnapshot,
-} from "@/lib/public-content/page-data";
-import { queryPublicFeed } from "@/lib/public-content/query";
-import {
-  shellChromeDataFromSnapshot,
-} from "@/lib/shell/chrome-data";
-import { mockStories } from "@/lib/mock/stories";
-import { appLocaleFromParam, type Story } from "@/lib/types";
+import { coerceFeedDateKey } from "@/lib/feed/page-query";
+import { readCachedPublicHomePageModel } from "@/lib/public-content/home-page-model";
+import { appLocaleFromParam } from "@/lib/types";
 
 export const revalidate = 60;
 
@@ -77,104 +60,20 @@ export default async function HotNewsPage({
   // source_id pins a specific publisher and overrides any preset bucket.
   const sourceId = sp.source_id?.trim() || undefined;
   const sourcePreset = coerceSourcePreset(sp.source);
-  const sourceFilter = sourceId
-    ? { sourceId }
-    : sourcePresetToFeedFilter(sourcePreset);
   const activeDate = coerceFeedDateKey(sp.date);
   // Default `today` (importance-sorted hot events). `daily` opts back into
   // the multi-day 3-per-day digest. Calendar drill-in (activeDate) overrides
   // both — that always shows the full archive for the picked day.
   const homeView: HomeView = coerceHomeView(sp.view);
-  // Day picked → show everything curated that day. Unfiltered top-featured
-  // view bumps to 120 (was 40 and people kept asking where the rest went).
-  const limit = feedPageLimitForDate(activeDate, 120);
-
-  // Daily-highlights mode kicks in only when the user hasn't pinned a date,
-  // a specific source, a non-default tier filter, AND has explicitly opted
-  // into ?view=daily. Otherwise the user is on the default ("今日热点")
-  // or drilling into a filter — both want hot-window/today semantics, not
-  // the multi-day digest.
-  const dailyHighlights =
-    !activeDate &&
-    !sourceId &&
-    sourcePreset === "all" &&
-    tier === DEFAULT_HOME_TIER &&
-    homeView === "daily";
-
-  // W8 read-budget floor: bound the default feed scan to the recent window so
-  // it seeks items_feed_recent_idx instead of scanning every enriched row.
-  // Skipped when a source filter is active (source views stay unbounded);
-  // ignored inside buildFeedWhere when a date is picked (calendar reaches any
-  // day). `today` view needs only ~2 days of content → 7d is generous; the
-  // daily-highlights archive browses back → 30d.
-  const feedFloorDays =
-    sourceId || sourcePreset !== "all"
-      ? undefined
-      : dailyHighlights
-        ? 30
-        : 7;
-
-  const { state, nowMs } = await readPublicPageSnapshot();
-  let stories: Story[] = queryPublicFeed(
-    state,
-    {
-      tier,
+  const { stories, chrome, topics, policy, tickerItems, days } =
+    await readCachedPublicHomePageModel({
       locale: appLocale,
-      limit,
-      date: activeDate,
-      // View selection:
-      //   - Specific date picked → archive view (full day's items, no time clip)
-      //   - Daily-highlights default → archive view too (we want top-per-day
-      //     across history, not just hot clusters from the last 24h)
-      //   - Otherwise (tab/source drill-in) → today view (trending events
-      //     with hot-window + start-of-yesterday rescue, see lib/items/live.ts)
-      view: activeDate || dailyHighlights ? "archive" : "today",
-      recencyFloorDays: feedFloorDays,
-      // Default home (no filter): up to 3 stories per day at importance >= 80.
-      // Surfaces the day's notable events (Apple CEO transition, GPT-5.5 release,
-      // Google→Anthropic $40B + secondary stories like DRAM shortages, OpenAI
-      // exec departures) instead of mid-tier noise. Tab/source filters opt out
-      // so power users still get the full feed for their slice. Threshold 80
-      // (vs 85) admits a few more borderline-major stories per day; cap of 3
-      // gives a "day digest" feel without burying the headline behind volume.
-      //
-      // recentDayRescueDays: 3 — Stage D cluster scoring lags ingestion by
-      // ~1-2 days. Without rescue, recent days where leads sit at imp 60-79
-      // disappear entirely from the home feed and the user sees "stuff from
-      // 3 days ago first." The OR-bypass admits any lead from the last 3
-      // calendar days regardless of threshold; maxPerDay=3 still bounds
-      // each rescued day to its top-3 by importance.
-      ...(dailyHighlights
-        ? { minImportance: 80, maxPerDay: 3, recentDayRescueDays: 3 }
-        : {}),
-      ...sourceFilter,
-    },
-    { nowMs },
-  ).items;
-
-  // Cold-start fallback: if there's literally no enriched content, show mock
-  // so the shell renders something sensible.
-  if (stories.length === 0 && tier === DEFAULT_HOME_TIER && sourcePreset === "all" && !sourceId && !activeDate) {
-    if (state.items.length === 0) stories = mockStories;
-  }
-
-  const chrome = shellChromeDataFromSnapshot(state, nowMs, {
-    pulse: true,
-    signalRatio: "fromRadar",
-  });
-  const topics = deriveTopTopics(state, nowMs);
-  const policy = publicPolicySummary(state, nowMs);
-  const tickerItems = deriveRecentTickerItems(state, appLocale, nowMs);
-  // Calendar must apply the SAME filters as the feed — otherwise the cell
-  // count can over-promise items that will not render after filtering.
-  const days = deriveDayCounts(
-    state,
-    60,
-    {
-      tier: DEFAULT_HOME_TIER,
-    },
-    nowMs,
-  );
+      tier,
+      sourceId,
+      sourcePreset,
+      activeDate,
+      homeView,
+    });
   const ticker = tickerItems.length > 0 ? tickerItems : FALLBACK_TICKER;
 
   // Both today and archive views render chronologically (published_at DESC

@@ -29,6 +29,10 @@ mock.module("next-intl/server", () => ({
   setRequestLocale: () => undefined,
 }));
 
+mock.module("next/cache", () => ({
+  unstable_cache: (fn: (...args: never[]) => unknown) => fn,
+}));
+
 const PAGE_SOURCES = [
   "app/[locale]/page.tsx",
   "app/[locale]/all/page.tsx",
