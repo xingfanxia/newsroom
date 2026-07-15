@@ -17,9 +17,3 @@ export function publicSnapshotReader(): PublicSnapshotReader {
 
 export { PublicSnapshotReader } from "./read-release";
 export { PublicSnapshotUnavailableError } from "./types";
-export type {
-  PublicCanonicalStateResult,
-  PublicLogicalArtifact,
-  PublicSnapshotReadSource,
-  ResolvedPublicRelease,
-} from "./types";

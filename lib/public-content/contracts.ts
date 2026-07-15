@@ -16,16 +16,11 @@ export {
   type CanonicalPublicState,
 } from "./contract-state";
 export {
-  idBucketShardSchema,
   parsePublicEntityShardValue,
   parsePublicEntityValue,
   publicEntityKey,
   publicEntityShardLogicalName,
   publicEntityShardMetadata,
   publicEntityShardSchemas,
-  publicEntityTypeFromShardLogicalName,
-  singletonShardSchema,
-  type PublicEntityShard,
-  type PublicEntityShardMetadata,
   type PublicEntityType,
 } from "./contract-shards";

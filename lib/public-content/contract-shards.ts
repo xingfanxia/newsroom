@@ -16,11 +16,11 @@ export const PUBLIC_ENTITY_TYPES = [
 ] as const;
 export type PublicEntityType = (typeof PUBLIC_ENTITY_TYPES)[number];
 
-export const idBucketShardSchema = z.strictObject({
+const idBucketShardSchema = z.strictObject({
   kind: z.literal("id_bucket"),
   bucket: z.string().regex(/^[a-f0-9]{2}$/),
 });
-export const singletonShardSchema = z.strictObject({
+const singletonShardSchema = z.strictObject({
   kind: z.literal("singleton"),
 });
 
@@ -57,10 +57,10 @@ export const publicEntityShardSchemas = {
   }),
 } as const;
 
-export type PublicEntityShard = z.infer<
+type PublicEntityShard = z.infer<
   (typeof publicEntityShardSchemas)[PublicEntityType]
 >;
-export type PublicEntityShardMetadata =
+type PublicEntityShardMetadata =
   | z.infer<typeof idBucketShardSchema>
   | z.infer<typeof singletonShardSchema>;
 
@@ -113,7 +113,7 @@ export function publicEntityShardLogicalName(
   return `state/${plural}/${bucket}`;
 }
 
-export function publicEntityTypeFromShardLogicalName(
+function publicEntityTypeFromShardLogicalName(
   logicalName: string,
 ): PublicEntityType {
   if (logicalName === "state/sources") return "source";

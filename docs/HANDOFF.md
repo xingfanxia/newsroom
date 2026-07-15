@@ -1,5 +1,38 @@
 # AX's AI RADAR — Current Handoff
 
+## 2026-07-14 — R2 public-read decoupling implemented locally; production gate pending
+
+The feature branch now separates anonymous traffic from Turso by construction.
+Public-relevant DB writes enqueue bounded outbox work; the authenticated
+`publish-public` cron builds content-addressed releases in the
+`newsroom-public` R2 bucket; anonymous HTML, RSC, public JSON, event/source/daily
+routes, and every RSS family read the validated release from
+`https://content.ax0x.ai`. Bearer v1/MCP, admin, saved data, feedback, tokens,
+and ingestion remain authenticated Turso consumers.
+
+Local evidence is strong but is not a production claim:
+
+- A fresh production build succeeds with Turso absent. Recursive source and
+  compiled/NFT/client/Proxy artifacts for the anonymous inventory contain no DB
+  client, publisher, or Turso marker.
+- All 30 anonymous entries pass GET/HEAD; public pages pass RSC; real Chrome
+  hydrates `/en/all`; a recording poison-Turso endpoint sees zero connections.
+- Bounded 1x/10x/100x load plans, cache contracts, paired Turso-window math, and
+  the cutover receipt aggregator pass locally. The verifier refuses AC-004,
+  AC-011, and AC-012 without a production receipt manifest.
+- No production migration, R2 release, deploy, traffic replay, or cutover has
+  run from this branch. The last measured production rate therefore remains the
+  pre-snapshot known-red result; do not claim the monthly target yet.
+
+The next step is the explicit production gate: apply the checksummed outbox
+migration, perform the single metered bootstrap, probe real release caching,
+deploy/canary without public dual-read, drill pointer/application rollback, run
+bounded traffic/control windows, and capture one clean >=24h Turso window. The
+authoritative command order, caps, monitoring, rollback, and credential cleanup
+are in [`docs/operations/public-snapshots.md`](./operations/public-snapshots.md).
+Older W8/W9 sections below explain the previous DB-cache approach; they are
+historical for anonymous ownership once the R2 cutover ships.
+
 ## 2026-07-13 — W9 read-budget: cron cadence + cache-purge + scale (all read paths bounded; forward run-rate measurement pending)
 
 W8 shipped but a full decomposition (6-agent workflow + a clean 22.9-min prod

@@ -17,7 +17,7 @@ import type { PublicEntityChange } from "./types";
 type ArtifactDescriptor = z.infer<typeof artifactDescriptorSchema>;
 export type PublicReleaseManifest = z.infer<typeof manifestSchema>;
 
-export type BuiltReleaseArtifact = {
+type BuiltReleaseArtifact = {
   logicalName: string;
   descriptor: ArtifactDescriptor;
   bytes: Uint8Array;

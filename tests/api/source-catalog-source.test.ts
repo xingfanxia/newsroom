@@ -24,7 +24,6 @@ const docsReadme = readSource("docs/README.md");
 const agentMcpPlan = readSource("docs/AGENT-MCP-PLAN.md");
 const architectureDoc = readSource("docs/architecture/ingestion.md");
 const handoffDoc = readSource("docs/HANDOFF.md");
-const liveSources = readSource("lib/sources/live.ts");
 const schema = readSource("db/schema.ts");
 const sourceCatalog = readSource("lib/api/source-catalog.ts");
 const removeErroredSourcesScript = readSource(
@@ -154,11 +153,8 @@ describe("source catalog source wiring", () => {
   test("source serializers reuse the shared nullable ISO helper", () => {
     expect(sourceCatalog).toContain("@/lib/time/relative");
     expect(sourceCatalog).toContain("toIsoStringOrNull");
-    expect(liveSources).toContain("toIsoStringOrNull");
     expect(sourceCatalog).not.toContain("function iso(");
     expect(publicSourcesRoute).not.toContain("toISOString()");
-    expect(liveSources).not.toContain("hLastFetched?.toISOString()");
-    expect(liveSources).not.toContain("hLastSuccess?.toISOString()");
   });
 
   test("current docs and public agent copy avoid fixed source-count claims", () => {

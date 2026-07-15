@@ -1,6 +1,6 @@
 const DAY_MS = 86_400_000;
-export const MINIMUM_PUBLIC_RELEASES = 7;
-export const MINIMUM_PUBLIC_RETENTION_DAYS = 30;
+const MINIMUM_PUBLIC_RELEASES = 7;
+const MINIMUM_PUBLIC_RETENTION_DAYS = 30;
 
 export type PublicReleaseInventoryEntry = {
   releaseId: string;

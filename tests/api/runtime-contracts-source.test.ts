@@ -41,7 +41,6 @@ const savedExport = read("lib/api/saved-export.ts");
 const newsletterRssFeed = read("lib/rss/newsletter-feed.ts");
 const sitemap = read("app/sitemap.ts");
 const liveItems = read("lib/items/live.ts");
-const itemDetail = read("lib/items/detail.ts");
 const publicItems = read("lib/api/public-items.ts");
 const v1Items = read("lib/api/v1-items.ts");
 const storyItemFields = read("lib/api/story-item-fields.ts");
@@ -157,7 +156,6 @@ describe("runtime contract source wiring", () => {
 
     for (const source of [
       liveItems,
-      itemDetail,
       savedItems,
       publicItems,
       v1Items,

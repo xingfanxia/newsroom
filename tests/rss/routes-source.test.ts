@@ -40,13 +40,18 @@ describe("RSS route source contracts", () => {
     expect(rssRenderer).toContain("appLocaleLanguageTag(DEFAULT_APP_LOCALE)");
     expect(rssRenderer).not.toContain('?? "zh-CN"');
 
-    for (const helper of [mainFeed, legacyFeeds, newsletterFeed]) {
+    for (const helper of [mainFeed, legacyFeeds]) {
       expect(helper).toContain("@/lib/rss/render");
       expect(helper).toContain("renderRssFeed");
       expect(helper).not.toContain("new NextResponse(xml");
       expect(helper).not.toContain("new Response(xml");
       expect(helper).not.toContain("application/rss+xml; charset=utf-8");
     }
+
+    expect(newsletterFeed).toContain("@/lib/rss/render");
+    expect(newsletterFeed).toContain("structuredNewsletterRssItem");
+    expect(newsletterFeed).not.toContain("renderRssFeed");
+    expect(newsletterFeed).not.toContain("new Response(xml");
   });
 
   test("legacy RSS routes do not hand-roll XML escaping or markdown rendering", () => {
@@ -142,7 +147,7 @@ describe("RSS route source contracts", () => {
     }
   });
 
-  test("legacy newsletter RSS route delegates digest construction to a shared helper", () => {
+  test("legacy newsletter RSS route uses snapshot rendering and a pure mapping helper", () => {
     expect(newsletterFeedRoute).toContain("@/lib/rss/newsletter-feed-meta");
     expect(newsletterFeedRoute).toContain("parseNewsletterRssLocale");
     expect(newsletterFeedRoute).toContain("newsletterPublicRssResponse");
@@ -155,9 +160,9 @@ describe("RSS route source contracts", () => {
     expect(newsletterFeedRoute).not.toContain("DESCRIPTION");
     expect(newsletterFeedRoute).not.toContain("formatRange");
 
-    expect(newsletterFeed).toContain("renderRssFeed");
     expect(newsletterFeed).toContain("structuredNewsletterRssItem");
-    expect(newsletterFeed).toContain("headline} IS NOT NULL");
+    expect(newsletterFeed).not.toContain("@/db/");
+    expect(newsletterFeed).not.toContain("renderStructuredNewsletterRssFeed");
   });
 
   test("snapshot RSS adapter owns all request-time rendering without DB helpers", () => {

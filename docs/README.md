@@ -13,6 +13,7 @@ Read these first for current architecture and operational behavior:
 | Latest production state and recent incidents | [`HANDOFF.md`](./HANDOFF.md) |
 | Architecture map and ownership boundaries | [`architecture/overview.md`](./architecture/overview.md) |
 | Ingestion, enrich, scoring, clustering, cron behavior, AI HOT runtime behavior | [`architecture/ingestion.md`](./architecture/ingestion.md) |
+| Public snapshot publishing, cutover, rollback, and evidence runbook | [`operations/public-snapshots.md`](./operations/public-snapshots.md) |
 | Agent/API/MCP surface | [`agent-access/README.md`](./agent-access/README.md) |
 | Testing and local verification strategy | [`testing/strategy.md`](./testing/strategy.md) |
 | Security notes (RLS doc is superseded — DB is Turso token-only since 2026-07-11) | [`security/2026-04-28-rls-hardening.md`](./security/2026-04-28-rls-hardening.md) |
@@ -23,10 +24,11 @@ trust code and update the doc in the same change.
 ## Active Implementation Plan
 
 - [`R2-PUBLIC-READ-PLAN-2026-07-14.md`](./R2-PUBLIC-READ-PLAN-2026-07-14.md) —
-  approved public-read decoupling authority. Its R2/custom-domain/cache-rule
-  infrastructure is provisioned and local implementation is active; production
-  publish/deploy/cutover remains gated, so this does not describe shipped runtime
-  behavior yet.
+  approved public-read decoupling authority. The implementation is complete in
+  the feature branch and the R2 custom domain/cache rule is provisioned, but the
+  migration, first release, deploy, production load replay, and cutover remain
+  explicitly gated. Use the operator runbook above for current status; do not
+  treat the plan checklist as an authorization to mutate production.
 
 ## Archived Historical Context
 

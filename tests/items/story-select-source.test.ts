@@ -5,7 +5,6 @@ const storySelect = read("lib/items/story-select.ts");
 const baseMapperPaths = [
   "lib/items/live.ts",
   "lib/items/saved.ts",
-  "lib/items/detail.ts",
   "lib/items/semantic-search.ts",
 ] as const;
 const eventMapperPaths = ["lib/items/live.ts", "lib/items/saved.ts"] as const;
@@ -39,7 +38,7 @@ describe("story select source wiring", () => {
       expect(read(path)).toContain("...eventStorySelectFields");
     }
 
-    for (const path of ["lib/items/detail.ts", "lib/items/semantic-search.ts"]) {
+    for (const path of ["lib/items/semantic-search.ts"]) {
       expect(read(path)).not.toContain("...eventStorySelectFields");
     }
   });

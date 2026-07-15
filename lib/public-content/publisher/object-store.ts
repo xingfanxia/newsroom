@@ -3,7 +3,7 @@ export const IMMUTABLE_PUBLIC_CACHE_CONTROL =
 export const POINTER_PUBLIC_CACHE_CONTROL =
   "public, max-age=15, s-maxage=30, stale-while-revalidate=300, stale-if-error=86400" as const;
 
-export type PublisherMediaType =
+type PublisherMediaType =
   | "application/json"
   | "application/rss+xml"
   | "application/xml"

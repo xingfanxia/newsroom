@@ -8,6 +8,7 @@ import { readSource as read } from "@/tests/helpers/source";
 const routeParamsSrc = read("lib/api/route-params.ts");
 const itemDetailSrc = read("lib/api/item-detail.ts");
 const eventMembersSrc = read("lib/api/event-members.ts");
+const eventMemberContractSrc = read("lib/api/event-member-contract.ts");
 const iterationsSrc = read("lib/policy/iterations.ts");
 
 describe("route parameter contracts", () => {
@@ -29,12 +30,13 @@ describe("route parameter contracts", () => {
   });
 
   test("item, event-member, and iteration route parsers reuse the shared parser", () => {
-    for (const source of [itemDetailSrc, eventMembersSrc, iterationsSrc]) {
+    for (const source of [itemDetailSrc, eventMemberContractSrc, iterationsSrc]) {
       expect(source).toContain("@/lib/api/route-params");
       expect(source).toContain("parsePositiveRouteId");
       expect(source).not.toContain("z.coerce.number().int().positive()");
       expect(source).not.toContain('{ ok: false, error: "invalid_id" }');
     }
-    expect(eventMembersSrc).toContain("INVALID_ROUTE_ID_ERROR");
+    expect(eventMemberContractSrc).toContain("INVALID_ROUTE_ID_ERROR");
+    expect(eventMembersSrc).toContain("parseEventMemberRouteParams");
   });
 });

@@ -346,5 +346,11 @@ This inventory is frozen from
   status: OPEN
   depends_on: [AC-004, AC-006, AC-007, AC-008, AC-012]
   reopen_condition: Runtime ownership, public API behavior, ops procedure, or measured budget changes without matching docs.
-  last_verification: Not run; implementation not shipped 2026-07-14.
+  last_verification: >-
+    Local documentation contract passed 2026-07-14: docs index, ownership map,
+    ingestion, agent access, testing strategy, environment template, handoff and
+    operator runbook agree with the runtime inventory, publisher cadence, env
+    names, 422 search behavior, rollback and receipt gates. AC-013 remains OPEN
+    until AC-004/AC-012 production evidence and the measured final budget are
+    written; no production action ran.
 ```

@@ -1,6 +1,6 @@
 # Agent Access — Public API + Skill + RSS
 
-> **Status**: shipped 2026-05-13 (PR #36). Three-track integration surface inspired by AI HOT's `/agent-access` model.
+> **Status**: the three-track integration surface shipped 2026-05-13. Its R2-backed anonymous implementation is current in this feature branch, but the production migration, first release, deploy, and cutover are still gated; the external links below continue to describe the public contract, not proof that production has cut over.
 
 External UI page for end users: [`/zh/agents`](https://news.ax0x.ai/zh/agents) (or `/en/agents`).
 
@@ -33,7 +33,9 @@ External canonical machine docs (served at runtime):
 
 All endpoints return `weak ETag` + honor `If-None-Match` → 304. CORS open (`*`). Cache headers are centralized in `lib/api/public-endpoint-config.ts` and tuned per family (short for feed/search, longer for stable daily-column resources).
 
-Anonymous JSON feed/search reads are served from the validated R2 snapshot through `lib/public-content/http.ts`; request volume does not query Turso. Lexical results update when the publisher advances the release pointer. Anonymous `mode=semantic` returns HTTP 422 `semantic_search_not_supported`; semantic retrieval remains on bearer-authenticated v1/MCP. Those private surfaces retain their `unstable_cache` data-layer caches (`feed-api` / `search-api`).
+Anonymous JSON feed/search reads are served from the validated R2 snapshot through `lib/public-content/http.ts`; the reader needs only `R2_PUBLIC_BASE_URL`, and request volume does not query Turso. Lexical results update when the publisher advances the release pointer. Anonymous `mode=semantic` returns HTTP 422 `semantic_search_not_supported`; semantic retrieval remains on bearer-authenticated v1/MCP. Those private surfaces retain their `unstable_cache` data-layer caches (`feed-api` / `search-api`).
+
+There is no DB fallback on an anonymous cache miss or snapshot failure.
 
 ## Field stripping (vs `/api/v1/*`)
 
@@ -71,10 +73,8 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 - **`lib/api/route-params.ts`** — shared positive route-id parser and `invalid_id` label used by item-detail, event-member, and admin iteration routes.
 - **`lib/api/policy-commit.ts`** — shared admin policy commit request schema and commit mapping; `/api/admin/policy/commit` keeps only admin auth, JSON body parsing, and response-envelope mapping.
 - **`lib/api/iteration-routes.ts`** — shared admin iteration-run lookup/apply/reject result helpers; the `[id]` routes keep only admin auth, route-id parsing, and `adminRouteResult` response-envelope mapping.
-- **`lib/api/daily-columns.ts` + `lib/daily-column/query-defaults.ts`** — live daily-column helpers retained for private/MCP and not-yet-migrated page/RSS paths; anonymous daily JSON routes use the same bounds/defaults over snapshot newsletters.
-- **`lib/rss/http-contract.ts` + `lib/rss/render.ts` + `lib/rss/main-feed-meta.ts` + `lib/rss/main-feed.ts`** — shared RSS HTTP labels, RSS 2.0 XML/HTTP response envelope, main-locale feed metadata, and main feed construction for `/api/feed/{locale}/rss.xml`, including XML escaping, safe `content:encoded` CDATA splitting, feed namespaces, extension elements, cache headers, content type, fallback feed selection, and lightweight markdown-ish HTML rendering. RSS routes and `/agents` technical notes reuse the same content-type/cache/rate label contract without client components importing the XML renderer or rate limiter. The main feed route owns only locale coercion plus the response envelope; layout alternate links, home RSS button, and `/agents` cards reuse the same locale/path/title contract.
-- **`lib/rss/legacy-feed-meta.ts` + `lib/rss/legacy-feeds.ts` + `lib/rss/legacy-feeds-cache.ts`** — shared feed slug/path/title metadata plus row queries and RSS item mapping for `/api/rss/{daily,today,curated}.xml`; the dynamic slug route owns only rate-limit/slug validation/404/response mapping, and the `/agents` integration page reuses the same metadata for its RSS cards. `legacy-feeds-cache.ts` (W9c-3) is the read-budget data-layer cache: `renderLegacyRssFeedCached` wraps the pure `renderLegacyRssFeed` in `unstable_cache` (10-min TTL, own non-cron-purged `legacy-rss` tag). The route stays force-dynamic for its per-request rate-limiter; the render is cached one layer down, so legacy RSS is up to ~10 min stale (matching main/newsletter RSS `revalidate=600`). The curated lane motivated it — with a single curated source it could full-walk the ~21.6k-row items index to fill `LIMIT 50`.
-- **`lib/rss/newsletter-feed.ts`** — shared locale normalization, structured-digest query, and RSS item/channel mapping for `/api/feed/newsletter/{locale}/rss.xml`; the route owns only the HTTP response envelope.
+- **`lib/api/daily-columns.ts` + `lib/daily-column/query-defaults.ts`** — live daily-column helpers retained for private/MCP. Anonymous pages and latest/date/index JSON read snapshot newsletters with the same bounds/defaults.
+- **`lib/rss/*` + `lib/public-content/rss.ts` + `lib/public-content/rss-http.ts`** — shared RSS metadata/XML/HTTP contracts plus pure snapshot derivation for main, newsletter, and legacy slug feeds. Anonymous RSS routes no longer invoke the legacy DB query/cache modules; those modules remain only as pre-cutover/private compatibility code until the stability gate permits removal.
 - **`lib/api/collection-requests.ts`** — shared saved-collection request schemas and duplicate-name detection used by cookie-gated `/api/admin/collections` and bearer-gated `/api/v1/collections`; each route still owns its auth surface and success shape, while `adminRouteResult` / `v1RouteResult` own result-to-envelope error mapping.
 - **`lib/api/saved-requests.ts` + `lib/saved/query-defaults.ts`** — shared saved-item query request parser, query defaults/bounds, and mutation schemas used by bearer-gated `/api/v1/saved` and the browser saved-item move route; route files still own auth and envelopes, while shared route helpers own any cross-surface mutation semantics.
 - **`lib/api/saved-routes.ts`** — shared saved-item route payload helpers used by bearer-gated `/api/v1/saved`, browser `/api/feedback/move`, and MCP `ax_radar_save`; it owns saved lookup, agent saved-item serialization, save toggling, owner-aware collection assignment and move semantics, assigned-collection payloads, and missing-item FK-to-`item_not_found` mapping while adapters keep their auth and response envelopes.
@@ -87,14 +87,15 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 1. Create `app/api/public/<name>/route.ts`
 2. Add its key, family, limit, cache policy, and doc grouping in `lib/api/public-endpoint-config.ts`
 3. Enter through `publicCachedRoute(req, { endpoint: "<endpoint-key>", etagFamily: "public-<name>", label: "<route-label>", load })`
-4. Inside `load`, build a stable `etagSignal({ ... })` — anything that changes when content updates — and return `{ ok: true, signal, body }`
-5. For explicit 4xx branches, return `{ ok: false, error, status }`; for query validation use `publicInvalidQueryResult(issues)`
-6. Reuse an existing domain request helper when one owns the endpoint contract; otherwise parse query strings with `parseQueryParams(req, schema)` from `lib/api/query-params.ts`
-7. Strip LLM internals before returning
-8. Update `/openapi.yaml` (in `app/openapi.yaml/route.ts`) with the new path
-9. Update `/skill.md` (in `app/skill.md/route.ts`) intent table if user-visible
-10. Update `/robots.ts` allow list if needed
-11. Add unit test under `tests/api/`
+4. Add the required public entity or pure query/derivation to `lib/public-content/*`; the loader must consume the validated snapshot and must not import a DB-owning helper.
+5. Inside `load`, build a stable `etagSignal({ ... })` — anything that changes when content updates — and return `{ ok: true, signal, body }`
+6. For explicit 4xx branches, return `{ ok: false, error, status }`; for query validation use `publicInvalidQueryResult(issues)`
+7. Reuse an existing domain request helper when one owns the endpoint contract; otherwise parse query strings with `parseQueryParams(req, schema)` from `lib/api/query-params.ts`
+8. Strip LLM internals before returning
+9. Update `/openapi.yaml` (in `app/openapi.yaml/route.ts`) with the new path
+10. Update `/skill.md` (in `app/skill.md/route.ts`) intent table if user-visible
+11. Update `/robots.ts` allow list if needed
+12. Add unit test under `tests/api/`
 
 ## Discovery files
 
@@ -149,7 +150,7 @@ Everything a user sees on the site stays: `importance`, `hkr` booleans, `tier`, 
 - `tests/items/collections.test.ts` — saved collection assignment rejects cross-owner collection ids
 - `tests/items/feed-source-filter-source.test.ts` — exact `source_id` feed filters win over source preset buckets and reader pages do not match publisher labels
 
-Run these with `bun test --env-file=.env.local tests/api/public-*.test.ts tests/api/agent-auth-source.test.ts tests/api/feed-results.test.ts tests/api/feed-query-*.test.ts tests/api/query-params*.test.ts tests/api/source-catalog*.test.ts tests/api/sources-active-source.test.ts tests/api/skill-source.test.ts tests/api/item-detail*.test.ts tests/api/event-members*.test.ts tests/api/daily-columns*.test.ts tests/api/policy-commit.test.ts tests/api/collection*.test.ts tests/api/saved-*.test.ts tests/api/tweak*.test.ts tests/api/mcp-contract-source.test.ts tests/api/usage-summary.test.ts tests/api/v1-route-*.test.ts tests/api/v1-saved-source.test.ts tests/llm/usage-display.test.ts tests/llm/usage-stats-source.test.ts tests/items/collections.test.ts tests/items/feed-source-filter-source.test.ts`.
+Use the credential-scrubbing runner, for example `bun run test -- tests/api/public-feed.test.ts`; never pass `.env.local` to the default test command. The complete public serving boundary is `bun run verify:r2-public --criterion AC-010`.
 
 ## Operational notes
 
@@ -172,10 +173,8 @@ Run these with `bun test --env-file=.env.local tests/api/public-*.test.ts tests/
 - **Saved item request validation and export rendering are shared across saved surfaces** — `/api/v1/saved` parses GET queries through `parseV1SavedQueryRequest`, with list bounds/defaults from `lib/saved/query-defaults.ts`; `/api/v1/saved` and `/api/feedback/move` parse mutation bodies through `lib/api/saved-requests.ts`, and `/api/feedback/move` delegates move semantics to `moveSavedItemRoutePayload`; cookie-session save-move failures map through `sessionRouteResult`, `APP_LOCALES` remains the locale source for saved queries, inbox moves preserve `targetCollectionId: null`, and `/api/saved/export` delegates Markdown/attachment construction to `lib/api/saved-export.ts`.
 - **Tweak validation is shared across browser + agent surfaces** — `lib/tweaks.ts` owns site-config option values and defaults, `lib/watchlist.ts` owns watchlist trim/lowercase/case-insensitive dedupe, and `/api/tweaks` plus `/api/v1/tweaks` both parse PATCH bodies and build DB patches through `lib/api/tweak-requests.ts`; cookie-session tweak save failures map through `sessionRouteResult`.
 - **Event-member contracts are shared, execution is split** — anonymous UI/public routes use snapshot event/member entities; v1/MCP use the live loader. Locale defaults and the pure parser/serializer remain shared.
-- **Daily JSON is snapshot-only** — public latest/date/index routes query snapshot newsletters with shared bounds/defaults. Live daily-column helpers remain for v1/MCP and page/RSS paths until their dedicated migration task.
-- **RSS rendering is centralized across feed families** — `lib/rss/render.ts` owns the RSS XML envelope, response content type/cache headers, XML escaping, `content:encoded` CDATA safety, namespaces, and extension fields; `lib/rss/main-feed-meta.ts` owns the featured-locale feed metadata shared by the RSS route helper, layout, home controls, and `/agents` page; `lib/rss/main-feed.ts` owns main-feed querying, fallback, item mapping, and channel construction.
-- **Legacy RSS slug feed construction is centralized** — `/api/rss/{daily,today,curated}.xml` delegates slug/path/title metadata to `lib/rss/legacy-feed-meta.ts` and DB row queries plus `RssItem` mapping to `lib/rss/legacy-feeds.ts`; the route file keeps only rate-limit, slug validation, 404 handling, and `rssResponse`. Since W9c-3, the route calls `renderLegacyRssFeedCached` (`lib/rss/legacy-feeds-cache.ts`), which caches the pure `renderLegacyRssFeed` render one layer down (`unstable_cache`, 10-min TTL, `legacy-rss` tag) — so legacy RSS is up to ~10 min stale. The route stays force-dynamic for its per-request rate-limiter (runs before the cached render → no bypass).
-- **Legacy newsletter RSS construction is centralized** — `/api/feed/newsletter/{locale}/rss.xml` delegates locale fallback, legacy structured-digest filtering (`headline IS NOT NULL`), content HTML, and channel metadata to `lib/rss/newsletter-feed.ts`; the route file keeps only `rssResponse`.
+- **Daily pages and JSON are snapshot-only** — anonymous latest/date/index routes and locale pages query snapshot newsletters with shared bounds/defaults. Live daily-column helpers remain for v1/MCP.
+- **All anonymous RSS families are snapshot-only** — main locale, newsletter, and `/api/rss/{daily,today,curated}.xml` bytes are derived through `lib/public-content/rss.ts` from the validated release. Route-level rate limits and HTTP headers remain, but a cache miss cannot reach Turso.
 - **Usage summary request parsing and serialization is centralized across bearer agent surfaces** — `/api/v1/usage/summary` parses requests through `parseUsageSummaryQueryRequest`, while MCP `ax_radar_usage` uses `usageSummaryWindowSchema` and `usageWindowOrDefault`; both call `getUsageSummary`. The helper owns the `today|week|month|all` window set, default `week` window, totals, `by_task`, `by_model`, and `recent_calls` shape.
 - **Usage presentation is centralized for the admin surface** — `lib/llm/usage-display.ts` owns usage range labels, task badge tones, compact token/call formatting, sparkline date labels, and task-model summaries; tests keep those helpers exhaustive over `USAGE_WINDOWS` and `LLM_TASKS`.
 - **v1 bearer auth + plain JSON envelopes are centralized** — route handlers under `/api/v1/*` should call `runV1Route(req, async (user) => ..., { serverErrorLabel })` and return `v1Json`, `v1RouteResult`, or `v1InvalidQueryResult`. Do not call `requireApiToken`, `Response.json`, `v1ServerError`, or hand-copy `try/catch` plus `server_error` responses directly in v1 leaf routes. MCP is the only route adapter that should call `requireApiToken` directly, because it must hand control to the MCP transport after auth. Put reusable or contract-bearing request schemas in `lib/api/*-requests.ts`; keep surface-specific success payload mapping in the route unless a shared route helper already owns that behavior.

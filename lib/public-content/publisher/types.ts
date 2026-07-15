@@ -23,7 +23,7 @@ export type PublicEntityChange =
     }
   | { entityType: "policy"; entityKey: string; value: PublicPolicy | null };
 
-export type PublisherSourceTelemetry = {
+type PublisherSourceTelemetry = {
   candidateRows: number;
   dedupedEntities: number;
   returnedRows: number;

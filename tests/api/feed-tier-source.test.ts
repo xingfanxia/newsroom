@@ -25,7 +25,6 @@ const recomputeClusterLeads = readSource(
 const homePage = readSource("app/[locale]/page.tsx");
 const allPage = readSource("app/[locale]/all/page.tsx");
 const liveItems = readSource("lib/items/live.ts");
-const itemDetail = readSource("lib/items/detail.ts");
 const savedItems = readSource("lib/items/saved.ts");
 const semanticSearch = readSource("lib/items/semantic-search.ts");
 const storyMapper = readSource("lib/items/story-mapper.ts");
@@ -233,7 +232,6 @@ describe("feed tier/view source wiring", () => {
 
     for (const source of [
       liveItems,
-      itemDetail,
       savedItems,
       semanticSearch,
     ]) {

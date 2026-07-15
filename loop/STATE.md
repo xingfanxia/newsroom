@@ -73,19 +73,22 @@ artifacts:
   repo_aliases:
     plan: docs/R2-PUBLIC-READ-PLAN-2026-07-14.md
     evidence: docs/reports/r2-public-read/
-iteration: 20
-phase: implementation
+iteration: 21
+phase: external-gate
 current_artifact: docs/superpowers/plans/2026-07-14-r2-public-read-decoupling.md
 current_criterion: AC-013
 last_action: >-
-  Completed Task 17's local evidence harness. Deterministic bounded anonymous
-  replays, R2 cache-contract probes, exact paired Turso windows and production
-  cutover receipt aggregation pass locally; AC-004/AC-011/AC-012 remain OPEN
-  until the verifier receives real production receipts. No external request,
-  publish, deploy or database mutation ran.
+  Completed Task 18's local documentation synchronization. The docs index,
+  architecture, ingestion, agent/API, testing, environment, handoff and public
+  snapshot operator runbook now match the implemented ownership and external
+  evidence gates. Removed the request-time DB loaders made obsolete by the
+  snapshot boundary; typecheck, dead-code analysis and all 1,439 tests pass
+  locally (1,437 pass, 2 production-only skips). No external request, publish,
+  deploy or database mutation ran.
 next_action: >-
-  Synchronize current architecture, testing and operator documentation for Task
-  18, keeping AC-013 OPEN until the production evidence gate is complete.
+  Pause for explicit authorization before the production gate: outbox migration,
+  one metered bootstrap, real cache probe, deploy/canary/cutover, bounded load
+  and rollback drills, 48h stability, and an exact clean >=24h Turso window.
 halt_cause: null
 halt_scan: []
 stuck_counters: {}

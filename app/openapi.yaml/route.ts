@@ -46,6 +46,7 @@ import {
   SEARCH_LIMIT_MIN,
 } from "@/lib/search/query-defaults";
 import { DEFAULT_PUBLIC_EVENT_MEMBERS_LOCALE } from "@/lib/event-members/query-defaults";
+import { publicRateLimitPerIpLabel } from "@/lib/api/public-endpoint-config";
 import { PUBLIC_SITE_URL, publicUrl } from "@/lib/site";
 
 function yamlInlineEnum(values: readonly (string | null)[]): string {
@@ -63,6 +64,7 @@ const SOURCE_HEALTH_STATUS_ENUM = yamlInlineEnum(SOURCE_HEALTH_STATUSES);
 const SOURCE_KIND_ENUM = yamlInlineEnum(SOURCE_KINDS);
 const SOURCE_LOCALE_ENUM = yamlInlineEnum(SOURCE_LOCALES);
 const VISIBLE_ITEM_TIER_ENUM = yamlInlineEnum(VISIBLE_ITEM_TIERS);
+const SEARCH_RATE_LIMIT_PER_IP = publicRateLimitPerIpLabel("search");
 
 const OPENAPI_YAML = `openapi: 3.1.0
 info:
@@ -172,6 +174,7 @@ paths:
       tags: [search]
       summary: Keyword (lexical) search
       description: |
+        Anonymous lexical search (${SEARCH_RATE_LIMIT_PER_IP}).
         \`mode=lexical\` (default) does LIKE substring against title/summary;
         \`mode=semantic\` returns HTTP 422 with
         \`{"error":"${PUBLIC_SEMANTIC_SEARCH_ERROR}"}\`. Semantic search remains

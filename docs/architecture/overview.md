@@ -15,11 +15,12 @@ OpenAPI, and public skill surfaces.
 
 | Layer | Owns | Should not own |
 |---|---|---|
-| `app/[locale]/*` | Locale-scoped reader/admin pages, page-level data orchestration, and UI composition. | API contract serialization, route envelopes, enum literals, worker logic. |
+| `app/[locale]/*` | Locale-scoped reader/admin pages and UI composition. Anonymous pages receive one validated public snapshot per render; authenticated pages may use private loaders. | Request-time anonymous DB access, API contract serialization, route envelopes, enum literals, worker logic. |
 | `components/*` | Reusable UI primitives and feature widgets. | Data fetching rules or cross-route business contracts. |
-| `app/api/*` | Thin HTTP adapters: auth, rate limit, cache headers, route params, response envelope choice, and static Next route config. | Shared DB queries, repeated serializers, copied `try/catch` server-error branches, duplicated request schemas. |
-| `lib/api/*` | Route-neutral request parsing, domain-result helpers, serializers, and shared payload contracts for public REST, bearer v1, MCP, site pages, and RSS consumers. Also owns the read-budget data caches (`unstable_cache`, 10-min TTL, non-cron-purged) wrapping the feed/search execution paths: `feed-results.ts` (tag `feed-api`) + `search-results.ts` (tag `search-api`) — so public/v1/MCP feed+search results are up to ~10 min stale (W9c-2). | Surface-specific auth policy that belongs in the route adapter. |
-| `lib/rss/*` | RSS metadata, feed construction, XML rendering, headers, and shared feed-family contracts. Also owns the legacy per-source RSS read-budget cache (`legacy-feeds-cache.ts`, `unstable_cache`, 10-min TTL, tag `legacy-rss`) wrapping the pure `renderLegacyRssFeed` — so `/api/rss/[slug]` output is up to ~10 min stale, matching main+newsletter RSS `revalidate=600` (W9c-3). | Per-page UI decisions or one-off route-local XML string assembly. |
+| `app/api/*` | Thin HTTP adapters: auth, rate limit, cache headers, route params, response envelope choice, and static Next route config. Anonymous GET/HEAD adapters read snapshots; cron/v1/MCP/admin adapters retain their explicit authenticated boundaries. | Shared queries, repeated serializers, copied `try/catch` branches, or anonymous DB fallback. |
+| `lib/public-content/*` | Strict public schemas, eligibility/privacy projection, canonical bytes, pure feed/search/page/RSS derivation, the fail-closed R2 reader, and the incremental publisher. `publisher/*` is the only public-content subtree allowed to import Turso. | Users, saved data, feedback, tokens, embeddings, raw reasoning, or request-time DB fallback. |
+| `lib/api/*` | Route-neutral parsing, result helpers, serializers, and private v1/MCP live-query paths. The `feed-api`/`search-api` caches now protect authenticated consumers only; anonymous execution uses `lib/public-content/http.ts`. | Surface-specific auth policy or anonymous live-query ownership. |
+| `lib/rss/*` | Shared RSS metadata and XML/HTTP primitives. Anonymous feed bytes are derived from the validated public snapshot through `lib/public-content/rss.ts` and `rss-http.ts`. | Anonymous DB queries, page UI decisions, or route-local XML assembly. |
 | `lib/types.ts` | Runtime tuples for app/source locales, source kinds/groups/cadences/health, item tiers, feed views, search modes, feedback votes, user roles, iteration statuses, and newsletter labels. | Database-only or route-local enum copies. |
 | `db/schema.ts` | Drizzle tables (Turso libSQL / sqlite-core) with typed TEXT enums, reusing runtime tuples where the value set is a cross-surface contract. | Independent literals that should be shared through `lib/types.ts`. |
 | `workers/*` | Durable ingestion, normalization, article-body prefetch, enrichment, scoring, clustering, newsletter, and editorial-agent processes. | HTTP envelope behavior or browser UI concerns. |
@@ -27,6 +28,22 @@ OpenAPI, and public skill surfaces.
 | `tests/**/*-source.test.ts` | Source-contract checks that keep architectural routing, delegation, and single-source-of-truth invariants from drifting. | Behavioral assertions that need runtime fixtures or DB-backed tests. |
 
 ## Change Routing
+
+### Public read and publication path
+
+Turso remains the private editorial/ingestion source of truth. Public-relevant
+writes append to `public_content_outbox`; the authenticated `publish-public`
+cron coalesces that bounded change set, writes content-addressed R2 objects and
+an immutable manifest, then advances `newsroom/v1/current.json` last with a
+conditional write. Anonymous HTML, RSC, JSON, event, source, daily, and RSS
+surfaces read only that release through `R2_PUBLIC_BASE_URL`.
+
+The reader validates schema, hashes, byte lengths, release identity, and source
+watermark. It may use the pointer's previous release or an in-process last-known
+good release; otherwise it returns controlled unavailable behavior. It never
+queries Turso. There is no DB fallback. See
+[`../operations/public-snapshots.md`](../operations/public-snapshots.md)
+for rollout, rollback, retention, and evidence gates.
 
 Public or agent API work starts in the shared contract module first, then fans
 out to surface adapters:

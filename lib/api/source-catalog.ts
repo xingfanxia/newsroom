@@ -13,11 +13,6 @@ type ActiveSourcePickerRow = Pick<
   "id" | "nameEn" | "nameZh" | "kind" | "group" | "locale"
 >;
 
-type ActiveSourcesRoutePayload = {
-  sources: ReturnType<typeof toActiveSourcePickerItem>[];
-  total: number;
-};
-
 export async function listSourceCatalogRows(
   order: SourceCatalogOrder = "priority",
 ) {
@@ -58,33 +53,6 @@ export async function listSourceCatalogRows(
 export type SourceCatalogRow = Awaited<
   ReturnType<typeof listSourceCatalogRows>
 >[number];
-
-async function listActiveSourcePickerRows(): Promise<
-  ActiveSourcePickerRow[]
-> {
-  return db()
-    .select({
-      id: sources.id,
-      nameEn: sources.nameEn,
-      nameZh: sources.nameZh,
-      kind: sources.kind,
-      group: sources.group,
-      locale: sources.locale,
-    })
-    .from(sources)
-    .where(eq(sources.enabled, true))
-    .orderBy(asc(sources.group), asc(sources.nameEn));
-}
-
-export async function getActiveSourcesRoutePayload(): Promise<
-  ActiveSourcesRoutePayload
-> {
-  const rows = await listActiveSourcePickerRows();
-  return {
-    sources: rows.map(toActiveSourcePickerItem),
-    total: rows.length,
-  };
-}
 
 export function toActiveSourcePickerItem(r: ActiveSourcePickerRow) {
   return {

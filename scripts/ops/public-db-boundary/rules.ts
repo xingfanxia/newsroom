@@ -10,20 +10,15 @@ export const DB_OWNING_LOADER_SOURCES = Object.freeze([
   "lib/api/public-items.ts",
   "lib/api/search-results.ts",
   "lib/api/source-catalog.ts",
-  "lib/items/detail.ts",
   "lib/items/live.ts",
   "lib/items/saved.ts",
   "lib/items/semantic-search.ts",
   "lib/rss/legacy-feeds.ts",
   "lib/rss/main-feed.ts",
-  "lib/rss/newsletter-feed.ts",
   "lib/shell/dashboard-stats.ts",
   "lib/shell/feed-cache.ts",
-  "lib/shell/podcast-channels.ts",
   "lib/shell/system-stats.ts",
   "lib/shell/ticker.ts",
-  "lib/shell/x-handles.ts",
-  "lib/sources/live.ts",
 ]);
 
 const DB_OWNING_LOADERS = new Set(DB_OWNING_LOADER_SOURCES);

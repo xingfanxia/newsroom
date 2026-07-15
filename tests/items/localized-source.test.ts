@@ -4,7 +4,6 @@ import { readSource as read } from "@/tests/helpers/source";
 const mapperPaths = [
   "lib/items/live.ts",
   "lib/items/saved.ts",
-  "lib/items/detail.ts",
   "lib/items/semantic-search.ts",
 ] as const;
 const storyMapper = "lib/items/story-mapper.ts";

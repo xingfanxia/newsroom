@@ -17,7 +17,7 @@ export type FetchedPublicObject = {
   contentType: string | null;
 };
 
-export class PublicSnapshotFetchError extends Error {
+class PublicSnapshotFetchError extends Error {
   constructor(readonly reason: "invalid_key" | "network" | "status" | "size") {
     super(`public snapshot fetch failed: ${reason}`);
     this.name = "PublicSnapshotFetchError";
@@ -101,7 +101,7 @@ export class PublicSnapshotHttpFetcher {
   }
 }
 
-export function isAllowedPublicReadKey(key: string): boolean {
+function isAllowedPublicReadKey(key: string): boolean {
   return (
     key === CURRENT_POINTER_KEY ||
     RELEASE_MANIFEST_KEY.test(key) ||

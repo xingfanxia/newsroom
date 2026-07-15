@@ -15,10 +15,7 @@ export {
   toEventMembersPayload,
 } from "./event-member-contract";
 export type {
-  EventMemberApiItem,
-  EventMembersListEnvelope,
   EventMembersPayload,
-  EventMemberRouteParams,
 } from "./event-member-contract";
 
 type EventMembersRoutePayloadResult =

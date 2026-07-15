@@ -4,9 +4,18 @@ This is the current testing and verification runbook. Historical plans may
 mention older commands; use this file plus `package.json` scripts as the
 source of truth.
 
-## Default Gate
+## Default and final gates
 
-Run the full local gate before committing a code or docs change:
+During implementation, run the smallest focused hermetic test that proves the
+changed contract, plus typecheck or focused lint when the edit needs them:
+
+```bash
+bun run test -- path/to/test.ts
+```
+
+Do not pay a full build/Knip/test pass after every small edit. Run the complete
+local gate once after the final relevant diff for broad or high-risk changes,
+or when preparing a merge/release:
 
 ```bash
 bun run verify
@@ -34,13 +43,14 @@ unreachable from the default gate. It does not promise an offline build: Next
 font resolution and `bunx knip` may still use their normal package/network
 behavior.
 
-Also run `git diff --check` before committing so whitespace issues are caught
+Also run `git diff --check` before the final commit so whitespace issues are caught
 outside the package script. It is not part of `verify` because agents usually
 run `verify` while there are intentional unstaged edits.
 
 ## Targeted Tests
 
-Use targeted tests while iterating, then finish with `bun run verify`.
+Use targeted tests while iterating. Finish with `bun run verify` only at the
+broad-change or merge/release boundary described above.
 
 ```bash
 bun run test -- path/to/test.ts
@@ -68,6 +78,25 @@ The optional Azure semantic smoke additionally requires
 `tests/integration/production/README.md` for the complete input and mutation
 inventory. Never run either command during a clean Turso measurement window.
 
+## Public snapshot boundary
+
+The public-read project has a separate criterion runner:
+
+```bash
+bun run verify:r2-public --criterion AC-009  # compiled source/bundle boundary
+bun run verify:r2-public --criterion AC-010  # cold runtime + browser + poison Turso
+```
+
+AC-004, AC-011, and AC-012 never infer production success from local mocks.
+They require `R2_PUBLIC_EVIDENCE_MANIFEST` pointing to cache, load/control,
+publisher, and exact Turso-window receipts. The evidence tools are explicit
+operators (`evidence:r2-cache`, `evidence:load-public`,
+`evidence:turso-window`, `evidence:public-cutover`): external endpoints require
+both `--apply` and `RUN_PRODUCTION_INTEGRATION=1`, and spend ledgers enforce 500
+object writes, 10,000 public requests, 1 GiB transfer, one bootstrap, and named
+Turso windows. Follow [`../operations/public-snapshots.md`](../operations/public-snapshots.md);
+do not run production evidence during ordinary development.
+
 ## Mocking — bun `mock.module` is process-global
 
 `bun`'s `mock.module` replaces a module for the **whole test process**, not just the
@@ -92,8 +121,8 @@ each had to re-learn:
    wrapper identity) and re-mockable (as `runFeedQuery`/`runSearchQuery` and
    `feed-cache.ts`'s arg-taking readers do).
 
-A targeted single-file run **masks** all three — always cross-check with the full
-`bun run test` before declaring a mock-touching change clean. Do not bypass the
+A targeted single-file run **masks** all three. For a mock-touching diff, run the
+full hermetic test stage once after the final relevant change. Do not bypass the
 runner with a raw `bun test tests/` command.
 
 ## Docs Changes

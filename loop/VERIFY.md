@@ -30,4 +30,4 @@ required production/cache/load receipts, passing criterion checks remain
 | AC-010 | PASS_PENDING_FINAL | Full 30-entry GET/HEAD + page RSC + real Chrome hydration passed with zero poison-Turso connections |
 | AC-011 | OPEN | Bounded 1x/10x/100x and warm/cache-miss/cold-deploy/missing-object harness passes locally; paired production Turso receipts still required |
 | AC-012 | OPEN | Exact-window/publisher receipt aggregation passes locally; clean >=24h production evidence still required and the last observed projection exceeded target |
-| AC-013 | OPEN | Not run |
+| AC-013 | OPEN | Local docs contract passes (5 tests, 56 assertions); remains open for real release/cache/load/24h budget receipts and post-cutover measured state |
