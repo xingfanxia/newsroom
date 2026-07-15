@@ -81,6 +81,7 @@ export async function bootstrapPublicSnapshot(
       previousManifest: null,
       sourceWatermark: input.sourceWatermark,
       changes: stateChanges(state),
+      generatedAtMs: startedAtMs,
       loadArtifact: async () => {
         throw new Error("bootstrap cannot load prior release artifacts");
       },

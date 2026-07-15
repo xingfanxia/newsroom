@@ -6,6 +6,7 @@ import {
 } from "@/lib/public-content/canonical";
 import {
   artifactDescriptorSchema,
+  canonicalStateSchema,
   manifestSchema,
   parsePublicEntityShardValue,
   parsePublicEntityValue,
@@ -17,12 +18,13 @@ import {
   type PublicEntityType,
 } from "@/lib/public-content/contracts";
 import { objectKey } from "@/lib/public-content/paths";
+import { buildMaterializedPageModels } from "./materialize-pages";
 import type { PublicEntityChange } from "./types";
 
 type ArtifactDescriptor = z.infer<typeof artifactDescriptorSchema>;
 export type PublicReleaseManifest = z.infer<typeof manifestSchema>;
 
-type BuiltReleaseArtifact = {
+export type BuiltReleaseArtifact = {
   logicalName: string;
   descriptor: ArtifactDescriptor;
   bytes: Uint8Array;
@@ -42,6 +44,7 @@ export type BuildPublicReleaseInput = {
   previousManifest: unknown | null;
   sourceWatermark: number;
   changes: readonly PublicEntityChange[];
+  generatedAtMs?: number;
   loadArtifact: (
     logicalName: string,
     descriptor: ArtifactDescriptor,
@@ -119,6 +122,30 @@ export async function buildPublicRelease(
     built.push(artifact);
   }
 
+  if (input.generatedAtMs !== undefined) {
+    const reconstructed = await reconstructCanonicalState(
+      nextDescriptors,
+      built,
+      input.loadArtifact,
+    );
+    loadedArtifactCount += reconstructed.loadedArtifactCount;
+    for (const logicalName of Object.keys(nextDescriptors)) {
+      if (logicalName.startsWith("views/")) delete nextDescriptors[logicalName];
+    }
+    for (const view of await buildMaterializedPageModels(
+      reconstructed.state,
+      input.generatedAtMs,
+    )) {
+      const artifact = await buildMaterializedArtifact(
+        view.logicalName,
+        view.value,
+        previous?.artifacts[view.logicalName],
+      );
+      nextDescriptors[view.logicalName] = artifact.descriptor;
+      built.push(artifact);
+    }
+  }
+
   const identity = await canonicalSha256({
     schemaVersion: 1,
     sourceWatermark: input.sourceWatermark,
@@ -142,6 +169,92 @@ export async function buildPublicRelease(
     artifacts: built,
     loadedArtifactCount,
   };
+}
+
+async function reconstructCanonicalState(
+  descriptors: Record<string, ArtifactDescriptor>,
+  built: readonly BuiltReleaseArtifact[],
+  loadArtifact: BuildPublicReleaseInput["loadArtifact"],
+): Promise<{
+  state: ReturnType<typeof canonicalStateSchema.parse>;
+  loadedArtifactCount: number;
+}> {
+  const builtByLogicalName = new Map(
+    built.map((artifact) => [artifact.logicalName, artifact] as const),
+  );
+  const entries = Object.entries(descriptors)
+    .filter(([logicalName]) => logicalName.startsWith("state/"))
+    .sort(([left], [right]) => left.localeCompare(right));
+  let loadedArtifactCount = 0;
+  const shards = await mapWithConcurrency(entries, 16, async ([logicalName, descriptor]) => {
+    const local = builtByLogicalName.get(logicalName);
+    const bytes = local?.bytes ?? (await loadArtifact(logicalName, descriptor));
+    if (!local) loadedArtifactCount += 1;
+    await verifyDescriptorBytes(descriptor, bytes);
+    return parsePublicEntityShardValue(
+      logicalName,
+      JSON.parse(new TextDecoder().decode(bytes)) as unknown,
+    );
+  });
+  const state = {
+    schemaVersion: 1 as const,
+    items: [] as unknown[],
+    events: [] as unknown[],
+    sources: [] as unknown[],
+    newsletters: [] as unknown[],
+    policies: [] as unknown[],
+  };
+  for (const shard of shards) {
+    if (shard.entityType === "item") state.items.push(...shard.entities);
+    else if (shard.entityType === "event") state.events.push(...shard.entities);
+    else if (shard.entityType === "source") state.sources.push(...shard.entities);
+    else if (shard.entityType === "newsletter") state.newsletters.push(...shard.entities);
+    else state.policies.push(...shard.entities);
+  }
+  return { state: canonicalStateSchema.parse(state), loadedArtifactCount };
+}
+
+async function buildMaterializedArtifact(
+  logicalName: string,
+  value: unknown,
+  previousDescriptor: ArtifactDescriptor | undefined,
+): Promise<BuiltReleaseArtifact> {
+  const bytes = canonicalJsonBytes(value);
+  const sha256 = await sha256Hex(bytes);
+  const descriptor = artifactDescriptorSchema.parse({
+    key: objectKey(sha256, "json"),
+    sha256,
+    byteLength: bytes.byteLength,
+    mediaType: "application/json",
+    encoding: "utf-8",
+    shard: { kind: "singleton" },
+  });
+  return {
+    logicalName,
+    descriptor,
+    bytes,
+    unchanged: previousDescriptor?.sha256 === sha256,
+  };
+}
+
+async function mapWithConcurrency<T, R>(
+  values: readonly T[],
+  concurrency: number,
+  map: (value: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(values.length);
+  let next = 0;
+  async function worker(): Promise<void> {
+    for (;;) {
+      const index = next++;
+      if (index >= values.length) return;
+      results[index] = await map(values[index]!);
+    }
+  }
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, values.length) }, worker),
+  );
+  return results;
 }
 
 type NumericEntityType = Extract<

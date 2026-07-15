@@ -180,6 +180,7 @@ async function pageFixture(): Promise<MemoryPublicSnapshotHttp> {
     previousManifest: null,
     sourceWatermark: 40,
     changes: allChanges(PARITY_STATE),
+    generatedAtMs: PARITY_NOW_MS,
     loadArtifact: async () => {
       throw new Error("fixture cannot load a prior artifact");
     },

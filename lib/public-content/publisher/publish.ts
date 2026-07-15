@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { canonicalJsonBytes, sha256Hex } from "@/lib/public-content/canonical";
 import {
+  parseMaterializedPageArtifact,
+  REQUIRED_MATERIALIZED_PAGE_LOGICAL_NAMES,
+} from "@/lib/public-content/materialized-artifact";
+import {
   manifestSchema,
   parsePublicEntityShardValue,
   runReceiptSchema,
@@ -93,7 +97,8 @@ export async function publishIncrementalSnapshot(
 
   if (
     context.batch.changes.length === 0 &&
-    !requiresNumericShardMigration(previousManifest)
+    !requiresNumericShardMigration(previousManifest) &&
+    hasRequiredMaterializedPages(previousManifest)
   ) {
     try {
       await input.source.acknowledgeThrough(context.batch.toWatermark);
@@ -114,6 +119,7 @@ export async function publishIncrementalSnapshot(
       previousManifest,
       sourceWatermark: context.batch.toWatermark,
       changes: context.batch.changes,
+      generatedAtMs: context.startedAtMs,
       loadArtifact: async (_logicalName, descriptor) => {
         const stored = await input.store.readObject(descriptor.key);
         if (!stored)
@@ -228,7 +234,11 @@ export async function uploadChangedReleaseArtifacts(
         `uploaded artifact bytes changed: ${artifact.logicalName}`,
       );
     }
-    parsePublicEntityShardValue(artifact.logicalName, parseJson(stored.bytes));
+    if (artifact.logicalName.startsWith("state/")) {
+      parsePublicEntityShardValue(artifact.logicalName, parseJson(stored.bytes));
+    } else if (artifact.logicalName.startsWith("views/")) {
+      parseMaterializedPageArtifact(stored.bytes);
+    }
     if (put.status === "uploaded") {
       metrics.uploaded += 1;
       metrics.uploadedBytes += artifact.bytes.byteLength;
@@ -237,6 +247,12 @@ export async function uploadChangedReleaseArtifacts(
       metrics.reusedBytes += artifact.bytes.byteLength;
     }
   }
+}
+
+function hasRequiredMaterializedPages(manifest: PublicReleaseManifest): boolean {
+  return REQUIRED_MATERIALIZED_PAGE_LOGICAL_NAMES.every(
+    (logicalName) => logicalName in manifest.artifacts,
+  );
 }
 
 export async function uploadAndVerifyReleaseManifest(

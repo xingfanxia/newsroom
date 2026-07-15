@@ -1,25 +1,25 @@
 import { unstable_cache } from "next/cache";
+import { readPublicPageSnapshot } from "@/lib/public-content/page-data";
 import {
-  deriveDayCounts,
-  derivePodcastChannels,
-  deriveXHandles,
-} from "@/lib/public-content/derive";
+  materializedPageLogicalName,
+  readMaterializedPageModel,
+} from "@/lib/public-content/materialized-artifact";
 import {
-  publicPageItemDetail,
-  readPublicPageSnapshot,
-} from "@/lib/public-content/page-data";
-import {
-  getPublicDailyByDate,
-  listPublicDailyColumns,
-} from "@/lib/public-content/public-dailies";
-import { queryPublicFeed } from "@/lib/public-content/query";
-import { feedPageLimitForDate } from "@/lib/feed/page-query";
-import type { PodcastTier } from "@/lib/feed/podcast-filters";
-import {
-  sourcePresetToFeedFilter,
-  type SourcePreset,
-} from "@/lib/feed/source-presets";
-import { shellChromeDataFromSnapshot } from "@/lib/shell/chrome-data";
+  buildAgentsPageModel,
+  buildAllPageModel,
+  buildCuratedPageModel,
+  buildDailyDatePageModel,
+  buildDailyIndexPageModel,
+  buildPodcastDetailPageModel,
+  buildPodcastsPageModel,
+  buildSourcesPageModel,
+  buildXMonitorPageModel,
+  type AllPageModelInput,
+  type CuratedPageModelInput,
+  type PodcastsPageModelInput,
+  type XMonitorPageModelInput,
+} from "@/lib/public-content/page-model-builders";
+import { DEFAULT_PODCAST_TIER } from "@/lib/feed/podcast-filters";
 import type { AppLocale } from "@/lib/types";
 
 export const PUBLIC_PAGE_MODELS_CACHE_TAG = "public-page-models";
@@ -30,208 +30,219 @@ const cacheOptions = {
   tags: [PUBLIC_PAGE_MODELS_CACHE_TAG],
 };
 
-const readAllPageModel = unstable_cache(
-  async (input: {
-    locale: AppLocale;
-    sourceId?: string;
-    sourcePreset: SourcePreset;
-    activeDate?: string;
-    offset: number;
-  }) => {
+const readCachedAllPageModel = unstable_cache(
+  async (input: AllPageModelInput) => {
     const { state, nowMs } = await readPublicPageSnapshot();
-    const sourceFilter = input.sourceId
-      ? { sourceId: input.sourceId }
-      : sourcePresetToFeedFilter(input.sourcePreset);
-    return {
-      stories: queryPublicFeed(
-        state,
-        {
-          tier: "all",
-          locale: input.locale,
-          limit: feedPageLimitForDate(input.activeDate),
-          offset: input.offset,
-          date: input.activeDate,
-          recencyFloorDays:
-            input.sourceId || input.sourcePreset !== "all" ? undefined : 30,
-          ...sourceFilter,
-        },
-        { nowMs },
-      ).items,
-      chrome: shellChromeDataFromSnapshot(state, nowMs, { pulse: true }),
-      days: deriveDayCounts(state, 60, {}, nowMs),
-    };
+    return buildAllPageModel(state, nowMs, input);
   },
   ["public-all-page-model:v1"],
   cacheOptions,
 );
 
-const readCuratedPageModel = unstable_cache(
-  async (input: {
-    locale: AppLocale;
-    sourceId?: string;
-    activeDate?: string;
-    offset: number;
-  }) => {
+const readCachedCuratedPageModel = unstable_cache(
+  async (input: CuratedPageModelInput) => {
     const { state, nowMs } = await readPublicPageSnapshot();
-    return {
-      stories: queryPublicFeed(
-        state,
-        {
-          tier: "all",
-          locale: input.locale,
-          limit: feedPageLimitForDate(input.activeDate),
-          offset: input.offset,
-          date: input.activeDate,
-          curatedOnly: true,
-          sourceId: input.sourceId,
-          recencyFloorDays: input.sourceId ? undefined : 30,
-        },
-        { nowMs },
-      ).items,
-      chrome: shellChromeDataFromSnapshot(state, nowMs, { pulse: true }),
-      days: deriveDayCounts(state, 60, { curatedOnly: true }, nowMs),
-    };
+    return buildCuratedPageModel(state, nowMs, input);
   },
   ["public-curated-page-model:v1"],
   cacheOptions,
 );
 
-const readSourcesPageModel = unstable_cache(
+const readCachedSourcesPageModel = unstable_cache(
   async () => {
     const { state, nowMs } = await readPublicPageSnapshot();
-    return {
-      live: state.sources,
-      chrome: shellChromeDataFromSnapshot(state, nowMs, { pulse: true }),
-    };
+    return buildSourcesPageModel(state, nowMs);
   },
   ["public-sources-page-model:v1"],
   cacheOptions,
 );
 
-const readPodcastsPageModel = unstable_cache(
-  async (input: {
-    locale: AppLocale;
-    source?: string;
-    tier: PodcastTier;
-  }) => {
+const readCachedPodcastsPageModel = unstable_cache(
+  async (input: PodcastsPageModelInput) => {
     const { state, nowMs } = await readPublicPageSnapshot();
-    const channels = derivePodcastChannels(state);
-    const activeChannel =
-      input.source && channels.some(({ id }) => id === input.source)
-        ? input.source
-        : null;
-    return {
-      channels,
-      activeChannel,
-      stories: queryPublicFeed(
-        state,
-        {
-          tier: input.tier,
-          locale: input.locale,
-          sourceGroup: activeChannel ? undefined : "podcast",
-          sourceId: activeChannel ?? undefined,
-          includeSourceGroup: true,
-          limit: activeChannel ? 300 : 120,
-        },
-        { nowMs },
-      ).items,
-      chrome: shellChromeDataFromSnapshot(state, nowMs, { pulse: true }),
-    };
+    return buildPodcastsPageModel(state, nowMs, input);
   },
   ["public-podcasts-page-model:v1"],
   cacheOptions,
 );
 
-const readPodcastDetailPageModel = unstable_cache(
+const readCachedPodcastDetailPageModel = unstable_cache(
   async (input: { locale: AppLocale; id: number }) => {
     const { state, nowMs } = await readPublicPageSnapshot();
-    return {
-      detail: publicPageItemDetail(state, input.id, input.locale, nowMs),
-      chrome: shellChromeDataFromSnapshot(state, nowMs),
-    };
+    return buildPodcastDetailPageModel(state, nowMs, input);
   },
   ["public-podcast-detail-page-model:v1"],
   cacheOptions,
 );
 
-const readXMonitorPageModel = unstable_cache(
-  async (input: { locale: AppLocale; handle?: string }) => {
+const readCachedXMonitorPageModel = unstable_cache(
+  async (input: XMonitorPageModelInput) => {
     const { state, nowMs } = await readPublicPageSnapshot();
-    const handles = deriveXHandles(state, nowMs);
-    const activeIsValid = input.handle
-      ? handles.some(({ id }) => id === input.handle)
-      : false;
-    return {
-      handles,
-      activeIsValid,
-      stories: queryPublicFeed(
-        state,
-        {
-          tier: "all",
-          locale: input.locale,
-          sourceId: activeIsValid ? input.handle : undefined,
-          sourceKind: activeIsValid ? undefined : "x-api",
-          limit: activeIsValid ? 200 : 80,
-        },
-        { nowMs },
-      ).items,
-      chrome: shellChromeDataFromSnapshot(state, nowMs, { pulse: true }),
-    };
+    return buildXMonitorPageModel(state, nowMs, input);
   },
   ["public-x-monitor-page-model:v1"],
   cacheOptions,
 );
 
-const readDailyIndexPageModel = unstable_cache(
+const readCachedDailyIndexPageModel = unstable_cache(
   async (input: { locale: AppLocale; offset: number; take: number }) => {
     const { state, nowMs } = await readPublicPageSnapshot();
-    return {
-      rows:
-        input.locale === "zh"
-          ? listPublicDailyColumns(state, {
-              locale: "zh",
-              take: input.take,
-              offset: input.offset,
-            })
-          : [],
-      chrome: shellChromeDataFromSnapshot(state, nowMs, { pulse: true }),
-    };
+    return buildDailyIndexPageModel(state, nowMs, input);
   },
   ["public-daily-index-page-model:v1"],
   cacheOptions,
 );
 
-const readDailyDatePageModel = unstable_cache(
+const readCachedDailyDatePageModel = unstable_cache(
   async (input: { locale: AppLocale; date: string }) => {
     const { state, nowMs } = await readPublicPageSnapshot();
-    return {
-      row: getPublicDailyByDate(state, input.date, input.locale),
-      chrome: shellChromeDataFromSnapshot(state, nowMs, { pulse: true }),
-    };
+    return buildDailyDatePageModel(state, nowMs, input);
   },
   ["public-daily-date-page-model:v1"],
   cacheOptions,
 );
 
-const readAgentsPageModel = unstable_cache(
+const readCachedAgentsPageModel = unstable_cache(
   async () => {
     const { state, nowMs } = await readPublicPageSnapshot();
-    return {
-      chrome: shellChromeDataFromSnapshot(state, nowMs, { pulse: true }),
-    };
+    return buildAgentsPageModel(state, nowMs);
   },
   ["public-agents-page-model:v1"],
   cacheOptions,
 );
 
+type AllPageModel = ReturnType<typeof buildAllPageModel>;
+type CuratedPageModel = ReturnType<typeof buildCuratedPageModel>;
+type SourcesPageModel = ReturnType<typeof buildSourcesPageModel>;
+type PodcastsPageModel = ReturnType<typeof buildPodcastsPageModel>;
+type PodcastDetailPageModel = ReturnType<typeof buildPodcastDetailPageModel>;
+type XMonitorPageModel = ReturnType<typeof buildXMonitorPageModel>;
+type DailyIndexPageModel = ReturnType<typeof buildDailyIndexPageModel>;
+type AgentsPageModel = ReturnType<typeof buildAgentsPageModel>;
+
+export async function readAllPageModel(input: AllPageModelInput): Promise<AllPageModel> {
+  if (!input.sourceId && input.sourcePreset === "all" && !input.activeDate && input.offset === 0) {
+    const published = await readMaterializedPageModel<AllPageModel>(
+      materializedPageLogicalName.all(input.locale),
+    );
+    if (published) return published;
+  }
+  return readCachedAllPageModel(input);
+}
+
+export async function readCuratedPageModel(
+  input: CuratedPageModelInput,
+): Promise<CuratedPageModel> {
+  if (!input.sourceId && !input.activeDate && input.offset === 0) {
+    const published = await readMaterializedPageModel<CuratedPageModel>(
+      materializedPageLogicalName.curated(input.locale),
+    );
+    if (published) return published;
+  }
+  return readCachedCuratedPageModel(input);
+}
+
+export async function readSourcesPageModel(): Promise<SourcesPageModel> {
+  const published = await readMaterializedPageModel<SourcesPageModel>(
+    materializedPageLogicalName.sources,
+  );
+  return published ?? readCachedSourcesPageModel();
+}
+
+export async function readPodcastsPageModel(
+  input: PodcastsPageModelInput,
+): Promise<PodcastsPageModel> {
+  if (!input.source && input.tier === DEFAULT_PODCAST_TIER) {
+    const published = await readMaterializedPageModel<PodcastsPageModel>(
+      materializedPageLogicalName.podcasts(input.locale),
+    );
+    if (published) return published;
+  }
+  return readCachedPodcastsPageModel(input);
+}
+
+type PublishedPodcastDetailModel = {
+  detailByLocale: Record<AppLocale, NonNullable<PodcastDetailPageModel["detail"]>>;
+  chrome: PodcastDetailPageModel["chrome"];
+};
+
+export async function readPodcastDetailPageModel(input: {
+  locale: AppLocale;
+  id: number;
+}): Promise<PodcastDetailPageModel> {
+  const published = await readMaterializedPageModel<PublishedPodcastDetailModel>(
+    materializedPageLogicalName.podcastDetail(input.id),
+  );
+  if (published) {
+    return { detail: published.detailByLocale[input.locale], chrome: published.chrome };
+  }
+  return readCachedPodcastDetailPageModel(input);
+}
+
+export async function readXMonitorPageModel(
+  input: XMonitorPageModelInput,
+): Promise<XMonitorPageModel> {
+  if (!input.handle) {
+    const published = await readMaterializedPageModel<XMonitorPageModel>(
+      materializedPageLogicalName.xMonitor(input.locale),
+    );
+    if (published) return published;
+  }
+  return readCachedXMonitorPageModel(input);
+}
+
+export async function readDailyIndexPageModel(input: {
+  locale: AppLocale;
+  offset: number;
+  take: number;
+}): Promise<DailyIndexPageModel> {
+  const published = await readMaterializedPageModel<DailyIndexPageModel>(
+    materializedPageLogicalName.daily(input.locale),
+  );
+  if (published) {
+    return {
+      rows: published.rows.slice(input.offset, input.offset + input.take),
+      chrome: published.chrome,
+    };
+  }
+  return readCachedDailyIndexPageModel(input);
+}
+
+export async function readDailyDatePageModel(input: {
+  locale: AppLocale;
+  date: string;
+}): Promise<ReturnType<typeof buildDailyDatePageModel>> {
+  const published = await readMaterializedPageModel<DailyIndexPageModel>(
+    materializedPageLogicalName.daily(input.locale),
+  );
+  if (published) {
+    return {
+      row: published.rows.find(({ date }) => date === input.date) ?? null,
+      chrome: published.chrome,
+    };
+  }
+  return readCachedDailyDatePageModel(input);
+}
+
+export async function readAgentsPageModel(): Promise<AgentsPageModel> {
+  const published = await readMaterializedPageModel<AgentsPageModel>(
+    materializedPageLogicalName.agents,
+  );
+  return published ?? readCachedAgentsPageModel();
+}
+
 export {
-  readAgentsPageModel,
-  readAllPageModel,
-  readCuratedPageModel,
-  readDailyDatePageModel,
-  readDailyIndexPageModel,
-  readPodcastDetailPageModel,
-  readPodcastsPageModel,
-  readSourcesPageModel,
-  readXMonitorPageModel,
+  buildAgentsPageModel,
+  buildAllPageModel,
+  buildCuratedPageModel,
+  buildDailyDatePageModel,
+  buildDailyIndexPageModel,
+  buildPodcastDetailPageModel,
+  buildPodcastsPageModel,
+  buildSourcesPageModel,
+  buildXMonitorPageModel,
+  type AllPageModelInput,
+  type CuratedPageModelInput,
+  type PodcastsPageModelInput,
+  type XMonitorPageModelInput,
 };

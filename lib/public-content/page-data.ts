@@ -1,5 +1,9 @@
 import { formatCoarseRelativeTime } from "@/lib/time/relative";
-import { createPublicStateIndex, publicStoryFromItem } from "@/lib/public-content/public-items";
+import {
+  createPublicStateIndex,
+  publicStoryFromItem,
+  type PublicStateIndex,
+} from "@/lib/public-content/public-items";
 import { publicSnapshotReader } from "@/lib/public-content/reader";
 import type { PublicCanonicalStateResult } from "@/lib/public-content/reader/types";
 import type { AppLocale } from "@/lib/types";
@@ -39,6 +43,16 @@ export function publicPageItemDetail(
 ) {
   if (!Number.isSafeInteger(id) || id <= 0) return null;
   const index = createPublicStateIndex(value);
+  return publicPageItemDetailFromIndex(index, id, locale, nowMs);
+}
+
+export function publicPageItemDetailFromIndex(
+  index: PublicStateIndex,
+  id: number,
+  locale: AppLocale,
+  nowMs: number,
+) {
+  if (!Number.isSafeInteger(id) || id <= 0) return null;
   const item = index.itemsById.get(id);
   if (!item) return null;
   return {

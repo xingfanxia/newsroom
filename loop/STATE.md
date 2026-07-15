@@ -303,10 +303,92 @@ budget:
   production_backed_default_tests: 0
   intentional_turso_windows: named-only
   spend_ledger:
+    - run_id: production-materialized-page-artifacts-cutover-20260715t220839z
+      operation: deploy publisher-built immutable page artifacts, run the one-time view migration publish, verify anonymous TTFB without prewarming, merge, and redeploy the merged main branch
+      planned_at: 2026-07-15T22:08:39Z
+      status: planned
+      planned:
+        r2_object_writes: 150
+        public_http_requests: 100
+        transfer_bytes: 209715200
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 0
+        previous_production_deployment: dpl_4yeVjBJ3nkznozqEKaZEF8wpQpmD
+    - run_id: production-materialized-page-artifacts-diagnostic-20260715t215425z
+      operation: measure the active canonical snapshot field/shape size before replacing request-time reconstruction with publisher-built materialized page artifacts
+      planned_at: 2026-07-15T21:54:25Z
+      status: succeeded
+      planned:
+        r2_object_writes: 0
+        public_http_requests: 800
+        transfer_bytes: 314572800
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 0
+      actual:
+        completed_at: 2026-07-15T22:04:32Z
+        public_http_requests: 630
+        transfer_bytes_approx: 190500000
+        canonical_bytes: 95119691
+        without_body_bytes: 33423106
+        materialized_artifacts: 93
+        materialized_total_bytes: 5320487
+        largest_materialized_artifact_bytes: 566568
+        canonical_read_ms: 1892
+        materialization_ms: 2927
+    - run_id: production-vercel-all-page-model-cache-20260715t214758z
+      operation: deploy compact shared model caches for every snapshot-backed anonymous HTML page, prewarm canonical route variants, and measure repeated production TTFB
+      planned_at: 2026-07-15T21:47:58Z
+      status: succeeded-interim-superseded
+      planned:
+        r2_object_writes: 0
+        public_http_requests: 100
+        transfer_bytes: 209715200
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 0
+        previous_production_deployment: dpl_BZnc5ka9aDs3TxUdMD9yHmrsKCFH
+        deployed_commit: 8e649fd
+      actual:
+        completed_at: 2026-07-15T21:50:40Z
+        deployment_id: dpl_4yeVjBJ3nkznozqEKaZEF8wpQpmD
+        public_http_requests: 57
+        transfer_bytes: 27413011
+        first_fill_ttfb_seconds:
+          min: 1.650397
+          max: 14.795092
+        steady_ttfb_seconds:
+          min: 0.194436
+          max: 0.505023
+        conclusion: shared runtime cache hid the canonical rebuild after prewarm, but publisher-built artifacts supersede it because ordinary traffic must not own the cold fill
+    - run_id: production-vercel-home-model-cache-20260715t214100z
+      operation: deploy and prewarm the compact shared homepage model cache, then measure cold-fill and repeated production TTFB without changing the public R2/Turso boundary
+      planned_at: 2026-07-15T21:41:00Z
+      status: succeeded-homepage-only
+      planned:
+        r2_object_writes: 0
+        public_http_requests: 20
+        transfer_bytes: 20971520
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 0
+        previous_production_deployment: dpl_44pRPuqym32BTh12urz8uwLXvMjN
+        deployed_commit: 91158f3
+      actual:
+        completed_at: 2026-07-15T21:46:28Z
+        deployment_id: dpl_BZnc5ka9aDs3TxUdMD9yHmrsKCFH
+        public_http_requests: 20
+        homepage_en_steady_ttfb_seconds:
+          min: 0.268214
+          max: 0.464507
+        homepage_zh_steady_ttfb_seconds:
+          min: 0.201447
+          max: 0.318658
+        secondary_page_probe:
+          path: /en/all
+          ttfb_seconds: 2.768372
+        conclusion: homepage cache succeeded; secondary snapshot-backed pages required the same compact-model treatment
     - run_id: production-stability-48h-20260715t075900z
       operation: observe the fixed production deployment for at least 48 hours with bounded representative probes and publisher/runtime failure accounting
       planned_at: 2026-07-15T07:59:00Z
-      status: in-progress
+      status: superseded-by-performance-cutover
       planned:
         r2_object_writes: 0
         public_http_requests: 200
@@ -328,7 +410,7 @@ budget:
     - run_id: production-clean-turso-48h-20260715t075900z
       operation: exact clean Turso window spanning the post-drill stability period, with the final capture after at least 24 hours
       planned_at: 2026-07-15T07:59:00Z
-      status: in-progress
+      status: superseded-by-performance-cutover
       planned:
         r2_object_writes: 0
         public_http_requests: 0
