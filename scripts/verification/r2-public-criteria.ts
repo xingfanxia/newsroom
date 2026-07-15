@@ -309,6 +309,13 @@ const AC008_TEST_INPUTS = [
   "tests/api/public-snapshot-feed-search.test.ts",
 ] as const;
 
+const AC007_TEST_INPUTS = [
+  "tests/e2e/public-snapshot-pages.test.ts",
+  "tests/feed/public-rubric.test.ts",
+  "tests/feed/calendar-prefetch.test.tsx",
+  "tests/privacy/saved-boundary.test.ts",
+] as const;
+
 const AC006_TEST_INPUTS = [
   "tests/api/public-snapshot-routes.test.ts",
   "tests/api/public-snapshot-feed-search.test.ts",
@@ -369,6 +376,31 @@ async function verifyAc008(root: string): Promise<CriterionReceipt> {
   };
 }
 
+async function verifyAc007(root: string): Promise<CriterionReceipt> {
+  const exitCode = await runHermeticTests({
+    root,
+    requestedInputs: AC007_TEST_INPUTS,
+    inheritedEnv: {
+      ...process.env,
+      TURSO_DATABASE_URL: "libsql://ac007-production-sentinel.invalid",
+      TURSO_AUTH_TOKEN: "ac007-production-token-sentinel",
+      R2_SECRET_ACCESS_KEY: "ac007-r2-secret-sentinel",
+    },
+    deadlineMs: 60_000,
+  });
+  assert(exitCode === 0, "AC-007 snapshot page suite failed");
+  return {
+    criterion: "AC-007",
+    ok: true,
+    receipts: [
+      `${AC007_TEST_INPUTS.length} hermetic page/privacy suites passed under hostile credential inheritance`,
+      "all anonymous HTML/RSC page variants rendered from an injected snapshot and their recursive source graphs remained DB-free",
+      "snapshot-unavailable handling, public-only rubric/detail fields and calendar prefetch suppression passed",
+      "anonymous saved page/export denial and robots/sitemap exclusion passed before private loaders",
+    ],
+  };
+}
+
 export async function verifyR2PublicCheap(
   root = resolve(join(import.meta.dir, "../..")),
 ): Promise<CriterionReceipt> {
@@ -398,6 +430,7 @@ export async function verifyR2PublicCriterion(
   if (criterion === "AC-003") return verifyAc003(root);
   if (criterion === "AC-005") return verifyAc005(root);
   if (criterion === "AC-006") return verifyAc006(root);
+  if (criterion === "AC-007") return verifyAc007(root);
   if (criterion === "AC-008") return verifyAc008(root);
   throw new Error(`Criterion is not implemented yet: ${criterion}`);
 }

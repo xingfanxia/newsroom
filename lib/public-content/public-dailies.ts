@@ -52,6 +52,22 @@ export function listPublicDailyIndex(
   };
 }
 
+export function listPublicDailyColumns(
+  value: unknown,
+  options: { locale?: AppLocale; take?: number; offset?: number } = {},
+): PublicDailyColumn[] {
+  const locale = options.locale ?? "zh";
+  const take = options.take ?? 20;
+  const offset = options.offset ?? 0;
+  if (!Number.isSafeInteger(take) || take < 0) {
+    throw new TypeError("take must be a non-negative safe integer");
+  }
+  if (!Number.isSafeInteger(offset) || offset < 0) {
+    throw new TypeError("offset must be a non-negative safe integer");
+  }
+  return dailyRows(value, locale).slice(offset, offset + take).map(toPublicDaily);
+}
+
 export function getPublicDailyByDate(
   value: unknown,
   date: string,
@@ -120,5 +136,14 @@ function assertDate(value: string): void {
     new Date(parsed).toISOString().slice(0, 10) !== value
   ) {
     throw new TypeError(`invalid date: ${value}`);
+  }
+}
+
+export function isPublicDailyDate(value: string): boolean {
+  try {
+    assertDate(value);
+    return true;
+  } catch {
+    return false;
   }
 }

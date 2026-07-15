@@ -61,7 +61,7 @@ describe("pure public feed query", () => {
       tier: "featured",
       coverage: 2,
       crossSourceCount: 1,
-      reasoning: "精选 · 重要度 95 · 吸引力 + 知识量",
+      whyFeatured: "精选 · 重要度 95 · 吸引力 + 知识量",
       stillDeveloping: true,
     });
     expect(en).toMatchObject({
@@ -69,8 +69,10 @@ describe("pure public feed query", () => {
       title: "Alpha event",
       summary: "Alpha summary",
       source: { publisher: "Alpha Podcast" },
-      reasoning: "Featured · importance 95 · hook + knowledge",
+      whyFeatured: "Featured · importance 95 · hook + knowledge",
     });
+    expect(zh).not.toHaveProperty("reasoning");
+    expect(en).not.toHaveProperty("reasoning");
     expect(JSON.stringify(zh)).not.toContain("reasonsZh");
   });
 

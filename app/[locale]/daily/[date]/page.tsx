@@ -2,11 +2,12 @@ import { notFound } from "next/navigation";
 import { setRequestLocale } from "next-intl/server";
 import { ViewShell } from "@/components/shell/view-shell";
 import { DailyColumnRenderer } from "../_renderer";
-import { getShellChromeData } from "@/lib/shell/chrome-data";
 import {
-  dailyColumnDateSchema,
-  getDailyColumnRowByDate,
-} from "@/lib/api/daily-columns";
+  getPublicDailyByDate,
+  isPublicDailyDate,
+} from "@/lib/public-content/public-dailies";
+import { readPublicPageSnapshot } from "@/lib/public-content/page-data";
+import { shellChromeDataFromSnapshot } from "@/lib/shell/chrome-data";
 import { appLocaleFromParam, DAILY_COLUMN_LOCALE } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -20,13 +21,11 @@ export default async function DailyDatePage({ params }: Props) {
   const appLocale = appLocaleFromParam(locale);
   setRequestLocale(appLocale);
   if (appLocale !== DAILY_COLUMN_LOCALE) notFound();
-  const parsedDate = dailyColumnDateSchema.safeParse(date);
-  if (!parsedDate.success) notFound();
+  if (!isPublicDailyDate(date)) notFound();
 
-  const [row, chrome] = await Promise.all([
-    getDailyColumnRowByDate(parsedDate.data, DAILY_COLUMN_LOCALE),
-    getShellChromeData({ pulse: true }),
-  ]);
+  const { state, nowMs } = await readPublicPageSnapshot();
+  const row = getPublicDailyByDate(state, date, DAILY_COLUMN_LOCALE);
+  const chrome = shellChromeDataFromSnapshot(state, nowMs, { pulse: true });
 
   if (!row) notFound();
 
@@ -42,13 +41,13 @@ export default async function DailyDatePage({ params }: Props) {
         <DailyColumnRenderer
           column={{
             id: row.id,
-            columnTitle: row.columnTitle ?? "",
-            columnSummaryMd: row.columnSummaryMd ?? "",
-            columnNarrativeMd: row.columnNarrativeMd ?? "",
-            columnThemeTag: row.columnThemeTag,
-            publishedAt: row.publishedAt,
-            periodStart: row.periodStart,
-            aihotDailyDate: row.aihotDailyDate,
+            columnTitle: row.title ?? "",
+            columnSummaryMd: row.summary_md ?? "",
+            columnNarrativeMd: row.narrative_md ?? "",
+            columnThemeTag: row.theme_tag,
+            publishedAt: new Date(row.generated_at),
+            periodStart: new Date(row.window_start),
+            aihotDailyDate: null,
           }}
         />
       </main>

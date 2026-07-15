@@ -24,7 +24,7 @@ required production/cache/load receipts, passing criterion checks remain
 | AC-004 | OPEN | Infrastructure probe passes MISS→HIT + Age; real release receipt waits on AC-002/AC-003 |
 | AC-005 | OPEN | Not run |
 | AC-006 | OPEN | Not run |
-| AC-007 | OPEN | Not run |
+| AC-007 | PASS_PENDING_FINAL | 4 hermetic page/privacy suites passed (16 tests, 88 assertions); compiled/browser poison proof remains Task 16 |
 | AC-008 | OPEN | Not run |
 | AC-009 | OPEN | Existing anonymous NFT bundles are known red |
 | AC-010 | OPEN | Not run |

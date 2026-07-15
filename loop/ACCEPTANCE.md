@@ -187,16 +187,18 @@ This inventory is frozen from
   fail_evidence: >-
     Current home/all/curated and related pages query Turso; saved falls back to
     ADMIN_USER_ID; calendar links permit automatic prefetch.
-  status: OPEN
+  status: PASS_PENDING_FINAL
   depends_on: [AC-005, AC-006]
   reopen_condition: Any anonymous HTML/RSC/follow-up route can touch Turso, saved data, or a non-public item.
   last_verification: >-
-    Partial local evidence 2026-07-14: Task 3 removed the anonymous saved admin
-    fallback, proved page/export denial before DB/body loaders, removed saved
-    from sitemap and disallowed all locale variants in robots, and disabled all
-    CalendarGrid Link prefetch. AC-007 remains OPEN for snapshot-backed HTML/RSC,
-    browser poison-Turso corpus, and item-eligibility proof. Receipt:
-    docs/reports/r2-public-read/ac-007-task-3-saved-boundary-2026-07-14.md.
+    Passed locally 2026-07-14 via `bun run verify:r2-public --criterion
+    AC-007`: 4 hermetic page/privacy suites, 16 tests and 88 assertions under
+    hostile inherited Turso/R2 credential sentinels. All ten anonymous page
+    variants render from an injected snapshot; recursive source graphs are
+    DB-free; controlled unavailable, public-only rubric/detail fields, disabled
+    calendar prefetch, saved denial and robots/sitemap exclusion passed. Task 16
+    still owns authoritative compiled-runtime and real-browser poison-Turso
+    evidence before final acceptance.
 
 - id: AC-008
   statement: >-

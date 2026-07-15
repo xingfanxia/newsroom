@@ -12,10 +12,11 @@ import {
   type PodcastTier,
 } from "@/lib/feed/podcast-filters";
 import { PodcastChannelPills } from "./_channel-pills";
-import { getFeaturedStories } from "@/lib/items/live";
-import { getShellChromeData } from "@/lib/shell/chrome-data";
-import { getPodcastChannels } from "@/lib/shell/podcast-channels";
-import { appLocaleFromParam, type AppLocale, type Story } from "@/lib/types";
+import { derivePodcastChannels } from "@/lib/public-content/derive";
+import { readPublicPageSnapshot } from "@/lib/public-content/page-data";
+import { queryPublicFeed } from "@/lib/public-content/query";
+import { shellChromeDataFromSnapshot } from "@/lib/shell/chrome-data";
+import { appLocaleFromParam, type AppLocale } from "@/lib/types";
 
 export const revalidate = 60;
 
@@ -41,25 +42,27 @@ export default async function PodcastsPage({
   setRequestLocale(appLocale);
   const activeTier: PodcastTier = coercePodcastTier(sp.tier);
 
-  const [channels, chrome] = await Promise.all([
-    getPodcastChannels().catch(() => []),
-    getShellChromeData({ pulse: true }),
-  ]);
+  const { state, nowMs } = await readPublicPageSnapshot();
+  const channels = derivePodcastChannels(state);
+  const chrome = shellChromeDataFromSnapshot(state, nowMs, { pulse: true });
 
   const activeChannel =
     sp.source && channels.some((c) => c.id === sp.source) ? sp.source : null;
 
-  // `tier='all'` surfaces excluded episodes too — lets the user catch low-
-  // score YT videos (usually off-topic history/crypto stuff) that score
-  // filters out of the default featured view.
-  const filtered = await getFeaturedStories({
-    tier: activeTier,
-    locale: appLocale,
-    sourceGroup: activeChannel ? undefined : "podcast",
-    sourceId: activeChannel ?? undefined,
-    includeSourceGroup: true,
-    limit: activeChannel ? 300 : 120,
-  }).catch((): Story[] => []);
+  // `tier='all'` includes every public-eligible episode. Explicitly excluded
+  // content is never published to the anonymous snapshot.
+  const filtered = queryPublicFeed(
+    state,
+    {
+      tier: activeTier,
+      locale: appLocale,
+      sourceGroup: activeChannel ? undefined : "podcast",
+      sourceId: activeChannel ?? undefined,
+      includeSourceGroup: true,
+      limit: activeChannel ? 300 : 120,
+    },
+    { nowMs },
+  ).items;
 
   const grouped = groupByDay(sortStoriesNewestFirst(filtered));
   const activeLabel = activeChannel

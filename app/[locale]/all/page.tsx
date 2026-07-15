@@ -19,10 +19,11 @@ import {
   feedPageLimitForDate,
   FEED_PAGE_SIZE,
 } from "@/lib/feed/page-query";
-import { getFeaturedStories } from "@/lib/items/live";
-import { getDayCountsCached } from "@/lib/shell/feed-cache";
-import { getShellChromeData } from "@/lib/shell/chrome-data";
-import { appLocaleFromParam, type Story } from "@/lib/types";
+import { deriveDayCounts } from "@/lib/public-content/derive";
+import { readPublicPageSnapshot } from "@/lib/public-content/page-data";
+import { queryPublicFeed } from "@/lib/public-content/query";
+import { shellChromeDataFromSnapshot } from "@/lib/shell/chrome-data";
+import { appLocaleFromParam } from "@/lib/types";
 
 export const revalidate = 60;
 
@@ -52,9 +53,10 @@ export default async function AllPostsPage({
   const offset = coerceFeedOffset(sp.offset);
   const limit = feedPageLimitForDate(activeDate);
 
-  let stories: Story[] = [];
-  try {
-    stories = await getFeaturedStories({
+  const { state, nowMs } = await readPublicPageSnapshot();
+  const stories = queryPublicFeed(
+    state,
+    {
       tier: "all",
       locale: appLocale,
       limit,
@@ -66,15 +68,12 @@ export default async function AllPostsPage({
       recencyFloorDays:
         sourceId || sourcePreset !== "all" ? undefined : 30,
       ...sourceFilter,
-    });
-  } catch {
-    stories = [];
-  }
+    },
+    { nowMs },
+  ).items;
 
-  const [chrome, days] = await Promise.all([
-    getShellChromeData({ pulse: true }),
-    getDayCountsCached(60).catch(() => []),
-  ]);
+  const chrome = shellChromeDataFromSnapshot(state, nowMs, { pulse: true });
+  const days = deriveDayCounts(state, 60, {}, nowMs);
 
   // /all is a chronological full-feed view — sort by publishedAt DESC
   // before grouping (the SQL already does this, but the explicit sort

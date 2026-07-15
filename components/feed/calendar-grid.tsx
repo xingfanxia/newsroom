@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { DayBucket } from "@/lib/shell/dashboard-stats";
+import type { PublicDayBucket } from "@/lib/public-content/derive";
 import { appLocaleLanguageTag, type AppLocale } from "@/lib/types";
 
 /**
@@ -20,7 +20,7 @@ export function CalendarGrid({
   locale,
   monthsBack = 2,
 }: {
-  days: DayBucket[];
+  days: PublicDayBucket[];
   active?: string;
   basePath: string;
   preserveSource?: string;

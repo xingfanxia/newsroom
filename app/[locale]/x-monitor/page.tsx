@@ -6,10 +6,11 @@ import { FeedEmptyState } from "@/components/feed/empty-state";
 import { DayBreak } from "../_day-break";
 import { groupByDay, sortStoriesNewestFirst } from "@/lib/feed/group-by-day";
 import { XHandlesSidebar } from "@/components/x-monitor/handles-sidebar";
-import { getFeaturedStories } from "@/lib/items/live";
-import { getShellChromeData } from "@/lib/shell/chrome-data";
-import { getXHandles } from "@/lib/shell/x-handles";
-import { appLocaleFromParam, type Story } from "@/lib/types";
+import { deriveXHandles } from "@/lib/public-content/derive";
+import { readPublicPageSnapshot } from "@/lib/public-content/page-data";
+import { queryPublicFeed } from "@/lib/public-content/query";
+import { shellChromeDataFromSnapshot } from "@/lib/shell/chrome-data";
+import { appLocaleFromParam } from "@/lib/types";
 
 export const revalidate = 60;
 
@@ -24,23 +25,26 @@ export default async function XMonitorPage({
   const appLocale = appLocaleFromParam(locale);
   setRequestLocale(appLocale);
 
-  const [handles, chrome] = await Promise.all([
-    getXHandles().catch(() => []),
-    getShellChromeData({ pulse: true }),
-  ]);
+  const { state, nowMs } = await readPublicPageSnapshot();
+  const handles = deriveXHandles(state, nowMs);
+  const chrome = shellChromeDataFromSnapshot(state, nowMs, { pulse: true });
 
   const activeHandle = sp.handle ?? null;
   const activeIsValid = activeHandle
     ? handles.some((h) => h.id === activeHandle)
     : false;
 
-  const narrowedStories = await getFeaturedStories({
-    tier: "all",
-    locale: appLocale,
-    sourceId: activeIsValid && activeHandle ? activeHandle : undefined,
-    sourceKind: activeIsValid ? undefined : "x-api",
-    limit: activeIsValid ? 200 : 80,
-  }).catch((): Story[] => []);
+  const narrowedStories = queryPublicFeed(
+    state,
+    {
+      tier: "all",
+      locale: appLocale,
+      sourceId: activeIsValid && activeHandle ? activeHandle : undefined,
+      sourceKind: activeIsValid ? undefined : "x-api",
+      limit: activeIsValid ? 200 : 80,
+    },
+    { nowMs },
+  ).items;
 
   const grouped = groupByDay(sortStoriesNewestFirst(narrowedStories));
   const activeLabel: string = activeIsValid

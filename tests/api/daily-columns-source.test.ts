@@ -94,17 +94,19 @@ describe("daily-column API source wiring", () => {
     );
   });
 
-  test("site daily pages and RSS helpers reuse the same daily-column query helpers", () => {
+  test("site daily pages use public snapshot daily helpers", () => {
     for (const path of dailyUiPaths) {
       const source = readSource(path);
 
-      expect(source).toContain("@/lib/api/daily-columns");
+      expect(source).toContain("@/lib/public-content/public-dailies");
+      expect(source).toContain("readPublicPageSnapshot");
+      expect(source).not.toContain("@/lib/api/daily-columns");
       expect(source).not.toContain(".select({");
       expect(source).not.toContain("from(newsletters)");
       expect(source).not.toContain("newsletters.columnTitle");
     }
     expect(readSource("app/[locale]/daily/page.tsx")).toContain(
-      "listDailyColumnRows",
+      "listPublicDailyColumns",
     );
     expect(dailyLandingPage).toContain("@/lib/time/relative");
     expect(dailyLandingPage).toContain("DAILY_COLUMN_LOCALE");
@@ -115,7 +117,7 @@ describe("daily-column API source wiring", () => {
     );
     expect(dailyLandingPage).not.toContain("`/zh/daily");
     expect(readSource("app/[locale]/daily/[date]/page.tsx")).toContain(
-      "getDailyColumnRowByDate",
+      "getPublicDailyByDate",
     );
     expect(readSource("app/[locale]/daily/[date]/page.tsx")).toContain(
       "DAILY_COLUMN_LOCALE",
@@ -143,6 +145,9 @@ describe("daily-column API source wiring", () => {
     expect(legacyRssFeedMeta).not.toContain("@/lib/api/daily-columns");
     expect(legacyRssFeeds).not.toContain("from(newsletters)");
     expect(readSource("app/api/rss/[slug]/route.ts")).toContain(
+      "@/lib/public-content/rss-http",
+    );
+    expect(readSource("app/api/rss/[slug]/route.ts")).not.toContain(
       "@/lib/rss/legacy-feeds",
     );
   });

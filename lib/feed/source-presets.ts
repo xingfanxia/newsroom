@@ -1,4 +1,4 @@
-import type { FeedQuery } from "@/lib/items/live";
+import type { PublicFeedQuery } from "@/lib/public-content/query";
 
 export const SOURCE_PRESETS = [
   "all",
@@ -21,7 +21,7 @@ export const SOURCE_PRESET_LABELS = {
   research: { en: "research", zh: "研究" },
 } as const satisfies Record<SourcePreset, { en: string; zh: string }>;
 
-type FeedSourceFilter = Pick<FeedQuery, "sourceGroup" | "sourceKind">;
+type FeedSourceFilter = Pick<PublicFeedQuery, "sourceGroup" | "sourceKind">;
 
 const SOURCE_PRESET_SET = new Set<string>(SOURCE_PRESETS);
 

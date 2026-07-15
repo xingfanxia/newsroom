@@ -63,17 +63,14 @@ describe("radar stats shell contract", () => {
     expect(widget).not.toContain("export type RadarStats");
   });
 
-  it("keeps shell chrome fallbacks on the shared empty object", () => {
+  it("keeps shell chrome on validated snapshot derivations", () => {
     const chromeData = readSource("lib/shell/chrome-data.ts");
 
-    // W8b: the shell reads the cached radar/pulse wrappers (lib/shell/feed-cache)
-    // so the chrome stats dedupe across renders — the empty-object fallback
-    // contract is unchanged.
     expect(chromeData).toContain("@/lib/shell/radar-stats");
-    expect(chromeData).toContain(
-      "getRadarStatsCached().catch(() => EMPTY_RADAR_STATS)",
-    );
-    expect(chromeData).toContain("getPulseDataCached().catch(() => [])");
+    expect(chromeData).toContain("publicSnapshotReader");
+    expect(chromeData).toContain("deriveRadarStats");
+    expect(chromeData).toContain("derivePulseData");
+    expect(chromeData).not.toContain("@/lib/shell/feed-cache");
     expect(chromeData).not.toMatch(INLINE_EMPTY_RADAR_STATS_RE);
   });
 
@@ -95,7 +92,7 @@ describe("radar stats shell contract", () => {
           ? `${readSource(path)}\n${readSource("lib/auth/saved-page-boundary.ts")}`
           : readSource(path);
 
-      expect(source).toMatch(/getShellChromeData(?:\(|:)\s*\{ pulse: true/);
+      expect(source).toContain("pulse: true");
       expect(source).toContain("pulse={chrome.pulse}");
     }
   });
@@ -219,9 +216,8 @@ describe("radar stats shell contract", () => {
   it("keeps the home signal-ratio derivation inside the shell helper", () => {
     const source = readSource("app/[locale]/page.tsx");
 
-    expect(source).toContain(
-      'getShellChromeData({ pulse: true, signalRatio: "fromRadar" })',
-    );
+    expect(source).toContain("shellChromeDataFromSnapshot");
+    expect(source).toContain('signalRatio: "fromRadar"');
     expect(source).not.toContain("signalRatioFromRadar(");
   });
 });

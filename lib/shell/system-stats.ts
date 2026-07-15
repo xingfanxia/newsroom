@@ -38,7 +38,7 @@ import {
   latestDate,
 } from "@/lib/time/relative";
 import { VISIBLE_ITEM_TIERS } from "@/lib/types";
-import { bodyPrefetchPendingSql } from "@/lib/urls/media";
+import { bodyPrefetchPendingSql } from "@/lib/urls/media-sql";
 import {
   enrichClaimableSql,
   scoreBackfillPendingSql,

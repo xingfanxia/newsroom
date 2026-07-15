@@ -127,7 +127,11 @@ describe("feed tier/view source wiring", () => {
   });
 
   test("UI source preset filters map through one typed helper", () => {
-    expect(sourcePresets).toContain('Pick<FeedQuery, "sourceGroup" | "sourceKind">');
+    expect(sourcePresets).toContain(
+      'Pick<PublicFeedQuery, "sourceGroup" | "sourceKind">',
+    );
+    expect(sourcePresets).toContain("@/lib/public-content/query");
+    expect(sourcePresets).not.toContain("@/lib/items/live");
     expect(sourcePresets).toContain("SOURCE_PRESETS");
     expect(sourcePresets).toContain("DEFAULT_SOURCE_PRESET");
     expect(sourcePresets).toContain("SOURCE_PRESET_LABELS");

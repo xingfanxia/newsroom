@@ -20,17 +20,22 @@ describe("content prefetch cron wiring", () => {
 
   it("keeps content URL ownership rules in the shared media helper", () => {
     const mediaHelper = readSource("lib/urls/media.ts");
+    const mediaSqlHelper = readSource("lib/urls/media-sql.ts");
     const articleBody = readSource("workers/fetcher/article-body.ts");
     const youtubeTranscript = readSource("workers/fetcher/youtube-transcript.ts");
 
-    expect(mediaHelper).toContain("articleBodyFetchUrlSql");
-    expect(mediaHelper).toContain("youtubeVideoUrlSql");
-    expect(mediaHelper).toContain("xStatusUrlSql");
-    expect(mediaHelper).toContain("enrichBodyPrefetchReadySql");
+    expect(mediaHelper).toContain("extractYouTubeId");
+    expect(mediaHelper).not.toContain("drizzle-orm");
+    expect(mediaSqlHelper).toContain("articleBodyFetchUrlSql");
+    expect(mediaSqlHelper).toContain("youtubeVideoUrlSql");
+    expect(mediaSqlHelper).toContain("xStatusUrlSql");
+    expect(mediaSqlHelper).toContain("enrichBodyPrefetchReadySql");
     expect(articleBody).toContain("@/lib/urls/media");
+    expect(articleBody).toContain("@/lib/urls/media-sql");
     expect(articleBody).toContain("articleBodyFetchUrlSql(items.canonicalUrl)");
     expect(articleBody).toContain("isYouTubeVideoUrl(target)");
     expect(youtubeTranscript).toContain("@/lib/urls/media");
+    expect(youtubeTranscript).toContain("@/lib/urls/media-sql");
     expect(youtubeTranscript).toContain("youtubeVideoUrlSql(items.canonicalUrl)");
     expect(youtubeTranscript).toContain("extractYouTubeId(");
     expect(articleBody).not.toContain("NOT LIKE '%youtube.com/watch%'");

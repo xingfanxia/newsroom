@@ -2,7 +2,8 @@ import { setRequestLocale } from "next-intl/server";
 import type { Metadata } from "next";
 import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
-import { getShellChromeData } from "@/lib/shell/chrome-data";
+import { readPublicPageSnapshot } from "@/lib/public-content/page-data";
+import { shellChromeDataFromSnapshot } from "@/lib/shell/chrome-data";
 import { AgentsTabs } from "./_tabs";
 import { PUBLIC_ENDPOINT_COUNT } from "@/lib/api/public-endpoint-config";
 import { publicUrl } from "@/lib/site";
@@ -25,7 +26,8 @@ export default async function AgentsPage({
   const appLocale = appLocaleFromParam(locale);
   setRequestLocale(appLocale);
 
-  const chrome = await getShellChromeData({ pulse: true });
+  const { state, nowMs } = await readPublicPageSnapshot();
+  const chrome = shellChromeDataFromSnapshot(state, nowMs, { pulse: true });
 
   return (
     <ViewShell

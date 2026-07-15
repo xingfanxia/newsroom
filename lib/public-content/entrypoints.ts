@@ -172,6 +172,7 @@ const OPERATOR_ROUTES = [
   "newsletter-daily",
   "newsletter-monthly",
   "normalize",
+  "publish-public",
   "score-backfill",
 ].map((slug) =>
   route(

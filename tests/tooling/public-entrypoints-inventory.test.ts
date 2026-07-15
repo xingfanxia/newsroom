@@ -23,7 +23,7 @@ afterEach(cleanupFixtures);
 describe("public serving entrypoint inventory", () => {
   test("freezes the approved 23 snapshot-only readers and all access classes", () => {
     expect(SNAPSHOT_ONLY_ENTRYPOINTS).toHaveLength(23);
-    expect(PUBLIC_SERVING_ENTRYPOINTS).toHaveLength(61);
+    expect(PUBLIC_SERVING_ENTRYPOINTS).toHaveLength(62);
 
     const counts = Object.groupBy(
       PUBLIC_SERVING_ENTRYPOINTS,
@@ -32,7 +32,7 @@ describe("public serving entrypoint inventory", () => {
     expect(counts["snapshot-only"]).toHaveLength(23);
     expect(counts["static-public"]).toHaveLength(7);
     expect(counts["private-authenticated"]).toHaveLength(20);
-    expect(counts["operator-authenticated"]).toHaveLength(11);
+    expect(counts["operator-authenticated"]).toHaveLength(12);
 
     const snapshotPaths = SNAPSHOT_ONLY_ENTRYPOINTS.map(
       (entrypoint) => entrypoint.appPath,
@@ -41,6 +41,9 @@ describe("public serving entrypoint inventory", () => {
     expect(snapshotPaths).toContain("/api/feed/newsletter/[locale]/rss.xml/route");
     expect(snapshotPaths).toContain("/api/events/[id]/members/route");
     expect(snapshotPaths).toContain("/api/sources/active/route");
+    expect(PUBLIC_SERVING_ENTRYPOINTS.map(({ appPath }) => appPath)).toContain(
+      "/api/cron/publish-public/route",
+    );
   });
 
   test("GET readers imply HEAD and pages imply both HTML and RSC", () => {
@@ -93,8 +96,8 @@ describe("public serving entrypoint inventory", () => {
       inventory: PUBLIC_SERVING_ENTRYPOINTS,
     });
 
-    expect(result.sourceEntrypoints).toHaveLength(60);
-    expect(result.builtEntrypoints).toHaveLength(61);
+    expect(result.sourceEntrypoints).toHaveLength(61);
+    expect(result.builtEntrypoints).toHaveLength(62);
     expect(result.unclassifiedSource).toEqual([]);
     expect(result.unclassifiedBuild).toEqual([]);
     expect(result.missingFromBuild).toEqual([]);

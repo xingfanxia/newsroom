@@ -17,7 +17,6 @@ export const DB_OWNING_LOADER_SOURCES = Object.freeze([
   "lib/rss/legacy-feeds.ts",
   "lib/rss/main-feed.ts",
   "lib/rss/newsletter-feed.ts",
-  "lib/shell/chrome-data.ts",
   "lib/shell/dashboard-stats.ts",
   "lib/shell/feed-cache.ts",
   "lib/shell/podcast-channels.ts",

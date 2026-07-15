@@ -27,7 +27,7 @@ let sourcePromise: Promise<SourceRow[]> | null = null;
 function loadSources(): Promise<SourceRow[]> {
   if (sourceCache) return Promise.resolve(sourceCache);
   if (sourcePromise) return sourcePromise;
-  sourcePromise = fetch("/api/sources/active", { credentials: "same-origin" })
+  sourcePromise = fetch("/api/sources/active", { credentials: "omit" })
     .then((r) => (r.ok ? r.json() : { sources: [] }))
     .then((j: { sources?: SourceRow[] }) => {
       sourceCache = j.sources ?? [];

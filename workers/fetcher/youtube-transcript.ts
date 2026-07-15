@@ -24,10 +24,8 @@ import { YoutubeTranscript } from "youtube-transcript";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items } from "@/db/schema";
-import {
-  extractYouTubeId,
-  youtubeVideoUrlSql,
-} from "@/lib/urls/media";
+import { extractYouTubeId } from "@/lib/urls/media";
+import { youtubeVideoUrlSql } from "@/lib/urls/media-sql";
 
 const TIMEOUT_MS = 25_000;
 const MAX_BODY_CHARS = 12_000;

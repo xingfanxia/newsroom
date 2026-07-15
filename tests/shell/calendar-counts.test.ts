@@ -80,18 +80,17 @@ describe("page calendars pass the same filters as their feed", () => {
   // [\s\S]*? is the cross-target-compatible substitute for `.` with the `s`
   // (dotAll) flag — the project targets ES2017 and `s` is ES2018+. Lazy
   // quantifier so the match doesn't stretch past the closing brace.
-  // Pages call the W8b cached wrapper (getDayCountsCached) — the filter contract
-  // is identical; only the read is deduped across renders (lib/shell/feed-cache).
-  it("home /zh — getDayCountsCached passes the default home highlight tier", () => {
+  // Pages now derive from the validated public snapshot rather than a DB cache.
+  it("home /zh — deriveDayCounts passes the default home highlight tier", () => {
     expect(homeSrc).toContain("DEFAULT_HOME_TIER");
     expect(homeSrc).toMatch(
-      /getDayCountsCached\(\s*60\s*,\s*\{[\s\S]*?tier:\s*DEFAULT_HOME_TIER[\s\S]*?\}/,
+      /deriveDayCounts\(\s*state\s*,\s*60\s*,\s*\{[\s\S]*?tier:\s*DEFAULT_HOME_TIER[\s\S]*?\}/,
     );
   });
 
-  it("curated /zh/curated — getDayCountsCached passes curatedOnly=true", () => {
+  it("curated /zh/curated — deriveDayCounts passes curatedOnly=true", () => {
     expect(curatedSrc).toMatch(
-      /getDayCountsCached\(\s*60\s*,\s*\{[\s\S]*?curatedOnly:\s*true[\s\S]*?\}/,
+      /deriveDayCounts\(\s*state\s*,\s*60\s*,\s*\{[\s\S]*?curatedOnly:\s*true[\s\S]*?\}/,
     );
   });
 });

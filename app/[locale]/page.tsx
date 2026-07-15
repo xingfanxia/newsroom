@@ -20,16 +20,19 @@ import {
 } from "@/lib/feed/home-filters";
 import { groupByDay } from "@/lib/feed/group-by-day";
 import { coerceFeedDateKey, feedPageLimitForDate } from "@/lib/feed/page-query";
-import { getFeaturedStories } from "@/lib/items/live";
 import {
-  getPolicySummary,
-} from "@/lib/shell/dashboard-stats";
-import { getShellChromeData } from "@/lib/shell/chrome-data";
+  deriveDayCounts,
+  deriveRecentTickerItems,
+  deriveTopTopics,
+} from "@/lib/public-content/derive";
 import {
-  getDayCountsCached,
-  getRecentTickerItemsCached,
-  getTopTopicsCached,
-} from "@/lib/shell/feed-cache";
+  publicPolicySummary,
+  readPublicPageSnapshot,
+} from "@/lib/public-content/page-data";
+import { queryPublicFeed } from "@/lib/public-content/query";
+import {
+  shellChromeDataFromSnapshot,
+} from "@/lib/shell/chrome-data";
 import { mockStories } from "@/lib/mock/stories";
 import { appLocaleFromParam, type Story } from "@/lib/types";
 
@@ -111,9 +114,10 @@ export default async function HotNewsPage({
         ? 30
         : 7;
 
-  let stories: Story[] = [];
-  try {
-    stories = await getFeaturedStories({
+  const { state, nowMs } = await readPublicPageSnapshot();
+  let stories: Story[] = queryPublicFeed(
+    state,
+    {
       tier,
       locale: appLocale,
       limit,
@@ -144,37 +148,33 @@ export default async function HotNewsPage({
         ? { minImportance: 80, maxPerDay: 3, recentDayRescueDays: 3 }
         : {}),
       ...sourceFilter,
-    });
-  } catch {
-    stories = [];
-  }
+    },
+    { nowMs },
+  ).items;
 
   // Cold-start fallback: if there's literally no enriched content, show mock
   // so the shell renders something sensible.
   if (stories.length === 0 && tier === DEFAULT_HOME_TIER && sourcePreset === "all" && !sourceId && !activeDate) {
-    try {
-      const probe = await getFeaturedStories({
-        tier: "all",
-        locale: appLocale,
-        limit: 1,
-      });
-      if (probe.length === 0) stories = mockStories;
-    } catch {
-      stories = mockStories;
-    }
+    if (state.items.length === 0) stories = mockStories;
   }
 
-  const [chrome, topics, policy, tickerItems, days] = await Promise.all([
-    getShellChromeData({ pulse: true, signalRatio: "fromRadar" }),
-    getTopTopicsCached().catch(() => []),
-    getPolicySummary().catch(() => ({ version: "v1", lastIterAt: null })),
-    getRecentTickerItemsCached(appLocale).catch(() => []),
-    // Calendar must apply the SAME filters as the feed — otherwise the cell
-    // count can over-promise items that will not render after filtering.
-    getDayCountsCached(60, {
+  const chrome = shellChromeDataFromSnapshot(state, nowMs, {
+    pulse: true,
+    signalRatio: "fromRadar",
+  });
+  const topics = deriveTopTopics(state, nowMs);
+  const policy = publicPolicySummary(state, nowMs);
+  const tickerItems = deriveRecentTickerItems(state, appLocale, nowMs);
+  // Calendar must apply the SAME filters as the feed — otherwise the cell
+  // count can over-promise items that will not render after filtering.
+  const days = deriveDayCounts(
+    state,
+    60,
+    {
       tier: DEFAULT_HOME_TIER,
-    }).catch(() => []),
-  ]);
+    },
+    nowMs,
+  );
   const ticker = tickerItems.length > 0 ? tickerItems : FALLBACK_TICKER;
 
   // Both today and archive views render chronologically (published_at DESC

@@ -251,6 +251,8 @@ export type Story = {
   editorAnalysis?: string;
   /** LLM's reason for the tier/importance it assigned — shown as 精选理由 on featured cards. */
   reasoning?: string;
+  /** Public-safe explanation derived only from persisted rubric facts. */
+  whyFeatured?: string;
   /** HKR rubric — booleans for Happy / Knowledge / Resonance. Optional
    *  per-axis bilingual reasons populate chip tooltips + reasoning panel.
    *  Older rows (pre-reasons) omit reasonsZh/reasonsEn; UI falls back

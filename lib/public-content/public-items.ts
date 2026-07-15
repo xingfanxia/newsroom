@@ -40,6 +40,7 @@ export function publicStoryFromItem(
     includeSourceGroup?: boolean;
     nowMs: number;
     hotWindowHours?: number;
+    tagLimit?: number;
   },
 ): Story {
   const source = index.sourcesById.get(item.sourceId);
@@ -90,7 +91,7 @@ export function publicStoryFromItem(
         en: item.summary.en,
         zh: item.summary.zh,
       }) ?? "",
-    tags: flattenItemTags(item.tags, 4),
+    tags: flattenItemTags(item.tags, options.tagLimit ?? 4),
     importance: effectiveImportance,
     tier: effectiveTier,
     publishedAt: item.publishedAt,
@@ -99,7 +100,7 @@ export function publicStoryFromItem(
     locale: source.locale,
     editorNote: editorNote ?? undefined,
     editorAnalysis: editorAnalysis ?? undefined,
-    reasoning:
+    whyFeatured:
       deriveWhyFeatured({
         locale: options.locale,
         tier: effectiveTier,

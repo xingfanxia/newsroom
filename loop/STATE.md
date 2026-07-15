@@ -73,21 +73,21 @@ artifacts:
   repo_aliases:
     plan: docs/R2-PUBLIC-READ-PLAN-2026-07-14.md
     evidence: docs/reports/r2-public-read/
-iteration: 17
+iteration: 18
 phase: implementation
 current_artifact: docs/superpowers/plans/2026-07-14-r2-public-read-decoupling.md
-current_criterion: AC-007
+current_criterion: AC-009
 last_action: >-
-  Completed Task 14 locally and moved AC-006 to PASS_PENDING_FINAL. Every
-  anonymous metadata/feed/search/RSS consumer now reads the validated snapshot;
-  all main, newsletter and legacy RSS variants preserve frozen bytes, headers,
-  fallbacks, rate-limit ordering and implicit HEAD while their recursive source
-  graphs remain DB-free. The AC-006 verifier passed 5 hermetic suites, 30 tests
-  and 194 assertions under hostile Turso/embedding/R2 sentinels.
+  Completed Task 15 locally and moved AC-007 to PASS_PENDING_FINAL. All ten
+  anonymous HTML/RSC page variants and shell follow-up reads now derive from one
+  validated snapshot per render; unavailable snapshots reach a controlled
+  locale error boundary, raw reasoning remains unpublished, calendar prefetch
+  stays disabled and saved data remains private. The AC-007 verifier passed 4
+  hermetic suites, 16 tests and 88 assertions under hostile Turso/R2 sentinels.
 next_action: >-
-  Implement Task 15 by moving all anonymous HTML/RSC pages and shell follow-up
-  data to snapshot-derived loaders, preserving visibility and controlled
-  unavailable behavior while eliminating request-time DB imports.
+  Implement Task 16 by scanning authoritative Next build artifacts/NFTs and
+  exercising the full anonymous runtime/browser corpus against a local snapshot
+  fixture plus a recording poison Turso endpoint.
 halt_cause: null
 halt_scan: []
 stuck_counters: {}
