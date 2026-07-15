@@ -2,7 +2,7 @@
 
 Goal version: `r2-public-read-v1-ec57c55fe111`
 
-Status: **not yet run**.
+Status: **BLOCKED_EXTERNAL** — attempted on 2026-07-14 and stopped at AC-004.
 
 Terminal command:
 
@@ -10,24 +10,26 @@ Terminal command:
 bun run verify:r2-public --final
 ```
 
-The final verifier must prove every row in `loop/ACCEPTANCE.md` in the same
-repo/deployment state and write a criterion-by-criterion evidence matrix here.
-Local green checks cannot mark a row `PASS`; until this command consumes the
-required production/cache/load receipts, passing criterion checks remain
-`PASS_PENDING_FINAL`.
+The implemented final verifier runs the hermetic repository gate and all 13
+criteria in order, writes this file only after complete success, and never
+contacts production implicitly. This attempt passed typecheck, lint, Next
+production build, all dead-code stages and 1,443 tests (1,441 pass, 2 explicit
+production-only skips). AC-001..AC-003 then passed their criterion paths; AC-004
+failed closed because `R2_PUBLIC_EVIDENCE_MANIFEST` is absent. No PASS report was
+written and no production operation ran.
 
 | Criterion | Status | Evidence |
 |---|---|---|
-| AC-001 | PASS_PENDING_FINAL | Local criterion and default gate passed; see `docs/reports/r2-public-read/ac-001-hermetic-gate-2026-07-14.md` |
-| AC-002 | PASS_PENDING_FINAL | Strict contracts plus pure query/derivation and independent hash-frozen parity passed 50/50 tests (337 assertions); see both AC-002 task receipts |
-| AC-003 | OPEN | Not run |
-| AC-004 | OPEN | Receipt verifier now enforces production content origin, CORS/ETag, distinct TTLs and MISS→HIT + Age; real release receipt still required |
-| AC-005 | OPEN | Not run |
-| AC-006 | OPEN | Not run |
-| AC-007 | PASS_PENDING_FINAL | 4 hermetic page/privacy suites passed (16 tests, 88 assertions); compiled/browser poison proof remains Task 16 |
-| AC-008 | OPEN | Not run |
-| AC-009 | PASS_PENDING_FINAL | Fresh no-Turso build; 136 source and 265 compiled/NFT artifacts DB-free; mutation suites red correctly |
-| AC-010 | PASS_PENDING_FINAL | Full 30-entry GET/HEAD + page RSC + real Chrome hydration passed with zero poison-Turso connections |
-| AC-011 | OPEN | Bounded 1x/10x/100x and warm/cache-miss/cold-deploy/missing-object harness passes locally; paired production Turso receipts still required |
-| AC-012 | OPEN | Exact-window/publisher receipt aggregation passes locally; clean >=24h production evidence still required and the last observed projection exceeded target |
-| AC-013 | OPEN | Local docs contract passes (5 tests, 56 assertions); remains open for real release/cache/load/24h budget receipts and post-cutover measured state |
+| AC-001 | PASS_PENDING_FINAL | Passed in this final attempt; hermetic credential and failure-sentinel gate remains intact. |
+| AC-002 | PASS_PENDING_FINAL | Passed in this final attempt; strict contracts and independent hash-frozen parity remain green. |
+| AC-003 | PASS_PENDING_FINAL | Passed in this final attempt; bounded publisher/outbox/atomic release fault suites remain green. |
+| AC-004 | BLOCKED_EXTERNAL | Final attempt stopped here: a real production release cache receipt manifest is required. |
+| AC-005 | PASS_PENDING_FINAL | Current reader criterion receipt proves active/previous/LKG and fail-closed no-DB behavior. |
+| AC-006 | PASS_PENDING_FINAL | Current JSON/RSS/feed/search parity and recursive no-DB receipt remains valid. |
+| AC-007 | PASS_PENDING_FINAL | Current anonymous page/privacy/calendar/saved receipt remains valid. |
+| AC-008 | PASS_PENDING_FINAL | Current lexical-only/semantic-422 public contract receipt remains valid. |
+| AC-009 | PASS_PENDING_FINAL | Current clean build, source graph and compiled/NFT contamination receipt remains valid. |
+| AC-010 | PASS_PENDING_FINAL | Current 30-entry GET/HEAD/RSC and real-browser poison-Turso receipt remains valid. |
+| AC-011 | BLOCKED_EXTERNAL | Local harness is green; paired production 1x/10x/100x load/control receipts are required. |
+| AC-012 | BLOCKED_EXTERNAL | Exact production >=24h Turso and publisher receipts are required; last production rate is known-red. |
+| AC-013 | BLOCKED_EXTERNAL | Local docs plus final-verifier tests pass; shipped docs must match final metrics and >=48h stability/rollback receipts. |

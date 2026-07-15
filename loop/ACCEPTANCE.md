@@ -105,7 +105,7 @@ This inventory is frozen from
   fail_evidence: >-
     Expected-red baseline: before the scoped rule, JSON returned
     CF-Cache-Status DYNAMIC on 2026-07-14.
-  status: OPEN
+  status: BLOCKED_EXTERNAL
   depends_on: [AC-002, AC-003]
   reopen_condition: Domain/SSL/CORS/cache-rule behavior stops matching the release contract.
   last_verification: >-
@@ -115,7 +115,10 @@ This inventory is frozen from
     variant. Receipt: docs/reports/r2-public-read/cache-rule-2026-07-14.md.
     Task 17 added a strict receipt parser that rejects non-production origins,
     missing CORS/ETag, collapsed TTLs and anything other than a second HIT with
-    positive Age. Remains OPEN until real release objects pass after cutover.
+    positive Age. The 2026-07-14 final-verifier attempt passed the hermetic
+    repository gate and AC-001..AC-003, then failed closed here because no
+    production manifest exists. Real release objects require the still-missing
+    production migration/bootstrap/deploy authorization.
 
 - id: AC-005
   statement: >-
@@ -295,14 +298,14 @@ This inventory is frozen from
     from CDN HIT alone.
   fail_evidence: >-
     Current public routes have DB-owning origin paths and observed RSC prefetch amplification.
-  status: OPEN
+  status: BLOCKED_EXTERNAL
   depends_on: [AC-004, AC-010]
   reopen_condition: Turso read delta becomes positively correlated with anonymous traffic or a cold/failure path queries DB.
   last_verification: >-
     Local harness passed 2026-07-14 for bounded deterministic 1x/10x/100x
     corpora and warm/cache-miss/cold-deploy/missing-object scenarios. The
     criterion verifier requires matching production load/control Turso receipts
-    and therefore remains OPEN; no production load was run.
+    and therefore remains externally blocked; no production load was run.
 
 - id: AC-012
   statement: >-
@@ -320,14 +323,14 @@ This inventory is frozen from
   fail_evidence: >-
     Recent post-W9 windows projected roughly 240–290M/month and no clean
     post-snapshot window exists.
-  status: OPEN
+  status: BLOCKED_EXTERNAL
   depends_on: [AC-003, AC-011]
   reopen_condition: A later clean window projects >=100M/month, publisher >=5M/month, or the residual attribution is invalidated.
   last_verification: >-
     Exact-window and publisher receipt aggregation passed locally 2026-07-14,
     including rejection of inconsistent derived counters. The last production
     rate remains known-red and no new production measurement was run, so this
-    criterion remains OPEN.
+    criterion remains externally blocked.
 
 - id: AC-013
   statement: >-
@@ -343,14 +346,15 @@ This inventory is frozen from
     and agree with runtime/source inventories.
   fail_evidence: >-
     Current docs describe the pre-snapshot ownership model and production-backed default test command.
-  status: OPEN
+  status: BLOCKED_EXTERNAL
   depends_on: [AC-004, AC-006, AC-007, AC-008, AC-012]
   reopen_condition: Runtime ownership, public API behavior, ops procedure, or measured budget changes without matching docs.
   last_verification: >-
     Local documentation contract passed 2026-07-14: docs index, ownership map,
     ingestion, agent access, testing strategy, environment template, handoff and
-    operator runbook agree with the runtime inventory, publisher cadence, env
-    names, 422 search behavior, rollback and receipt gates. AC-013 remains OPEN
-    until AC-004/AC-012 production evidence and the measured final budget are
-    written; no production action ran.
+    operator runbook agree with runtime. AC-013 now has a fail-closed criterion
+    implementation that additionally requires the production manifest, >=48h
+    stability, a conditional rollback drill, shipped-status docs and exact
+    measured total/publisher projections. It remains externally blocked until
+    those production actions and doc updates are authorized and completed.
 ```

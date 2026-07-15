@@ -1,8 +1,9 @@
 # R2 Public-Read Pressure Weather
 
 This file is a rendered view of `loop/STATE.md` `pressure_objects`; STATE is the
-source of truth. Re-render and read it before every iteration, then record
-`pressure_consulted` before making a decision.
+source of truth. Rendered for iteration 21 on 2026-07-14. Re-render and read it
+before every iteration, then record `pressure_consulted` before making a
+decision.
 
 | ID | Source | Scope | Mode | Strength | Satisfied by | Violation | Expires | Status |
 |---|---|---|---|---|---|---|---|---|
@@ -22,4 +23,3 @@ Maintenance contract:
   transitions at 5 per row.
 - Pressure may reorder work but cannot erase an OPEN acceptance criterion or
   weaken its verifier.
-

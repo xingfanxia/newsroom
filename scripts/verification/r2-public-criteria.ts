@@ -7,7 +7,10 @@ import { createClient } from "@libsql/client";
 import { ANONYMOUS_SERVING_ENTRYPOINTS } from "@/lib/public-content/entrypoints";
 import { checkSourcePublicDbBoundary } from "@/scripts/ops/check-public-db-boundary";
 import { checkPublicNftBoundary } from "./check-public-nft";
-import { assertPublicEvidenceCriterion } from "@/scripts/ops/verify-public-cutover";
+import {
+  assertPublicEvidenceCriterion,
+  verifyFinalPublicCutoverEvidence,
+} from "@/scripts/ops/verify-public-cutover";
 import {
   EnvironmentPolicyError,
   createHermeticEnvironment,
@@ -511,12 +514,7 @@ function verifyProductionEvidence(
   criterion: "AC-004" | "AC-011" | "AC-012",
   root: string,
 ): CriterionReceipt {
-  const manifest = process.env.R2_PUBLIC_EVIDENCE_MANIFEST;
-  assert(
-    manifest,
-    `${criterion} requires R2_PUBLIC_EVIDENCE_MANIFEST with production receipts`,
-  );
-  const manifestPath = resolve(root, manifest);
+  const manifestPath = productionEvidenceManifestPath(criterion, root);
   const verdict = assertPublicEvidenceCriterion(criterion, manifestPath);
   return {
     criterion,
@@ -525,6 +523,107 @@ function verifyProductionEvidence(
       `validated production receipt manifest ${manifestPath}`,
       `cache=${verdict.ac004} load-decoupled=${verdict.ac011} 24h-budget=${verdict.ac012}`,
       `Turso projection ${Math.round(verdict.totalTursoProjectedMonthlyRows)} rows/month; publisher ${Math.round(verdict.publisherProjectedMonthlyRows)} rows/month`,
+    ],
+  };
+}
+
+function productionEvidenceManifestPath(criterion: string, root: string): string {
+  const manifest = process.env.R2_PUBLIC_EVIDENCE_MANIFEST;
+  assert(
+    manifest,
+    `${criterion} requires R2_PUBLIC_EVIDENCE_MANIFEST with production receipts`,
+  );
+  return resolve(root, manifest);
+}
+
+export interface FinalProductionDocumentation {
+  handoff: string;
+  operations: string;
+}
+
+interface FinalProductionMeasurement {
+  totalTursoProjectedMonthlyRows: number;
+  publisherProjectedMonthlyRows: number;
+  preferredTargetMet: boolean;
+}
+
+export function assertFinalProductionDocumentation(
+  documents: FinalProductionDocumentation,
+  measured: FinalProductionMeasurement,
+): void {
+  const total = Math.round(measured.totalTursoProjectedMonthlyRows).toLocaleString(
+    "en-US",
+  );
+  const publisher = Math.round(
+    measured.publisherProjectedMonthlyRows,
+  ).toLocaleString("en-US");
+  assert(
+    documents.handoff.includes("R2 public-read decoupling shipped"),
+    "handoff does not mark R2 public-read decoupling shipped",
+  );
+  assert(
+    documents.operations.includes("Status: production cutover complete"),
+    "operator runbook does not mark production cutover complete",
+  );
+  for (const document of [documents.handoff, documents.operations]) {
+    assert(
+      document.includes(`Total Turso projection: ${total} rows/month`),
+      "docs do not contain the measured total Turso projection",
+    );
+    assert(
+      document.includes(`Publisher projection: ${publisher} rows/month`),
+      "docs do not contain the measured publisher projection",
+    );
+  }
+  const preferred = measured.preferredTargetMet ? "met" : "not met";
+  assert(
+    documents.operations.includes(`Preferred <10M/month target: ${preferred}`),
+    "operator runbook does not state the measured preferred-target result",
+  );
+  if (!measured.preferredTargetMet) {
+    assert(
+      documents.operations.includes("Residual attribution:"),
+      "preferred-target miss lacks measured residual attribution",
+    );
+  }
+  assert(
+    documents.operations.includes("48-hour stability receipt") &&
+      documents.operations.includes("rollback drill receipt"),
+    "operator runbook does not link stability and rollback evidence",
+  );
+}
+
+const AC013_TEST_INPUTS = [
+  "tests/docs/docs-routing-source.test.ts",
+  "tests/docs/public-snapshot-docs.test.ts",
+] as const;
+
+async function verifyAc013(root: string): Promise<CriterionReceipt> {
+  const exitCode = await runHermeticTests({
+    root,
+    requestedInputs: AC013_TEST_INPUTS,
+    inheritedEnv: process.env,
+    deadlineMs: 60_000,
+  });
+  assert(exitCode === 0, "AC-013 current documentation contract failed");
+  const manifestPath = productionEvidenceManifestPath("AC-013", root);
+  const finalEvidence = verifyFinalPublicCutoverEvidence(manifestPath);
+  const documents: FinalProductionDocumentation = {
+    handoff: readFileSync(resolve(root, "docs/HANDOFF.md"), "utf8"),
+    operations: readFileSync(
+      resolve(root, "docs/operations/public-snapshots.md"),
+      "utf8",
+    ),
+  };
+  assertFinalProductionDocumentation(documents, finalEvidence.verdict);
+  return {
+    criterion: "AC-013",
+    ok: true,
+    receipts: [
+      `${AC013_TEST_INPUTS.length} hermetic current-documentation suites passed`,
+      `validated final production evidence manifest ${manifestPath}`,
+      `matched shipped docs to ${Math.round(finalEvidence.verdict.totalTursoProjectedMonthlyRows)} total and ${Math.round(finalEvidence.verdict.publisherProjectedMonthlyRows)} publisher rows/month`,
+      `validated ${finalEvidence.stability.durationHours}-hour stability and conditional rollback drill receipts`,
     ],
   };
 }
@@ -565,5 +664,6 @@ export async function verifyR2PublicCriterion(
   if (criterion === "AC-010") return verifyAc010(root);
   if (criterion === "AC-011") return verifyProductionEvidence("AC-011", root);
   if (criterion === "AC-012") return verifyProductionEvidence("AC-012", root);
+  if (criterion === "AC-013") return verifyAc013(root);
   throw new Error(`Criterion is not implemented yet: ${criterion}`);
 }

@@ -30,6 +30,8 @@ const evidenceManifestSchema = z.strictObject({
   cleanTursoWindow: z.string().min(1),
   publisherReceipts: z.array(z.string().min(1)).min(1),
   publisherWindowHours: z.number().positive(),
+  stabilityReceipt: z.string().min(1).optional(),
+  rollbackReceipt: z.string().min(1).optional(),
 });
 
 export const publicCutoverVerdictSchema = z.strictObject({
@@ -45,6 +47,44 @@ export const publicCutoverVerdictSchema = z.strictObject({
 });
 
 export type PublicCutoverVerdict = z.infer<typeof publicCutoverVerdictSchema>;
+
+export const publicStabilityReceiptSchema = z.strictObject({
+  schemaVersion: z.literal(1),
+  kind: z.literal("public-stability"),
+  runId: z.string().min(1),
+  deploymentId: z.string().min(1),
+  releaseId: z.string().min(1),
+  startedAt: z.string().datetime(),
+  finishedAt: z.string().datetime(),
+  durationHours: z.number().positive(),
+  publisherFailureCount: z.number().int().nonnegative(),
+  unexpected5xxCount: z.number().int().nonnegative(),
+  controlled503Count: z.number().int().nonnegative(),
+});
+
+export const publicRollbackReceiptSchema = z.strictObject({
+  schemaVersion: z.literal(1),
+  kind: z.literal("public-rollback"),
+  runId: z.string().min(1),
+  deploymentId: z.string().min(1),
+  rollbackDeploymentId: z.string().min(1),
+  applicationRollbackValidated: z.literal(true),
+  fromReleaseId: z.string().min(1),
+  rollbackReleaseId: z.string().min(1),
+  pointerEtagBefore: z.string().min(1),
+  pointerEtagAfter: z.string().min(1),
+  conditionalPointerReplace: z.literal(true),
+  representativeRequests: z.number().int().positive(),
+  unexpected5xxCount: z.literal(0),
+  cacheRevalidated: z.literal(true),
+  capturedAt: z.string().datetime(),
+});
+
+export interface FinalPublicCutoverEvidence {
+  verdict: PublicCutoverVerdict;
+  stability: z.infer<typeof publicStabilityReceiptSchema>;
+  rollback: z.infer<typeof publicRollbackReceiptSchema>;
+}
 
 export function verifyPublicCutoverEvidence(
   manifestPath: string,
@@ -127,6 +167,54 @@ export function assertPublicEvidenceCriterion(
     throw new Error(`${criterion} production evidence is incomplete: ${verdict.issues.join("; ")}`);
   }
   return verdict;
+}
+
+export function verifyFinalPublicCutoverEvidence(
+  manifestPath: string,
+): FinalPublicCutoverEvidence {
+  const resolvedManifest = resolve(manifestPath);
+  const manifest = evidenceManifestSchema.parse(readJson(resolvedManifest));
+  if (!manifest.stabilityReceipt || !manifest.rollbackReceipt) {
+    throw new Error("final evidence requires 48-hour stability and rollback receipts");
+  }
+  const base = dirname(resolvedManifest);
+  const stability = publicStabilityReceiptSchema.parse(
+    readRelative(base, manifest.stabilityReceipt),
+  );
+  const rollback = publicRollbackReceiptSchema.parse(
+    readRelative(base, manifest.rollbackReceipt),
+  );
+  const measuredDurationHours =
+    (Date.parse(stability.finishedAt) - Date.parse(stability.startedAt)) /
+    3_600_000;
+  if (
+    measuredDurationHours < 48 ||
+    Math.abs(measuredDurationHours - stability.durationHours) > 0.001
+  ) {
+    throw new Error("stability receipt must contain a consistent >=48-hour window");
+  }
+  if (
+    stability.publisherFailureCount !== 0 ||
+    stability.unexpected5xxCount !== 0 ||
+    stability.controlled503Count !== 0
+  ) {
+    throw new Error("stability receipt contains rollout failures");
+  }
+  if (
+    rollback.deploymentId !== stability.deploymentId ||
+    rollback.rollbackDeploymentId === rollback.deploymentId ||
+    rollback.fromReleaseId === rollback.rollbackReleaseId ||
+    rollback.pointerEtagBefore === rollback.pointerEtagAfter
+  ) {
+    throw new Error(
+      "rollback receipt does not prove application and conditional release changes",
+    );
+  }
+  const verdict = verifyPublicCutoverEvidence(resolvedManifest);
+  if (!verdict.ac004 || !verdict.ac011 || !verdict.ac012) {
+    throw new Error(`final production evidence is incomplete: ${verdict.issues.join("; ")}`);
+  }
+  return { verdict, stability, rollback };
 }
 
 function cacheIsComplete(cache: R2CacheReceipt, issues: string[]): boolean {

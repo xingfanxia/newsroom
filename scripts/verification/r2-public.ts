@@ -2,6 +2,13 @@ import {
   verifyR2PublicCheap,
   verifyR2PublicCriterion,
 } from "./r2-public-criteria";
+import {
+  renderFinalVerificationReport,
+  verifyR2PublicFinal,
+  writeFinalVerificationReport,
+} from "./r2-public-final";
+import { R2_PUBLIC_GOAL_VERSION } from "@/scripts/ops/public-evidence";
+import { resolve } from "node:path";
 
 interface CliArguments {
   criterion?: string;
@@ -28,9 +35,19 @@ async function main(): Promise<void> {
   try {
     const options = parseArguments(Bun.argv.slice(2));
     if (options.final) {
-      throw new Error(
-        "Final verification is unavailable until every criterion implementation exists.",
-      );
+      const root = resolve(import.meta.dir, "../..");
+      const result = await verifyR2PublicFinal(root);
+      for (const criterion of result.criteria) {
+        for (const receipt of criterion.receipts) {
+          process.stdout.write(`[${criterion.criterion}] ${receipt}\n`);
+        }
+      }
+      const report = renderFinalVerificationReport(result, {
+        goalVersion: R2_PUBLIC_GOAL_VERSION,
+      });
+      const reportPath = writeFinalVerificationReport(root, report);
+      process.stdout.write(`[FINAL] wrote ${reportPath}\nFINAL_COMPLETE\n`);
+      return;
     }
 
     const result = options.cheap

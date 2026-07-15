@@ -76,21 +76,29 @@ artifacts:
 iteration: 21
 phase: external-gate
 current_artifact: docs/superpowers/plans/2026-07-14-r2-public-read-decoupling.md
-current_criterion: AC-013
+current_criterion: AC-004
 last_action: >-
-  Completed Task 18's local documentation synchronization. The docs index,
-  architecture, ingestion, agent/API, testing, environment, handoff and public
-  snapshot operator runbook now match the implemented ownership and external
-  evidence gates. Removed the request-time DB loaders made obsolete by the
-  snapshot boundary; typecheck, dead-code analysis and all 1,439 tests pass
-  locally (1,437 pass, 2 production-only skips). No external request, publish,
-  deploy or database mutation ran.
+  Completion audit found and repaired the missing terminal verifier and AC-013
+  implementation. `verify:r2-public --final` now runs the hermetic repository
+  gate plus all 13 frozen criteria, writes PASS only after complete success, and
+  requires cache/load/budget, >=48h stability, rollback and measured shipped-doc
+  evidence. The real final attempt passed typecheck/lint/build/dead-code and
+  1,443 tests (1,441 pass, 2 production-only skips), then failed closed at
+  AC-004 because no production evidence manifest exists. No external request,
+  publish, deploy or database mutation ran.
 next_action: >-
-  Pause for explicit authorization before the production gate: outbox migration,
-  one metered bootstrap, real cache probe, deploy/canary/cutover, bounded load
-  and rollback drills, 48h stability, and an exact clean >=24h Turso window.
-halt_cause: null
-halt_scan: []
+  Await explicit production authorization before the outbox migration, one
+  metered bootstrap, real cache probe, deploy/canary/cutover, bounded load and
+  rollback drills, 48h stability, and an exact clean >=24h Turso window.
+halt_cause: genuine-escalate
+halt_scan:
+  - AC-001..AC-003 pass their local criterion paths in the current final attempt.
+  - AC-004 is BLOCKED_EXTERNAL on a real release/cache receipt after authorized cutover.
+  - AC-005..AC-010 retain current local criterion receipts and have no remaining legal local action.
+  - AC-011 is BLOCKED_EXTERNAL on paired production load/control receipts.
+  - AC-012 is BLOCKED_EXTERNAL on publisher receipts and a clean exact >=24h Turso window.
+  - AC-013 is BLOCKED_EXTERNAL on >=48h stability, rollback, final metrics and shipped-doc evidence.
+  - Oracle is intact: plan SHA-256 still starts ec57c55fe111 and all 13 criteria remain enforced.
 stuck_counters: {}
 final_verify: bun run verify:r2-public --final
 oracle_change_notes:
@@ -262,6 +270,31 @@ attempts:
       Revert iteration-13 files if origin/path pinning, exact hashes, full
       canonical cross-references, active/previous/LKG ordering, timeout, unknown
       schemas or recursive DB/publisher-free ownership cannot be proven locally.
+  - iteration: 21
+    criterion: AC-013
+    failing_evidence: >-
+      `bun run verify:r2-public --final` is hard-coded to fail and AC-013 has no
+      criterion implementation. The expected-red final-verifier test exits 1
+      because its required orchestration module does not exist.
+    hypothesis: >-
+      A fail-closed final orchestrator can run the hermetic repository gate and
+      all 13 frozen criteria in one state, require production cache/load/budget,
+      48-hour stability and rollback receipts, and write a complete PASS matrix
+      only after every proof succeeds.
+    edit_surface:
+      - scripts/verification/r2-public.ts
+      - scripts/verification/r2-public-criteria.ts
+      - scripts/verification/r2-public-final.ts
+      - scripts/ops/verify-public-cutover.ts
+      - tests/verification/r2-public-final.test.ts
+      - tests/ops/public-load-budget.test.ts
+      - loop/ACCEPTANCE.md
+      - loop/STATE.md
+      - loop/VERIFY.md
+    rollback: >-
+      Revert iteration-21 verifier/state files if the final command can pass
+      without all 13 criteria, writes partial success, contacts production
+      implicitly, or accepts stale pre-cutover docs or unmeasured rollout state.
 budget:
   source: loop/PROMPT.md immutable human-authored policy
   r2_object_writes_per_run: 500
@@ -658,6 +691,35 @@ pressure_consulted:
       P-metered-cap: >-
         No public-domain fetch or cloud request runs; all traffic and external
         transfer remain zero.
+  - iteration: 21
+    consulted_at: 2026-07-14
+    ids:
+      - P-public-db-zero
+      - P-rows-hard
+      - P-rows-ideal
+      - P-safe-tests
+      - P-architecture-api
+      - P-metered-cap
+    influence:
+      P-public-db-zero: >-
+        Requires the resumed audit to keep AC-004/AC-011/AC-012 open until real
+        production receipts prove the R2 cutover and zero load-correlated reads.
+      P-rows-hard: >-
+        Keeps the exact clean >=24h threshold as a terminal production gate;
+        local green evidence cannot substitute for it.
+      P-rows-ideal: >-
+        Preserves the preferred <10M/month attribution requirement after the
+        hard <100M/month line is measured.
+      P-safe-tests: >-
+        Uses only the hermetic criterion/final verifier paths; no production-
+        backed default suite or ambient credential loading is allowed.
+      P-architecture-api: >-
+        Rechecks source/NFT ownership through the frozen verifier rather than
+        adding another review layer.
+      P-metered-cap: >-
+        This resumed pass is local/read-only. No R2 write, public replay, Turso
+        window, migration, bootstrap, deploy, cutover, DNS, or cache mutation is
+        authorized by goal invocation alone.
 ```
 
 ## Alignment reviews

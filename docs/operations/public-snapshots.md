@@ -122,9 +122,17 @@ Execute in this order; do not combine steps or infer success from a later one:
    the preferred line is `<13,699 rows/hour` (<10M/month), and publisher scans
    must project below 5M/month. If the preferred line is missed, attribute the
    measured residual to cron/auth/MCP consumers; do not blame anonymous traffic.
+   Save a `public-stability` receipt with the deployment/release IDs, exact
+   start/end/duration, and zero publisher failures, unexpected 5xx, and
+   controlled 503s.
 9. **Aggregate receipts.** Point `R2_PUBLIC_EVIDENCE_MANIFEST` at the cache,
-   load/control, clean-window, and publisher receipt manifest. Run AC-004,
-   AC-011, and AC-012, then the final verifier in the same repo/deployment state.
+   load/control, clean-window, publisher, `stabilityReceipt`, and
+   `rollbackReceipt` manifest entries. Run AC-004, AC-011, and AC-012, update
+   this runbook and `docs/HANDOFF.md` with the exact measured projections, then
+   run AC-013 and the final verifier in the same repo/deployment state. The
+   shipped docs must use these exact labels so the final verifier can compare
+   them to the manifest: `Total Turso projection: N rows/month`, `Publisher
+   projection: N rows/month`, and `Preferred <10M/month target: met|not met`.
 
 The evidence CLIs require both `--apply` and
 `RUN_PRODUCTION_INTEGRATION=1` for non-loopback endpoints. Receipt files are
@@ -156,7 +164,11 @@ created exclusively (`wx`, mode 0600) so a later run cannot overwrite evidence.
   next bounded run after fixing the cause.
 - **Rollback validation:** repeat the real cache probe and a representative
   HTML/RSC/JSON/RSS corpus, then record the deployment, pointer ETag, release ID,
-  and receipt paths.
+  and receipt paths. Save a `public-rollback` receipt proving a conditional
+  application deployment rollback plus a conditional pointer replacement
+  between distinct releases/ETags, zero unexpected 5xx, positive representative
+  request count, and cache revalidation; reference it as `rollbackReceipt` in
+  the final manifest.
 
 Do not delete R2 objects, revoke the active bucket writer, remove the outbox, or
 remove legacy application code until the stability and final evidence gates

@@ -94,6 +94,8 @@ describe("public snapshot documentation contracts", () => {
     expect(operations).toContain("10,000");
     expect(operations).toContain("1 GiB");
     expect(operations).toContain("named exact window");
+    expect(operations).toContain("stabilityReceipt");
+    expect(operations).toContain("rollbackReceipt");
     for (const script of [
       "evidence:load-public",
       "evidence:r2-cache",

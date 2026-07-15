@@ -18,7 +18,10 @@ import {
   assertPublicRuntimeCorpusComplete,
   buildAnonymousLoadPlan,
 } from "@/scripts/verification/public-runtime-corpus";
-import { verifyPublicCutoverEvidence } from "@/scripts/ops/verify-public-cutover";
+import {
+  verifyFinalPublicCutoverEvidence,
+  verifyPublicCutoverEvidence,
+} from "@/scripts/ops/verify-public-cutover";
 
 const temporaryDirectories: string[] = [];
 
@@ -211,6 +214,36 @@ describe("production cutover receipt aggregation", () => {
       snapshot("clean", "to", 1_100_000, 24),
     ));
     writeJson(directory, "publisher.json", publisherReceipt());
+    writeJson(directory, "stability.json", {
+      schemaVersion: 1,
+      kind: "public-stability",
+      runId: "stability-production",
+      deploymentId: "deployment-production",
+      releaseId: "release-current",
+      startedAt: "2026-07-12T12:00:00.000Z",
+      finishedAt: "2026-07-14T12:00:00.000Z",
+      durationHours: 48,
+      publisherFailureCount: 0,
+      unexpected5xxCount: 0,
+      controlled503Count: 0,
+    });
+    writeJson(directory, "rollback.json", {
+      schemaVersion: 1,
+      kind: "public-rollback",
+      runId: "rollback-production",
+      deploymentId: "deployment-production",
+      rollbackDeploymentId: "deployment-previous",
+      applicationRollbackValidated: true,
+      fromReleaseId: "release-current",
+      rollbackReleaseId: "release-previous",
+      pointerEtagBefore: '"current"',
+      pointerEtagAfter: '"previous"',
+      conditionalPointerReplace: true,
+      representativeRequests: 30,
+      unexpected5xxCount: 0,
+      cacheRevalidated: true,
+      capturedAt: "2026-07-14T12:00:00.000Z",
+    });
     writeJson(directory, "manifest.json", {
       schemaVersion: 1,
       cacheReceipt: "cache.json",
@@ -219,12 +252,32 @@ describe("production cutover receipt aggregation", () => {
       cleanTursoWindow: "clean.json",
       publisherReceipts: ["publisher.json"],
       publisherWindowHours: 24,
+      stabilityReceipt: "stability.json",
+      rollbackReceipt: "rollback.json",
     });
 
     const verdict = verifyPublicCutoverEvidence(join(directory, "manifest.json"));
     expect(verdict.ac004).toBeTrue();
     expect(verdict.ac011).toBeTrue();
     expect(verdict.ac012).toBeTrue();
+    const finalEvidence = verifyFinalPublicCutoverEvidence(
+      join(directory, "manifest.json"),
+    );
+    expect(finalEvidence.stability.durationHours).toBe(48);
+    expect(finalEvidence.rollback.conditionalPointerReplace).toBeTrue();
+
+    writeJson(directory, "stability-short.json", {
+      ...JSON.parse(readFileSync(join(directory, "stability.json"), "utf8")),
+      finishedAt: "2026-07-14T11:00:00.000Z",
+      durationHours: 47,
+    });
+    writeJson(directory, "manifest-short.json", {
+      ...JSON.parse(readFileSync(join(directory, "manifest.json"), "utf8")),
+      stabilityReceipt: "stability-short.json",
+    });
+    expect(() =>
+      verifyFinalPublicCutoverEvidence(join(directory, "manifest-short.json")),
+    ).toThrow(">=48-hour");
 
     writeJson(directory, "cache-local.json", {
       ...cache,
