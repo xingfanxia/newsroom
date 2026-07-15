@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "kind": "public-rollback",
+  "runId": "production-application-pointer-rollback-drill-20260715t074300z",
+  "deploymentId": "dpl_44pRPuqym32BTh12urz8uwLXvMjN",
+  "rollbackDeploymentId": "dpl_E7RuRig2csWMFPvdhb2UEH7igEMU",
+  "applicationRollbackValidated": true,
+  "fromReleaseId": "r75-62e05a8ff5c8f6ccabef",
+  "rollbackReleaseId": "r65-a7414bd51615a2889cae",
+  "pointerEtagBefore": "\"ab9e90fbcb6cd4ac9189e65224f63602\"",
+  "pointerEtagAfter": "\"96d5f2797283a3099754ee217c58ff07\"",
+  "conditionalPointerReplace": true,
+  "representativeRequests": 12,
+  "unexpected5xxCount": 0,
+  "cacheRevalidated": true,
+  "capturedAt": "2026-07-15T07:55:58.000Z"
+}

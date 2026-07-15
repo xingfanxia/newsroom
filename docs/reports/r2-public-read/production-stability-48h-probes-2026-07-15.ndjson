@@ -1,0 +1,4 @@
+{"capturedAt":"2026-07-15T08:00:40Z","kind":"html","url":"https://news.ax0x.ai/en","httpStatus":200,"bytes":372143,"durationSeconds":2.965675,"curlExitCode":0}
+{"capturedAt":"2026-07-15T08:00:40Z","kind":"rsc","url":"https://news.ax0x.ai/en?_rsc=stability-1784102440","httpStatus":200,"bytes":173,"durationSeconds":0.190025,"curlExitCode":0}
+{"capturedAt":"2026-07-15T08:00:40Z","kind":"json","url":"https://news.ax0x.ai/api/public/feed?locale=en","httpStatus":200,"bytes":43149,"durationSeconds":2.185400,"curlExitCode":0}
+{"capturedAt":"2026-07-15T08:00:40Z","kind":"rss","url":"https://news.ax0x.ai/api/feed/en/rss.xml","httpStatus":200,"bytes":120132,"durationSeconds":0.458982,"curlExitCode":0}

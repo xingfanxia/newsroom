@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "kind": "turso-usage-snapshot",
+  "windowName": "production-load-missing-object-1x-20260715t074300z",
+  "lane": "load",
+  "phase": "from",
+  "database": "newsroom-v2",
+  "capturedAt": "2026-07-15T07:53:47.991Z",
+  "rowsRead": 615316432,
+  "rowsWritten": 4310729
+}

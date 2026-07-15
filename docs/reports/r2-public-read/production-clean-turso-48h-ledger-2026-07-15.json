@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "goalVersion": "r2-public-read-v1-ec57c55fe111",
+  "runId": "production-clean-turso-48h-20260715t075900z",
+  "plannedAt": "2026-07-15T07:59:00.000Z",
+  "planned": {
+    "bootstrapSnapshots": 0,
+    "publicHttpRequests": 0,
+    "r2ObjectWrites": 0,
+    "transferBytes": 2097152
+  },
+  "tursoWindowName": "production-clean-turso-48h-20260715t075900z"
+}

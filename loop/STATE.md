@@ -76,24 +76,27 @@ artifacts:
 iteration: 23
 phase: production-gate
 current_artifact: docs/superpowers/plans/2026-07-14-r2-public-read-decoupling.md
-current_criterion: AC-004
+current_criterion: AC-012
 last_action: >-
-  AX explicitly authorized the R2 public-read production gate at
-  2026-07-15T04:16:32Z, including the Turso outbox migration, exactly one R2
-  bootstrap, Vercel deploy/cutover, Cloudflare/cache/load/rollback validation,
-  and the existing immutable spend caps.
+  Production missing-object and rollback gates completed: the fixed deployment
+  returned controlled 503s for all 60 missing-object requests with zero Turso
+  delta, application rollback restored dpl_44pRPuqym32BTh12urz8uwLXvMjN, and
+  the R2 pointer was conditionally swapped and restored across distinct releases
+  and ETags with representative/cache revalidation.
 next_action: >-
-  Verify production env injection, write-ahead reserve the named Turso migration
-  and bootstrap operations, then execute migration -> one bootstrap -> cache
-  probe -> Vercel deploy/cutover -> bounded load/rollback evidence in order.
+  Keep dpl_44pRPuqym32BTh12urz8uwLXvMjN stable while the durable hourly
+  HTML/RSC/JSON/RSS probe runs. Capture the clean Turso endpoint after at least
+  24 hours, finish the stability window no earlier than
+  2026-07-17T07:59:25.302Z, then aggregate publisher/runtime receipts and run
+  AC-012/AC-013 plus the final verifier once.
 halt_cause: null
 halt_scan:
   - AC-001..AC-003 pass their local criterion paths in the current final attempt.
-  - AC-004 is authorized and pending the first production bootstrap/cache proof.
+  - AC-004 has production bootstrap and Cloudflare MISS -> HIT cache proof.
   - AC-005..AC-010 retain current local criterion receipts and have no remaining legal local action.
-  - AC-011 is authorized and pending paired production load/control receipts.
-  - AC-012 is authorized and pending publisher receipts and a clean exact >=24h Turso window.
-  - AC-013 is authorized and pending >=48h stability, rollback, final metrics and shipped-doc evidence.
+  - AC-011 has clean 1x/10x/100x and missing-object load/control receipts with zero net Turso rows.
+  - AC-012 is pending the clean exact Turso window and final publisher receipt aggregation.
+  - AC-013 is pending only the active >=48h stability window, final metrics and shipped-doc evidence; rollback proof is complete.
   - Oracle is intact: plan SHA-256 still starts ec57c55fe111 and all 13 criteria remain enforced.
 stuck_counters: {}
 final_verify: bun run verify:r2-public --final
@@ -300,32 +303,67 @@ budget:
   production_backed_default_tests: 0
   intentional_turso_windows: named-only
   spend_ledger:
-    - run_id: production-application-pointer-rollback-drill-20260715t074300z
-      operation: roll the intentionally bad deployment back to the good deployment, conditionally swap the R2 pointer to previous and restore it, then revalidate representative/cache paths
-      planned_at: 2026-07-15T07:43:00Z
-      status: planned
-      planned:
-        r2_object_writes: 2
-        public_http_requests: 20
-        transfer_bytes: 20971520
-        bootstrap_snapshots: 0
-        intentional_turso_windows: 0
-        good_deployment_id: dpl_2Lsx5kxkAQ5Q5aNyoQZ1Cp2dyVhe
-    - run_id: production-load-missing-object-1x-20260715t074300z
-      operation: 1x missing-object anonymous corpus on the intentionally unavailable public snapshot origin with an equal Turso control
-      planned_at: 2026-07-15T07:43:00Z
-      status: planned
+    - run_id: production-stability-48h-20260715t075900z
+      operation: observe the fixed production deployment for at least 48 hours with bounded representative probes and publisher/runtime failure accounting
+      planned_at: 2026-07-15T07:59:00Z
+      status: in-progress
       planned:
         r2_object_writes: 0
-        public_http_requests: 60
-        transfer_bytes: 33554432
+        public_http_requests: 200
+        transfer_bytes: 104857600
         bootstrap_snapshots: 0
-        intentional_turso_windows: 2
-        turso_window: production-load-missing-object-1x-20260715t074300z
-    - run_id: production-vercel-missing-object-20260715t074300z
-      operation: deploy one intentionally unavailable R2 public origin for the bounded missing-object and application rollback drill
-      planned_at: 2026-07-15T07:43:00Z
-      status: planned
+        intentional_turso_windows: 0
+        deployment_id: dpl_44pRPuqym32BTh12urz8uwLXvMjN
+        release_id: r75-62e05a8ff5c8f6ccabef
+        earliest_finish_at: 2026-07-17T07:59:00Z
+      actual:
+        started_at: 2026-07-15T07:59:25.302Z
+        earliest_valid_finish_at: 2026-07-17T07:59:25.302Z
+        monitor_label: ai.ax0x.newsroom-stability
+        probe_interval_seconds: 3600
+        probe_receipt: docs/reports/r2-public-read/production-stability-48h-probes-2026-07-15.ndjson
+        initial_probe_at: 2026-07-15T08:00:40Z
+        initial_probe_requests: 4
+        initial_probe_unexpected_5xx: 0
+    - run_id: production-clean-turso-48h-20260715t075900z
+      operation: exact clean Turso window spanning the post-drill stability period, with the final capture after at least 24 hours
+      planned_at: 2026-07-15T07:59:00Z
+      status: in-progress
+      planned:
+        r2_object_writes: 0
+        public_http_requests: 0
+        transfer_bytes: 2097152
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 1
+        turso_window: production-clean-turso-48h-20260715t075900z
+        minimum_finish_at: 2026-07-16T07:59:00Z
+      actual:
+        from_at: 2026-07-15T07:59:25.302Z
+        from_rows_read: 615316434
+        from_rows_written: 4310729
+        from_receipt: docs/reports/r2-public-read/production-clean-turso-48h-2026-07-15-from.json
+    - run_id: production-vercel-missing-object-503-retry-20260715t074924z
+      operation: deploy one intentionally unavailable R2 public origin after the controlled-503 HTML fix for the bounded missing-object retry
+      planned_at: 2026-07-15T07:49:24Z
+      status: succeeded
+      planned:
+        r2_object_writes: 0
+        public_http_requests: 2
+        transfer_bytes: 2097152
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 0
+      actual:
+        completed_at: 2026-07-15T07:52:52Z
+        deployment_id: dpl_E7RuRig2csWMFPvdhb2UEH7igEMU
+        deployment_url: newsroom-c8td78ppf-panpanmao.vercel.app
+        public_http_requests: 2
+        html_status: 503
+        json_status: 503
+        r2_object_writes: 0
+    - run_id: production-vercel-snapshot-503-fix-20260715t074924z
+      operation: deploy the snapshot availability gate against the normal production R2 origin before repeating the missing-object drill
+      planned_at: 2026-07-15T07:49:24Z
+      status: succeeded
       planned:
         r2_object_writes: 0
         public_http_requests: 2
@@ -333,6 +371,88 @@ budget:
         bootstrap_snapshots: 0
         intentional_turso_windows: 0
         previous_production_deployment: dpl_2Lsx5kxkAQ5Q5aNyoQZ1Cp2dyVhe
+      actual:
+        completed_at: 2026-07-15T07:51:37Z
+        deployment_id: dpl_44pRPuqym32BTh12urz8uwLXvMjN
+        deployment_url: newsroom-kg1bh9z23-panpanmao.vercel.app
+        deployed_commit: b8a9f2a
+        public_http_requests: 2
+        html_status: 200
+        json_status: 200
+        r2_object_writes: 0
+    - run_id: production-application-pointer-rollback-drill-20260715t074300z
+      operation: roll the intentionally bad deployment back to the good deployment, conditionally swap the R2 pointer to previous and restore it, then revalidate representative/cache paths
+      planned_at: 2026-07-15T07:43:00Z
+      status: succeeded
+      planned:
+        r2_object_writes: 2
+        public_http_requests: 20
+        transfer_bytes: 20971520
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 0
+        good_deployment_id: dpl_2Lsx5kxkAQ5Q5aNyoQZ1Cp2dyVhe
+      actual:
+        completed_at: 2026-07-15T07:55:58Z
+        deployment_id: dpl_44pRPuqym32BTh12urz8uwLXvMjN
+        rollback_deployment_id: dpl_E7RuRig2csWMFPvdhb2UEH7igEMU
+        application_rollback_validated: true
+        r2_object_writes: 2
+        public_http_requests: 20
+        representative_requests: 12
+        unexpected_5xx: 0
+        from_release_id: r75-62e05a8ff5c8f6ccabef
+        rollback_release_id: r65-a7414bd51615a2889cae
+        restored_release_id: r75-62e05a8ff5c8f6ccabef
+        conditional_pointer_replace: true
+        cache_revalidated: true
+        receipt: docs/reports/r2-public-read/production-public-rollback-2026-07-15.json
+        pointer_swap_receipt: docs/reports/r2-public-read/production-pointer-rollback-swap-2026-07-15.json
+        pointer_restore_receipt: docs/reports/r2-public-read/production-pointer-rollback-restore-2026-07-15.json
+    - run_id: production-load-missing-object-1x-20260715t074300z
+      operation: 1x missing-object anonymous corpus on the intentionally unavailable public snapshot origin with an equal Turso control
+      planned_at: 2026-07-15T07:43:00Z
+      status: succeeded
+      planned:
+        r2_object_writes: 0
+        public_http_requests: 60
+        transfer_bytes: 33554432
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 2
+        turso_window: production-load-missing-object-1x-20260715t074300z
+      actual:
+        public_http_requests: 60
+        attempted_requests: 60
+        transfer_bytes: 76699
+        status_mismatches: 0
+        unexpected_5xx: 0
+        network_errors: 0
+        network_retries: 0
+        load_delta_rows_read: 0
+        control_delta_rows_read: 0
+        net_delta_rows_read: 0
+        decoupled: true
+        receipt: docs/reports/r2-public-read/production-load-missing-object-1x-2026-07-15-load.json
+        turso_comparison: docs/reports/r2-public-read/production-load-missing-object-1x-2026-07-15-turso-comparison.json
+    - run_id: production-vercel-missing-object-20260715t074300z
+      operation: deploy one intentionally unavailable R2 public origin for the bounded missing-object and application rollback drill
+      planned_at: 2026-07-15T07:43:00Z
+      status: failed-uncontrolled-html-500
+      planned:
+        r2_object_writes: 0
+        public_http_requests: 2
+        transfer_bytes: 2097152
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 0
+        previous_production_deployment: dpl_2Lsx5kxkAQ5Q5aNyoQZ1Cp2dyVhe
+      actual:
+        completed_at: 2026-07-15T07:46:26Z
+        deployment_id: dpl_544J11chfT9EEs2DsMz6VXKCohcZ
+        deployment_url: newsroom-4nau5tprt-panpanmao.vercel.app
+        public_http_requests: 2
+        json_status: 503
+        html_status: 500
+        application_rollback_deployment: dpl_2Lsx5kxkAQ5Q5aNyoQZ1Cp2dyVhe
+        application_rollback_validated: true
     - run_id: production-load-cold-100x-reader-retry-20260715t072130z
       operation: 100x anonymous replay on the transient-R2-retry reader in matched cron-free load/control slots
       planned_at: 2026-07-15T07:14:00Z
