@@ -44,10 +44,12 @@ export const anonymousLoadReceiptSchema = z.strictObject({
   finishedAt: z.string().datetime(),
   plannedRequests: z.number().int().nonnegative(),
   completedRequests: z.number().int().nonnegative(),
+  attemptedRequests: z.number().int().nonnegative().optional(),
   receivedBytes: z.number().int().nonnegative(),
   statusMismatchCount: z.number().int().nonnegative(),
   unexpected5xxCount: z.number().int().nonnegative(),
   networkErrorCount: z.number().int().nonnegative().default(0),
+  networkRetryCount: z.number().int().nonnegative().default(0),
   mismatches: z.array(
     z.strictObject({
       expected: z.number().int(),
@@ -105,9 +107,11 @@ export async function runAnonymousLoad(options: {
   const startedAt = now();
   let cursor = 0;
   let completedRequests = 0;
+  let attemptedRequests = 0;
   let receivedBytes = 0;
   let unexpected5xxCount = 0;
   let networkErrorCount = 0;
+  let networkRetryCount = 0;
   let statusMismatchCount = 0;
   const mismatches: AnonymousLoadReceipt["mismatches"] = [];
 
@@ -115,17 +119,31 @@ export async function runAnonymousLoad(options: {
     while (cursor < plan.length) {
       const item = plan[cursor++] as AnonymousLoadRequest;
       const url = new URL(item.path, baseUrl);
-      let response: Response;
-      try {
-        response = await request(url, {
-          method: item.method === "HEAD" ? "HEAD" : "GET",
-          redirect: "manual",
-          headers:
-            item.method === "RSC"
-              ? { RSC: "1", "Next-Router-Prefetch": "1" }
-              : undefined,
-        });
-      } catch {
+      let response: Response | null = null;
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        if (attemptedRequests >= options.ledger.planned.publicHttpRequests)
+          break;
+        attemptedRequests += 1;
+        try {
+          response = await request(url, {
+            method: item.method === "HEAD" ? "HEAD" : "GET",
+            redirect: "manual",
+            headers:
+              item.method === "RSC"
+                ? { RSC: "1", "Next-Router-Prefetch": "1" }
+                : undefined,
+          });
+          break;
+        } catch {
+          if (
+            attempt === 0 &&
+            attemptedRequests < options.ledger.planned.publicHttpRequests
+          ) {
+            networkRetryCount += 1;
+          }
+        }
+      }
+      if (!response) {
         completedRequests += 1;
         networkErrorCount += 1;
         statusMismatchCount += 1;
@@ -181,10 +199,12 @@ export async function runAnonymousLoad(options: {
     finishedAt: new Date(now()).toISOString(),
     plannedRequests: plan.length,
     completedRequests,
+    attemptedRequests,
     receivedBytes,
     statusMismatchCount,
     unexpected5xxCount,
     networkErrorCount,
+    networkRetryCount,
     mismatches,
   });
 }

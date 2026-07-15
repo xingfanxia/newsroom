@@ -283,6 +283,9 @@ function loadEvidenceIsComplete(
     if (
       load.plannedRequests !== expectedRequests ||
       load.completedRequests !== load.plannedRequests ||
+      (load.attemptedRequests ?? load.completedRequests) <
+        load.completedRequests ||
+      (load.attemptedRequests ?? load.completedRequests) > 10_000 ||
       load.statusMismatchCount !== 0 ||
       load.unexpected5xxCount !== 0 ||
       load.networkErrorCount !== 0

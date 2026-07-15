@@ -300,10 +300,25 @@ budget:
   production_backed_default_tests: 0
   intentional_turso_windows: named-only
   spend_ledger:
+    - run_id: production-load-cold-100x-budgeted-retry-20260715t070630z
+      operation: 100x anonymous replay with one bounded network-only retry in matched cron-free load/control slots
+      planned_at: 2026-07-15T06:58:00Z
+      status: planned
+      planned:
+        r2_object_writes: 0
+        public_http_requests: 10000
+        transfer_bytes: 1073741824
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 2
+        deployment_id: dpl_tEFkTiZ5RYV67UP8eak4p1gsVeX6
+        turso_window: production-load-cold-100x-budgeted-retry-20260715t070630z
+        concurrency: 32
+        load_target_start: 2026-07-15T07:06:30Z
+        control_target_start: 2026-07-15T07:21:30Z
     - run_id: production-load-cold-100x-no-cron-20260715t065130z
       operation: final 100x fresh-deploy replay in matched cron-free slots with an equal named Turso control
       planned_at: 2026-07-15T06:47:00Z
-      status: planned
+      status: failed-client-network-only
       planned:
         r2_object_writes: 0
         public_http_requests: 7100
@@ -314,10 +329,21 @@ budget:
         concurrency: 32
         load_target_start: 2026-07-15T06:51:30Z
         control_target_start: 2026-07-15T07:06:30Z
+      actual:
+        public_http_requests: 7100
+        transfer_bytes: 504536492
+        status_mismatches: 5
+        unexpected_5xx: 0
+        network_errors: 5
+        load_delta_rows_read: 0
+        reason: the cron-free Turso window proved zero DB reads, but five client connection failures had no retry allowance and failed the availability receipt
+        receipt: docs/reports/r2-public-read/production-load-cold-100x-no-cron-2026-07-15-load.json
+        load_from: docs/reports/r2-public-read/production-load-cold-100x-no-cron-2026-07-15-load-from.json
+        load_to: docs/reports/r2-public-read/production-load-cold-100x-no-cron-2026-07-15-load-to.json
     - run_id: production-vercel-rollback-operator-20260715t064700z
       operation: deploy the authenticated unscheduled conditional pointer rollback operator before the final cold-deploy replay
       planned_at: 2026-07-15T06:47:00Z
-      status: planned
+      status: succeeded
       planned:
         r2_object_writes: 0
         public_http_requests: 2
@@ -325,6 +351,14 @@ budget:
         bootstrap_snapshots: 0
         intentional_turso_windows: 0
         previous_production_deployment: dpl_BxEx3ha7mC6MJWqnQBCmNBVquZTc
+      actual:
+        completed_at: 2026-07-15T06:48:31Z
+        deployment_id: dpl_tEFkTiZ5RYV67UP8eak4p1gsVeX6
+        deployment_url: newsroom-1157pmnqh-panpanmao.vercel.app
+        deployed_commit: db176f2
+        public_http_requests: 0
+        transfer_bytes: 0
+        r2_object_writes: 0
     - run_id: production-load-cold-100x-cacheable-retry-20260715t062500z
       operation: retry the 100x fresh-deploy anonymous corpus at concurrency 32 with durable network-error receipts and an equal named Turso control
       planned_at: 2026-07-15T06:25:00Z

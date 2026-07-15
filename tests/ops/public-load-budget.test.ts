@@ -128,27 +128,32 @@ describe("bounded anonymous load evidence", () => {
       scenario: "warm",
     });
     expect(receipt.completedRequests).toBe(plan.length);
+    expect(receipt.attemptedRequests).toBe(plan.length);
     expect(receipt.statusMismatchCount).toBe(0);
     expect(receipt.unexpected5xxCount).toBe(0);
     expect(receipt.networkErrorCount).toBe(0);
     expect(receipt.receivedBytes).toBeGreaterThan(0);
   });
 
-  test("records a network failure and completes the bounded replay", async () => {
+  test("retries one network failure within the reserved request budget", async () => {
     const plan = buildAnonymousLoadPlan(1);
     let index = 0;
+    let firstAttempt = true;
     const receipt = await runAnonymousLoad({
       baseUrl: "http://127.0.0.1:43123",
       concurrency: 1,
       fetch: async () => {
+        if (firstAttempt) {
+          firstAttempt = false;
+          throw new Error("injected network failure");
+        }
         const expected = plan[index++]!;
-        if (index === 1) throw new Error("injected network failure");
         return new Response(expected.method === "HEAD" ? null : "ok", {
           status: expected.expectedStatus,
         });
       },
       ledger: ledger({
-        publicHttpRequests: plan.length,
+        publicHttpRequests: plan.length + 1,
         transferBytes: 10_000,
       }),
       multiplier: 1,
@@ -156,9 +161,10 @@ describe("bounded anonymous load evidence", () => {
       scenario: "warm",
     });
     expect(receipt.completedRequests).toBe(plan.length);
-    expect(receipt.networkErrorCount).toBe(1);
-    expect(receipt.statusMismatchCount).toBe(1);
-    expect(receipt.mismatches[0]?.received).toBe(0);
+    expect(receipt.attemptedRequests).toBe(plan.length + 1);
+    expect(receipt.networkRetryCount).toBe(1);
+    expect(receipt.networkErrorCount).toBe(0);
+    expect(receipt.statusMismatchCount).toBe(0);
   });
 });
 

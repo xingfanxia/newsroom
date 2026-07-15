@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "goalVersion": "r2-public-read-v1-ec57c55fe111",
+  "runId": "production-load-cold-100x-budgeted-retry-20260715t070630z",
+  "plannedAt": "2026-07-15T06:58:00.000Z",
+  "planned": {
+    "bootstrapSnapshots": 0,
+    "publicHttpRequests": 10000,
+    "r2ObjectWrites": 0,
+    "transferBytes": 1073741824
+  },
+  "tursoWindowName": "production-load-cold-100x-budgeted-retry-20260715t070630z"
+}
