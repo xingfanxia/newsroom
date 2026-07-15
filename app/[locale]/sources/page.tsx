@@ -3,8 +3,7 @@ import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
 import { SOURCE_GROUP_LABELS, SOURCE_GROUPS } from "@/lib/sources/groups";
 import { coerceSourcesView } from "@/lib/sources/view";
-import { readPublicPageSnapshot } from "@/lib/public-content/page-data";
-import { shellChromeDataFromSnapshot } from "@/lib/shell/chrome-data";
+import { readSourcesPageModel } from "@/lib/public-content/page-models";
 import { SourcesViewToggle } from "./_view-toggle";
 import { appLocaleFromParam } from "@/lib/types";
 
@@ -22,9 +21,7 @@ export default async function SourcesPage({
   setRequestLocale(appLocale);
   const view = coerceSourcesView(sp.view);
 
-  const { state, nowMs } = await readPublicPageSnapshot();
-  const live = state.sources;
-  const chrome = shellChromeDataFromSnapshot(state, nowMs, { pulse: true });
+  const { live, chrome } = await readSourcesPageModel();
 
   const totalItems = live.reduce((a, b) => a + b.health.totalItemsCount, 0);
   const okCount = live.filter((s) => s.health.status === "ok").length;

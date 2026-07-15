@@ -2,12 +2,8 @@ import { notFound } from "next/navigation";
 import { setRequestLocale } from "next-intl/server";
 import { ViewShell } from "@/components/shell/view-shell";
 import { DailyColumnRenderer } from "../_renderer";
-import {
-  getPublicDailyByDate,
-  isPublicDailyDate,
-} from "@/lib/public-content/public-dailies";
-import { readPublicPageSnapshot } from "@/lib/public-content/page-data";
-import { shellChromeDataFromSnapshot } from "@/lib/shell/chrome-data";
+import { isPublicDailyDate } from "@/lib/public-content/public-dailies";
+import { readDailyDatePageModel } from "@/lib/public-content/page-models";
 import { appLocaleFromParam, DAILY_COLUMN_LOCALE } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -23,9 +19,10 @@ export default async function DailyDatePage({ params }: Props) {
   if (appLocale !== DAILY_COLUMN_LOCALE) notFound();
   if (!isPublicDailyDate(date)) notFound();
 
-  const { state, nowMs } = await readPublicPageSnapshot();
-  const row = getPublicDailyByDate(state, date, DAILY_COLUMN_LOCALE);
-  const chrome = shellChromeDataFromSnapshot(state, nowMs, { pulse: true });
+  const { row, chrome } = await readDailyDatePageModel({
+    locale: DAILY_COLUMN_LOCALE,
+    date,
+  });
 
   if (!row) notFound();
 

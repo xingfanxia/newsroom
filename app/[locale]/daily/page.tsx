@@ -2,9 +2,7 @@ import Link from "next/link";
 import { setRequestLocale } from "next-intl/server";
 import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
-import { listPublicDailyColumns } from "@/lib/public-content/public-dailies";
-import { readPublicPageSnapshot } from "@/lib/public-content/page-data";
-import { shellChromeDataFromSnapshot } from "@/lib/shell/chrome-data";
+import { readDailyIndexPageModel } from "@/lib/public-content/page-models";
 import {
   DAILY_COLUMN_INDEX_ROUTE,
   dailyColumnIssueRoute,
@@ -54,15 +52,11 @@ export default async function DailyLandingPage({
   const offset = (page - 1) * PAGE_SIZE;
   const isDailyColumnLocale = appLocale === DAILY_COLUMN_LOCALE;
 
-  const { state, nowMs } = await readPublicPageSnapshot();
-  const rows = isDailyColumnLocale
-    ? listPublicDailyColumns(state, {
-        locale: DAILY_COLUMN_LOCALE,
-        take: PAGE_SIZE,
-        offset,
-      })
-    : [];
-  const chrome = shellChromeDataFromSnapshot(state, nowMs, { pulse: true });
+  const { rows, chrome } = await readDailyIndexPageModel({
+    locale: appLocale,
+    take: PAGE_SIZE,
+    offset,
+  });
 
   return (
     <ViewShell

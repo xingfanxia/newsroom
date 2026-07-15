@@ -12,10 +12,7 @@ import {
   type PodcastTier,
 } from "@/lib/feed/podcast-filters";
 import { PodcastChannelPills } from "./_channel-pills";
-import { derivePodcastChannels } from "@/lib/public-content/derive";
-import { readPublicPageSnapshot } from "@/lib/public-content/page-data";
-import { queryPublicFeed } from "@/lib/public-content/query";
-import { shellChromeDataFromSnapshot } from "@/lib/shell/chrome-data";
+import { readPodcastsPageModel } from "@/lib/public-content/page-models";
 import { appLocaleFromParam, type AppLocale } from "@/lib/types";
 
 export const revalidate = 60;
@@ -42,27 +39,16 @@ export default async function PodcastsPage({
   setRequestLocale(appLocale);
   const activeTier: PodcastTier = coercePodcastTier(sp.tier);
 
-  const { state, nowMs } = await readPublicPageSnapshot();
-  const channels = derivePodcastChannels(state);
-  const chrome = shellChromeDataFromSnapshot(state, nowMs, { pulse: true });
-
-  const activeChannel =
-    sp.source && channels.some((c) => c.id === sp.source) ? sp.source : null;
-
-  // `tier='all'` includes every public-eligible episode. Explicitly excluded
-  // content is never published to the anonymous snapshot.
-  const filtered = queryPublicFeed(
-    state,
-    {
-      tier: activeTier,
+  const {
+    channels,
+    activeChannel,
+    stories: filtered,
+    chrome,
+  } = await readPodcastsPageModel({
       locale: appLocale,
-      sourceGroup: activeChannel ? undefined : "podcast",
-      sourceId: activeChannel ?? undefined,
-      includeSourceGroup: true,
-      limit: activeChannel ? 300 : 120,
-    },
-    { nowMs },
-  ).items;
+      source: sp.source,
+      tier: activeTier,
+    });
 
   const grouped = groupByDay(sortStoriesNewestFirst(filtered));
   const activeLabel = activeChannel

@@ -5,11 +5,7 @@ import { Prose } from "@/components/markdown/prose";
 import { Transcript } from "@/components/podcasts/transcript";
 import { YouTubeEmbed, extractYouTubeId } from "@/components/podcasts/youtube-embed";
 import { ViewShell } from "@/components/shell/view-shell";
-import {
-  publicPageItemDetail,
-  readPublicPageSnapshot,
-} from "@/lib/public-content/page-data";
-import { shellChromeDataFromSnapshot } from "@/lib/shell/chrome-data";
+import { readPodcastDetailPageModel } from "@/lib/public-content/page-models";
 import { appLocaleFromParam } from "@/lib/types";
 
 // Re-render every 5 min — commentary + transcript only change via background
@@ -28,9 +24,10 @@ export default async function PodcastDetailPage({
   const id = Number.parseInt(idRaw, 10);
   if (!Number.isInteger(id) || id <= 0) notFound();
 
-  const { state, nowMs } = await readPublicPageSnapshot();
-  const detail = publicPageItemDetail(state, id, appLocale, nowMs);
-  const chrome = shellChromeDataFromSnapshot(state, nowMs);
+  const { detail, chrome } = await readPodcastDetailPageModel({
+    locale: appLocale,
+    id,
+  });
   if (!detail) notFound();
 
   const { story, bodyMd } = detail;
