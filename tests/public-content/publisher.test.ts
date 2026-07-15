@@ -22,6 +22,7 @@ import type {
   PublicEntityChange,
   PublisherSourceBatch,
 } from "@/lib/public-content/publisher/types";
+import { swapPublicPointerToPrevious } from "@/lib/public-content/publisher/rollback-pointer";
 import { canonicalState, item } from "./contract-fixtures";
 
 const NOW = Date.parse("2026-07-14T12:00:00.000Z");
@@ -307,6 +308,35 @@ describe("pointer-last incremental publisher", () => {
       `read:${fixture.pointer.active.manifestKey}`,
       "ack:10",
     ]);
+  });
+
+  test("conditionally swaps to the validated previous release and can restore", async () => {
+    const fixture = await seededFixture();
+    const source = new FakeSource(
+      batch(10, 11, [changedItem(fixture.state)]),
+      fixture.events,
+    );
+    const published = await run(fixture, source);
+    expect(published.status).toBe("succeeded");
+
+    const rollback = await swapPublicPointerToPrevious(
+      fixture.store,
+      () => NOW + 1,
+    );
+    expect(rollback).toMatchObject({
+      fromReleaseId: published.releaseId,
+      rollbackReleaseId: fixture.release.releaseId,
+      conditionalPointerReplace: true,
+      sourceWatermark: 10,
+    });
+    const restore = await swapPublicPointerToPrevious(
+      fixture.store,
+      () => NOW + 2,
+    );
+    expect(restore.fromReleaseId).toBe(fixture.release.releaseId);
+    expect(restore.rollbackReleaseId).toBe(published.releaseId!);
+    expect(restore.sourceWatermark).toBe(11);
+    expect(restore.pointerEtagAfter).not.toBe(rollback.pointerEtagAfter);
   });
 
   test("reuses identical content hashes but still advances the watermark", async () => {

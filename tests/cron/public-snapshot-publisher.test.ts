@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { readFile } from "node:fs/promises";
 import { handlePublishPublicCron } from "@/app/api/cron/publish-public/route";
+import { handleRollbackPublicCron } from "@/app/api/cron/rollback-public/route";
 import { runIncrementalPublicPublisher } from "@/lib/public-content/publisher/runtime";
 import { CRON_RUNNERS, resolveCronKind } from "@/scripts/ops/run-cron";
 import { runReceipt } from "../public-content/contract-fixtures";
@@ -57,9 +58,7 @@ describe("public snapshot publisher cron", () => {
       },
     ]);
     expect(resolveCronKind("publish-public")).toBe("publish-public");
-    expect(CRON_RUNNERS["publish-public"]).toBe(
-      runIncrementalPublicPublisher,
-    );
+    expect(CRON_RUNNERS["publish-public"]).toBe(runIncrementalPublicPublisher);
 
     const packageJson = JSON.parse(await readFile("package.json", "utf8")) as {
       scripts: Record<string, string>;
@@ -67,6 +66,53 @@ describe("public snapshot publisher cron", () => {
     expect(packageJson.scripts["cron:publish-public"]).toBe(
       "bun scripts/ops/run-cron.ts publish-public",
     );
+  });
+
+  test("keeps pointer rollback operator-only and unscheduled", async () => {
+    process.env.CRON_SECRET = "cron-test-secret";
+    let calls = 0;
+    const run = async () => {
+      calls += 1;
+      return {
+        fromReleaseId: "release-current",
+        rollbackReleaseId: "release-previous",
+        pointerEtagBefore: '"etag-current"',
+        pointerEtagAfter: '"etag-previous"',
+        conditionalPointerReplace: true as const,
+        sourceWatermark: 10,
+        capturedAt: "2026-07-15T06:30:00.000Z",
+      };
+    };
+    const denied = await handleRollbackPublicCron(
+      new Request("https://example.com/api/cron/rollback-public", {
+        method: "POST",
+        headers: { authorization: "Bearer wrong" },
+      }),
+      run,
+    );
+    expect(denied.status).toBe(401);
+    expect(calls).toBe(0);
+
+    const allowed = await handleRollbackPublicCron(
+      new Request("https://example.com/api/cron/rollback-public", {
+        method: "POST",
+        headers: { authorization: "Bearer cron-test-secret" },
+      }),
+      run,
+    );
+    expect(allowed.status).toBe(200);
+    expect(calls).toBe(1);
+    expect(await allowed.json()).toMatchObject({
+      kind: "rollback-public",
+      receipt: { conditionalPointerReplace: true },
+    });
+
+    const vercel = JSON.parse(await readFile("vercel.json", "utf8")) as {
+      crons: Array<{ path: string; schedule: string }>;
+    };
+    expect(
+      vercel.crons.some(({ path }) => path === "/api/cron/rollback-public"),
+    ).toBeFalse();
   });
 
   test("recurring entrypoints cannot import bootstrap or full materialization", async () => {

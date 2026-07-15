@@ -300,10 +300,35 @@ budget:
   production_backed_default_tests: 0
   intentional_turso_windows: named-only
   spend_ledger:
+    - run_id: production-load-cold-100x-no-cron-20260715t065130z
+      operation: final 100x fresh-deploy replay in matched cron-free slots with an equal named Turso control
+      planned_at: 2026-07-15T06:47:00Z
+      status: planned
+      planned:
+        r2_object_writes: 0
+        public_http_requests: 7100
+        transfer_bytes: 1073741824
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 2
+        turso_window: production-load-cold-100x-no-cron-20260715t065130z
+        concurrency: 32
+        load_target_start: 2026-07-15T06:51:30Z
+        control_target_start: 2026-07-15T07:06:30Z
+    - run_id: production-vercel-rollback-operator-20260715t064700z
+      operation: deploy the authenticated unscheduled conditional pointer rollback operator before the final cold-deploy replay
+      planned_at: 2026-07-15T06:47:00Z
+      status: planned
+      planned:
+        r2_object_writes: 0
+        public_http_requests: 2
+        transfer_bytes: 2097152
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 0
+        previous_production_deployment: dpl_BxEx3ha7mC6MJWqnQBCmNBVquZTc
     - run_id: production-load-cold-100x-cacheable-retry-20260715t062500z
       operation: retry the 100x fresh-deploy anonymous corpus at concurrency 32 with durable network-error receipts and an equal named Turso control
       planned_at: 2026-07-15T06:25:00Z
-      status: planned
+      status: inconclusive-background-publisher
       planned:
         r2_object_writes: 0
         public_http_requests: 7100
@@ -313,10 +338,33 @@ budget:
         release_id: r49-c0d0ff3e7a4fb1c9efe5
         turso_window: production-load-cold-100x-cacheable-retry-20260715t062500z
         concurrency: 32
+      actual_so_far:
+        public_http_requests: 7100
+        transfer_bytes: 504591800
+        status_mismatches: 0
+        unexpected_5xx: 0
+        network_errors: 0
+        load_delta_rows_read: 205
+        load_started_at: 2026-07-15T06:26:33.028Z
+        load_finished_at: 2026-07-15T06:31:27.178Z
+        aligned_control_target: 2026-07-15T06:41:33.028Z
+        receipt: docs/reports/r2-public-read/production-load-cold-100x-cacheable-retry-2026-07-15-load.json
+      actual:
+        public_http_requests: 7100
+        transfer_bytes: 504591800
+        status_mismatches: 0
+        unexpected_5xx: 0
+        network_errors: 0
+        load_delta_rows_read: 205
+        control_delta_rows_read: 2
+        net_delta_rows_read: 203
+        decoupled: false
+        reason: the availability replay passed, but its load window crossed a publisher with pending outbox work while the aligned control publisher was a two-row noop
+        turso_comparison: docs/reports/r2-public-read/production-load-cold-100x-cacheable-retry-2026-07-15-turso-comparison.json
     - run_id: production-vercel-cold-100x-retry-redeploy-20260715t062500z
       operation: force one fresh production deployment before the concurrency-32 100x retry
       planned_at: 2026-07-15T06:25:00Z
-      status: planned
+      status: succeeded
       planned:
         r2_object_writes: 0
         public_http_requests: 2
@@ -324,6 +372,14 @@ budget:
         bootstrap_snapshots: 0
         intentional_turso_windows: 0
         previous_production_deployment: dpl_9ckMiFAjNdbWGnQT7v9bPowbQJ8R
+      actual:
+        completed_at: 2026-07-15T06:26:12Z
+        deployment_id: dpl_BxEx3ha7mC6MJWqnQBCmNBVquZTc
+        deployment_url: newsroom-aiwj41tbg-panpanmao.vercel.app
+        deployed_commit: f5fd516
+        public_http_requests: 0
+        transfer_bytes: 0
+        r2_object_writes: 0
     - run_id: production-load-cold-100x-cacheable-20260715t061800z
       operation: 100x anonymous corpus immediately after a fresh production deployment with an equal named Turso control
       planned_at: 2026-07-15T06:18:00Z
