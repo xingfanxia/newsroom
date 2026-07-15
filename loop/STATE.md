@@ -303,6 +303,44 @@ budget:
   production_backed_default_tests: 0
   intentional_turso_windows: named-only
   spend_ledger:
+    - run_id: production-stability-48h-materialized-20260715t222538z
+      operation: observe the final merged materialized-page production deployment for 48 hours with hourly HTML, RSC, JSON, and RSS probes
+      planned_at: 2026-07-15T22:25:38Z
+      status: in-progress
+      planned:
+        r2_object_writes: 0
+        public_http_requests: 200
+        transfer_bytes: 104857600
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 0
+        deployment_id: dpl_H7eQJG3TxfaVT4EwffzpZD15xPnt
+        release_id: r457-28ad1215f3a0fd05dbc7
+        main_sha: 4ca3aa7e7363df23bb96ec67d863de79f568a12e
+        earliest_finish_at: 2026-07-17T22:25:38Z
+      actual:
+        started_at: 2026-07-15T22:25:38Z
+        monitor_label: ai.ax0x.newsroom-stability
+        probe_interval_seconds: 3600
+        probe_receipt: docs/reports/r2-public-read/production-stability-48h-materialized-probes-2026-07-15.ndjson
+        initial_probe_at: 2026-07-15T22:26:35Z
+        initial_probe_requests: 4
+        initial_probe_unexpected_5xx: 0
+    - run_id: production-clean-turso-48h-materialized-20260715t222538z
+      operation: exact clean Turso rows-read window spanning the final materialized-page stability period
+      planned_at: 2026-07-15T22:25:38Z
+      status: in-progress
+      planned:
+        r2_object_writes: 0
+        public_http_requests: 0
+        transfer_bytes: 2097152
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 1
+        turso_window: production-clean-turso-48h-materialized-20260715t222538z
+        minimum_finish_at: 2026-07-17T22:25:38Z
+      actual:
+        from_at: 2026-07-15T22:26:56.001Z
+        from_rows_read: 615628145
+        from_rows_written: 4325960
     - run_id: production-materialized-page-artifacts-cutover-20260715t220839z
       operation: deploy publisher-built immutable page artifacts, run the one-time view migration publish, verify anonymous TTFB without prewarming, merge, and redeploy the merged main branch
       planned_at: 2026-07-15T22:08:39Z
@@ -316,8 +354,8 @@ budget:
         previous_production_deployment: dpl_4yeVjBJ3nkznozqEKaZEF8wpQpmD
       actual:
         completed_at: 2026-07-15T22:23:24Z
-        merged_main_sha: 9ae3596bf56eb4c9fade99e966dd597cfdfceb3e
-        deployment_id: dpl_uTYCxxymEjp2H9p7PC8uJeGTzQdk
+        merged_main_sha: 4ca3aa7e7363df23bb96ec67d863de79f568a12e
+        deployment_id: dpl_H7eQJG3TxfaVT4EwffzpZD15xPnt
         release_id: r457-28ad1215f3a0fd05dbc7
         r2_object_writes: 117
         public_http_requests_approx: 100

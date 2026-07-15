@@ -7,8 +7,8 @@ snapshot. The publisher cron derives immutable serving artifacts and advances
 the same atomic release pointer. Runtime pages read one route artifact; podcast
 details read one of 16 ID buckets covering all 416 current podcast items.
 
-- Main SHA: `9ae3596bf56eb4c9fade99e966dd597cfdfceb3e`
-- Production deployment: `dpl_uTYCxxymEjp2H9p7PC8uJeGTzQdk`
+- Main SHA: `4ca3aa7e7363df23bb96ec67d863de79f568a12e`
+- Production deployment: `dpl_H7eQJG3TxfaVT4EwffzpZD15xPnt`
 - Active release: `r457-28ad1215f3a0fd05dbc7`
 - Serving views: 30 immutable artifacts
 - Canonical archive: 313 state artifacts, retained for publication and rollback

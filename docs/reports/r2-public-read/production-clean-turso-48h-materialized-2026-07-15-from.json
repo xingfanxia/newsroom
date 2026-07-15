@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "kind": "turso-usage-snapshot",
+  "windowName": "production-clean-turso-48h-materialized-20260715t222538z",
+  "lane": "clean",
+  "phase": "from",
+  "database": "newsroom-v2",
+  "capturedAt": "2026-07-15T22:26:56.001Z",
+  "rowsRead": 615628145,
+  "rowsWritten": 4325960
+}
