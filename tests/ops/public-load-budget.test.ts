@@ -45,6 +45,22 @@ describe("bounded anonymous load evidence", () => {
     );
   });
 
+  test("substitutes release-backed production samples without changing the corpus", () => {
+    const plan = buildAnonymousLoadPlan(1, "warm", {
+      dailyDate: "2026-07-13",
+      eventId: 12_181,
+      itemId: 4,
+      podcastId: 4,
+    });
+    const paths = new Set(plan.map(({ path }) => path));
+    expect(plan).toHaveLength(71);
+    expect(paths).toContain("/zh/daily/2026-07-13");
+    expect(paths).toContain("/api/public/daily/2026-07-13?locale=zh");
+    expect(paths).toContain("/api/events/12181/members?locale=en");
+    expect(paths).toContain("/api/public/items/4?locale=en");
+    expect(paths).toContain("/en/podcasts/4");
+  });
+
   test("rejects every over-cap spend ledger before execution", () => {
     for (const [key, value] of [
       ["r2ObjectWrites", 501],
@@ -166,8 +182,18 @@ describe("production cutover receipt aggregation", () => {
         cacheObservation("HIT", 10, "public, max-age=60", '"pointer"'),
       ],
       immutable: [
-        cacheObservation("MISS", 0, "public, max-age=31536000, immutable", '"object"'),
-        cacheObservation("HIT", 10, "public, max-age=31536000, immutable", '"object"'),
+        cacheObservation(
+          "MISS",
+          0,
+          "public, max-age=31536000, immutable",
+          '"object"',
+        ),
+        cacheObservation(
+          "HIT",
+          10,
+          "public, max-age=31536000, immutable",
+          '"object"',
+        ),
       ],
       receivedBytes: 2,
     };
@@ -180,7 +206,10 @@ describe("production cutover receipt aggregation", () => {
       ["load-missing", 1, "missing-object"],
     ] as const;
     for (const [runId, multiplier, scenario] of loadSpecs) {
-      const plannedRequests = buildAnonymousLoadPlan(multiplier, scenario).length;
+      const plannedRequests = buildAnonymousLoadPlan(
+        multiplier,
+        scenario,
+      ).length;
       writeJson(directory, `${runId}.json`, {
         schemaVersion: 1,
         kind: "anonymous-load",
@@ -209,10 +238,14 @@ describe("production cutover receipt aggregation", () => {
         decoupled: true,
       });
     }
-    writeJson(directory, "clean.json", measureTursoWindow(
-      snapshot("clean", "from", 1_000_000, 0),
-      snapshot("clean", "to", 1_100_000, 24),
-    ));
+    writeJson(
+      directory,
+      "clean.json",
+      measureTursoWindow(
+        snapshot("clean", "from", 1_000_000, 0),
+        snapshot("clean", "to", 1_100_000, 24),
+      ),
+    );
     writeJson(directory, "publisher.json", publisherReceipt());
     writeJson(directory, "stability.json", {
       schemaVersion: 1,
@@ -256,7 +289,9 @@ describe("production cutover receipt aggregation", () => {
       rollbackReceipt: "rollback.json",
     });
 
-    const verdict = verifyPublicCutoverEvidence(join(directory, "manifest.json"));
+    const verdict = verifyPublicCutoverEvidence(
+      join(directory, "manifest.json"),
+    );
     expect(verdict.ac004).toBeTrue();
     expect(verdict.ac011).toBeTrue();
     expect(verdict.ac012).toBeTrue();
@@ -326,7 +361,9 @@ function snapshot(
     lane,
     phase,
     database: "newsroom-v2",
-    capturedAt: new Date(Date.parse("2026-07-14T00:00:00.000Z") + hours * 3_600_000).toISOString(),
+    capturedAt: new Date(
+      Date.parse("2026-07-14T00:00:00.000Z") + hours * 3_600_000,
+    ).toISOString(),
     rowsRead,
     rowsWritten: 0,
   };

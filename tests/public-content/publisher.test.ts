@@ -4,10 +4,12 @@ import {
   manifestSchema,
   snapshotPointerSchema,
 } from "@/lib/public-content/contracts";
-import { CURRENT_POINTER_KEY, releaseManifestKey } from "@/lib/public-content/paths";
 import {
-  buildPublicRelease,
-} from "@/lib/public-content/publisher/build-release";
+  CURRENT_POINTER_KEY,
+  objectKey,
+  releaseManifestKey,
+} from "@/lib/public-content/paths";
+import { buildPublicRelease } from "@/lib/public-content/publisher/build-release";
 import type {
   ImmutablePutInput,
   PointerCasInput,
@@ -183,43 +185,35 @@ async function seededFixture() {
   return { events, store, state, release, pointer };
 }
 
-function allChanges(state: ReturnType<typeof canonicalState>): PublicEntityChange[] {
+function allChanges(
+  state: ReturnType<typeof canonicalState>,
+): PublicEntityChange[] {
   return [
-    ...state.sources.map(
-      (value): PublicEntityChange => ({
-        entityType: "source",
-        entityKey: value.id,
-        value,
-      }),
-    ),
-    ...state.items.map(
-      (value): PublicEntityChange => ({
-        entityType: "item",
-        entityKey: String(value.id),
-        value,
-      }),
-    ),
-    ...state.events.map(
-      (value): PublicEntityChange => ({
-        entityType: "event",
-        entityKey: String(value.id),
-        value,
-      }),
-    ),
-    ...state.newsletters.map(
-      (value): PublicEntityChange => ({
-        entityType: "newsletter",
-        entityKey: String(value.id),
-        value,
-      }),
-    ),
-    ...state.policies.map(
-      (value): PublicEntityChange => ({
-        entityType: "policy",
-        entityKey: value.skillName,
-        value,
-      }),
-    ),
+    ...state.sources.map((value): PublicEntityChange => ({
+      entityType: "source",
+      entityKey: value.id,
+      value,
+    })),
+    ...state.items.map((value): PublicEntityChange => ({
+      entityType: "item",
+      entityKey: String(value.id),
+      value,
+    })),
+    ...state.events.map((value): PublicEntityChange => ({
+      entityType: "event",
+      entityKey: String(value.id),
+      value,
+    })),
+    ...state.newsletters.map((value): PublicEntityChange => ({
+      entityType: "newsletter",
+      entityKey: String(value.id),
+      value,
+    })),
+    ...state.policies.map((value): PublicEntityChange => ({
+      entityType: "policy",
+      entityKey: value.skillName,
+      value,
+    })),
   ];
 }
 
@@ -281,11 +275,11 @@ describe("pointer-last incremental publisher", () => {
     expect(receipt.objects.uploaded).toBe(1);
     expect(source.outboxIds).toEqual([12]);
 
-    const contentPut = fixture.events.findIndex(
-      (event) => event.startsWith("put:newsroom/v1/objects/"),
+    const contentPut = fixture.events.findIndex((event) =>
+      event.startsWith("put:newsroom/v1/objects/"),
     );
-    const manifestPut = fixture.events.findIndex(
-      (event) => event.startsWith("put:newsroom/v1/releases/"),
+    const manifestPut = fixture.events.findIndex((event) =>
+      event.startsWith("put:newsroom/v1/releases/"),
     );
     const pointerCas = fixture.events.indexOf(`cas:${CURRENT_POINTER_KEY}`);
     const ack = fixture.events.indexOf("ack:11");
@@ -319,7 +313,11 @@ describe("pointer-last incremental publisher", () => {
     const unchanged = fixture.state.items[0]!;
     const source = new FakeSource(
       batch(10, 11, [
-        { entityType: "item", entityKey: String(unchanged.id), value: unchanged },
+        {
+          entityType: "item",
+          entityKey: String(unchanged.id),
+          value: unchanged,
+        },
       ]),
       fixture.events,
     );
@@ -370,7 +368,9 @@ describe("pointer-last incremental publisher", () => {
 
     for (const scenario of cases) {
       const fixture = await seededFixture();
-      const before = fixture.store.objects.get(CURRENT_POINTER_KEY)!.bytes.slice();
+      const before = fixture.store.objects
+        .get(CURRENT_POINTER_KEY)!
+        .bytes.slice();
       const source = new FakeSource(
         batch(10, 11, [changedItem(fixture.state)]),
         fixture.events,
@@ -451,6 +451,46 @@ describe("pointer-last incremental publisher", () => {
 });
 
 describe("incremental release scale", () => {
+  test("repartitions a legacy 128-bucket release before applying incremental work", async () => {
+    const legacyItem = item(17);
+    const legacyBytes = canonicalJsonBytes({
+      schemaVersion: 1,
+      entityType: "item",
+      shard: { kind: "id_bucket", bucket: "11" },
+      entities: [legacyItem],
+    });
+    const legacySha = await sha256Hex(legacyBytes);
+    const legacyDescriptor = {
+      key: objectKey(legacySha, "json"),
+      sha256: legacySha,
+      byteLength: legacyBytes.byteLength,
+      mediaType: "application/json" as const,
+      encoding: "utf-8" as const,
+      shard: { kind: "id_bucket" as const, bucket: "11" },
+    };
+    const previous = manifestSchema.parse({
+      schemaVersion: 1,
+      releaseId: "r20-legacy",
+      sourceWatermark: 20,
+      artifacts: { "state/items/11": legacyDescriptor },
+    });
+    const migrated = await buildPublicRelease({
+      previousManifest: previous,
+      sourceWatermark: 21,
+      changes: [],
+      loadArtifact: async () => legacyBytes,
+    });
+    expect(migrated.loadedArtifactCount).toBe(1);
+    expect(Object.keys(migrated.manifest.artifacts)).toEqual([
+      "state/items/01",
+    ]);
+    expect(migrated.artifacts).toHaveLength(1);
+    expect(
+      JSON.parse(new TextDecoder().decode(migrated.artifacts[0]!.bytes))
+        .entities[0].id,
+    ).toBe(17);
+  });
+
   test("loads only touched stable shards, independent of unrelated corpus descriptors", async () => {
     const initialChanges = Array.from({ length: 100 }, (_, index) => {
       const value = item(index + 1);
@@ -469,7 +509,10 @@ describe("incremental release scale", () => {
       },
     });
     const bytesByKey = new Map(
-      initial.artifacts.map((artifact) => [artifact.descriptor.key, artifact.bytes]),
+      initial.artifacts.map((artifact) => [
+        artifact.descriptor.key,
+        artifact.bytes,
+      ]),
     );
     const filler = initial.artifacts[0]!.descriptor;
     const unrelated = Object.fromEntries(
@@ -497,7 +540,10 @@ describe("incremental release scale", () => {
     const one = await build([
       {
         ...initialChanges[0]!,
-        value: { ...initialChanges[0]!.value, title: { raw: "one", zh: null, en: "one" } },
+        value: {
+          ...initialChanges[0]!.value,
+          title: { raw: "one", zh: null, en: "one" },
+        },
       },
     ]);
     expect(one.loadedArtifactCount).toBe(1);
@@ -513,9 +559,9 @@ describe("incremental release scale", () => {
         },
       })),
     );
-    expect(hundred.loadedArtifactCount).toBe(100);
-    expect(hundred.artifacts).toHaveLength(100);
-    expect(loadCounts[0]).toBe(100);
+    expect(hundred.loadedArtifactCount).toBe(16);
+    expect(hundred.artifacts).toHaveLength(16);
+    expect(loadCounts[0]).toBe(16);
 
     const repeated = await build(
       initialChanges.map((change) => ({

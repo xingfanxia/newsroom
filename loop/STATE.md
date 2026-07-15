@@ -300,6 +300,64 @@ budget:
   production_backed_default_tests: 0
   intentional_turso_windows: named-only
   spend_ledger:
+    - run_id: production-vercel-repartition-20260715t053700z
+      operation: deploy the backward-compatible 16-bucket reader/writer and verify representative production paths
+      planned_at: 2026-07-15T05:37:00Z
+      status: planned
+      planned:
+        r2_object_writes: 0
+        public_http_requests: 10
+        transfer_bytes: 10485760
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 0
+        previous_production_deployment: dpl_6K4t8Zy9fDLJuJJAdt9xnPQEXSHL
+    - run_id: production-r2-repartition-preflight-20260715t053300z
+      operation: read-only reconstruction of the active 128-bucket release into the planned 16-bucket layout
+      planned_at: 2026-07-15T05:33:00Z
+      status: succeeded
+      planned:
+        r2_object_writes: 0
+        public_http_requests: 320
+        transfer_bytes: 134217728
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 0
+        active_release: r34-25092d7f5022cc16d278
+      actual:
+        public_http_requests: 308
+        transfer_bytes: 94319426
+        r2_object_writes: 0
+        loaded_artifacts: 308
+        built_artifacts: 48
+        manifest_artifacts: 50
+        projected_publish_writes: 51
+        max_artifact_bytes: 6218222
+        item_count: 8743
+        event_count: 462
+        newsletter_count: 71
+        legacy_high_bucket_names: 0
+    - run_id: production-load-warm-1x-retry-20260715t052300z
+      operation: 1x warm anonymous corpus with release-backed samples and equal named Turso control
+      planned_at: 2026-07-15T05:23:00Z
+      status: succeeded
+      planned:
+        r2_object_writes: 0
+        public_http_requests: 71
+        transfer_bytes: 33554432
+        bootstrap_snapshots: 0
+        intentional_turso_windows: 2
+        deployment_id: dpl_6K4t8Zy9fDLJuJJAdt9xnPQEXSHL
+        turso_window: production-load-warm-1x-retry-20260715t052300z
+      actual:
+        public_http_requests: 71
+        transfer_bytes: 5046932
+        status_mismatches: 0
+        unexpected_5xx: 0
+        load_delta_rows_read: 0
+        control_delta_rows_read: 0
+        net_delta_rows_read: 0
+        decoupled: true
+        receipt: docs/reports/r2-public-read/production-load-warm-1x-retry-2026-07-15-load.json
+        turso_comparison: docs/reports/r2-public-read/production-load-warm-1x-retry-2026-07-15-turso-comparison.json
     - run_id: production-load-cold-100x-20260715t051700z
       operation: 100x cold-deploy anonymous corpus with equal named Turso control
       planned_at: 2026-07-15T05:17:00Z
@@ -315,7 +373,7 @@ budget:
     - run_id: production-load-cache-miss-10x-20260715t051700z
       operation: 10x cache-miss anonymous corpus with equal named Turso control
       planned_at: 2026-07-15T05:17:00Z
-      status: planned
+      status: failed-runtime-capacity
       planned:
         r2_object_writes: 0
         public_http_requests: 710
@@ -324,10 +382,24 @@ budget:
         intentional_turso_windows: 2
         deployment_id: dpl_6K4t8Zy9fDLJuJJAdt9xnPQEXSHL
         turso_window: production-load-cache-miss-10x-20260715t051700z
+        cache_purge_urls:
+          - https://content.ax0x.ai/newsroom/v1/current.json
+          - https://content.ax0x.ai/newsroom/v1/releases/r0-8c1c86004a59bbcb8eed/manifest.json
+      actual:
+        cache_purge_performed: false
+        cache_miss_method: pointer TTL expiry after the temporary Cache Rules token had been removed
+        public_http_requests: 710
+        transfer_bytes: 47507361
+        status_mismatches: 6
+        unexpected_5xx: 6
+        load_delta_rows_read: 0
+        reason: Cold Vercel instances timed out while reconstructing the 309-artifact canonical state; no DB fallback occurred
+        receipt: docs/reports/r2-public-read/production-load-cache-miss-10x-2026-07-15-load.json
+        failed_window: docs/reports/r2-public-read/production-load-cache-miss-10x-2026-07-15-failed-window.json
     - run_id: production-load-warm-1x-20260715t051700z
       operation: 1x warm anonymous corpus with equal named Turso control
       planned_at: 2026-07-15T05:17:00Z
-      status: planned
+      status: failed-fixture-precondition
       planned:
         r2_object_writes: 0
         public_http_requests: 71
@@ -336,6 +408,15 @@ budget:
         intentional_turso_windows: 2
         deployment_id: dpl_6K4t8Zy9fDLJuJJAdt9xnPQEXSHL
         turso_window: production-load-warm-1x-20260715t051700z
+      actual:
+        public_http_requests: 71
+        transfer_bytes: 4874394
+        status_mismatches: 8
+        unexpected_5xx: 0
+        turso_delta_rows_read: 64
+        reason: Fixed local-fixture item, podcast, and daily identifiers were absent from the production release; production correctly returned 404
+        receipt: docs/reports/r2-public-read/production-load-warm-1x-2026-07-15-load.json
+        failed_window: docs/reports/r2-public-read/production-load-warm-1x-2026-07-15-failed-window.json
     - run_id: production-vercel-cutover-20260715t051149z
       operation: production Vercel deployment, public-origin cutover, representative probes, and bounded rollback if needed
       planned_at: 2026-07-15T05:11:49Z

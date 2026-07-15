@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "goalVersion": "r2-public-read-v1-ec57c55fe111",
+  "runId": "production-load-warm-1x-retry-20260715t052300z",
+  "plannedAt": "2026-07-15T05:23:00.000Z",
+  "planned": {
+    "bootstrapSnapshots": 0,
+    "publicHttpRequests": 71,
+    "r2ObjectWrites": 0,
+    "transferBytes": 33554432
+  },
+  "tursoWindowName": "production-load-warm-1x-retry-20260715t052300z"
+}

@@ -6,10 +6,7 @@ import {
   anonymousLoadReceiptSchema,
   type AnonymousLoadReceipt,
 } from "./load-anonymous";
-import {
-  assertR2CacheReceipt,
-  type R2CacheReceipt,
-} from "./verify-r2-cache";
+import { assertR2CacheReceipt, type R2CacheReceipt } from "./verify-r2-cache";
 import {
   tursoLoadComparisonSchema,
   tursoWindowReceiptSchema,
@@ -128,7 +125,8 @@ export function verifyPublicCutoverEvidence(
   if (clean.lane !== "clean" || clean.durationHours < 24) {
     issues.push("clean Turso window must cover at least 24 hours");
   }
-  if (!clean.hardTargetMet) issues.push("clean Turso window exceeds 100M/month");
+  if (!clean.hardTargetMet)
+    issues.push("clean Turso window exceeds 100M/month");
   if (publisherProjectedMonthlyRows >= 5_000_000) {
     issues.push("publisher projection exceeds 5M/month");
   }
@@ -164,7 +162,9 @@ export function assertPublicEvidenceCriterion(
         ? verdict.ac011
         : verdict.ac012;
   if (!passed) {
-    throw new Error(`${criterion} production evidence is incomplete: ${verdict.issues.join("; ")}`);
+    throw new Error(
+      `${criterion} production evidence is incomplete: ${verdict.issues.join("; ")}`,
+    );
   }
   return verdict;
 }
@@ -175,7 +175,9 @@ export function verifyFinalPublicCutoverEvidence(
   const resolvedManifest = resolve(manifestPath);
   const manifest = evidenceManifestSchema.parse(readJson(resolvedManifest));
   if (!manifest.stabilityReceipt || !manifest.rollbackReceipt) {
-    throw new Error("final evidence requires 48-hour stability and rollback receipts");
+    throw new Error(
+      "final evidence requires 48-hour stability and rollback receipts",
+    );
   }
   const base = dirname(resolvedManifest);
   const stability = publicStabilityReceiptSchema.parse(
@@ -191,7 +193,9 @@ export function verifyFinalPublicCutoverEvidence(
     measuredDurationHours < 48 ||
     Math.abs(measuredDurationHours - stability.durationHours) > 0.001
   ) {
-    throw new Error("stability receipt must contain a consistent >=48-hour window");
+    throw new Error(
+      "stability receipt must contain a consistent >=48-hour window",
+    );
   }
   if (
     stability.publisherFailureCount !== 0 ||
@@ -212,7 +216,9 @@ export function verifyFinalPublicCutoverEvidence(
   }
   const verdict = verifyPublicCutoverEvidence(resolvedManifest);
   if (!verdict.ac004 || !verdict.ac011 || !verdict.ac012) {
-    throw new Error(`final production evidence is incomplete: ${verdict.issues.join("; ")}`);
+    throw new Error(
+      `final production evidence is incomplete: ${verdict.issues.join("; ")}`,
+    );
   }
   return { verdict, stability, rollback };
 }
@@ -227,7 +233,9 @@ function cacheIsComplete(cache: R2CacheReceipt, issues: string[]): boolean {
     pointer.hostname !== "content.ax0x.ai" ||
     immutable.hostname !== "content.ax0x.ai"
   ) {
-    issues.push("cache receipt is not from the production public/content origins");
+    issues.push(
+      "cache receipt is not from the production public/content origins",
+    );
     return false;
   }
   return true;
@@ -263,10 +271,13 @@ function loadEvidenceIsComplete(
   }
   const runIds = new Set<string>();
   for (const load of loads) {
-    if (runIds.has(load.runId)) issues.push(`load receipt ${load.runId} is duplicated`);
+    if (runIds.has(load.runId))
+      issues.push(`load receipt ${load.runId} is duplicated`);
     runIds.add(load.runId);
     if (load.baseOrigin !== "https://news.ax0x.ai") {
-      issues.push(`load receipt ${load.runId} is not from the production public origin`);
+      issues.push(
+        `load receipt ${load.runId} is not from the production public origin`,
+      );
     }
     const expectedRequests = buildExpectedRequestCount(load);
     if (
@@ -291,7 +302,8 @@ function loadEvidenceIsComplete(
 }
 
 function buildExpectedRequestCount(load: AnonymousLoadReceipt): number {
-  return buildAnonymousLoadPlan(load.multiplier, load.scenario).length;
+  return buildAnonymousLoadPlan(load.multiplier, load.scenario, load.fixtures)
+    .length;
 }
 
 function readRelative(base: string, path: string): unknown {

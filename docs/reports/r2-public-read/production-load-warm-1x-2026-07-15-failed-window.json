@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "kind": "turso-window",
+  "windowName": "production-load-warm-1x-20260715t051700z",
+  "lane": "load",
+  "database": "newsroom-v2",
+  "fromAt": "2026-07-15T05:19:29.725Z",
+  "toAt": "2026-07-15T05:21:26.725Z",
+  "durationHours": 0.0325,
+  "deltaRowsRead": 64,
+  "rowsPerHour": 1969.230769230769,
+  "projectedMonthlyRows": 1437538.4615384615,
+  "hardTargetMet": true,
+  "preferredTargetMet": true
+}

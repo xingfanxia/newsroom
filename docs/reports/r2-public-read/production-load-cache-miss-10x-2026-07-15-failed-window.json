@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "kind": "turso-window",
+  "windowName": "production-load-cache-miss-10x-20260715t051700z",
+  "lane": "load",
+  "database": "newsroom-v2",
+  "fromAt": "2026-07-15T05:25:42.937Z",
+  "toAt": "2026-07-15T05:26:52.993Z",
+  "durationHours": 0.01946,
+  "deltaRowsRead": 0,
+  "rowsPerHour": 0,
+  "projectedMonthlyRows": 0,
+  "hardTargetMet": true,
+  "preferredTargetMet": true
+}

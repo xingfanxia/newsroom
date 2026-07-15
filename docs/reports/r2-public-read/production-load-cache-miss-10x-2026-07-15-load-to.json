@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "kind": "turso-usage-snapshot",
+  "windowName": "production-load-cache-miss-10x-20260715t051700z",
+  "lane": "load",
+  "phase": "to",
+  "database": "newsroom-v2",
+  "capturedAt": "2026-07-15T05:26:52.993Z",
+  "rowsRead": 615301839,
+  "rowsWritten": 4307153
+}

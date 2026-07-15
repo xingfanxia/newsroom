@@ -16,7 +16,8 @@ export const PUBLIC_ENTITY_TYPES = [
 ] as const;
 export type PublicEntityType = (typeof PUBLIC_ENTITY_TYPES)[number];
 
-export const PUBLIC_NUMERIC_SHARD_COUNT = 128;
+export const PUBLIC_NUMERIC_SHARD_COUNT = 16;
+const PUBLIC_READABLE_NUMERIC_SHARD_COUNTS = [16, 128] as const;
 
 const idBucketShardSchema = z.strictObject({
   kind: z.literal("id_bucket"),
@@ -63,8 +64,7 @@ type PublicEntityShard = z.infer<
   (typeof publicEntityShardSchemas)[PublicEntityType]
 >;
 type PublicEntityShardMetadata =
-  | z.infer<typeof idBucketShardSchema>
-  | z.infer<typeof singletonShardSchema>;
+  z.infer<typeof idBucketShardSchema> | z.infer<typeof singletonShardSchema>;
 
 export function parsePublicEntityShardValue(
   logicalName: string,
@@ -83,7 +83,7 @@ export function parsePublicEntityShardValue(
     const key = publicEntityKey(entityType, entity);
     if (seen.has(key)) throw new Error(`duplicate ${entityType} in shard`);
     seen.add(key);
-    if (publicEntityShardLogicalName(entityType, key) !== logicalName) {
+    if (!isReadableNumericShard(entityType, key, logicalName)) {
       throw new Error(`${entityType} is stored in the wrong shard`);
     }
   }
@@ -103,9 +103,21 @@ export function publicEntityShardLogicalName(
   entityType: PublicEntityType,
   entityKey: string,
 ): string {
+  return publicEntityShardLogicalNameForCount(
+    entityType,
+    entityKey,
+    PUBLIC_NUMERIC_SHARD_COUNT,
+  );
+}
+
+function publicEntityShardLogicalNameForCount(
+  entityType: PublicEntityType,
+  entityKey: string,
+  shardCount: number,
+): string {
   if (entityType === "source") return "state/sources";
   if (entityType === "policy") return "state/policies";
-  const bucket = numericBucket(entityKey, entityType);
+  const bucket = numericBucket(entityKey, entityType, shardCount);
   const plural =
     entityType === "item"
       ? "items"
@@ -113,6 +125,24 @@ export function publicEntityShardLogicalName(
         ? "events"
         : "newsletters";
   return `state/${plural}/${bucket}`;
+}
+
+function isReadableNumericShard(
+  entityType: PublicEntityType,
+  entityKey: string,
+  logicalName: string,
+): boolean {
+  if (entityType === "source" || entityType === "policy") {
+    return publicEntityShardLogicalName(entityType, entityKey) === logicalName;
+  }
+  return PUBLIC_READABLE_NUMERIC_SHARD_COUNTS.some(
+    (shardCount) =>
+      publicEntityShardLogicalNameForCount(
+        entityType,
+        entityKey,
+        shardCount,
+      ) === logicalName,
+  );
 }
 
 function publicEntityTypeFromShardLogicalName(
@@ -136,7 +166,11 @@ export function publicEntityShardMetadata(
     ? { kind: "singleton" }
     : {
         kind: "id_bucket",
-        bucket: numericBucket(entityKey, entityType),
+        bucket: numericBucket(
+          entityKey,
+          entityType,
+          PUBLIC_NUMERIC_SHARD_COUNT,
+        ),
       };
 }
 
@@ -160,11 +194,13 @@ function publicEntityShardMetadataFromLogicalName(
   return { kind: "id_bucket", bucket: logicalName.slice(-2) };
 }
 
-function numericBucket(value: string, label: string): string {
+function numericBucket(
+  value: string,
+  label: string,
+  shardCount: number,
+): string {
   if (!/^[1-9]\d*$/.test(value)) throw new Error(`invalid ${label} key`);
   const parsed = Number(value);
   if (!Number.isSafeInteger(parsed)) throw new Error(`invalid ${label} key`);
-  return (parsed % PUBLIC_NUMERIC_SHARD_COUNT)
-    .toString(16)
-    .padStart(2, "0");
+  return (parsed % shardCount).toString(16).padStart(2, "0");
 }

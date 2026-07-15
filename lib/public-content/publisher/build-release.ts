@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { canonicalJsonBytes, canonicalSha256, sha256Hex } from "@/lib/public-content/canonical";
+import {
+  canonicalJsonBytes,
+  canonicalSha256,
+  sha256Hex,
+} from "@/lib/public-content/canonical";
 import {
   artifactDescriptorSchema,
   manifestSchema,
@@ -57,9 +61,31 @@ export async function buildPublicRelease(
   const nextDescriptors: Record<string, ArtifactDescriptor> = {
     ...(previous?.artifacts ?? {}),
   };
-  const grouped = groupChanges(input.changes);
   const built: BuiltReleaseArtifact[] = [];
   let loadedArtifactCount = 0;
+  const repartitionNumericShards =
+    previous !== null && requiresNumericShardMigration(previous);
+  if (repartitionNumericShards) {
+    const migration = await buildRepartitionedNumericArtifacts(
+      previous,
+      input.changes,
+      input.loadArtifact,
+    );
+    for (const logicalName of Object.keys(nextDescriptors)) {
+      if (isNumericShardLogicalName(logicalName)) {
+        delete nextDescriptors[logicalName];
+      }
+    }
+    for (const artifact of migration.artifacts) {
+      nextDescriptors[artifact.logicalName] = artifact.descriptor;
+      built.push(artifact);
+    }
+    loadedArtifactCount += migration.loadedArtifactCount;
+  }
+  const incrementalChanges = repartitionNumericShards
+    ? input.changes.filter(({ entityType }) => !isNumericEntityType(entityType))
+    : input.changes;
+  const grouped = groupChanges(incrementalChanges);
 
   for (const [logicalName, changes] of grouped) {
     const entityType = changes[0]!.entityType;
@@ -81,29 +107,15 @@ export async function buildPublicRelease(
     }
 
     const patched = patchEntities(entityType, entities, changes);
-    const shard = publicEntityShardSchemas[entityType].parse({
-      schemaVersion: 1,
+    const artifact = await buildShardArtifact(
       entityType,
-      shard: expectedShard,
-      entities: patched,
-    });
-    const bytes = canonicalJsonBytes(shard);
-    const sha256 = await sha256Hex(bytes);
-    const descriptor = artifactDescriptorSchema.parse({
-      key: objectKey(sha256, "json"),
-      sha256,
-      byteLength: bytes.byteLength,
-      mediaType: "application/json",
-      encoding: "utf-8",
-      shard: expectedShard,
-    });
-    nextDescriptors[logicalName] = descriptor;
-    built.push({
       logicalName,
-      descriptor,
-      bytes,
-      unchanged: previousDescriptor?.sha256 === sha256,
-    });
+      expectedShard,
+      patched,
+      previousDescriptor,
+    );
+    nextDescriptors[logicalName] = artifact.descriptor;
+    built.push(artifact);
   }
 
   const identity = await canonicalSha256({
@@ -127,6 +139,152 @@ export async function buildPublicRelease(
     artifacts: built,
     loadedArtifactCount,
   };
+}
+
+type NumericEntityType = Extract<
+  PublicEntityType,
+  "item" | "event" | "newsletter"
+>;
+
+async function buildRepartitionedNumericArtifacts(
+  previous: PublicReleaseManifest,
+  changes: readonly PublicEntityChange[],
+  loadArtifact: BuildPublicReleaseInput["loadArtifact"],
+): Promise<{
+  artifacts: BuiltReleaseArtifact[];
+  loadedArtifactCount: number;
+}> {
+  const entities: Record<NumericEntityType, Map<string, unknown>> = {
+    item: new Map(),
+    event: new Map(),
+    newsletter: new Map(),
+  };
+  let loadedArtifactCount = 0;
+  for (const [logicalName, descriptor] of Object.entries(previous.artifacts)) {
+    if (!isNumericShardLogicalName(logicalName)) continue;
+    const bytes = await loadArtifact(logicalName, descriptor);
+    loadedArtifactCount += 1;
+    await verifyDescriptorBytes(descriptor, bytes);
+    const shard = parsePublicEntityShardValue(
+      logicalName,
+      JSON.parse(new TextDecoder().decode(bytes)) as unknown,
+    );
+    if (!isNumericEntityType(shard.entityType)) {
+      throw new Error(`non-numeric entity in numeric shard: ${logicalName}`);
+    }
+    const destination = entities[shard.entityType];
+    for (const value of shard.entities) {
+      const key = publicEntityKey(shard.entityType, value);
+      if (destination.has(key)) {
+        throw new Error(`duplicate ${shard.entityType} across prior shards`);
+      }
+      destination.set(key, value);
+    }
+  }
+  for (const change of changes) {
+    if (!isNumericEntityType(change.entityType)) continue;
+    const destination = entities[change.entityType];
+    if (change.value === null) destination.delete(change.entityKey);
+    else {
+      const parsed = parsePublicEntityValue(change.entityType, change.value);
+      if (publicEntityKey(change.entityType, parsed) !== change.entityKey) {
+        throw new Error(`${change.entityType} key/value mismatch`);
+      }
+      destination.set(change.entityKey, parsed);
+    }
+  }
+
+  const grouped = new Map<
+    string,
+    { entityType: NumericEntityType; values: unknown[] }
+  >();
+  for (const entityType of ["item", "event", "newsletter"] as const) {
+    for (const [entityKey, value] of entities[entityType]) {
+      const logicalName = publicEntityShardLogicalName(entityType, entityKey);
+      const group = grouped.get(logicalName) ?? { entityType, values: [] };
+      group.values.push(value);
+      grouped.set(logicalName, group);
+    }
+  }
+
+  const artifacts: BuiltReleaseArtifact[] = [];
+  for (const [logicalName, group] of [...grouped.entries()].sort(
+    ([left], [right]) => left.localeCompare(right),
+  )) {
+    group.values.sort((left, right) =>
+      compareEntityKeys(
+        group.entityType,
+        publicEntityKey(group.entityType, left),
+        publicEntityKey(group.entityType, right),
+      ),
+    );
+    const firstKey = publicEntityKey(group.entityType, group.values[0]);
+    const expectedShard = publicEntityShardMetadata(group.entityType, firstKey);
+    artifacts.push(
+      await buildShardArtifact(
+        group.entityType,
+        logicalName,
+        expectedShard,
+        group.values,
+        previous.artifacts[logicalName],
+      ),
+    );
+  }
+  return { artifacts, loadedArtifactCount };
+}
+
+async function buildShardArtifact(
+  entityType: PublicEntityType,
+  logicalName: string,
+  shardMetadata: ReturnType<typeof publicEntityShardMetadata>,
+  entities: readonly unknown[],
+  previousDescriptor: ArtifactDescriptor | undefined,
+): Promise<BuiltReleaseArtifact> {
+  const shard = publicEntityShardSchemas[entityType].parse({
+    schemaVersion: 1,
+    entityType,
+    shard: shardMetadata,
+    entities,
+  });
+  const bytes = canonicalJsonBytes(shard);
+  const sha256 = await sha256Hex(bytes);
+  const descriptor = artifactDescriptorSchema.parse({
+    key: objectKey(sha256, "json"),
+    sha256,
+    byteLength: bytes.byteLength,
+    mediaType: "application/json",
+    encoding: "utf-8",
+    shard: shardMetadata,
+  });
+  return {
+    logicalName,
+    descriptor,
+    bytes,
+    unchanged: previousDescriptor?.sha256 === sha256,
+  };
+}
+
+function requiresNumericShardMigration(
+  manifest: PublicReleaseManifest,
+): boolean {
+  return Object.keys(manifest.artifacts).some((logicalName) => {
+    if (!isNumericShardLogicalName(logicalName)) return false;
+    return Number.parseInt(logicalName.slice(-2), 16) >= 16;
+  });
+}
+
+function isNumericShardLogicalName(logicalName: string): boolean {
+  return /^state\/(?:items|events|newsletters)\/[a-f0-9]{2}$/.test(logicalName);
+}
+
+function isNumericEntityType(
+  entityType: PublicEntityType,
+): entityType is NumericEntityType {
+  return (
+    entityType === "item" ||
+    entityType === "event" ||
+    entityType === "newsletter"
+  );
 }
 
 export async function verifyDescriptorBytes(

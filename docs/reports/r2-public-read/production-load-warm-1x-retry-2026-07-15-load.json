@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "kind": "anonymous-load",
+  "runId": "production-load-warm-1x-retry-20260715t052300z",
+  "scenario": "warm",
+  "multiplier": 1,
+  "fixtures": {
+    "dailyDate": "2026-07-13",
+    "eventId": 12181,
+    "itemId": 4,
+    "podcastId": 4
+  },
+  "baseOrigin": "https://news.ax0x.ai",
+  "startedAt": "2026-07-15T05:23:08.304Z",
+  "finishedAt": "2026-07-15T05:23:18.918Z",
+  "plannedRequests": 71,
+  "completedRequests": 71,
+  "receivedBytes": 5046932,
+  "statusMismatchCount": 0,
+  "unexpected5xxCount": 0,
+  "mismatches": []
+}

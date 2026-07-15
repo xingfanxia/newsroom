@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "kind": "turso-load-comparison",
+  "windowName": "production-load-warm-1x-retry-20260715t052300z",
+  "database": "newsroom-v2",
+  "durationHours": 0.0030258333333333335,
+  "loadDeltaRowsRead": 0,
+  "controlDeltaRowsRead": 0,
+  "netDeltaRowsRead": 0,
+  "decoupled": true
+}

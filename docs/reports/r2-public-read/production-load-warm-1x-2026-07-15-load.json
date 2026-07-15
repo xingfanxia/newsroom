@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "kind": "anonymous-load",
+  "runId": "production-load-warm-1x-20260715t051700z",
+  "scenario": "warm",
+  "multiplier": 1,
+  "baseOrigin": "https://news.ax0x.ai",
+  "startedAt": "2026-07-15T05:19:29.759Z",
+  "finishedAt": "2026-07-15T05:19:49.343Z",
+  "plannedRequests": 71,
+  "completedRequests": 71,
+  "receivedBytes": 4874394,
+  "statusMismatchCount": 8,
+  "unexpected5xxCount": 0,
+  "mismatches": [
+    {
+      "expected": 200,
+      "method": "HEAD",
+      "path": "/zh/daily/2026-07-14",
+      "received": 404,
+      "session": 1
+    },
+    {
+      "expected": 200,
+      "method": "HEAD",
+      "path": "/en/podcasts/1",
+      "received": 404,
+      "session": 1
+    },
+    {
+      "expected": 200,
+      "method": "GET",
+      "path": "/en/podcasts/1",
+      "received": 404,
+      "session": 1
+    },
+    {
+      "expected": 200,
+      "method": "GET",
+      "path": "/zh/daily/2026-07-14",
+      "received": 404,
+      "session": 1
+    },
+    {
+      "expected": 200,
+      "method": "GET",
+      "path": "/api/public/daily/2026-07-14?locale=zh",
+      "received": 404,
+      "session": 1
+    },
+    {
+      "expected": 200,
+      "method": "HEAD",
+      "path": "/api/public/items/1?locale=en",
+      "received": 404,
+      "session": 1
+    },
+    {
+      "expected": 200,
+      "method": "HEAD",
+      "path": "/api/public/daily/2026-07-14?locale=zh",
+      "received": 404,
+      "session": 1
+    },
+    {
+      "expected": 200,
+      "method": "GET",
+      "path": "/api/public/items/1?locale=en",
+      "received": 404,
+      "session": 1
+    }
+  ]
+}

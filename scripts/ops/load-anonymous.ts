@@ -12,6 +12,7 @@ import {
   buildAnonymousLoadPlan,
   type AnonymousLoadRequest,
   type AnonymousLoadScenario,
+  type PublicRuntimeFixtures,
 } from "@/scripts/verification/public-runtime-corpus";
 
 const scenarios = [
@@ -27,6 +28,17 @@ export const anonymousLoadReceiptSchema = z.strictObject({
   runId: z.string().min(1),
   scenario: z.enum(scenarios),
   multiplier: z.union([z.literal(1), z.literal(10), z.literal(100)]),
+  fixtures: z
+    .strictObject({
+      dailyDate: z
+        .string()
+        .regex(/^\d{4}-\d{2}-\d{2}$/)
+        .optional(),
+      eventId: z.number().int().positive().safe().optional(),
+      itemId: z.number().int().positive().safe().optional(),
+      podcastId: z.number().int().positive().safe().optional(),
+    })
+    .optional(),
   baseOrigin: z.string().url(),
   startedAt: z.string().datetime(),
   finishedAt: z.string().datetime(),
@@ -57,6 +69,7 @@ export async function runAnonymousLoad(options: {
   readonly baseUrl: string;
   readonly concurrency?: number;
   readonly fetch?: FetchLike;
+  readonly fixtures?: PublicRuntimeFixtures;
   readonly ledger: PublicSpendLedger;
   readonly multiplier: 1 | 10 | 100;
   readonly now?: () => number;
@@ -67,7 +80,11 @@ export async function runAnonymousLoad(options: {
   baseUrl.search = "";
   baseUrl.hash = "";
   assertExplicitIntegrationOptIn(baseUrl.toString());
-  const plan = buildAnonymousLoadPlan(options.multiplier, options.scenario);
+  const plan = buildAnonymousLoadPlan(
+    options.multiplier,
+    options.scenario,
+    options.fixtures,
+  );
   assertPublicSpendReservation(options.ledger, {
     bootstrapSnapshots: 0,
     publicHttpRequests: plan.length,
@@ -75,7 +92,11 @@ export async function runAnonymousLoad(options: {
     transferBytes: options.ledger.planned.transferBytes,
   });
   const concurrency = options.concurrency ?? 16;
-  if (!Number.isSafeInteger(concurrency) || concurrency < 1 || concurrency > 64) {
+  if (
+    !Number.isSafeInteger(concurrency) ||
+    concurrency < 1 ||
+    concurrency > 64
+  ) {
     throw new Error("load concurrency must be an integer from 1 to 64");
   }
   const request = options.fetch ?? fetch;
@@ -135,6 +156,7 @@ export async function runAnonymousLoad(options: {
     runId: options.ledger.runId,
     scenario: options.scenario,
     multiplier: options.multiplier,
+    fixtures: options.fixtures,
     baseOrigin: baseUrl.origin,
     startedAt: new Date(startedAt).toISOString(),
     finishedAt: new Date(now()).toISOString(),
@@ -149,7 +171,9 @@ export async function runAnonymousLoad(options: {
 
 function parseScenario(value: string): AnonymousLoadScenario {
   if (!(scenarios as readonly string[]).includes(value)) {
-    throw new Error("--scenario must be warm, cache-miss, cold-deploy or missing-object");
+    throw new Error(
+      "--scenario must be warm, cache-miss, cold-deploy or missing-object",
+    );
   }
   return value as AnonymousLoadScenario;
 }
@@ -165,9 +189,12 @@ async function main(argv: readonly string[]): Promise<void> {
   );
   const receipt = await runAnonymousLoad({
     baseUrl: requiredFlagValue(argv, "--base-url"),
-    concurrency: Number(argv.includes("--concurrency")
-      ? requiredFlagValue(argv, "--concurrency")
-      : 16),
+    concurrency: Number(
+      argv.includes("--concurrency")
+        ? requiredFlagValue(argv, "--concurrency")
+        : 16,
+    ),
+    fixtures: parseRuntimeFixtures(argv),
     ledger,
     multiplier: multiplier as 1 | 10 | 100,
     scenario: parseScenario(requiredFlagValue(argv, "--scenario")),
@@ -177,6 +204,19 @@ async function main(argv: readonly string[]): Promise<void> {
   if (receipt.statusMismatchCount > 0 || receipt.unexpected5xxCount > 0) {
     process.exitCode = 1;
   }
+}
+
+function parseRuntimeFixtures(argv: readonly string[]): PublicRuntimeFixtures {
+  const integer = (flag: string): number | undefined =>
+    argv.includes(flag) ? Number(requiredFlagValue(argv, flag)) : undefined;
+  return {
+    dailyDate: argv.includes("--daily-date")
+      ? requiredFlagValue(argv, "--daily-date")
+      : undefined,
+    eventId: integer("--event-id"),
+    itemId: integer("--item-id"),
+    podcastId: integer("--podcast-id"),
+  };
 }
 
 if (import.meta.main) {

@@ -26,14 +26,10 @@ import {
 
 describe("pointer, manifest, and receipt contracts", () => {
   test("bounds numeric entity shards below the bootstrap write cap", () => {
-    expect(PUBLIC_NUMERIC_SHARD_COUNT).toBe(128);
+    expect(PUBLIC_NUMERIC_SHARD_COUNT).toBe(16);
     expect(publicEntityShardLogicalName("item", "1")).toBe("state/items/01");
-    expect(publicEntityShardLogicalName("item", "129")).toBe(
-      "state/items/01",
-    );
-    expect(publicEntityShardLogicalName("event", "128")).toBe(
-      "state/events/00",
-    );
+    expect(publicEntityShardLogicalName("item", "17")).toBe("state/items/01");
+    expect(publicEntityShardLogicalName("event", "16")).toBe("state/events/00");
   });
 
   test("reject unknown schema versions on otherwise valid records", () => {
@@ -42,7 +38,9 @@ describe("pointer, manifest, and receipt contracts", () => {
       { schema: manifestSchema, valid: snapshotManifest() },
       { schema: runReceiptSchema, valid: runReceipt() },
     ]) {
-      expect(schema.safeParse({ ...valid, schemaVersion: 2 }).success).toBe(false);
+      expect(schema.safeParse({ ...valid, schemaVersion: 2 }).success).toBe(
+        false,
+      );
       expect(schema.safeParse({ ...valid, schemaVersion: "1" }).success).toBe(
         false,
       );
@@ -94,9 +92,9 @@ describe("pointer, manifest, and receipt contracts", () => {
 
     const manifest = snapshotManifest();
     expect(manifestSchema.parse(manifest)).toEqual(manifest);
-    expect(manifestSchema.safeParse({ ...manifest, artifacts: {} }).success).toBe(
-      false,
-    );
+    expect(
+      manifestSchema.safeParse({ ...manifest, artifacts: {} }).success,
+    ).toBe(false);
     expect(
       manifestSchema.safeParse({
         ...manifest,
