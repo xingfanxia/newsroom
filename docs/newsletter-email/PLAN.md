@@ -280,7 +280,7 @@ Gates: `bun run verify` (all 7 stages) + `bun run verify:public-boundary` green.
 | Phase | Scope | Acceptance | Status |
 |---|---|---|---|
 | NLE-1 Contracts+DB | contracts, tokens, schema.ts tables, migration module + ops script | migration tests green; `bun run typecheck` green | **done** 2026-07-16 |
-| NLE-2 Email core | markdown renderer, templates (frontend-design skill first), resend adapter | unit+snapshot tests green; size budget asserted | pending |
+| NLE-2 Email core | markdown renderer, templates (frontend-design skill first), resend adapter | unit+snapshot tests green; size budget asserted | **done** 2026-07-16 |
 | NLE-3 API | subscribe/confirm/unsubscribe routes, rate-limit family, subscribers repo | route+repo tests green; no-enumeration verified | pending |
 | NLE-4 Send pipeline | send worker, cron route, vercel.json, run-cron.ts, system-stats signal | worker tests green incl. idempotency; `bun scripts/ops/run-cron.ts newsletter-send` works locally w/ dryRun | pending |
 | NLE-5 UI | subscribe card, /newsletter page, daily-page embed, nav, i18n both locales | visual verify (screenshot sweep zh+en covering every §5b state); lint/build green | pending |

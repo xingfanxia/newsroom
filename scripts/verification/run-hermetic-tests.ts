@@ -188,6 +188,7 @@ export function createHermeticRuntimeOverrides(
     R2_SECRET_ACCESS_KEY: "fake-newsroom-secret-key",
     R2_ENDPOINT: "https://r2.invalid",
     R2_PUBLIC_BASE_URL: "https://content.invalid",
+    RESEND_API_KEY: "fake-newsroom-resend-api-key",
     CF_ACCOUNT_ID: "fake-newsroom-cf-account",
     CF_API_KEY: "fake-newsroom-cf-api-key",
     CF_API_TOKEN: "fake-newsroom-cf-api-token",
