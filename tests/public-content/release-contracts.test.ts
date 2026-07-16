@@ -2,7 +2,9 @@ import { describe, expect, test } from "bun:test";
 import {
   artifactDescriptorSchema,
   manifestSchema,
+  parsePublicItemBodyShardValue,
   PUBLIC_NUMERIC_SHARD_COUNT,
+  publicItemBodyShardLogicalName,
   publicEntityShardLogicalName,
   runReceiptSchema,
   snapshotPointerSchema,
@@ -13,6 +15,7 @@ import {
   releaseManifestKey,
   runReceiptKey,
 } from "@/lib/public-content/paths";
+import { requiresBodySplitMigration } from "@/lib/public-content/publisher/build-release";
 import {
   artifactDescriptor,
   HASH_A,
@@ -207,5 +210,92 @@ describe("pointer, manifest, and receipt contracts", () => {
     expect(runReceiptKey("2026-07-14", RELEASE_ID)).toBe(
       `newsroom/v1/ops/runs/2026-07-14/${RELEASE_ID}.json`,
     );
+  });
+});
+
+describe("item body shard contracts", () => {
+  test("uses the same 128-bucket partition as item state shards", () => {
+    expect(publicItemBodyShardLogicalName("1")).toBe("bodies/items/01");
+    expect(publicItemBodyShardLogicalName("128")).toBe("bodies/items/00");
+    expect(publicItemBodyShardLogicalName("129")).toBe("bodies/items/01");
+  });
+
+  test("accepts empty and correctly bucketed strict body shards", () => {
+    expect(
+      parsePublicItemBodyShardValue("bodies/items/00", {
+        schemaVersion: 1,
+        entityType: "item-body",
+        entities: [],
+      }).entities,
+    ).toEqual([]);
+    expect(
+      parsePublicItemBodyShardValue("bodies/items/01", {
+        schemaVersion: 1,
+        entityType: "item-body",
+        entities: [{ id: 129, bodyMd: "exact body" }],
+      }).entities,
+    ).toEqual([{ id: 129, bodyMd: "exact body" }]);
+  });
+
+  test("rejects wrong-bucket IDs, duplicates, and invalid shapes", () => {
+    expect(() =>
+      parsePublicItemBodyShardValue("bodies/items/80", {
+        schemaVersion: 1,
+        entityType: "item-body",
+        entities: [],
+      }),
+    ).toThrow("unknown public item body shard");
+    expect(() =>
+      parsePublicItemBodyShardValue("bodies/items/00", {
+        schemaVersion: 1,
+        entityType: "item-body",
+        entities: [{ id: 129, bodyMd: "wrong bucket" }],
+      }),
+    ).toThrow("item body is stored in the wrong shard");
+    expect(() =>
+      parsePublicItemBodyShardValue("bodies/items/01", {
+        schemaVersion: 1,
+        entityType: "item-body",
+        entities: [
+          { id: 1, bodyMd: "one" },
+          { id: 1, bodyMd: "duplicate" },
+        ],
+      }),
+    ).toThrow("duplicate item body in shard");
+    for (const invalid of [
+      {
+        schemaVersion: 1,
+        entityType: "item-body",
+        entities: [{ id: 1, bodyMd: null }],
+      },
+      {
+        schemaVersion: 1,
+        entityType: "item-body",
+        entities: [{ id: "1", bodyMd: "body" }],
+      },
+      {
+        schemaVersion: 1,
+        entityType: "item-body",
+        entities: [],
+        private: true,
+      },
+    ]) {
+      expect(() =>
+        parsePublicItemBodyShardValue("bodies/items/01", invalid),
+      ).toThrow();
+    }
+  });
+
+  test("requires migration until the body split sentinel artifact exists", () => {
+    const legacy = manifestSchema.parse(snapshotManifest());
+    expect(requiresBodySplitMigration(legacy)).toBe(true);
+    const split = manifestSchema.parse({
+      ...legacy,
+      artifacts: {
+        ...legacy.artifacts,
+        "bodies/items/00": artifactDescriptor(),
+      },
+    });
+    expect(requiresBodySplitMigration(split)).toBe(false);
   });
 });

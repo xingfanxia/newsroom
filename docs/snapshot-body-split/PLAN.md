@@ -170,7 +170,7 @@ news.ax0x.ai 的所有匿名读取来自 R2 公共快照(`https://content.ax0x.a
 
 | Phase | 内容 | 状态 | Commit |
 |---|---|---|---|
-| SBS-1 | contracts + 迁移谓词 | pending | |
+| SBS-1 | contracts + 迁移谓词 | done | `perf(public-content): add item body shard contracts` |
 | SBS-2 | publisher 拆分/patch/迁移/物化线程 | pending | |
 | SBS-3 | reader release-pinned body 读取 | pending | |
 | SBS-4 | item API + podcast 详情消费者 | pending | |

@@ -394,6 +394,12 @@ export function requiresNumericShardMigration(
   return inferredShardCount !== PUBLIC_NUMERIC_SHARD_COUNT;
 }
 
+export function requiresBodySplitMigration(
+  manifest: PublicReleaseManifest,
+): boolean {
+  return manifest.artifacts["bodies/items/00"] === undefined;
+}
+
 function isNumericShardLogicalName(logicalName: string): boolean {
   return /^state\/(?:items|events|newsletters)\/[a-f0-9]{2}$/.test(logicalName);
 }

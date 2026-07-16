@@ -6,6 +6,7 @@ import {
   publicPolicySchema,
   publicSourceSchema,
 } from "./contract-entities";
+import { positiveEntityIdSchema } from "./contract-primitives";
 
 export const PUBLIC_ENTITY_TYPES = [
   "item",
@@ -60,6 +61,17 @@ export const publicEntityShardSchemas = {
   }),
 } as const;
 
+export const publicItemBodyShardSchema = z.strictObject({
+  schemaVersion: z.literal(1),
+  entityType: z.literal("item-body"),
+  entities: z.array(
+    z.strictObject({
+      id: positiveEntityIdSchema,
+      bodyMd: z.string(),
+    }),
+  ),
+});
+
 type PublicEntityShard = z.infer<
   (typeof publicEntityShardSchemas)[PublicEntityType]
 >;
@@ -90,6 +102,29 @@ export function parsePublicEntityShardValue(
   return parsed;
 }
 
+export function parsePublicItemBodyShardValue(
+  logicalName: string,
+  value: unknown,
+): z.infer<typeof publicItemBodyShardSchema> {
+  const logicalNameMatch = /^bodies\/items\/([a-f0-9]{2})$/.exec(logicalName);
+  if (
+    logicalNameMatch === null ||
+    Number.parseInt(logicalNameMatch[1]!, 16) >= PUBLIC_NUMERIC_SHARD_COUNT
+  ) {
+    throw new Error(`unknown public item body shard: ${logicalName}`);
+  }
+  const parsed = publicItemBodyShardSchema.parse(value);
+  const seen = new Set<number>();
+  for (const entity of parsed.entities) {
+    if (seen.has(entity.id)) throw new Error("duplicate item body in shard");
+    seen.add(entity.id);
+    if (publicItemBodyShardLogicalName(String(entity.id)) !== logicalName) {
+      throw new Error("item body is stored in the wrong shard");
+    }
+  }
+  return parsed;
+}
+
 export function parsePublicEntityValue(
   entityType: PublicEntityType,
   value: unknown,
@@ -108,6 +143,14 @@ export function publicEntityShardLogicalName(
     entityKey,
     PUBLIC_NUMERIC_SHARD_COUNT,
   );
+}
+
+export function publicItemBodyShardLogicalName(entityKey: string): string {
+  return `bodies/items/${numericBucket(
+    entityKey,
+    "item",
+    PUBLIC_NUMERIC_SHARD_COUNT,
+  )}`;
 }
 
 function publicEntityShardLogicalNameForCount(
