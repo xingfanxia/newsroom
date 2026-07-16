@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { canonicalJsonBytes, sha256Hex } from "@/lib/public-content/canonical";
-import { snapshotPointerSchema } from "@/lib/public-content/contracts";
+import {
+  publicItemBodyShardLogicalName,
+  snapshotPointerSchema,
+} from "@/lib/public-content/contracts";
 import {
   CURRENT_POINTER_KEY,
   releaseManifestKey,
@@ -77,6 +80,101 @@ describe("public snapshot reader", () => {
       cold.readCanonicalState(),
     ]);
     expect(b.state).toBe(a.state);
+  });
+
+  test("keeps body shards out of canonical state and reads one body bucket by id", async () => {
+    const fixture = await snapshotFixture();
+    const reader = fixture.reader();
+    const snapshot = await reader.readCanonicalState();
+
+    expect(snapshot.state.items.every(({ bodyMd }) => bodyMd === null)).toBe(
+      true,
+    );
+    expect(await reader.readItemBody(snapshot.release, 1)).toBe(
+      "Changed body bytes",
+    );
+    expect(await reader.readItemBody(snapshot.release, 129)).toBeNull();
+  });
+
+  test("returns null without fetching when a legacy release has no body descriptor", async () => {
+    const fixture = await snapshotFixture();
+    const reader = fixture.reader();
+    const release = await reader.readRelease();
+    const legacyRelease = {
+      ...release,
+      manifest: {
+        ...release.manifest,
+        artifacts: Object.fromEntries(
+          Object.entries(release.manifest.artifacts).filter(
+            ([logicalName]) => !logicalName.startsWith("bodies/items/"),
+          ),
+        ),
+      },
+    };
+    fixture.http.clearRequests();
+
+    expect(await reader.readItemBody(legacyRelease, 1)).toBeNull();
+    expect(fixture.http.requests).toHaveLength(0);
+  });
+
+  test("pins body reads to the supplied release across a pointer flip", async () => {
+    const fixture = await snapshotFixture();
+    const reader = fixture.reader();
+    const release = await reader.readRelease();
+    const repointed = snapshotPointerSchema.parse({
+      schemaVersion: 1,
+      active: releaseRef(fixture.previous),
+      previous: null,
+      publishedAt: PUBLISHED_AT,
+      sourceWatermark: fixture.previous.manifest.sourceWatermark,
+    });
+    fixture.http.put(CURRENT_POINTER_KEY, canonicalJsonBytes(repointed));
+    fixture.http.clearRequests();
+
+    expect(await reader.readItemBody(release, 1)).toBe("Changed body bytes");
+    expect(fixture.http.requestCount(CURRENT_POINTER_KEY)).toBe(0);
+  });
+
+  test("rejects corrupt release-pinned body bytes", async () => {
+    const fixture = await snapshotFixture();
+    const reader = fixture.reader();
+    const release = await reader.readRelease();
+    const descriptor =
+      release.manifest.artifacts[publicItemBodyShardLogicalName("1")]!;
+    fixture.http.put(
+      descriptor.key,
+      new TextEncoder().encode('{"corrupt":true}\n'),
+    );
+
+    await expect(reader.readItemBody(release, 1)).rejects.toThrow(
+      "public artifact integrity mismatch",
+    );
+  });
+
+  test("does not let a warm artifact cache bypass descriptor length integrity", async () => {
+    const fixture = await snapshotFixture();
+    const reader = fixture.reader();
+    const release = await reader.readRelease();
+    const logicalName = publicItemBodyShardLogicalName("1");
+    const descriptor = release.manifest.artifacts[logicalName]!;
+    expect(await reader.readItemBody(release, 1)).toBe("Changed body bytes");
+    const malformedRelease = {
+      ...release,
+      manifest: {
+        ...release.manifest,
+        artifacts: {
+          ...release.manifest.artifacts,
+          [logicalName]: {
+            ...descriptor,
+            byteLength: descriptor.byteLength + 1,
+          },
+        },
+      },
+    };
+
+    await expect(reader.readItemBody(malformedRelease, 1)).rejects.toThrow(
+      "public artifact integrity mismatch",
+    );
   });
 
   test("a pointer release change replaces the memoized state", async () => {
@@ -265,6 +363,7 @@ async function snapshotFixture() {
   const changed = {
     ...previousState.items[0]!,
     title: { ...previousState.items[0]!.title, en: "Changed title" },
+    bodyMd: "Changed body bytes",
   };
   const active = await buildPublicRelease({
     previousManifest: previous.manifest,

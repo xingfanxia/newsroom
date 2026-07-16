@@ -3,6 +3,8 @@ import {
   canonicalStateSchema,
   manifestSchema,
   parsePublicEntityShardValue,
+  parsePublicItemBodyShardValue,
+  publicItemBodyShardLogicalName,
   snapshotPointerSchema,
 } from "@/lib/public-content/contracts";
 import { CURRENT_POINTER_KEY, isSafeLogicalName } from "@/lib/public-content/paths";
@@ -129,6 +131,18 @@ export class PublicSnapshotReader {
     throw new PublicSnapshotUnavailableError();
   }
 
+  async readItemBody(
+    release: ResolvedPublicRelease,
+    id: number,
+  ): Promise<string | null> {
+    const logicalName = publicItemBodyShardLogicalName(String(id));
+    const descriptor = release.manifest.artifacts[logicalName];
+    if (!descriptor) return null;
+    const bytes = await this.#readArtifactBytes(descriptor);
+    const shard = parsePublicItemBodyShardValue(logicalName, parseJson(bytes));
+    return shard.entities.find((entity) => entity.id === id)?.bodyMd ?? null;
+  }
+
   async #candidateReleases(): Promise<ResolvedPublicRelease[]> {
     let pointer: SnapshotPointer;
     try {
@@ -196,7 +210,7 @@ export class PublicSnapshotReader {
   async #readArtifactBytes(
     descriptor: SnapshotArtifactDescriptor,
   ): Promise<Uint8Array> {
-    const cacheKey = `${descriptor.key}:${descriptor.sha256}`;
+    const cacheKey = `${descriptor.key}:${descriptor.sha256}:${descriptor.byteLength}`;
     const cached = this.#artifactCache.get(cacheKey);
     if (cached) return (await cached).slice();
     const loading = (async () => {
