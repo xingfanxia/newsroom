@@ -45,29 +45,32 @@ export function shellChromeDataFromSnapshot(
   };
 }
 
-export async function getShellChromeData(
-  opts: ShellChromeOptions = {},
+async function fetchShellChromeData(
+  opts: ShellChromeOptions,
 ): Promise<ShellChromeData> {
   const snapshot = await publicSnapshotReader().readCanonicalState();
   return shellChromeDataFromSnapshot(snapshot.state, Date.now(), opts);
 }
 
 const readCachedChrome = unstable_cache(
-  async (pulse: boolean): Promise<ShellChromeData> =>
-    getShellChromeData({ pulse }),
+  async (
+    pulse: boolean,
+    signalRatio: number | "fromRadar" | undefined,
+  ): Promise<ShellChromeData> => fetchShellChromeData({ pulse, signalRatio }),
   ["shell-chrome:v1"],
   { revalidate: 60, tags: ["shell-chrome"] },
 );
 
 /**
- * 60s-cached chrome for anonymous public pages. The uncached
- * getShellChromeData fetches + parses the FULL R2 canonical snapshot
- * per request (2-5s) — fine for low-traffic authed admin views, wrong
- * for public routes. Derived chrome is tiny, so cache the derivation
- * like every other anonymous page model does.
+ * 60s-cached shell chrome (top-bar stats + optional pulse). ALWAYS
+ * cached — the raw path fetches + parses the FULL R2 canonical
+ * snapshot per request (2-5s), which made every page that loaded
+ * chrome uncached (all admin views, /saved, /newsletter) slow. Chrome
+ * is global, tiny after derivation, and tolerant of 60s staleness, so
+ * there is deliberately NO uncached public variant to mis-pick.
  */
-export async function getCachedShellChromeData(
-  opts: { pulse?: boolean } = {},
+export async function getShellChromeData(
+  opts: ShellChromeOptions = {},
 ): Promise<ShellChromeData> {
-  return readCachedChrome(opts.pulse ?? false);
+  return readCachedChrome(opts.pulse ?? false, opts.signalRatio);
 }

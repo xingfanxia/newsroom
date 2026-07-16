@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
 import { SubscribeCard } from "@/components/newsletter/subscribe-card";
-import { getCachedShellChromeData } from "@/lib/shell/chrome-data";
+import { getShellChromeData } from "@/lib/shell/chrome-data";
 import { appLocaleFromParam } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -44,7 +44,7 @@ export default async function NewsletterPage({
   const { status } = await searchParams;
   const banner = bannerStatus(status);
 
-  const chrome = await getCachedShellChromeData({ pulse: true });
+  const chrome = await getShellChromeData({ pulse: true });
 
   return (
     <ViewShell
