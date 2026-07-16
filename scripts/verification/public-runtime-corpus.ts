@@ -58,6 +58,12 @@ export const PUBLIC_RUNTIME_CASES: readonly PublicRuntimeCase[] = [
     kind: "page",
     path: "/zh/daily",
   },
+  {
+    appPath: "/[locale]/newsletter/page",
+    expectedStatus: 200,
+    kind: "page",
+    path: "/zh/newsletter",
+  },
   { appPath: "/[locale]/page", expectedStatus: 200, kind: "page", path: "/en" },
   {
     appPath: "/[locale]/podcasts/[id]/page",

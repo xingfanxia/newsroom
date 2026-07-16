@@ -159,6 +159,7 @@ describe("hermetic package entrypoints", () => {
         "R2_ENDPOINT",
         "R2_PUBLIC_BASE_URL",
         "R2_SECRET_ACCESS_KEY",
+        "RESEND_API_KEY",
         "TURSO_API_TOKEN",
         "TURSO_AUTH_TOKEN",
         "TURSO_DATABASE_URL",

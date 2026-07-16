@@ -17,6 +17,7 @@ import { runFetchCronBucket } from "@/workers/fetcher/pipeline";
 import { runContentPrefetch } from "@/workers/fetcher/content-prefetch";
 import { runYoutubeTranscriptFetch } from "@/workers/fetcher/youtube-transcript";
 import { runDailyColumn, runNewsletterBatch } from "@/workers/newsletter";
+import { runNewsletterSend } from "@/workers/newsletter/send";
 import { runIncrementalPublicPublisher } from "@/lib/public-content/publisher/runtime";
 
 type CronRunner = () => Promise<unknown>;
@@ -40,6 +41,12 @@ export const CRON_RUNNERS = {
   "score-backfill": async () => ({ score: await runScoreBackfill() }),
   "cluster": () => runClusterPipeline(),
   "newsletter-daily": async () => ({ report: await runDailyColumn() }),
+  // NEWSLETTER_SEND_DRY_RUN=1 renders + counts without network/ledger.
+  "newsletter-send": async () => ({
+    send: await runNewsletterSend({
+      dryRun: process.env.NEWSLETTER_SEND_DRY_RUN === "1",
+    }),
+  }),
   "newsletter-monthly": async () => ({
     newsletter: await runNewsletterBatch("monthly"),
   }),

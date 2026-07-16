@@ -43,6 +43,7 @@
     "cron:yt": "bun scripts/ops/run-cron.ts yt",
     "cron:cluster": "bun scripts/ops/run-cron.ts cluster",
     "cron:newsletter-daily": "bun scripts/ops/run-cron.ts newsletter-daily",
+    "cron:newsletter-send": "bun scripts/ops/run-cron.ts newsletter-send",
     "cron:newsletter-monthly": "bun scripts/ops/run-cron.ts newsletter-monthly",
     "cron:publish-public": "bun scripts/ops/run-cron.ts publish-public",
     "snapshot:publish": "bun scripts/ops/publish-public-snapshot.ts",

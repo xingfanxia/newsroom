@@ -72,6 +72,7 @@ describe("hermetic environment policy", () => {
         CF_API_TOKEN: "prod-cf-token",
         AWS_ACCESS_KEY_ID: "prod-aws-access-key",
         AWS_SECRET_ACCESS_KEY: "prod-aws-secret",
+        RESEND_API_KEY: "re_prod_resend_key",
       },
     });
 
@@ -85,6 +86,7 @@ describe("hermetic environment policy", () => {
     expect(environment.CF_API_TOKEN).toBeUndefined();
     expect(environment.AWS_ACCESS_KEY_ID).toBeUndefined();
     expect(environment.AWS_SECRET_ACCESS_KEY).toBeUndefined();
+    expect(environment.RESEND_API_KEY).toBeUndefined();
   });
 
   test("permits explicit local libSQL and fake object-store overrides", () => {
@@ -92,6 +94,7 @@ describe("hermetic environment policy", () => {
       inherited: { PATH: process.env.PATH },
       overrides: {
         TURSO_DATABASE_URL: "file:./tmp/hermetic.sqlite",
+        RESEND_API_KEY: "fake-newsroom-resend-api-key",
         TURSO_AUTH_TOKEN: "test-turso-auth-token",
         TURSO_API_TOKEN: "test-turso-api-token",
         TURSO_ORG: "test-turso-org",
@@ -120,6 +123,7 @@ describe("hermetic environment policy", () => {
     );
     expect(environment.DATABASE_URL).toBe("file:///tmp/hermetic.sqlite");
     expect(environment.TURSO_AUTH_TOKEN).toBe("test-turso-auth-token");
+    expect(environment.RESEND_API_KEY).toBe("fake-newsroom-resend-api-key");
     expect(environment.TURSO_API_TOKEN).toBe("test-turso-api-token");
     expect(environment.LIBSQL_AUTH_TOKEN).toBe("test-libsql-auth-token");
     expect(environment.R2_ENDPOINT).toBe("http://127.0.0.1:9000");

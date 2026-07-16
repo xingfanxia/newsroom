@@ -608,6 +608,93 @@ export const newsletters = sqliteTable(
 );
 
 /**
+ * newsletter_subscribers — email-newsletter subscriber list (PRIVATE data:
+ * never exported to the public snapshot / public API). Double opt-in:
+ * rows start status='pending' and flip to 'active' via confirm_token.
+ * DDL is owned by lib/email/migration.ts (checksummed raw-SQL runner —
+ * db:push is banned); this mirror exists for query typing only. The email
+ * column is COLLATE NOCASE in the real DDL (case-insensitive unique).
+ */
+export const newsletterSubscribers = sqliteTable(
+  "newsletter_subscribers",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    /** Lowercased at the API boundary; COLLATE NOCASE unique in DDL. */
+    email: text("email").notNull(),
+    /** 'zh' | 'en' — stored for future en sends (v1 sends are zh-only). */
+    locale: text("locale").notNull().default("zh"),
+    wantsDailyDigest: integer("wants_daily_digest", { mode: "boolean" })
+      .notNull()
+      .default(true),
+    wantsDailyFeatured: integer("wants_daily_featured", { mode: "boolean" })
+      .notNull()
+      .default(true),
+    /** 'pending' | 'active' | 'unsubscribed' | 'bounced' | 'complained' */
+    status: text("status").$type<import("@/lib/email/contracts").SubscriberStatus>()
+      .notNull()
+      .default("pending"),
+    confirmToken: text("confirm_token").notNull(),
+    unsubscribeToken: text("unsubscribe_token").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(nowMs),
+    confirmedAt: integer("confirmed_at", { mode: "timestamp_ms" }),
+    unsubscribedAt: integer("unsubscribed_at", { mode: "timestamp_ms" }),
+  },
+  (t) => ({
+    emailIdx: uniqueIndex("newsletter_subscribers_email_idx").on(t.email),
+    confirmTokIdx: uniqueIndex("newsletter_subscribers_confirm_tok_idx").on(
+      t.confirmToken,
+    ),
+    unsubTokIdx: uniqueIndex("newsletter_subscribers_unsub_tok_idx").on(
+      t.unsubscribeToken,
+    ),
+    statusIdx: index("newsletter_subscribers_status_idx").on(t.status),
+  }),
+);
+
+/**
+ * newsletter_email_sends — per-recipient send ledger. The unique
+ * (email_kind, period_key, subscriber_id) index IS the idempotency
+ * primitive: the send worker inserts a row only after a Resend chunk
+ * succeeds, so a re-run skips already-delivered recipients. DDL owned by
+ * lib/email/migration.ts (same runner as subscribers).
+ */
+export const newsletterEmailSends = sqliteTable(
+  "newsletter_email_sends",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    /** 'daily_digest' | 'daily_featured' */
+    emailKind: text("email_kind")
+      .$type<import("@/lib/email/contracts").EmailKind>()
+      .notNull(),
+    /** YYYY-MM-DD (UTC date of the column window end). */
+    periodKey: text("period_key").notNull(),
+    subscriberId: integer("subscriber_id")
+      .notNull()
+      .references(() => newsletterSubscribers.id, { onDelete: "cascade" }),
+    /** 'sent' | 'failed' */
+    status: text("status")
+      .$type<import("@/lib/email/contracts").SendStatus>()
+      .notNull()
+      .default("sent"),
+    resendId: text("resend_id"),
+    error: text("error"),
+    sentAt: integer("sent_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(nowMs),
+  },
+  (t) => ({
+    dedupeIdx: uniqueIndex("newsletter_email_sends_dedupe_idx").on(
+      t.emailKind,
+      t.periodKey,
+      t.subscriberId,
+    ),
+    sentAtIdx: index("newsletter_email_sends_sent_at_idx").on(t.sentAt),
+  }),
+);
+
+/**
  * llm_usage — per-call LLM token usage and cost ledger.
  * One row per generateText / generateStructured / embed call. Cost is computed
  * at insert time using LiteLLM pricing (see lib/llm/pricing.ts); rows with

@@ -37,3 +37,18 @@ export function sectionBetween(
 
   return source.slice(startIndex, endIndex);
 }
+
+/**
+ * Extract a single top-level `export function <name>` body — from its
+ * signature up to the next top-level `export ` declaration (or EOF for the
+ * last one). Used to scope page-model-builder assertions to one page's builder
+ * so a regression in a sibling builder can't false-satisfy the check.
+ */
+export function exportedFunctionSection(source: string, name: string): string {
+  const start = source.indexOf(`export function ${name}`);
+  if (start < 0) {
+    throw new Error(`exported function not found: ${name}`);
+  }
+  const next = source.indexOf("\nexport ", start + 1);
+  return next < 0 ? source.slice(start) : source.slice(start, next);
+}

@@ -14,17 +14,18 @@
  *      Dropping `recencyFloorFilter` from the and(...) — the exact regression that
  *      silently reverts the read-budget win — makes the floor param vanish and
  *      trips these tests (a source-string guard could not catch that).
- *   3. Wiring tripwires — lightweight source checks that the 3 server-component
- *      page callers pass the floor and that schema/optimizer declare the
- *      published_at-leading index + seek-shape plan check. Server components and
- *      migration DDL aren't unit-executable here, so these catch accidental
- *      deletion of the wiring; they are explicitly NOT the behavioral guard
- *      (that's level 2) — only a cheap tripwire for the non-executable surfaces.
+ *   3. Wiring tripwires — lightweight source checks that the page-model builders
+ *      (which the server components delegate to) pass the floor and that
+ *      schema/optimizer declare the published_at-leading index + seek-shape plan
+ *      check. Builder composition and migration DDL aren't unit-executable here,
+ *      so these catch accidental deletion of the wiring; they are explicitly NOT
+ *      the behavioral guard (that's level 2) — only a cheap tripwire for the
+ *      non-executable surfaces.
  */
 import { describe, expect, it } from "bun:test";
 import { SQLiteSyncDialect } from "drizzle-orm/sqlite-core";
 import { buildFeedWhere, feedIndexFor } from "@/lib/items/live";
-import { readSource } from "@/tests/helpers/source";
+import { exportedFunctionSection, readSource } from "@/tests/helpers/source";
 
 const dialect = new SQLiteSyncDialect();
 
@@ -135,20 +136,30 @@ describe("count + fetch pin the SAME feed index (no pagination-total drift)", ()
   });
 });
 
-describe("page callers pass the W8 recency floor (wiring tripwire)", () => {
+describe("page-model builders pass the W8 recency floor (wiring tripwire)", () => {
+  // The floor is derived and wired into queryPublicFeed inside each page's
+  // model builder now; the server components just coerce params and delegate.
+  const buildersSrc = readSource("lib/public-content/page-model-builders.ts");
+  const homeBuilder = exportedFunctionSection(
+    buildersSrc,
+    "buildPublicHomePageModelFromSnapshot",
+  );
+  const allBuilder = exportedFunctionSection(buildersSrc, "buildAllPageModel");
+  const curatedBuilder = exportedFunctionSection(
+    buildersSrc,
+    "buildCuratedPageModel",
+  );
+
   it("home: 7d today / 30d daily-highlights, skipped for source views", () => {
-    const homeSrc = readSource("app/[locale]/page.tsx");
-    expect(homeSrc).toContain("recencyFloorDays: feedFloorDays");
-    expect(homeSrc).toMatch(/dailyHighlights\s*\?\s*30\s*:\s*7/);
-    expect(homeSrc).toContain('sourceId || sourcePreset !== "all"');
+    expect(homeBuilder).toContain("recencyFloorDays");
+    expect(homeBuilder).toMatch(/dailyHighlights\s*\?\s*30\s*:\s*7/);
+    expect(homeBuilder).toContain('input.sourceId || input.sourcePreset !== "all"');
   });
 
   it("all + curated: 30d default, skipped when a source filter is active", () => {
-    expect(readSource("app/[locale]/all/page.tsx")).toMatch(
-      /recencyFloorDays:\s*[\s\S]*?30/,
-    );
-    expect(readSource("app/[locale]/curated/page.tsx")).toMatch(
-      /recencyFloorDays:\s*sourceId\s*\?\s*undefined\s*:\s*30/,
+    expect(allBuilder).toMatch(/recencyFloorDays:\s*[\s\S]*?30/);
+    expect(curatedBuilder).toMatch(
+      /recencyFloorDays:\s*input\.sourceId\s*\?\s*undefined\s*:\s*30/,
     );
   });
 });

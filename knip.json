@@ -10,7 +10,8 @@
     "scripts/**/*.ts",
     "tests/**/*.{test,spec,integration,live}.{ts,tsx}",
     "tests/fixtures/verification/*.ts",
-    "workers/**/*.{test,spec}.{ts,tsx}"
+    "workers/**/*.{test,spec}.{ts,tsx}",
+    "lib/**/*.{test,spec}.{ts,tsx}"
   ],
   "project": [
     "**/*.{js,cjs,mjs,jsx,ts,tsx}",

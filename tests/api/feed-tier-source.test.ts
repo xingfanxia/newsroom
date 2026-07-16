@@ -5,7 +5,7 @@ import {
   isVisibleItemTier,
   VISIBLE_ITEM_TIERS,
 } from "@/lib/types";
-import { readSource } from "@/tests/helpers/source";
+import { exportedFunctionSection, readSource } from "@/tests/helpers/source";
 
 const types = readSource("lib/types.ts");
 const tierSql = readSource("lib/items/tier-sql.ts");
@@ -24,6 +24,20 @@ const recomputeClusterLeads = readSource(
 );
 const homePage = readSource("app/[locale]/page.tsx");
 const allPage = readSource("app/[locale]/all/page.tsx");
+// The home/all pages coerce their filter params, then hand off to a page-model
+// builder that runs the actual feed query. The preset→feed-filter mapping and
+// the default-tier reference moved into these builders.
+const pageModelBuildersSrc = readSource(
+  "lib/public-content/page-model-builders.ts",
+);
+const homePageBuilder = exportedFunctionSection(
+  pageModelBuildersSrc,
+  "buildPublicHomePageModelFromSnapshot",
+);
+const allPageBuilder = exportedFunctionSection(
+  pageModelBuildersSrc,
+  "buildAllPageModel",
+);
 const liveItems = readSource("lib/items/live.ts");
 const savedItems = readSource("lib/items/saved.ts");
 const semanticSearch = readSource("lib/items/semantic-search.ts");
@@ -139,9 +153,15 @@ describe("feed tier/view source wiring", () => {
     for (const source of [homePage, allPage, homeFilters]) {
       expect(source).toContain("@/lib/feed/source-presets");
     }
+    // Pages coerce the preset param; the preset→feed-filter mapping runs one
+    // layer down in the page-model builder — but still through the typed helper.
     for (const source of [homePage, allPage]) {
       expect(source).toContain("coerceSourcePreset");
+    }
+    for (const source of [homePageBuilder, allPageBuilder]) {
       expect(source).toContain("sourcePresetToFeedFilter");
+    }
+    for (const source of [homePage, allPage, homePageBuilder, allPageBuilder]) {
       expect(source).not.toContain("function presetToFilter");
       expect(source).not.toContain("new Set<SourcePreset>");
       expect(source).not.toContain(
@@ -172,7 +192,10 @@ describe("feed tier/view source wiring", () => {
     expect(homeFilters).not.toContain('{ v: "p1",       en: "P1",       zh: "P1" }');
     expect(homePage).toContain("coerceHomeTier");
     expect(homePage).toContain("coerceHomeView");
-    expect(homePage).toContain("DEFAULT_HOME_TIER");
+    // The home page defers its default tier to coerceHomeTier above; the
+    // explicit DEFAULT_HOME_TIER reference for the home flow (daily-highlights
+    // guard + day-count tier) now lives in the page-model builder.
+    expect(homePageBuilder).toContain("DEFAULT_HOME_TIER");
     expect(homePage).not.toContain("function coerceTier");
     expect(homePage).not.toContain("function coerceView");
     expect(allPage).toContain("DEFAULT_HOME_TIER");

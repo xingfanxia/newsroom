@@ -12,8 +12,8 @@ import {
 import { DEFAULT_HOME_TIER, DEFAULT_HOME_VIEW } from "@/lib/feed/home-filters";
 import { DEFAULT_SOURCE_PRESET } from "@/lib/feed/source-presets";
 
-export const PUBLIC_HOME_MODEL_CACHE_TAG = "public-home-model";
-export const PUBLIC_HOME_MODEL_CACHE_TTL = 600;
+const PUBLIC_HOME_MODEL_CACHE_TAG = "public-home-model";
+const PUBLIC_HOME_MODEL_CACHE_TTL = 600;
 
 async function buildPublicHomePageModel(
   input: PublicHomePageModelInput,
@@ -50,7 +50,6 @@ export async function readCachedPublicHomePageModel(
 }
 
 export {
-  buildPublicHomePageModelFromSnapshot,
   type PublicHomePageModel,
   type PublicHomePageModelInput,
 };

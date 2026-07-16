@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { readSource, sectionBetween } from "@/tests/helpers/source";
+import {
+  exportedFunctionSection,
+  readSource,
+  sectionBetween,
+} from "@/tests/helpers/source";
 
 const routePaths = [
   "app/api/public/daily/route.ts",
@@ -20,6 +24,23 @@ const legacyRssFeedMeta = readSource("lib/rss/legacy-feed-meta.ts");
 const publicDailiesRoute = readSource("app/api/public/dailies/route.ts");
 const openApiRoute = readSource("app/openapi.yaml/route.ts");
 const skillRoute = readSource("app/skill.md/route.ts");
+
+// The daily UI pages read through the public-content page-model layer: the
+// pages import a daily reader from page-models.ts, that module reads the
+// validated public snapshot, and the builders pull rows via the public-dailies
+// helpers.
+const pageModelsSrc = readSource("lib/public-content/page-models.ts");
+const pageModelBuildersSrc = readSource(
+  "lib/public-content/page-model-builders.ts",
+);
+const dailyIndexBuilder = exportedFunctionSection(
+  pageModelBuildersSrc,
+  "buildDailyIndexPageModel",
+);
+const dailyDateBuilder = exportedFunctionSection(
+  pageModelBuildersSrc,
+  "buildDailyDatePageModel",
+);
 
 const mcpRoute = readSource("app/api/mcp/route.ts");
 const mcpDailyResources = sectionBetween(
@@ -98,16 +119,19 @@ describe("daily-column API source wiring", () => {
     for (const path of dailyUiPaths) {
       const source = readSource(path);
 
-      expect(source).toContain("@/lib/public-content/public-dailies");
-      expect(source).toContain("readPublicPageSnapshot");
+      // Pages read through the public-content page-model layer instead of the
+      // DB-backed daily-columns module or raw newsletter selects.
+      expect(source).toContain("@/lib/public-content/page-models");
       expect(source).not.toContain("@/lib/api/daily-columns");
       expect(source).not.toContain(".select({");
       expect(source).not.toContain("from(newsletters)");
       expect(source).not.toContain("newsletters.columnTitle");
     }
-    expect(readSource("app/[locale]/daily/page.tsx")).toContain(
-      "listPublicDailyColumns",
-    );
+    // The snapshot read + public-dailies helpers now live one layer down, in
+    // the page-model readers and their builders.
+    expect(pageModelsSrc).toContain("readPublicPageSnapshot");
+    expect(pageModelBuildersSrc).toContain("@/lib/public-content/public-dailies");
+    expect(dailyIndexBuilder).toContain("listPublicDailyColumns");
     expect(dailyLandingPage).toContain("@/lib/time/relative");
     expect(dailyLandingPage).toContain("DAILY_COLUMN_LOCALE");
     expect(dailyLandingPage).toContain("DAILY_COLUMN_INDEX_ROUTE");
@@ -116,9 +140,7 @@ describe("daily-column API source wiring", () => {
       "function relativeAgo",
     );
     expect(dailyLandingPage).not.toContain("`/zh/daily");
-    expect(readSource("app/[locale]/daily/[date]/page.tsx")).toContain(
-      "getPublicDailyByDate",
-    );
+    expect(dailyDateBuilder).toContain("getPublicDailyByDate");
     expect(readSource("app/[locale]/daily/[date]/page.tsx")).toContain(
       "DAILY_COLUMN_LOCALE",
     );

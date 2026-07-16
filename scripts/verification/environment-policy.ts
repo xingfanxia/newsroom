@@ -14,6 +14,7 @@ const CONTROLLED_PREFIXES = [
   "CF_",
   "CLOUDFLARE_",
   "R2_",
+  "RESEND_",
   "TURSO_",
 ] as const;
 
@@ -49,6 +50,7 @@ const FAKE_IDENTIFIER_KEYS = new Set([
   "R2_ACCOUNT_ID",
   "R2_BUCKET",
   "R2_SECRET_ACCESS_KEY",
+  "RESEND_API_KEY",
   "TURSO_API_TOKEN",
   "TURSO_AUTH_TOKEN",
   "TURSO_ORG",

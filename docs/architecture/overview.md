@@ -65,6 +65,23 @@ Ingestion or cron work starts in the worker helper first:
    in `scripts/ops/check-data-state.ts` / `lib/shell/system-stats.ts`.
 4. Update [`ingestion.md`](./ingestion.md) and the cron/source-contract tests.
 
+Newsletter EMAIL work stays inside `lib/email/*` + `workers/newsletter/send`:
+
+1. `lib/email/` owns the email domain: contracts (kinds/statuses/from
+   addresses), token generation, the escape-first markdown renderer, dark
+   table-layout templates, the raw-fetch Resend adapter, the subscribers
+   repo (the ONLY module touching `newsletter_subscribers` /
+   `newsletter_email_sends`), and the API handler factory.
+2. Subscriber data is PRIVATE — it must never enter `lib/public-content/*`,
+   the R2 snapshot, or any `/api/public/*` surface.
+3. Schema changes go through the checksummed runner
+   (`lib/email/migration.ts` + `scripts/ops/migrate-newsletter-email.ts
+   --apply`) — never db:push.
+4. Delivery idempotency is ledger-first: the unique
+   `(email_kind, period_key, subscriber_id)` index plus Resend batch
+   idempotency keys; failed chunks record nothing so re-runs retry them.
+5. Design doc: [`../newsletter-email/PLAN.md`](../newsletter-email/PLAN.md).
+
 Shared enum or contract work starts in the runtime tuple:
 
 1. Add or change the tuple in `lib/types.ts` or `lib/llm/types.ts`.

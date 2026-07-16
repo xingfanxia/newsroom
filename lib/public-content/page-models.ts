@@ -22,8 +22,8 @@ import {
 import { DEFAULT_PODCAST_TIER } from "@/lib/feed/podcast-filters";
 import type { AppLocale } from "@/lib/types";
 
-export const PUBLIC_PAGE_MODELS_CACHE_TAG = "public-page-models";
-export const PUBLIC_PAGE_MODELS_CACHE_TTL = 600;
+const PUBLIC_PAGE_MODELS_CACHE_TAG = "public-page-models";
+const PUBLIC_PAGE_MODELS_CACHE_TTL = 600;
 
 const cacheOptions = {
   revalidate: PUBLIC_PAGE_MODELS_CACHE_TTL,
@@ -236,15 +236,7 @@ export async function readAgentsPageModel(): Promise<AgentsPageModel> {
 }
 
 export {
-  buildAgentsPageModel,
-  buildAllPageModel,
-  buildCuratedPageModel,
   buildDailyDatePageModel,
-  buildDailyIndexPageModel,
-  buildPodcastDetailPageModel,
-  buildPodcastsPageModel,
-  buildSourcesPageModel,
-  buildXMonitorPageModel,
   type AllPageModelInput,
   type CuratedPageModelInput,
   type PodcastsPageModelInput,
