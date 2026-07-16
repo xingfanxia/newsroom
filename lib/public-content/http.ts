@@ -34,12 +34,17 @@ import {
   getPublicDailyByDate,
   listPublicDailyIndex,
 } from "@/lib/public-content/public-dailies";
+import { parsePublicEntityShardValue } from "@/lib/public-content/contracts";
 import { createPublicStateIndex } from "@/lib/public-content/public-items";
 import {
   getPublicEventMembers,
   queryPublicFeed,
 } from "@/lib/public-content/query";
-import { publicSnapshotReader } from "@/lib/public-content/reader";
+import {
+  PublicSnapshotUnavailableError,
+  publicSnapshotReader,
+  type PublicSnapshotReader,
+} from "@/lib/public-content/reader";
 import type { PublicCanonicalStateResult } from "@/lib/public-content/reader/types";
 import { APP_LOCALES, type AppLocale } from "@/lib/types";
 import { PUBLIC_SEMANTIC_SEARCH_ERROR } from "@/lib/search/query-defaults";
@@ -164,16 +169,19 @@ export async function publicSearchSnapshotRequestResult(
   };
 }
 
-export function publicSourcesSnapshotResult(
-  snapshot: PublicCanonicalStateResult,
-): SnapshotCachedResult {
-  const rows = [...snapshot.state.sources].sort(
+export async function publicSourcesSnapshotResult(): Promise<SnapshotCachedResult> {
+  const artifact = await publicSnapshotReader().readLogicalArtifact(
+    "state/sources",
+    { required: true, validate: parsePublicSourceRows },
+  );
+  if (!artifact) throw new PublicSnapshotUnavailableError();
+  const rows = [...parsePublicSourceRows(artifact.bytes)].sort(
     (left, right) => left.priority - right.priority || left.id.localeCompare(right.id),
   );
   return {
     ok: true,
     signal: etagSignal({
-      release: snapshot.release.ref.manifestSha256,
+      release: artifact.release.ref.manifestSha256,
       count: rows.length,
       latest_success:
         rows
@@ -207,6 +215,17 @@ export function publicSourcesSnapshotResult(
   };
 }
 
+function parsePublicSourceRows(bytes: Uint8Array) {
+  const shard = parsePublicEntityShardValue(
+    "state/sources",
+    JSON.parse(new TextDecoder().decode(bytes)) as unknown,
+  );
+  if (shard.entityType !== "source") {
+    throw new Error("public sources artifact has the wrong entity type");
+  }
+  return shard.entities;
+}
+
 export function activeSourcesSnapshotBody(
   snapshot: PublicCanonicalStateResult,
 ): unknown {
@@ -229,10 +248,11 @@ export function activeSourcesSnapshotBody(
   return { sources, total: sources.length };
 }
 
-export function publicItemSnapshotResult(
+export async function publicItemSnapshotResult(
   snapshot: PublicCanonicalStateResult,
   rawId: string,
-): SnapshotCachedResult {
+  reader: Pick<PublicSnapshotReader, "readItemBody"> = publicSnapshotReader(),
+): Promise<SnapshotCachedResult> {
   const parsed = parsePositiveRouteId(rawId);
   if (!parsed.ok) return { ok: false, error: parsed.error, status: 400 };
   const index = createPublicStateIndex(snapshot.state);
@@ -244,6 +264,8 @@ export function publicItemSnapshotResult(
   if (item.eventId !== null && !event) {
     throw new Error(`missing public event: ${item.eventId}`);
   }
+  const bodyMd =
+    item.bodyMd ?? await reader.readItemBody(snapshot.release, item.id);
   const publicEvent =
     event && event.coverage > 1
       ? {
@@ -298,7 +320,7 @@ export function publicItemSnapshotResult(
       published_at: item.publishedAt,
       enriched_at: item.enrichedAt,
       commentary_at: item.commentaryAt,
-      body_md: item.bodyMd,
+      body_md: bodyMd,
       hkr: item.hkr ? { ...item.hkr } : null,
       event: publicEvent,
     },

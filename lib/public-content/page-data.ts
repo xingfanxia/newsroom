@@ -40,10 +40,17 @@ export function publicPageItemDetail(
   id: number,
   locale: AppLocale,
   nowMs: number,
+  resolvedBodyMd: string | null = null,
 ) {
   if (!Number.isSafeInteger(id) || id <= 0) return null;
   const index = createPublicStateIndex(value);
-  return publicPageItemDetailFromIndex(index, id, locale, nowMs);
+  return publicPageItemDetailFromIndex(
+    index,
+    id,
+    locale,
+    nowMs,
+    resolvedBodyMd,
+  );
 }
 
 export function publicPageItemDetailFromIndex(
@@ -51,6 +58,7 @@ export function publicPageItemDetailFromIndex(
   id: number,
   locale: AppLocale,
   nowMs: number,
+  resolvedBodyMd: string | null = null,
 ) {
   if (!Number.isSafeInteger(id) || id <= 0) return null;
   const item = index.itemsById.get(id);
@@ -62,6 +70,6 @@ export function publicPageItemDetailFromIndex(
       nowMs,
       tagLimit: 6,
     }),
-    bodyMd: item.bodyMd,
+    bodyMd: item.bodyMd ?? resolvedBodyMd,
   };
 }

@@ -3,6 +3,8 @@ import {
   canonicalStateSchema,
   manifestSchema,
   parsePublicEntityShardValue,
+  parsePublicItemBodyShardValue,
+  publicItemBodyShardLogicalName,
   snapshotPointerSchema,
 } from "@/lib/public-content/contracts";
 import { CURRENT_POINTER_KEY, isSafeLogicalName } from "@/lib/public-content/paths";
@@ -26,6 +28,11 @@ const MAX_STATE_ARTIFACTS = 800;
 const STATE_FETCH_CONCURRENCY = 16;
 /** active + previous — a third release id evicts the oldest entry. */
 const STATE_CACHE_MAX_RELEASES = 2;
+
+type LogicalArtifactReadOptions = {
+  required?: boolean;
+  validate?: (bytes: Uint8Array) => void;
+};
 
 export class PublicSnapshotReader {
   readonly #fetcher: PublicSnapshotHttpFetcher;
@@ -70,19 +77,27 @@ export class PublicSnapshotReader {
 
   async readLogicalArtifact(
     logicalName: string,
+    options: LogicalArtifactReadOptions = {},
   ): Promise<PublicLogicalArtifact | null> {
     if (!isSafeLogicalName(logicalName)) {
       throw new PublicSnapshotUnavailableError();
     }
     const candidates = await this.#candidateReleases();
     const active = candidates.find(({ source }) => source === "active");
-    if (active && !(logicalName in active.manifest.artifacts)) return null;
+    if (
+      active &&
+      !(logicalName in active.manifest.artifacts) &&
+      !options.required
+    ) {
+      return null;
+    }
 
     for (const release of candidates) {
       const descriptor = release.manifest.artifacts[logicalName];
       if (!descriptor) continue;
       try {
         const bytes = await this.#readArtifactBytes(descriptor);
+        options.validate?.(bytes);
         this.#lastKnownGoodRelease = release;
         return { logicalName, descriptor, bytes, release };
       } catch {
@@ -92,16 +107,16 @@ export class PublicSnapshotReader {
     if (this.#lastKnownGoodRelease) {
       const release = asLastKnownGood(this.#lastKnownGoodRelease);
       const descriptor = release.manifest.artifacts[logicalName];
-      if (!descriptor) return null;
-      try {
-        return {
-          logicalName,
-          descriptor,
-          bytes: await this.#readArtifactBytes(descriptor),
-          release,
-        };
-      } catch {
-        // Terminal controlled-unavailable below.
+      if (!descriptor) {
+        if (!options.required) return null;
+      } else {
+        try {
+          const bytes = await this.#readArtifactBytes(descriptor);
+          options.validate?.(bytes);
+          return { logicalName, descriptor, bytes, release };
+        } catch {
+          // Terminal controlled-unavailable below.
+        }
       }
     }
     throw new PublicSnapshotUnavailableError();
@@ -127,6 +142,18 @@ export class PublicSnapshotReader {
       };
     }
     throw new PublicSnapshotUnavailableError();
+  }
+
+  async readItemBody(
+    release: ResolvedPublicRelease,
+    id: number,
+  ): Promise<string | null> {
+    const logicalName = publicItemBodyShardLogicalName(String(id));
+    const descriptor = release.manifest.artifacts[logicalName];
+    if (!descriptor) return null;
+    const bytes = await this.#readArtifactBytes(descriptor);
+    const shard = parsePublicItemBodyShardValue(logicalName, parseJson(bytes));
+    return shard.entities.find((entity) => entity.id === id)?.bodyMd ?? null;
   }
 
   async #candidateReleases(): Promise<ResolvedPublicRelease[]> {
@@ -196,7 +223,7 @@ export class PublicSnapshotReader {
   async #readArtifactBytes(
     descriptor: SnapshotArtifactDescriptor,
   ): Promise<Uint8Array> {
-    const cacheKey = `${descriptor.key}:${descriptor.sha256}`;
+    const cacheKey = `${descriptor.key}:${descriptor.sha256}:${descriptor.byteLength}`;
     const cached = this.#artifactCache.get(cacheKey);
     if (cached) return (await cached).slice();
     const loading = (async () => {

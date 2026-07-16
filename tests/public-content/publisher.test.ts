@@ -1,13 +1,24 @@
 import { describe, expect, test } from "bun:test";
 import { canonicalJsonBytes, sha256Hex } from "@/lib/public-content/canonical";
 import {
+  canonicalStateSchema,
   manifestSchema,
+  parsePublicEntityShardValue,
+  parsePublicItemBodyShardValue,
+  PUBLIC_NUMERIC_SHARD_COUNT,
+  publicItemBodyShardLogicalName,
+  publicItemSchema,
   snapshotPointerSchema,
 } from "@/lib/public-content/contracts";
+import {
+  materializedPageLogicalName,
+  parseMaterializedPageArtifact,
+} from "@/lib/public-content/materialized-artifact";
 import {
   CURRENT_POINTER_KEY,
   objectKey,
   releaseManifestKey,
+  runReceiptKey,
 } from "@/lib/public-content/paths";
 import { buildPublicRelease } from "@/lib/public-content/publisher/build-release";
 import type {
@@ -17,6 +28,7 @@ import type {
   StoredPublisherObject,
 } from "@/lib/public-content/publisher/object-store";
 import { publishIncrementalSnapshot } from "@/lib/public-content/publisher/publish";
+import { runIncrementalPublicPublisher } from "@/lib/public-content/publisher/runtime";
 import type {
   PublicContentPublisherSource,
   PublicEntityChange,
@@ -153,10 +165,12 @@ class FakeSource implements PublicContentPublisherSource {
   }
 }
 
-async function seededFixture() {
+async function seededFixture(
+  state: ReturnType<typeof canonicalStateSchema.parse> =
+    canonicalStateSchema.parse(canonicalState()),
+) {
   const events: string[] = [];
   const store = new FakeStore(events);
-  const state = canonicalState();
   const changes = allChanges(state);
   const release = await buildPublicRelease({
     previousManifest: null,
@@ -187,8 +201,108 @@ async function seededFixture() {
   return { events, store, state, release, pointer };
 }
 
+function artifactBytesByKey(
+  release: Awaited<ReturnType<typeof buildPublicRelease>>,
+): Map<string, Uint8Array> {
+  return new Map(
+    release.artifacts.map((artifact) => [
+      artifact.descriptor.key,
+      artifact.bytes,
+    ]),
+  );
+}
+
+function loadFromRelease(
+  release: Awaited<ReturnType<typeof buildPublicRelease>>,
+  loadedLogicalNames: string[] = [],
+) {
+  const bytesByKey = artifactBytesByKey(release);
+  return async (logicalName: string, descriptor: { key: string }) => {
+    loadedLogicalNames.push(logicalName);
+    const bytes = bytesByKey.get(descriptor.key);
+    if (!bytes) throw new Error(`missing fixture artifact: ${logicalName}`);
+    return bytes;
+  };
+}
+
+async function jsonFixtureArtifact(
+  value: unknown,
+  shard:
+    | { kind: "id_bucket"; bucket: string }
+    | { kind: "singleton" },
+) {
+  const bytes = canonicalJsonBytes(value);
+  const sha256 = await sha256Hex(bytes);
+  return {
+    bytes,
+    descriptor: {
+      key: objectKey(sha256, "json"),
+      sha256,
+      byteLength: bytes.byteLength,
+      mediaType: "application/json" as const,
+      encoding: "utf-8" as const,
+      shard,
+    },
+  };
+}
+
+async function downgradeToLegacyFatItems(
+  fixture: Awaited<ReturnType<typeof seededFixture>>,
+) {
+  const bodyById = new Map(
+    fixture.state.items.map(({ id, bodyMd }) => [id, bodyMd] as const),
+  );
+  const artifacts = Object.fromEntries(
+    Object.entries(fixture.release.manifest.artifacts).filter(
+      ([logicalName]) => !logicalName.startsWith("bodies/items/"),
+    ),
+  );
+  for (const [logicalName, descriptor] of Object.entries(artifacts)) {
+    if (!logicalName.startsWith("state/items/")) continue;
+    const stored = fixture.store.objects.get(descriptor.key);
+    if (!stored) throw new Error(`missing fixture state shard: ${logicalName}`);
+    const shard = parsePublicEntityShardValue(
+      logicalName,
+      JSON.parse(new TextDecoder().decode(stored.bytes)) as unknown,
+    );
+    const bytes = canonicalJsonBytes({
+      ...shard,
+      entities: shard.entities.map((entity) => {
+        const parsed = publicItemSchema.parse(entity);
+        return { ...parsed, bodyMd: bodyById.get(parsed.id) ?? null };
+      }),
+    });
+    const sha256 = await sha256Hex(bytes);
+    const fatDescriptor = {
+      ...descriptor,
+      key: objectKey(sha256, "json"),
+      sha256,
+      byteLength: bytes.byteLength,
+    };
+    artifacts[logicalName] = fatDescriptor;
+    fixture.store.seed(fatDescriptor.key, bytes);
+  }
+  const releaseId = `r${fixture.release.manifest.sourceWatermark}-legacy-fat`;
+  const manifest = manifestSchema.parse({
+    ...fixture.release.manifest,
+    releaseId,
+    artifacts,
+  });
+  const manifestBytes = canonicalJsonBytes(manifest);
+  const manifestSha256 = await sha256Hex(manifestBytes);
+  const manifestKey = releaseManifestKey(releaseId);
+  fixture.store.seed(manifestKey, manifestBytes);
+  const pointer = snapshotPointerSchema.parse({
+    ...fixture.pointer,
+    active: { releaseId, manifestKey, manifestSha256 },
+  });
+  fixture.store.seed(CURRENT_POINTER_KEY, canonicalJsonBytes(pointer));
+  fixture.store.clearEvents();
+  return { manifest, pointer };
+}
+
 function allChanges(
-  state: ReturnType<typeof canonicalState>,
+  state: ReturnType<typeof canonicalStateSchema.parse>,
 ): PublicEntityChange[] {
   return [
     ...state.sources.map((value): PublicEntityChange => ({
@@ -241,7 +355,7 @@ function batch(
 }
 
 function changedItem(
-  state: ReturnType<typeof canonicalState>,
+  state: ReturnType<typeof canonicalStateSchema.parse>,
 ): PublicEntityChange {
   const value = {
     ...state.items[0]!,
@@ -260,6 +374,73 @@ async function run(
     runId: "run-11",
     now: () => NOW,
   });
+}
+
+async function runRuntime(
+  fixture: Awaited<ReturnType<typeof seededFixture>>,
+  source: FakeSource,
+  runId: string,
+) {
+  return runIncrementalPublicPublisher({
+    source,
+    store: fixture.store,
+    runId,
+    now: () => NOW,
+  });
+}
+
+function bucketFanoutChanges(
+  state: ReturnType<typeof canonicalStateSchema.parse>,
+  newsletterCount: number,
+): PublicEntityChange[] {
+  const seedItem = state.items[0]!;
+  const seedEvent = state.events[0]!;
+  const seedNewsletter = state.newsletters[0]!;
+  if (seedNewsletter.format !== "daily_column") {
+    throw new Error("expected daily-column fixture");
+  }
+  const changes: PublicEntityChange[] = [];
+  for (let id = 1; id <= 248; id += 1) {
+    changes.push({
+      entityType: "item",
+      entityKey: String(id),
+      value: {
+        ...seedItem,
+        id,
+        eventId: Math.ceil(id / 2),
+        title: { ...seedItem.title, raw: `Item ${id}` },
+        url: `https://example.com/items/${id}`,
+        canonicalUrl: `https://example.com/items/${id}`,
+      },
+    });
+  }
+  for (let id = 1; id <= 124; id += 1) {
+    const leadItemId = id * 2 - 1;
+    changes.push({
+      entityType: "event",
+      entityKey: String(id),
+      value: {
+        ...seedEvent,
+        id,
+        leadItemId,
+        memberItemIds: [leadItemId, leadItemId + 1],
+        coverage: 2,
+      },
+    });
+  }
+  for (let id = 1; id <= newsletterCount; id += 1) {
+    changes.push({
+      entityType: "newsletter",
+      entityKey: String(id),
+      value: {
+        ...seedNewsletter,
+        id,
+        itemIds: [1],
+        featuredItemIds: [1],
+      },
+    });
+  }
+  return changes;
 }
 
 describe("pointer-last incremental publisher", () => {
@@ -421,6 +602,81 @@ describe("pointer-last incremental publisher", () => {
     }
   });
 
+  test("publishes exactly 497 changed artifacts within the 500-write runtime cap", async () => {
+    const fixture = await seededFixture();
+    const changes = bucketFanoutChanges(fixture.state, 87);
+    const candidate = await buildPublicRelease({
+      previousManifest: fixture.release.manifest,
+      sourceWatermark: 10 + changes.length,
+      changes,
+      generatedAtMs: NOW,
+      loadArtifact: async (logicalName, descriptor) => {
+        const stored = fixture.store.objects.get(descriptor.key);
+        if (!stored) throw new Error(`missing fixture artifact: ${logicalName}`);
+        return stored.bytes;
+      },
+    });
+    expect(
+      candidate.artifacts.filter(({ unchanged }) => !unchanged),
+    ).toHaveLength(497);
+    const source = new FakeSource(
+      batch(10, 10 + changes.length, changes),
+      fixture.events,
+    );
+    const runId = "run-at-write-cap";
+
+    const receipt = await runRuntime(fixture, source, runId);
+
+    expect(receipt).toMatchObject({ status: "succeeded", failureStage: null });
+    expect(source.ackCalls).toEqual([10 + changes.length]);
+    expect(
+      fixture.events.filter(
+        (event) => event.startsWith("put:") || event.startsWith("cas:"),
+      ),
+    ).toHaveLength(500);
+    expect(fixture.events).toContain(
+      `put:${runReceiptKey("2026-07-14", runId)}`,
+    );
+  });
+
+  test("rejects 498 changed artifacts before runtime writes only its receipt", async () => {
+    const fixture = await seededFixture();
+    const changes = bucketFanoutChanges(fixture.state, 88);
+    const candidate = await buildPublicRelease({
+      previousManifest: fixture.release.manifest,
+      sourceWatermark: 10 + changes.length,
+      changes,
+      generatedAtMs: NOW,
+      loadArtifact: async (logicalName, descriptor) => {
+        const stored = fixture.store.objects.get(descriptor.key);
+        if (!stored) throw new Error(`missing fixture artifact: ${logicalName}`);
+        return stored.bytes;
+      },
+    });
+    expect(
+      candidate.artifacts.filter(({ unchanged }) => !unchanged),
+    ).toHaveLength(498);
+    const source = new FakeSource(
+      batch(10, 10 + changes.length, changes),
+      fixture.events,
+    );
+    const runId = "run-over-write-cap";
+
+    const receipt = await runRuntime(fixture, source, runId);
+
+    expect(receipt).toMatchObject({
+      status: "failed",
+      failureStage: "upload_objects",
+      objects: { uploaded: 0, reused: 0 },
+    });
+    expect(source.ackCalls).toEqual([]);
+    expect(
+      fixture.events.filter(
+        (event) => event.startsWith("put:") || event.startsWith("cas:"),
+      ),
+    ).toEqual([`put:${runReceiptKey("2026-07-14", runId)}`]);
+  });
+
   test("resolves an ambiguous CAS only when reread proves the intended release", async () => {
     const committed = await seededFixture();
     const committedSource = new FakeSource(
@@ -485,45 +741,442 @@ describe("pointer-last incremental publisher", () => {
 });
 
 describe("incremental release scale", () => {
-  test("repartitions a legacy 16-bucket release before applying incremental work", async () => {
-    const legacyItem = item(17);
-    const legacyBytes = canonicalJsonBytes({
-      schemaVersion: 1,
-      entityType: "item",
-      shard: { kind: "id_bucket", bucket: "01" },
-      entities: [legacyItem],
+  test("patches the matching slim and body shards without rebuilding unrelated buckets", async () => {
+    const first = item(1);
+    const second = item(2);
+    const initial = await buildPublicRelease({
+      previousManifest: null,
+      sourceWatermark: 20,
+      changes: [first, second].map((value) => ({
+        entityType: "item" as const,
+        entityKey: String(value.id),
+        value,
+      })),
+      loadArtifact: async () => {
+        throw new Error("bootstrap cannot load a prior artifact");
+      },
     });
-    const legacySha = await sha256Hex(legacyBytes);
-    const legacyDescriptor = {
-      key: objectKey(legacySha, "json"),
-      sha256: legacySha,
-      byteLength: legacyBytes.byteLength,
-      mediaType: "application/json" as const,
-      encoding: "utf-8" as const,
-      shard: { kind: "id_bucket" as const, bucket: "01" },
+    expect(
+      Object.keys(initial.manifest.artifacts).filter((logicalName) =>
+        logicalName.startsWith("bodies/items/"),
+      ),
+    ).toHaveLength(PUBLIC_NUMERIC_SHARD_COUNT);
+
+    const changed = {
+      ...first,
+      title: { ...first.title, en: "Changed title" },
+      bodyMd: "Changed body bytes",
     };
+    const next = await buildPublicRelease({
+      previousManifest: initial.manifest,
+      sourceWatermark: 21,
+      changes: [
+        {
+          entityType: "item",
+          entityKey: String(changed.id),
+          value: changed,
+        },
+      ],
+      loadArtifact: loadFromRelease(initial),
+    });
+    expect(next.loadedArtifactCount).toBe(2);
+    expect(next.artifacts.map(({ logicalName }) => logicalName).sort()).toEqual([
+      "bodies/items/01",
+      "state/items/01",
+    ]);
+    expect(next.artifacts.every(({ unchanged }) => !unchanged)).toBe(true);
+    const slim = next.artifacts.find(
+      ({ logicalName }) => logicalName === "state/items/01",
+    )!;
+    expect(
+      parsePublicEntityShardValue(
+        slim.logicalName,
+        JSON.parse(new TextDecoder().decode(slim.bytes)) as unknown,
+      ).entities[0],
+    ).toMatchObject({ id: 1, bodyMd: null, title: changed.title });
+    const body = next.artifacts.find(
+      ({ logicalName }) => logicalName === "bodies/items/01",
+    )!;
+    expect(
+      parsePublicItemBodyShardValue(
+        body.logicalName,
+        JSON.parse(new TextDecoder().decode(body.bytes)) as unknown,
+      ).entities,
+    ).toEqual([{ id: 1, bodyMd: "Changed body bytes" }]);
+    expect(next.manifest.artifacts["state/items/02"]!.sha256).toBe(
+      initial.manifest.artifacts["state/items/02"]!.sha256,
+    );
+    expect(next.manifest.artifacts["bodies/items/02"]!.sha256).toBe(
+      initial.manifest.artifacts["bodies/items/02"]!.sha256,
+    );
+  });
+
+  test("removes item bodies when the body is cleared or the item is deleted", async () => {
+    const value = item(1);
+    const initial = await buildPublicRelease({
+      previousManifest: null,
+      sourceWatermark: 20,
+      changes: [{ entityType: "item", entityKey: "1", value }],
+      loadArtifact: async () => {
+        throw new Error("bootstrap cannot load a prior artifact");
+      },
+    });
+    for (const change of [
+      { entityType: "item" as const, entityKey: "1", value: { ...value, bodyMd: null } },
+      { entityType: "item" as const, entityKey: "1", value: null },
+    ]) {
+      const next = await buildPublicRelease({
+        previousManifest: initial.manifest,
+        sourceWatermark: 21,
+        changes: [change],
+        loadArtifact: loadFromRelease(initial),
+      });
+      const body = next.artifacts.find(
+        ({ logicalName }) => logicalName === "bodies/items/01",
+      )!;
+      expect(
+        parsePublicItemBodyShardValue(
+          body.logicalName,
+          JSON.parse(new TextDecoder().decode(body.bytes)) as unknown,
+        ).entities,
+      ).toEqual([]);
+      const slim = next.artifacts.find(
+        ({ logicalName }) => logicalName === "state/items/01",
+      )!;
+      const slimEntities = parsePublicEntityShardValue(
+        slim.logicalName,
+        JSON.parse(new TextDecoder().decode(slim.bytes)) as unknown,
+      ).entities;
+      if (change.value === null) expect(slimEntities).toEqual([]);
+      else expect(slimEntities[0]).toMatchObject({ id: 1, bodyMd: null });
+    }
+  });
+
+  test("forces a zero-change legacy migration and preserves podcast detail bodies", async () => {
+    const fixtureState = canonicalState();
+    const state = canonicalStateSchema.parse({
+      ...fixtureState,
+      items: Array.from({ length: PUBLIC_NUMERIC_SHARD_COUNT }, (_, index) => {
+        const id = index + 1;
+        return {
+          ...item(id),
+          eventId: null,
+          url: `https://example.com/podcast/${id}`,
+          canonicalUrl: `https://example.com/podcast/${id}`,
+        };
+      }),
+      events: [],
+      newsletters: [],
+      sources: fixtureState.sources.map((value) => ({
+        ...value,
+        group: "podcast",
+      })),
+    });
+    const rebuiltFixture = await seededFixture(state);
+    const expectedBody = state.items[0]!.bodyMd!;
+    const legacy = await downgradeToLegacyFatItems(rebuiltFixture);
+    expect(
+      Object.keys(legacy.manifest.artifacts).filter((logicalName) =>
+        logicalName.startsWith("state/items/"),
+      ),
+    ).toHaveLength(PUBLIC_NUMERIC_SHARD_COUNT);
+    const source = new FakeSource(batch(10, 10, []), rebuiltFixture.events);
+
+    const receipt = await runRuntime(
+      rebuiltFixture,
+      source,
+      "run-full-body-split-migration",
+    );
+    expect(receipt).toMatchObject({ status: "succeeded", failureStage: null });
+    expect(
+      rebuiltFixture.events.filter(
+        (event) => event.startsWith("put:") || event.startsWith("cas:"),
+      ),
+    ).toHaveLength(259);
+    const pointer = snapshotPointerSchema.parse(
+      JSON.parse(
+        new TextDecoder().decode(
+          rebuiltFixture.store.objects.get(CURRENT_POINTER_KEY)!.bytes,
+        ),
+      ),
+    );
+    const manifest = manifestSchema.parse(
+      JSON.parse(
+        new TextDecoder().decode(
+          rebuiltFixture.store.objects.get(pointer.active.manifestKey)!.bytes,
+        ),
+      ),
+    );
+    expect(
+      Object.keys(manifest.artifacts).filter((logicalName) =>
+        logicalName.startsWith("bodies/items/"),
+      ),
+    ).toHaveLength(PUBLIC_NUMERIC_SHARD_COUNT);
+    for (const [logicalName, descriptor] of Object.entries(
+      manifest.artifacts,
+    )) {
+      if (!logicalName.startsWith("state/items/")) continue;
+      const shard = parsePublicEntityShardValue(
+        logicalName,
+        JSON.parse(
+          new TextDecoder().decode(
+            rebuiltFixture.store.objects.get(descriptor.key)!.bytes,
+          ),
+        ) as unknown,
+      );
+      if (shard.entityType !== "item") {
+        throw new Error(`unexpected fixture shard: ${logicalName}`);
+      }
+      expect(shard.entities.every((entity) => entity.bodyMd === null)).toBe(
+        true,
+      );
+    }
+    const bodyLogicalName = publicItemBodyShardLogicalName("1");
+    const bodyDescriptor = manifest.artifacts[bodyLogicalName]!;
+    expect(
+      parsePublicItemBodyShardValue(
+        bodyLogicalName,
+        JSON.parse(
+          new TextDecoder().decode(
+            rebuiltFixture.store.objects.get(bodyDescriptor.key)!.bytes,
+          ),
+        ) as unknown,
+      ).entities,
+    ).toContainEqual({ id: 1, bodyMd: expectedBody });
+    const detailDescriptor =
+      manifest.artifacts[materializedPageLogicalName.podcastDetails(1)]!;
+    const detail = parseMaterializedPageArtifact<{
+      detailsById: Record<
+        string,
+        { en: { bodyMd: string | null }; zh: { bodyMd: string | null } }
+      >;
+    }>(rebuiltFixture.store.objects.get(detailDescriptor.key)!.bytes);
+    expect(detail.model.detailsById["1"]!.en.bodyMd).toBe(
+      expectedBody,
+    );
+    expect(detail.model.detailsById["1"]!.zh.bodyMd).toBe(
+      expectedBody,
+    );
+  });
+
+  test("loads only podcast body buckets when rematerializing an existing split release", async () => {
+    const fixtureState = canonicalState();
+    const state = canonicalStateSchema.parse({
+      ...fixtureState,
+      sources: fixtureState.sources.map((value) => ({
+        ...value,
+        group: "podcast",
+      })),
+    });
+    const initial = await buildPublicRelease({
+      previousManifest: null,
+      sourceWatermark: 20,
+      changes: allChanges(state),
+      generatedAtMs: NOW,
+      loadArtifact: async () => {
+        throw new Error("bootstrap cannot load a prior artifact");
+      },
+    });
+    const expectedBody = state.items[0]!.bodyMd!;
+    const loadedLogicalNames: string[] = [];
+    const changedSource = {
+      ...state.sources[0]!,
+      name: { ...state.sources[0]!.name, en: "Changed podcast" },
+    };
+    const next = await buildPublicRelease({
+      previousManifest: initial.manifest,
+      sourceWatermark: 21,
+      changes: [
+        {
+          entityType: "source",
+          entityKey: changedSource.id,
+          value: changedSource,
+        },
+      ],
+      generatedAtMs: NOW + 1,
+      loadArtifact: loadFromRelease(initial, loadedLogicalNames),
+    });
+    expect(
+      loadedLogicalNames
+        .filter((logicalName) => logicalName.startsWith("bodies/items/"))
+        .sort(),
+    ).toEqual(["bodies/items/01", "bodies/items/02"]);
+    const detail = next.artifacts.find(
+      ({ logicalName }) =>
+        logicalName === materializedPageLogicalName.podcastDetails(1),
+    )!;
+    const parsed = parseMaterializedPageArtifact<{
+      detailsById: Record<string, { en: { bodyMd: string | null } }>;
+    }>(detail.bytes);
+    expect(parsed.model.detailsById["1"]!.en.bodyMd).toBe(
+      expectedBody,
+    );
+  });
+
+  test("preserves full canonical state through combined 16-bucket and body-split migration", async () => {
+    const base = canonicalState();
+    const legacyState = canonicalStateSchema.parse({
+      ...base,
+      items: [
+        { ...item(17), eventId: 7 },
+        { ...item(34), eventId: 7 },
+      ],
+      events: [
+        {
+          ...base.events[0]!,
+          leadItemId: 17,
+          memberItemIds: [17, 34],
+        },
+      ],
+      newsletters: [
+        {
+          ...base.newsletters[0]!,
+          itemIds: [34, 17],
+          featuredItemIds: [17],
+        },
+      ],
+    });
+    const legacyShardValues = new Map<string, unknown>([
+      [
+        "state/items/01",
+        {
+          schemaVersion: 1,
+          entityType: "item",
+          shard: { kind: "id_bucket", bucket: "01" },
+          entities: [legacyState.items[0]],
+        },
+      ],
+      [
+        "state/items/02",
+        {
+          schemaVersion: 1,
+          entityType: "item",
+          shard: { kind: "id_bucket", bucket: "02" },
+          entities: [legacyState.items[1]],
+        },
+      ],
+      [
+        "state/events/07",
+        {
+          schemaVersion: 1,
+          entityType: "event",
+          shard: { kind: "id_bucket", bucket: "07" },
+          entities: legacyState.events,
+        },
+      ],
+      [
+        "state/newsletters/04",
+        {
+          schemaVersion: 1,
+          entityType: "newsletter",
+          shard: { kind: "id_bucket", bucket: "04" },
+          entities: legacyState.newsletters,
+        },
+      ],
+      [
+        "state/sources",
+        {
+          schemaVersion: 1,
+          entityType: "source",
+          shard: { kind: "singleton" },
+          entities: legacyState.sources,
+        },
+      ],
+      [
+        "state/policies",
+        {
+          schemaVersion: 1,
+          entityType: "policy",
+          shard: { kind: "singleton" },
+          entities: legacyState.policies,
+        },
+      ],
+    ]);
+    const legacyArtifacts: Record<
+      string,
+      Awaited<ReturnType<typeof jsonFixtureArtifact>>["descriptor"]
+    > = {};
+    const legacyBytesByKey = new Map<string, Uint8Array>();
+    for (const [logicalName, value] of legacyShardValues) {
+      const shard = logicalName === "state/sources" || logicalName === "state/policies"
+        ? { kind: "singleton" as const }
+        : { kind: "id_bucket" as const, bucket: logicalName.slice(-2) };
+      const artifact = await jsonFixtureArtifact(value, shard);
+      legacyArtifacts[logicalName] = artifact.descriptor;
+      legacyBytesByKey.set(artifact.descriptor.key, artifact.bytes);
+    }
     const previous = manifestSchema.parse({
       schemaVersion: 1,
       releaseId: "r20-legacy",
       sourceWatermark: 20,
       numericShardCount: 16,
-      artifacts: { "state/items/01": legacyDescriptor },
+      artifacts: legacyArtifacts,
     });
     const migrated = await buildPublicRelease({
       previousManifest: previous,
       sourceWatermark: 21,
       changes: [],
-      loadArtifact: async () => legacyBytes,
+      loadArtifact: async (logicalName, descriptor) => {
+        const bytes = legacyBytesByKey.get(descriptor.key);
+        if (!bytes) throw new Error(`missing legacy fixture: ${logicalName}`);
+        return bytes;
+      },
     });
-    expect(migrated.loadedArtifactCount).toBe(1);
-    expect(Object.keys(migrated.manifest.artifacts)).toEqual([
-      "state/items/11",
-    ]);
-    expect(migrated.artifacts).toHaveLength(1);
+    expect(migrated.loadedArtifactCount).toBe(4);
+    expect(migrated.manifest.artifacts["state/items/11"]).toBeDefined();
+    expect(migrated.manifest.artifacts["state/items/22"]).toBeDefined();
     expect(
-      JSON.parse(new TextDecoder().decode(migrated.artifacts[0]!.bytes))
-        .entities[0].id,
-    ).toBe(17);
+      Object.keys(migrated.manifest.artifacts).filter((logicalName) =>
+        logicalName.startsWith("bodies/items/"),
+      ),
+    ).toHaveLength(PUBLIC_NUMERIC_SHARD_COUNT);
+    expect(migrated.artifacts).toHaveLength(
+      PUBLIC_NUMERIC_SHARD_COUNT + 4,
+    );
+
+    const migratedBytesByKey = new Map([
+      ...legacyBytesByKey,
+      ...artifactBytesByKey(migrated),
+    ]);
+    const reconstructed = {
+      schemaVersion: 1 as const,
+      items: [] as unknown[],
+      events: [] as unknown[],
+      sources: [] as unknown[],
+      newsletters: [] as unknown[],
+      policies: [] as unknown[],
+    };
+    const bodiesById = new Map<number, string>();
+    for (const [logicalName, descriptor] of Object.entries(
+      migrated.manifest.artifacts,
+    )) {
+      const bytes = migratedBytesByKey.get(descriptor.key)!;
+      if (logicalName.startsWith("bodies/items/")) {
+        for (const body of parsePublicItemBodyShardValue(
+          logicalName,
+          JSON.parse(new TextDecoder().decode(bytes)) as unknown,
+        ).entities) {
+          bodiesById.set(body.id, body.bodyMd);
+        }
+        continue;
+      }
+      if (!logicalName.startsWith("state/")) continue;
+      const shard = parsePublicEntityShardValue(
+        logicalName,
+        JSON.parse(new TextDecoder().decode(bytes)) as unknown,
+      );
+      if (shard.entityType === "item") reconstructed.items.push(...shard.entities);
+      else if (shard.entityType === "event") reconstructed.events.push(...shard.entities);
+      else if (shard.entityType === "source") reconstructed.sources.push(...shard.entities);
+      else if (shard.entityType === "newsletter") reconstructed.newsletters.push(...shard.entities);
+      else reconstructed.policies.push(...shard.entities);
+    }
+    reconstructed.items = reconstructed.items.map((value) => {
+      const parsed = publicItemSchema.parse(value);
+      return { ...parsed, bodyMd: bodiesById.get(parsed.id) ?? null };
+    });
+    const restoredState = canonicalStateSchema.parse(reconstructed);
+    expect(restoredState).toEqual(legacyState);
   });
 
   test("loads only touched stable shards, independent of unrelated corpus descriptors", async () => {
@@ -581,8 +1234,8 @@ describe("incremental release scale", () => {
         },
       },
     ]);
-    expect(one.loadedArtifactCount).toBe(1);
-    expect(one.artifacts).toHaveLength(1);
+    expect(one.loadedArtifactCount).toBe(2);
+    expect(one.artifacts).toHaveLength(2);
 
     loadCounts[0] = 0;
     const hundred = await build(
@@ -594,9 +1247,9 @@ describe("incremental release scale", () => {
         },
       })),
     );
-    expect(hundred.loadedArtifactCount).toBe(100);
-    expect(hundred.artifacts).toHaveLength(100);
-    expect(loadCounts[0]).toBe(100);
+    expect(hundred.loadedArtifactCount).toBe(200);
+    expect(hundred.artifacts).toHaveLength(200);
+    expect(loadCounts[0]).toBe(200);
 
     const repeated = await build(
       initialChanges.map((change) => ({

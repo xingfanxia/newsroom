@@ -212,9 +212,16 @@ export function buildPodcastDetailPageModel(
   state: CanonicalPublicState,
   nowMs: number,
   input: { locale: AppLocale; id: number },
+  resolvedBodyMd: string | null = null,
 ) {
   return {
-    detail: publicPageItemDetail(state, input.id, input.locale, nowMs),
+    detail: publicPageItemDetail(
+      state,
+      input.id,
+      input.locale,
+      nowMs,
+      resolvedBodyMd,
+    ),
     chrome: shellChromeDataFromSnapshot(state, nowMs),
   };
 }

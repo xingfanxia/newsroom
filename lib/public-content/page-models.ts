@@ -1,5 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { readPublicPageSnapshot } from "@/lib/public-content/page-data";
+import { publicSnapshotReader } from "@/lib/public-content/reader";
 import {
   materializedPageLogicalName,
   readMaterializedPageModel,
@@ -68,8 +69,14 @@ const readCachedPodcastsPageModel = unstable_cache(
 
 const readCachedPodcastDetailPageModel = unstable_cache(
   async (input: { locale: AppLocale; id: number }) => {
-    const { state, nowMs } = await readPublicPageSnapshot();
-    return buildPodcastDetailPageModel(state, nowMs, input);
+    const { state, release, nowMs } = await readPublicPageSnapshot();
+    const item = state.items.find(({ id }) => id === input.id);
+    const resolvedBodyMd =
+      item?.bodyMd ??
+      (item
+        ? await publicSnapshotReader().readItemBody(release, input.id)
+        : null);
+    return buildPodcastDetailPageModel(state, nowMs, input, resolvedBodyMd);
   },
   ["public-podcast-detail-page-model:v1"],
   cacheOptions,

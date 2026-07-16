@@ -29,6 +29,41 @@ Turso (private source of truth)
 - The recurring publisher is proportional to outbox changes. The one full
   bootstrap is separately metered and may run exactly once.
 
+## Release artifact layout
+
+The manifest separates queryable canonical state from large item bodies:
+
+```text
+state/items/<00-7f>       128 slim item shards (`bodyMd: null`)
+bodies/items/<00-7f>      128 aligned item-body shards
+state/events/<00-7f>      up to 128 event shards
+state/newsletters/<00-7f> up to 128 newsletter shards
+state/sources             singleton source catalog
+state/policies            singleton policy history
+views/*                   materialized page and feed artifacts
+```
+
+`state/items/<00-7f>` holds the slim canonical records, while each
+`bodies/items/<00-7f>` entity contains only an item ID and a non-null Markdown
+body. The numeric bucket is identical to the corresponding slim item bucket.
+The publisher always emits all 128 body shards, including empty ones;
+steady-state item changes rewrite only the matching slim and body buckets.
+The first publisher tick against a pre-split manifest forces the one-time split
+even when the outbox has no content changes. Before uploading, the incremental
+publisher counts changed artifacts plus the manifest, pointer CAS, and receipt;
+a plan above the 500-write cap fails without uploading artifacts or
+acknowledging the outbox.
+
+Canonical readers aggregate only `state/*`, so page/feed reads do not parse the
+body shards. Item detail reads the body descriptor from the exact state release
+and keeps that lookup release-pinned across a `current.json` flip. A legacy
+release without body descriptors falls back to its inline `bodyMd`; an older
+application can still parse a split release because slim items retain the
+nullable field. Podcast detail materialization resolves the same split body
+before publishing its view buckets. `/api/public/sources` reads and validates
+the required `state/sources` singleton directly while preserving the
+active-to-previous-to-last-known-good fallback ladder.
+
 ## Environment and credentials
 
 Vercel server environments require:

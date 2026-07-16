@@ -7,6 +7,7 @@ import {
 import {
   manifestSchema,
   parsePublicEntityShardValue,
+  parsePublicItemBodyShardValue,
   runReceiptSchema,
   snapshotPointerSchema,
 } from "@/lib/public-content/contracts";
@@ -16,6 +17,7 @@ import {
 } from "@/lib/public-content/paths";
 import {
   buildPublicRelease,
+  requiresBodySplitMigration,
   requiresNumericShardMigration,
   verifyDescriptorBytes,
   type BuiltPublicRelease,
@@ -34,6 +36,10 @@ import type {
 
 type SnapshotPointer = z.infer<typeof snapshotPointerSchema>;
 export type PublicPublisherReceipt = z.infer<typeof runReceiptSchema>;
+
+const MAX_INCREMENTAL_OBJECT_WRITES = 500;
+// Manifest + current.json CAS + the runtime receipt persisted after this call.
+const INCREMENTAL_RELEASE_FIXED_WRITES = 3;
 
 export type IncrementalPublishInput = {
   source: PublicContentPublisherSource;
@@ -98,6 +104,7 @@ export async function publishIncrementalSnapshot(
   if (
     context.batch.changes.length === 0 &&
     !requiresNumericShardMigration(previousManifest) &&
+    !requiresBodySplitMigration(previousManifest) &&
     hasRequiredMaterializedPages(previousManifest)
   ) {
     try {
@@ -129,6 +136,10 @@ export async function publishIncrementalSnapshot(
     });
   } catch {
     return receipt(context, "failed", "derive", null);
+  }
+
+  if (plannedIncrementalObjectWrites(release) > MAX_INCREMENTAL_OBJECT_WRITES) {
+    return receipt(context, "failed", "upload_objects", null);
   }
 
   try {
@@ -171,6 +182,13 @@ export async function publishIncrementalSnapshot(
     return receipt(context, "failed", "ack_outbox", release.releaseId);
   }
   return receipt(context, "succeeded", null, release.releaseId);
+}
+
+function plannedIncrementalObjectWrites(release: BuiltPublicRelease): number {
+  return (
+    release.artifacts.filter(({ unchanged }) => !unchanged).length +
+    INCREMENTAL_RELEASE_FIXED_WRITES
+  );
 }
 
 type PointerRecord = {
@@ -236,6 +254,11 @@ export async function uploadChangedReleaseArtifacts(
     }
     if (artifact.logicalName.startsWith("state/")) {
       parsePublicEntityShardValue(artifact.logicalName, parseJson(stored.bytes));
+    } else if (artifact.logicalName.startsWith("bodies/items/")) {
+      parsePublicItemBodyShardValue(
+        artifact.logicalName,
+        parseJson(stored.bytes),
+      );
     } else if (artifact.logicalName.startsWith("views/")) {
       parseMaterializedPageArtifact(stored.bytes);
     }

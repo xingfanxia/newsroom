@@ -7,11 +7,21 @@ import { GET as getPublicEventMembers } from "@/app/api/public/events/[id]/membe
 import { GET as getPublicItem } from "@/app/api/public/items/[id]/route";
 import { GET as getPublicSources } from "@/app/api/public/sources/route";
 import { GET as getActiveSources } from "@/app/api/sources/active/route";
-import { canonicalJsonBytes } from "@/lib/public-content/canonical";
-import { snapshotPointerSchema } from "@/lib/public-content/contracts";
-import { CURRENT_POINTER_KEY, releaseManifestKey } from "@/lib/public-content/paths";
+import { canonicalJsonBytes, sha256Hex } from "@/lib/public-content/canonical";
+import {
+  manifestSchema,
+  snapshotPointerSchema,
+  type CanonicalPublicState,
+} from "@/lib/public-content/contracts";
+import { publicItemSnapshotResult } from "@/lib/public-content/http";
+import {
+  CURRENT_POINTER_KEY,
+  objectKey,
+  releaseManifestKey,
+} from "@/lib/public-content/paths";
 import { buildPublicRelease } from "@/lib/public-content/publisher/build-release";
 import type { PublicEntityChange } from "@/lib/public-content/publisher/types";
+import { publicSnapshotReader } from "@/lib/public-content/reader";
 import { MemoryPublicSnapshotHttp } from "@/lib/public-content/testing/memory-store";
 import { __resetPublicBuckets } from "@/lib/rate-limit/public";
 import { checkSourcePublicDbBoundary } from "@/scripts/ops/check-public-db-boundary";
@@ -78,6 +88,17 @@ describe("snapshot-backed public JSON routes", () => {
         },
       ],
     });
+    expect(
+      new Set(
+        fixture.http.requests
+          .map(({ key }) => key)
+          .filter((key) => key.includes("/objects/")),
+      ),
+    ).toEqual(
+      new Set([
+        fixture.release.manifest.artifacts["state/sources"]!.key,
+      ]),
+    );
 
     const etag = response.headers.get("etag");
     expect(etag).not.toBeNull();
@@ -86,6 +107,68 @@ describe("snapshot-backed public JSON routes", () => {
     );
     expect(notModified.status).toBe(304);
     expect(await notModified.text()).toBe("");
+  });
+
+  test("falls back source-shard validation and maps terminal corruption to 503", async () => {
+    for (const mode of ["missing", "invalid"] as const) {
+      const fallback = await sourcesFallbackFixture(mode, true);
+      stores.set(fallback.baseUrl, fallback);
+      process.env.R2_PUBLIC_BASE_URL = fallback.baseUrl;
+
+      const response = await getPublicSources(
+        publicRequest(`/api/public/sources?case=${mode}`),
+      );
+
+      expect(response.status).toBe(200);
+      expect((await response.json()).sources[0].name_en).toBe(
+        "Previous Source",
+      );
+    }
+
+    const terminal = await sourcesFallbackFixture("invalid", false);
+    stores.set(terminal.baseUrl, terminal);
+    process.env.R2_PUBLIC_BASE_URL = terminal.baseUrl;
+    const unavailable = await getPublicSources(
+      publicRequest("/api/public/sources?case=terminal"),
+    );
+    expect(unavailable.status).toBe(503);
+    expect(await unavailable.json()).toEqual({ error: "snapshot_unavailable" });
+  });
+
+  test("revalidates warm source artifacts before serving last-known-good", async () => {
+    const warm = await routeFixture("https://sources-warm-lkg.test");
+    stores.set(warm.http.baseUrl, warm.http);
+    process.env.R2_PUBLIC_BASE_URL = warm.http.baseUrl;
+    const first = await getPublicSources(
+      publicRequest("/api/public/sources?case=warm"),
+    );
+    const firstBody = await first.json();
+    expect(first.status).toBe(200);
+
+    warm.http.delete(CURRENT_POINTER_KEY);
+    const lastKnownGood = await getPublicSources(
+      publicRequest("/api/public/sources?case=lkg"),
+    );
+    expect(lastKnownGood.status).toBe(200);
+    expect(await lastKnownGood.json()).toEqual(firstBody);
+
+    const invalid = await sourcesFallbackFixture(
+      "invalid",
+      false,
+      "unvalidated-lkg",
+    );
+    stores.set(invalid.baseUrl, invalid);
+    process.env.R2_PUBLIC_BASE_URL = invalid.baseUrl;
+    expect(
+      await publicSnapshotReader().readLogicalArtifact("state/sources"),
+    ).not.toBeNull();
+    invalid.delete(CURRENT_POINTER_KEY);
+
+    const rejected = await getPublicSources(
+      publicRequest("/api/public/sources?case=invalid-lkg"),
+    );
+    expect(rejected.status).toBe(503);
+    expect(await rejected.json()).toEqual({ error: "snapshot_unavailable" });
   });
 
   test("serves only persisted eligible item details and preserves errors", async () => {
@@ -100,9 +183,17 @@ describe("snapshot-backed public JSON routes", () => {
       title: { raw: "Raw title", zh: "标题", en: "Title" },
       hkr: { h: true, k: true, r: false },
       event: { cluster_id: 7, coverage: 2 },
+      body_md: "Public, sanitized article markdown",
     });
     expect(body).not.toHaveProperty("reasoning");
     expect(body).not.toHaveProperty("body_rss");
+
+    const emptyBody = await getPublicItem(
+      publicRequest("/api/public/items/2"),
+      { params: Promise.resolve({ id: "2" }) },
+    );
+    expect(emptyBody.status).toBe(200);
+    expect((await emptyBody.json()).body_md).toBeNull();
 
     for (const id of ["777", "999999"]) {
       const missing = await getPublicItem(
@@ -117,6 +208,72 @@ describe("snapshot-backed public JSON routes", () => {
     });
     expect(invalid.status).toBe(400);
     expect(await invalid.json()).toEqual({ error: "invalid_id" });
+  });
+
+  test("preserves inline legacy bodies and the existing item ETag signal", async () => {
+    const pointer = snapshotPointerSchema.parse({
+      schemaVersion: 1,
+      active: {
+        releaseId: fixture.release.releaseId,
+        manifestKey: releaseManifestKey(fixture.release.releaseId),
+        manifestSha256: fixture.release.manifestSha256,
+      },
+      previous: null,
+      publishedAt: "2026-07-14T12:00:00.000Z",
+      sourceWatermark: fixture.release.manifest.sourceWatermark,
+    });
+    const release = {
+      ref: pointer.active,
+      manifest: fixture.release.manifest,
+      pointer,
+      source: "active" as const,
+    };
+    const inlineState: CanonicalPublicState = canonicalState();
+    inlineState.sources[0] = { ...inlineState.sources[0]!, enabled: true };
+    inlineState.items[1] = { ...inlineState.items[1]!, bodyMd: null };
+    const splitState = {
+      ...inlineState,
+      items: inlineState.items.map((item) => ({ ...item, bodyMd: null })),
+    };
+    let bodyReads = 0;
+    const reader = {
+      readItemBody: async (pinnedRelease: typeof release, id: number) => {
+        expect(pinnedRelease).toBe(release);
+        bodyReads += 1;
+        return id === 1 ? inlineState.items[0]!.bodyMd : null;
+      },
+    };
+
+    const inline = await publicItemSnapshotResult(
+      { state: inlineState, release },
+      "1",
+      reader,
+    );
+    const split = await publicItemSnapshotResult(
+      { state: splitState, release },
+      "1",
+      reader,
+    );
+    const empty = await publicItemSnapshotResult(
+      { state: splitState, release },
+      "2",
+      reader,
+    );
+
+    expect(inline).toMatchObject({
+      ok: true,
+      body: { body_md: "Public, sanitized article markdown" },
+    });
+    expect(split).toMatchObject({
+      ok: true,
+      body: { body_md: "Public, sanitized article markdown" },
+    });
+    expect(empty).toMatchObject({ ok: true, body: { body_md: null } });
+    expect(bodyReads).toBe(2);
+    expect(inline.ok).toBeTrue();
+    expect(split.ok).toBeTrue();
+    if (!inline.ok || !split.ok) throw new Error("expected item results");
+    expect(inline.signal).toBe(split.signal);
   });
 
   test("preserves public and UI event-member locale/envelope contracts", async () => {
@@ -259,9 +416,10 @@ function publicRequest(
   return new Request(`https://newsroom.test${path}`, { headers });
 }
 
-async function routeFixture() {
-  const state = canonicalState();
+async function routeFixture(baseUrl?: string) {
+  const state: CanonicalPublicState = canonicalState();
   state.sources[0] = { ...state.sources[0]!, enabled: true };
+  state.items[1] = { ...state.items[1]!, bodyMd: null };
   const release = await buildPublicRelease({
     previousManifest: null,
     sourceWatermark: 10,
@@ -270,7 +428,7 @@ async function routeFixture() {
       throw new Error("fixture cannot load a prior artifact");
     },
   });
-  const http = new MemoryPublicSnapshotHttp();
+  const http = new MemoryPublicSnapshotHttp(baseUrl);
   for (const artifact of release.artifacts) {
     http.put(artifact.descriptor.key, artifact.bytes);
   }
@@ -295,9 +453,103 @@ async function routeFixture() {
   return { http, release, state };
 }
 
-function allChanges(
-  state: ReturnType<typeof canonicalState>,
-): PublicEntityChange[] {
+async function sourcesFallbackFixture(
+  mode: "missing" | "invalid",
+  withPrevious: boolean,
+  label = withPrevious ? "fallback" : "terminal",
+): Promise<MemoryPublicSnapshotHttp> {
+  const previousState: CanonicalPublicState = canonicalState();
+  previousState.sources[0] = {
+    ...previousState.sources[0]!,
+    enabled: true,
+    name: { zh: "上一个来源", en: "Previous Source" },
+  };
+  const activeState: CanonicalPublicState = canonicalState();
+  activeState.sources[0] = {
+    ...activeState.sources[0]!,
+    enabled: true,
+    name: { zh: "当前来源", en: "Active Source" },
+  };
+  const [previous, active] = await Promise.all([
+    buildPublicRelease({
+      previousManifest: null,
+      sourceWatermark: 9,
+      changes: allChanges(previousState),
+      generatedAtMs: Date.parse("2026-07-14T11:00:00.000Z"),
+      loadArtifact: async () => {
+        throw new Error("fixture cannot load a prior artifact");
+      },
+    }),
+    buildPublicRelease({
+      previousManifest: null,
+      sourceWatermark: 10,
+      changes: allChanges(activeState),
+      generatedAtMs: Date.parse("2026-07-14T12:00:00.000Z"),
+      loadArtifact: async () => {
+        throw new Error("fixture cannot load a prior artifact");
+      },
+    }),
+  ]);
+  const store = new MemoryPublicSnapshotHttp(
+    `https://sources-${mode}-${label}.test`,
+  );
+  for (const release of [previous, active]) {
+    for (const artifact of release.artifacts) {
+      store.put(artifact.descriptor.key, artifact.bytes);
+    }
+  }
+  const previousManifestKey = releaseManifestKey(previous.releaseId);
+  store.put(previousManifestKey, previous.manifestBytes);
+
+  const activeArtifacts = { ...active.manifest.artifacts };
+  if (mode === "missing") {
+    delete activeArtifacts["state/sources"];
+  } else {
+    const invalidBytes = canonicalJsonBytes({ invalid: true });
+    const sha256 = await sha256Hex(invalidBytes);
+    const descriptor = activeArtifacts["state/sources"]!;
+    activeArtifacts["state/sources"] = {
+      ...descriptor,
+      key: objectKey(sha256, "json"),
+      sha256,
+      byteLength: invalidBytes.byteLength,
+    };
+    store.put(objectKey(sha256, "json"), invalidBytes);
+  }
+  const activeManifest = manifestSchema.parse({
+    ...active.manifest,
+    artifacts: activeArtifacts,
+  });
+  const activeManifestBytes = canonicalJsonBytes(activeManifest);
+  const activeManifestSha256 = await sha256Hex(activeManifestBytes);
+  const activeManifestKey = releaseManifestKey(active.releaseId);
+  store.put(activeManifestKey, activeManifestBytes);
+  store.put(
+    CURRENT_POINTER_KEY,
+    canonicalJsonBytes(
+      snapshotPointerSchema.parse({
+        schemaVersion: 1,
+        active: {
+          releaseId: active.releaseId,
+          manifestKey: activeManifestKey,
+          manifestSha256: activeManifestSha256,
+        },
+        previous: withPrevious
+          ? {
+              releaseId: previous.releaseId,
+              manifestKey: previousManifestKey,
+              manifestSha256: previous.manifestSha256,
+            }
+          : null,
+        publishedAt: "2026-07-14T12:00:00.000Z",
+        sourceWatermark: 10,
+      }),
+    ),
+  );
+  return store;
+}
+
+function allChanges(state: CanonicalPublicState): PublicEntityChange[] {
   return [
     ...state.sources.map((value) => ({
       entityType: "source" as const,

@@ -10,11 +10,15 @@ import {
   manifestSchema,
   parsePublicEntityShardValue,
   parsePublicEntityValue,
+  parsePublicItemBodyShardValue,
   PUBLIC_NUMERIC_SHARD_COUNT,
   publicEntityKey,
   publicEntityShardLogicalName,
   publicEntityShardMetadata,
   publicEntityShardSchemas,
+  publicItemBodyShardLogicalName,
+  publicItemBodyShardSchema,
+  publicItemSchema,
   type PublicEntityType,
 } from "@/lib/public-content/contracts";
 import { objectKey } from "@/lib/public-content/paths";
@@ -69,14 +73,28 @@ export async function buildPublicRelease(
   let loadedArtifactCount = 0;
   const repartitionNumericShards =
     previous !== null && requiresNumericShardMigration(previous);
-  if (repartitionNumericShards) {
-    const migration = await buildRepartitionedNumericArtifacts(
+  const splitItemBodies =
+    previous !== null && requiresBodySplitMigration(previous);
+  const migratedEntityTypes = new Set<NumericEntityType>(
+    repartitionNumericShards
+      ? ["item", "event", "newsletter"]
+      : splitItemBodies
+        ? ["item"]
+        : [],
+  );
+  if (previous && migratedEntityTypes.size > 0) {
+    const migration = await buildMigratedNumericArtifacts(
       previous,
       input.changes,
       input.loadArtifact,
+      migratedEntityTypes,
+      splitItemBodies,
     );
     for (const logicalName of Object.keys(nextDescriptors)) {
-      if (isNumericShardLogicalName(logicalName)) {
+      if (
+        isMigratedNumericShardLogicalName(logicalName, migratedEntityTypes) ||
+        logicalName.startsWith("bodies/items/")
+      ) {
         delete nextDescriptors[logicalName];
       }
     }
@@ -86,8 +104,10 @@ export async function buildPublicRelease(
     }
     loadedArtifactCount += migration.loadedArtifactCount;
   }
-  const incrementalChanges = repartitionNumericShards
-    ? input.changes.filter(({ entityType }) => !isNumericEntityType(entityType))
+  const incrementalChanges = migratedEntityTypes.size > 0
+    ? input.changes.filter(
+        ({ entityType }) => !migratedEntityTypes.has(entityType as NumericEntityType),
+      )
     : input.changes;
   const grouped = groupChanges(incrementalChanges);
 
@@ -111,12 +131,61 @@ export async function buildPublicRelease(
     }
 
     const patched = patchEntities(entityType, entities, changes);
+    if (entityType === "item") {
+      const bodyLogicalName = publicItemBodyShardLogicalName(
+        changes[0]!.entityKey,
+      );
+      const previousBodyDescriptor = previous?.artifacts[bodyLogicalName];
+      let bodies: ItemBody[] = [];
+      if (previousBodyDescriptor) {
+        assertDescriptorShard(previousBodyDescriptor, expectedShard);
+        const bytes = await input.loadArtifact(
+          bodyLogicalName,
+          previousBodyDescriptor,
+        );
+        loadedArtifactCount += 1;
+        await verifyDescriptorBytes(previousBodyDescriptor, bytes);
+        bodies = parsePublicItemBodyShardValue(
+          bodyLogicalName,
+          JSON.parse(new TextDecoder().decode(bytes)) as unknown,
+        ).entities;
+      }
+      const slimArtifact = await buildShardArtifact(
+        entityType,
+        logicalName,
+        expectedShard,
+        withoutItemBodies(patched),
+        previousDescriptor,
+      );
+      const bodyArtifact = await buildItemBodyShardArtifact(
+        bodyLogicalName,
+        patchItemBodies(bodies, changes),
+        previousBodyDescriptor,
+      );
+      nextDescriptors[logicalName] = slimArtifact.descriptor;
+      nextDescriptors[bodyLogicalName] = bodyArtifact.descriptor;
+      built.push(slimArtifact, bodyArtifact);
+      continue;
+    }
     const artifact = await buildShardArtifact(
       entityType,
       logicalName,
       expectedShard,
       patched,
       previousDescriptor,
+    );
+    nextDescriptors[logicalName] = artifact.descriptor;
+    built.push(artifact);
+  }
+
+  for (let bucket = 0; bucket < PUBLIC_NUMERIC_SHARD_COUNT; bucket += 1) {
+    const entityKey = bucket === 0 ? String(PUBLIC_NUMERIC_SHARD_COUNT) : String(bucket);
+    const logicalName = publicItemBodyShardLogicalName(entityKey);
+    if (nextDescriptors[logicalName]) continue;
+    const artifact = await buildItemBodyShardArtifact(
+      logicalName,
+      [],
+      previous?.artifacts[logicalName],
     );
     nextDescriptors[logicalName] = artifact.descriptor;
     built.push(artifact);
@@ -129,12 +198,20 @@ export async function buildPublicRelease(
       input.loadArtifact,
     );
     loadedArtifactCount += reconstructed.loadedArtifactCount;
+    const bodies = await loadItemBodyLookup(
+      reconstructed.state,
+      nextDescriptors,
+      built,
+      input.loadArtifact,
+    );
+    loadedArtifactCount += bodies.loadedArtifactCount;
     for (const logicalName of Object.keys(nextDescriptors)) {
       if (logicalName.startsWith("views/")) delete nextDescriptors[logicalName];
     }
     for (const view of await buildMaterializedPageModels(
       reconstructed.state,
       input.generatedAtMs,
+      (id) => bodies.byId.get(id) ?? null,
     )) {
       const artifact = await buildMaterializedArtifact(
         view.logicalName,
@@ -214,6 +291,57 @@ async function reconstructCanonicalState(
   return { state: canonicalStateSchema.parse(state), loadedArtifactCount };
 }
 
+async function loadItemBodyLookup(
+  state: ReturnType<typeof canonicalStateSchema.parse>,
+  descriptors: Record<string, ArtifactDescriptor>,
+  built: readonly BuiltReleaseArtifact[],
+  loadArtifact: BuildPublicReleaseInput["loadArtifact"],
+): Promise<{ byId: Map<number, string>; loadedArtifactCount: number }> {
+  const podcastSourceIds = new Set(
+    state.sources
+      .filter((source) => source.group === "podcast")
+      .map((source) => source.id),
+  );
+  const logicalNames = [
+    ...new Set(
+      state.items
+        .filter((item) => podcastSourceIds.has(item.sourceId))
+        .map((item) => publicItemBodyShardLogicalName(String(item.id))),
+    ),
+  ].sort();
+  const builtByLogicalName = new Map(
+    built.map((artifact) => [artifact.logicalName, artifact] as const),
+  );
+  const shards = await mapWithConcurrency(
+    logicalNames,
+    16,
+    async (logicalName) => {
+      const descriptor = descriptors[logicalName];
+      if (!descriptor) {
+        throw new Error(`missing item body artifact: ${logicalName}`);
+      }
+      const local = builtByLogicalName.get(logicalName);
+      const bytes = local?.bytes ?? (await loadArtifact(logicalName, descriptor));
+      await verifyDescriptorBytes(descriptor, bytes);
+      return {
+        loaded: local === undefined,
+        shard: parsePublicItemBodyShardValue(
+          logicalName,
+          JSON.parse(new TextDecoder().decode(bytes)) as unknown,
+        ),
+      };
+    },
+  );
+  const byId = new Map<number, string>();
+  for (const { shard } of shards) {
+    for (const body of shard.entities) byId.set(body.id, body.bodyMd);
+  }
+  return {
+    byId,
+    loadedArtifactCount: shards.filter(({ loaded }) => loaded).length,
+  };
+}
+
 async function buildMaterializedArtifact(
   logicalName: string,
   value: unknown,
@@ -261,11 +389,16 @@ type NumericEntityType = Extract<
   PublicEntityType,
   "item" | "event" | "newsletter"
 >;
+type ItemBody = z.infer<
+  typeof publicItemBodyShardSchema
+>["entities"][number];
 
-async function buildRepartitionedNumericArtifacts(
+async function buildMigratedNumericArtifacts(
   previous: PublicReleaseManifest,
   changes: readonly PublicEntityChange[],
   loadArtifact: BuildPublicReleaseInput["loadArtifact"],
+  migratedEntityTypes: ReadonlySet<NumericEntityType>,
+  bodiesAreInline: boolean,
 ): Promise<{
   artifacts: BuiltReleaseArtifact[];
   loadedArtifactCount: number;
@@ -275,9 +408,11 @@ async function buildRepartitionedNumericArtifacts(
     event: new Map(),
     newsletter: new Map(),
   };
+  const bodies = new Map<number, ItemBody>();
   let loadedArtifactCount = 0;
   for (const [logicalName, descriptor] of Object.entries(previous.artifacts)) {
-    if (!isNumericShardLogicalName(logicalName)) continue;
+    const entityType = numericEntityTypeFromShardLogicalName(logicalName);
+    if (!entityType || !migratedEntityTypes.has(entityType)) continue;
     const bytes = await loadArtifact(logicalName, descriptor);
     loadedArtifactCount += 1;
     await verifyDescriptorBytes(descriptor, bytes);
@@ -294,14 +429,56 @@ async function buildRepartitionedNumericArtifacts(
       if (destination.has(key)) {
         throw new Error(`duplicate ${shard.entityType} across prior shards`);
       }
-      destination.set(key, value);
+      if (shard.entityType === "item") {
+        const parsed = publicItemSchema.parse(value);
+        if (bodiesAreInline && parsed.bodyMd !== null) {
+          bodies.set(parsed.id, { id: parsed.id, bodyMd: parsed.bodyMd });
+        }
+        destination.set(key, { ...parsed, bodyMd: null });
+      } else {
+        destination.set(key, value);
+      }
+    }
+  }
+  if (migratedEntityTypes.has("item") && !bodiesAreInline) {
+    for (const [logicalName, descriptor] of Object.entries(
+      previous.artifacts,
+    )) {
+      if (!logicalName.startsWith("bodies/items/")) continue;
+      const bytes = await loadArtifact(logicalName, descriptor);
+      loadedArtifactCount += 1;
+      await verifyDescriptorBytes(descriptor, bytes);
+      for (const body of parsePublicItemBodyShardValue(
+        logicalName,
+        JSON.parse(new TextDecoder().decode(bytes)) as unknown,
+      ).entities) {
+        if (bodies.has(body.id)) {
+          throw new Error("duplicate item body across prior shards");
+        }
+        bodies.set(body.id, body);
+      }
     }
   }
   for (const change of changes) {
-    if (!isNumericEntityType(change.entityType)) continue;
+    if (
+      !isNumericEntityType(change.entityType) ||
+      !migratedEntityTypes.has(change.entityType)
+    ) {
+      continue;
+    }
     const destination = entities[change.entityType];
-    if (change.value === null) destination.delete(change.entityKey);
-    else {
+    if (change.value === null) {
+      destination.delete(change.entityKey);
+      if (change.entityType === "item") bodies.delete(Number(change.entityKey));
+    } else if (change.entityType === "item") {
+      const parsed = publicItemSchema.parse(change.value);
+      if (String(parsed.id) !== change.entityKey) {
+        throw new Error("item key/value mismatch");
+      }
+      destination.set(change.entityKey, { ...parsed, bodyMd: null });
+      if (parsed.bodyMd === null) bodies.delete(parsed.id);
+      else bodies.set(parsed.id, { id: parsed.id, bodyMd: parsed.bodyMd });
+    } else {
       const parsed = parsePublicEntityValue(change.entityType, change.value);
       if (publicEntityKey(change.entityType, parsed) !== change.entityKey) {
         throw new Error(`${change.entityType} key/value mismatch`);
@@ -315,6 +492,7 @@ async function buildRepartitionedNumericArtifacts(
     { entityType: NumericEntityType; values: unknown[] }
   >();
   for (const entityType of ["item", "event", "newsletter"] as const) {
+    if (!migratedEntityTypes.has(entityType)) continue;
     for (const [entityKey, value] of entities[entityType]) {
       const logicalName = publicEntityShardLogicalName(entityType, entityKey);
       const group = grouped.get(logicalName) ?? { entityType, values: [] };
@@ -345,6 +523,29 @@ async function buildRepartitionedNumericArtifacts(
         previous.artifacts[logicalName],
       ),
     );
+  }
+  if (migratedEntityTypes.has("item")) {
+    const bodiesByLogicalName = new Map<string, ItemBody[]>();
+    for (const body of bodies.values()) {
+      const logicalName = publicItemBodyShardLogicalName(String(body.id));
+      const group = bodiesByLogicalName.get(logicalName) ?? [];
+      group.push(body);
+      bodiesByLogicalName.set(logicalName, group);
+    }
+    for (let bucket = 0; bucket < PUBLIC_NUMERIC_SHARD_COUNT; bucket += 1) {
+      const entityKey =
+        bucket === 0 ? String(PUBLIC_NUMERIC_SHARD_COUNT) : String(bucket);
+      const logicalName = publicItemBodyShardLogicalName(entityKey);
+      const values = bodiesByLogicalName.get(logicalName) ?? [];
+      values.sort((left, right) => left.id - right.id);
+      artifacts.push(
+        await buildItemBodyShardArtifact(
+          logicalName,
+          values,
+          previous.artifacts[logicalName],
+        ),
+      );
+    }
   }
   return { artifacts, loadedArtifactCount };
 }
@@ -380,6 +581,39 @@ async function buildShardArtifact(
   };
 }
 
+async function buildItemBodyShardArtifact(
+  logicalName: string,
+  entities: readonly ItemBody[],
+  previousDescriptor: ArtifactDescriptor | undefined,
+): Promise<BuiltReleaseArtifact> {
+  const shard = publicItemBodyShardSchema.parse({
+    schemaVersion: 1,
+    entityType: "item-body",
+    entities,
+  });
+  parsePublicItemBodyShardValue(logicalName, shard);
+  const bytes = canonicalJsonBytes(shard);
+  const sha256 = await sha256Hex(bytes);
+  const shardMetadata = {
+    kind: "id_bucket" as const,
+    bucket: logicalName.slice(-2),
+  };
+  const descriptor = artifactDescriptorSchema.parse({
+    key: objectKey(sha256, "json"),
+    sha256,
+    byteLength: bytes.byteLength,
+    mediaType: "application/json",
+    encoding: "utf-8",
+    shard: shardMetadata,
+  });
+  return {
+    logicalName,
+    descriptor,
+    bytes,
+    unchanged: previousDescriptor?.sha256 === sha256,
+  };
+}
+
 export function requiresNumericShardMigration(
   manifest: PublicReleaseManifest,
 ): boolean {
@@ -394,8 +628,33 @@ export function requiresNumericShardMigration(
   return inferredShardCount !== PUBLIC_NUMERIC_SHARD_COUNT;
 }
 
+export function requiresBodySplitMigration(
+  manifest: PublicReleaseManifest,
+): boolean {
+  return manifest.artifacts["bodies/items/00"] === undefined;
+}
+
 function isNumericShardLogicalName(logicalName: string): boolean {
   return /^state\/(?:items|events|newsletters)\/[a-f0-9]{2}$/.test(logicalName);
+}
+
+function numericEntityTypeFromShardLogicalName(
+  logicalName: string,
+): NumericEntityType | null {
+  if (/^state\/items\/[a-f0-9]{2}$/.test(logicalName)) return "item";
+  if (/^state\/events\/[a-f0-9]{2}$/.test(logicalName)) return "event";
+  if (/^state\/newsletters\/[a-f0-9]{2}$/.test(logicalName)) {
+    return "newsletter";
+  }
+  return null;
+}
+
+function isMigratedNumericShardLogicalName(
+  logicalName: string,
+  migratedEntityTypes: ReadonlySet<NumericEntityType>,
+): boolean {
+  const entityType = numericEntityTypeFromShardLogicalName(logicalName);
+  return entityType !== null && migratedEntityTypes.has(entityType);
 }
 
 function isNumericEntityType(
@@ -465,6 +724,35 @@ function patchEntities(
   return [...entities.entries()]
     .sort(([left], [right]) => compareEntityKeys(entityType, left, right))
     .map(([, value]) => value);
+}
+
+function withoutItemBodies(values: readonly unknown[]): unknown[] {
+  return values.map((value) => ({ ...publicItemSchema.parse(value), bodyMd: null }));
+}
+
+function patchItemBodies(
+  previous: readonly ItemBody[],
+  changes: readonly PublicEntityChange[],
+): ItemBody[] {
+  const bodies = new Map(previous.map((body) => [body.id, body] as const));
+  for (const change of changes) {
+    if (change.entityType !== "item") {
+      throw new Error("mixed entity types in item body shard patch");
+    }
+    const id = Number(change.entityKey);
+    if (!Number.isSafeInteger(id) || id <= 0) {
+      throw new Error("invalid item key");
+    }
+    if (change.value === null) {
+      bodies.delete(id);
+      continue;
+    }
+    const parsed = publicItemSchema.parse(change.value);
+    if (parsed.id !== id) throw new Error("item key/value mismatch");
+    if (parsed.bodyMd === null) bodies.delete(id);
+    else bodies.set(id, { id, bodyMd: parsed.bodyMd });
+  }
+  return [...bodies.values()].sort((left, right) => left.id - right.id);
 }
 
 function compareEntityKeys(

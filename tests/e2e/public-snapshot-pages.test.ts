@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
-import { canonicalJsonBytes } from "@/lib/public-content/canonical";
+import { canonicalJsonBytes, sha256Hex } from "@/lib/public-content/canonical";
 import {
+  manifestSchema,
   snapshotPointerSchema,
   type CanonicalPublicState,
 } from "@/lib/public-content/contracts";
@@ -11,6 +12,7 @@ import {
   publicPageItemDetail,
   publicPolicySummary,
 } from "@/lib/public-content/page-data";
+import { materializedPageLogicalName } from "@/lib/public-content/materialized-artifact";
 import { CURRENT_POINTER_KEY, releaseManifestKey } from "@/lib/public-content/paths";
 import { buildPublicRelease } from "@/lib/public-content/publisher/build-release";
 import type { PublicEntityChange } from "@/lib/public-content/publisher/types";
@@ -48,7 +50,8 @@ const PAGE_SOURCES = [
 
 const originalFetch = globalThis.fetch;
 const originalBaseUrl = process.env.R2_PUBLIC_BASE_URL;
-const stores = new Map<string, MemoryPublicSnapshotHttp>();
+type SnapshotStore = Pick<MemoryPublicSnapshotHttp, "baseUrl" | "fetch">;
+const stores = new Map<string, SnapshotStore>();
 let http: MemoryPublicSnapshotHttp;
 
 beforeAll(async () => {
@@ -139,6 +142,20 @@ describe("snapshot-backed anonymous pages", () => {
     ).toEqual(["2026-07-13"]);
   });
 
+  test("pins the podcast fallback body to the state release across a pointer flip", async () => {
+    const fallback = await pointerFlipPageFixture();
+    stores.set(fallback.baseUrl, fallback);
+    process.env.R2_PUBLIC_BASE_URL = fallback.baseUrl;
+
+    const { readPodcastDetailPageModel } = await import(
+      "@/lib/public-content/page-models"
+    );
+    const model = await readPodcastDetailPageModel({ locale: "en", id: 1 });
+
+    expect(model.detail?.bodyMd).toBe("Alpha public body");
+    expect(fallback.requestCount(CURRENT_POINTER_KEY)).toBe(2);
+  });
+
   test("fails closed when no active, previous or warm snapshot exists", async () => {
     const unavailable = new MemoryPublicSnapshotHttp("https://page-unavailable.test");
     stores.set(unavailable.baseUrl, unavailable);
@@ -208,6 +225,105 @@ async function pageFixture(): Promise<MemoryPublicSnapshotHttp> {
     ),
   );
   return store;
+}
+
+async function pointerFlipPageFixture(): Promise<
+  SnapshotStore & { requestCount: (key: string) => number }
+> {
+  const nextState: CanonicalPublicState = {
+    ...PARITY_STATE,
+    items: PARITY_STATE.items.map((item) =>
+      item.id === 1 ? { ...item, bodyMd: "New release body" } : item,
+    ),
+  };
+  const [oldRelease, nextRelease] = await Promise.all([
+    buildPublicRelease({
+      previousManifest: null,
+      sourceWatermark: 40,
+      changes: allChanges(PARITY_STATE),
+      generatedAtMs: PARITY_NOW_MS,
+      loadArtifact: async () => {
+        throw new Error("fixture cannot load a prior artifact");
+      },
+    }),
+    buildPublicRelease({
+      previousManifest: null,
+      sourceWatermark: 41,
+      changes: allChanges(nextState),
+      generatedAtMs: PARITY_NOW_MS + 60_000,
+      loadArtifact: async () => {
+        throw new Error("fixture cannot load a prior artifact");
+      },
+    }),
+  ]);
+  const store = new MemoryPublicSnapshotHttp(
+    "https://page-content-pointer-flip.test",
+  );
+  for (const release of [oldRelease, nextRelease]) {
+    for (const artifact of release.artifacts) {
+      store.put(artifact.descriptor.key, artifact.bytes);
+    }
+  }
+
+  const oldArtifacts = { ...oldRelease.manifest.artifacts };
+  delete oldArtifacts[materializedPageLogicalName.podcastDetails(1)];
+  const oldManifest = manifestSchema.parse({
+    ...oldRelease.manifest,
+    artifacts: oldArtifacts,
+  });
+  const oldManifestBytes = canonicalJsonBytes(oldManifest);
+  const oldManifestSha256 = await sha256Hex(oldManifestBytes);
+  const oldManifestKey = releaseManifestKey(oldRelease.releaseId);
+  store.put(oldManifestKey, oldManifestBytes);
+  store.put(
+    releaseManifestKey(nextRelease.releaseId),
+    nextRelease.manifestBytes,
+  );
+
+  const oldPointer = snapshotPointerSchema.parse({
+    schemaVersion: 1,
+    active: {
+      releaseId: oldRelease.releaseId,
+      manifestKey: oldManifestKey,
+      manifestSha256: oldManifestSha256,
+    },
+    previous: null,
+    publishedAt: PARITY_NOW_ISO,
+    sourceWatermark: 40,
+  });
+  const nextPointer = snapshotPointerSchema.parse({
+    schemaVersion: 1,
+    active: {
+      releaseId: nextRelease.releaseId,
+      manifestKey: releaseManifestKey(nextRelease.releaseId),
+      manifestSha256: nextRelease.manifestSha256,
+    },
+    previous: oldPointer.active,
+    publishedAt: new Date(PARITY_NOW_MS + 60_000).toISOString(),
+    sourceWatermark: 41,
+  });
+  store.put(CURRENT_POINTER_KEY, canonicalJsonBytes(oldPointer));
+
+  const unreadStateKeys = new Set(
+    Object.entries(oldManifest.artifacts)
+      .filter(([logicalName]) => logicalName.startsWith("state/"))
+      .map(([, descriptor]) => descriptor.key),
+  );
+  const fetch: MemoryPublicSnapshotHttp["fetch"] = async (input, init) => {
+    const response = await store.fetch(input, init);
+    const url = new URL(
+      input instanceof Request ? input.url : input.toString(),
+    );
+    if (unreadStateKeys.delete(url.pathname.slice(1)) && unreadStateKeys.size === 0) {
+      store.put(CURRENT_POINTER_KEY, canonicalJsonBytes(nextPointer));
+    }
+    return response;
+  };
+  return {
+    baseUrl: store.baseUrl,
+    fetch,
+    requestCount: (key) => store.requestCount(key),
+  };
 }
 
 function allChanges(state: CanonicalPublicState): PublicEntityChange[] {

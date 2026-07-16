@@ -26,7 +26,10 @@ export async function GET(
     label: "api/public/items/:id",
     load: async () => {
       const { id: idRaw } = await ctx.params;
-      return publicItemSnapshotResult(await readPublicSnapshot(), idRaw);
+      return await publicItemSnapshotResult(
+        await readPublicSnapshot(),
+        idRaw,
+      );
     },
   });
 }
