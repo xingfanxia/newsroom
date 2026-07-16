@@ -13,7 +13,11 @@ import {
   publicPolicySummary,
 } from "@/lib/public-content/page-data";
 import { materializedPageLogicalName } from "@/lib/public-content/materialized-artifact";
-import { CURRENT_POINTER_KEY, releaseManifestKey } from "@/lib/public-content/paths";
+import {
+  CURRENT_POINTER_KEY,
+  objectKey,
+  releaseManifestKey,
+} from "@/lib/public-content/paths";
 import { buildPublicRelease } from "@/lib/public-content/publisher/build-release";
 import type { PublicEntityChange } from "@/lib/public-content/publisher/types";
 import { PublicSnapshotUnavailableError } from "@/lib/public-content/reader";
@@ -153,7 +157,53 @@ describe("snapshot-backed anonymous pages", () => {
     const model = await readPodcastDetailPageModel({ locale: "en", id: 1 });
 
     expect(model.detail?.bodyMd).toBe("Alpha public body");
-    expect(fallback.requestCount(CURRENT_POINTER_KEY)).toBe(2);
+    expect(fallback.requestCount(CURRENT_POINTER_KEY)).toBe(1);
+  });
+
+  test("preserves podcast-detail lookup for an existing non-podcast item", async () => {
+    const { readPodcastDetailPageModel } = await import(
+      "@/lib/public-content/page-models"
+    );
+
+    const model = await readPodcastDetailPageModel({ locale: "en", id: 3 });
+
+    expect(model.detail).toMatchObject({
+      bodyMd: null,
+      story: {
+        id: "3",
+        sourceId: "beta-x",
+        title: "Model A100x",
+      },
+    });
+  });
+
+  test("preserves podcast-detail lookup for an event-backed non-podcast item", async () => {
+    const { readPodcastDetailPageModel } = await import(
+      "@/lib/public-content/page-models"
+    );
+
+    const model = await readPodcastDetailPageModel({ locale: "en", id: 2 });
+
+    expect(model.detail).toMatchObject({
+      bodyMd: null,
+      story: {
+        id: "2",
+        sourceId: "beta-x",
+      },
+    });
+  });
+
+  test("a missing podcast detail in an active materialized bucket retries previous", async () => {
+    const fallback = await missingPodcastDetailFixture();
+    stores.set(fallback.baseUrl, fallback);
+    process.env.R2_PUBLIC_BASE_URL = fallback.baseUrl;
+    const { readPodcastDetailPageModel } = await import(
+      "@/lib/public-content/page-models"
+    );
+
+    const model = await readPodcastDetailPageModel({ locale: "en", id: 1 });
+
+    expect(model.detail?.bodyMd).toBe("Alpha public body");
   });
 
   test("fails closed when no active, previous or warm snapshot exists", async () => {
@@ -206,6 +256,10 @@ async function pageFixture(): Promise<MemoryPublicSnapshotHttp> {
   for (const artifact of release.artifacts) {
     store.put(artifact.descriptor.key, artifact.bytes);
   }
+  // PCR-5 guard: every page variant must remain available when an unrelated
+  // canonical shard is unreadable. Materialized/default support and direct
+  // feed hydration do not need policy state at request time.
+  store.delete(release.manifest.artifacts["state/policies"]!.key);
   const manifestKey = releaseManifestKey(release.releaseId);
   store.put(manifestKey, release.manifestBytes);
   store.put(
@@ -267,6 +321,9 @@ async function pointerFlipPageFixture(): Promise<
 
   const oldArtifacts = { ...oldRelease.manifest.artifacts };
   delete oldArtifacts[materializedPageLogicalName.podcastDetails(1)];
+  for (const logicalName of Object.keys(oldArtifacts)) {
+    if (logicalName.startsWith("feeds/")) delete oldArtifacts[logicalName];
+  }
   const oldManifest = manifestSchema.parse({
     ...oldRelease.manifest,
     artifacts: oldArtifacts,
@@ -324,6 +381,94 @@ async function pointerFlipPageFixture(): Promise<
     fetch,
     requestCount: (key) => store.requestCount(key),
   };
+}
+
+async function missingPodcastDetailFixture(): Promise<MemoryPublicSnapshotHttp> {
+  const activeState: CanonicalPublicState = {
+    ...PARITY_STATE,
+    items: PARITY_STATE.items.map((item) =>
+      item.id === 1 ? { ...item, bodyMd: "Active body must not be served" } : item,
+    ),
+  };
+  const [previous, active] = await Promise.all([
+    buildPublicRelease({
+      previousManifest: null,
+      sourceWatermark: 40,
+      changes: allChanges(PARITY_STATE),
+      generatedAtMs: PARITY_NOW_MS,
+      loadArtifact: async () => {
+        throw new Error("fixture cannot load a prior artifact");
+      },
+    }),
+    buildPublicRelease({
+      previousManifest: null,
+      sourceWatermark: 41,
+      changes: allChanges(activeState),
+      generatedAtMs: PARITY_NOW_MS + 60_000,
+      loadArtifact: async () => {
+        throw new Error("fixture cannot load a prior artifact");
+      },
+    }),
+  ]);
+  const store = new MemoryPublicSnapshotHttp(
+    "https://page-missing-podcast-detail.test",
+  );
+  for (const release of [previous, active]) {
+    for (const artifact of release.artifacts) {
+      store.put(artifact.descriptor.key, artifact.bytes);
+    }
+  }
+
+  const logicalName = materializedPageLogicalName.podcastDetails(1);
+  const artifact = active.artifacts.find(
+    (candidate) => candidate.logicalName === logicalName,
+  )!;
+  const value = JSON.parse(new TextDecoder().decode(artifact.bytes)) as {
+    model: { detailsById: Record<string, unknown> };
+  };
+  delete value.model.detailsById["1"];
+  const bytes = canonicalJsonBytes(value);
+  const sha256 = await sha256Hex(bytes);
+  const descriptor = {
+    ...active.manifest.artifacts[logicalName]!,
+    key: objectKey(sha256, "json"),
+    sha256,
+    byteLength: bytes.byteLength,
+  };
+  const corruptManifest = manifestSchema.parse({
+    ...active.manifest,
+    artifacts: {
+      ...active.manifest.artifacts,
+      [logicalName]: descriptor,
+    },
+  });
+  const corruptManifestBytes = canonicalJsonBytes(corruptManifest);
+  const activeManifestKey = releaseManifestKey(active.releaseId);
+  const previousManifestKey = releaseManifestKey(previous.releaseId);
+  store.put(descriptor.key, bytes);
+  store.put(activeManifestKey, corruptManifestBytes);
+  store.put(previousManifestKey, previous.manifestBytes);
+  store.put(
+    CURRENT_POINTER_KEY,
+    canonicalJsonBytes(
+      snapshotPointerSchema.parse({
+        schemaVersion: 1,
+        active: {
+          releaseId: active.releaseId,
+          manifestKey: activeManifestKey,
+          manifestSha256: await sha256Hex(corruptManifestBytes),
+        },
+        previous: {
+          releaseId: previous.releaseId,
+          manifestKey: previousManifestKey,
+          manifestSha256: previous.manifestSha256,
+        },
+        publishedAt: new Date(PARITY_NOW_MS + 60_000).toISOString(),
+        sourceWatermark: 41,
+      }),
+    ),
+  );
+  return store;
 }
 
 function allChanges(state: CanonicalPublicState): PublicEntityChange[] {

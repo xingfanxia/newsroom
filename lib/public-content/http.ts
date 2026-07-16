@@ -31,11 +31,56 @@ import {
 } from "@/lib/daily-column/query-defaults";
 import {
   getLatestPublicDaily,
-  getPublicDailyByDate,
-  listPublicDailyIndex,
+  listPublicDailyColumnsFromNewsletters,
+  type PublicDailyColumn,
 } from "@/lib/public-content/public-dailies";
-import { parsePublicEntityShardValue } from "@/lib/public-content/contracts";
-import { createPublicStateIndex } from "@/lib/public-content/public-items";
+import {
+  PUBLIC_FEED_DIRECTORY_LOGICAL_NAME,
+  isDefaultPublicFeedQuery,
+  parsePublicFeedDefault,
+  parsePublicFeedDirectory,
+  parsePublicFeedSegment,
+  publicFeedApiItemFromStory,
+  publicFeedDefaultLogicalName,
+  publicFeedRowId,
+  publicFeedRowPublishedAt,
+  queryPublicFeedRows,
+  selectPublicFeedSegmentLogicalNames,
+  type PublicFeedDirectory,
+  type PublicFeedResult,
+  type PublicFeedRow,
+} from "@/lib/public-content/feed-artifacts";
+import {
+  readDirectPublicNewsletters,
+  readDirectPublicSources,
+  supportsDirectPublicRouteReads,
+} from "@/lib/public-content/direct-route-read";
+import {
+  materializedPageLogicalName,
+  readScopedMaterializedPageModel,
+} from "@/lib/public-content/materialized-artifact";
+import {
+  PUBLIC_NUMERIC_SHARD_COUNT,
+  parsePublicEntityShardValue,
+  parsePublicItemBodyShardValue,
+  publicEntityShardLogicalName,
+  publicItemBodyShardLogicalName,
+  type CanonicalPublicState,
+} from "@/lib/public-content/contracts";
+import {
+  parsePublicLexicalShard,
+  PUBLIC_LEXICAL_SHARD_COUNT,
+  publicLexicalRowFromEntities,
+  publicLexicalRowId,
+  publicLexicalShardLogicalNames,
+  queryPublicLexicalRows,
+  type PublicLexicalRow,
+} from "@/lib/public-content/lexical-search-artifacts";
+import {
+  createPublicStateIndex,
+  publicEventMembersFromIndex,
+  publicStoryFromItem,
+} from "@/lib/public-content/public-items";
 import {
   getPublicEventMembers,
   queryPublicFeed,
@@ -45,8 +90,12 @@ import {
   publicSnapshotReader,
   type PublicSnapshotReader,
 } from "@/lib/public-content/reader";
-import type { PublicCanonicalStateResult } from "@/lib/public-content/reader/types";
-import { APP_LOCALES, type AppLocale } from "@/lib/types";
+import type {
+  PublicCanonicalStateResult,
+  PublicReleaseReadScope,
+  ResolvedPublicRelease,
+} from "@/lib/public-content/reader/types";
+import { APP_LOCALES, type AppLocale, type Story } from "@/lib/types";
 import { PUBLIC_SEMANTIC_SEARCH_ERROR } from "@/lib/search/query-defaults";
 
 type SnapshotCachedResult =
@@ -81,10 +130,6 @@ const dailyIndexQuerySchema = z.object({
     .default(DEFAULT_DAILY_COLUMN_QUERY_LOCALE),
 });
 
-export async function readPublicSnapshot(): Promise<PublicCanonicalStateResult> {
-  return publicSnapshotReader().readCanonicalState();
-}
-
 export async function publicFeedSnapshotRequestResult(
   req: Request,
 ): Promise<SnapshotCachedResult> {
@@ -96,26 +141,103 @@ export async function publicFeedSnapshotRequestResult(
       status: 400,
     };
   }
-  const snapshot = await readPublicSnapshot();
-  const result = queryPublicFeed(
-    snapshot.state,
-    feedQueryFromParams(parsed.data),
-    { nowMs: Date.now() },
-  );
+  const query = feedQueryFromParams(parsed.data);
+  const reader = publicSnapshotReader();
+  const scoped = await reader.readReleaseScoped(async (scope) => {
+    if (!supportsDirectFeedRead(scope.release)) {
+      const snapshot = await scope.readCanonicalState();
+      const result = queryPublicFeed(snapshot.state, query, { nowMs: Date.now() });
+      return feedSnapshotResult(
+        snapshot.release,
+        {
+          ...result,
+          items: result.items.map((story) =>
+            publicFeedApiItemFromStory(story, query.locale ?? "zh"),
+          ),
+        },
+        parsed.search,
+      );
+    }
+    if (isDefaultPublicFeedQuery(query)) {
+      const locale = query.locale ?? "zh";
+      let result: PublicFeedResult | undefined;
+      await scope.readLogicalArtifact(publicFeedDefaultLogicalName(locale), {
+        required: true,
+        validate: (bytes) => {
+          result = parsePublicFeedDefault(locale, bytes).result;
+        },
+      });
+      return feedSnapshotResult(scope.release, result!, parsed.search);
+    }
+
+    let directory: PublicFeedDirectory | undefined;
+    await scope.readLogicalArtifact(PUBLIC_FEED_DIRECTORY_LOGICAL_NAME, {
+      required: true,
+      validate: (bytes) => {
+        directory = parsePublicFeedDirectory(bytes);
+      },
+    });
+    assertCompleteFeedDirectory(scope, directory!);
+    const logicalNames = selectPublicFeedSegmentLogicalNames(directory!, query);
+    const directoryByName = new Map(
+      directory!.segments.map((segment) => [segment.logicalName, segment]),
+    );
+    const rowShards = await mapWithConcurrency(
+      logicalNames,
+      16,
+      async (logicalName) => {
+        let rows: PublicFeedRow[] | undefined;
+        await scope.readLogicalArtifact(logicalName, {
+          required: true,
+          validate: (bytes) => {
+            const segment = parsePublicFeedSegment(logicalName, bytes);
+            const expected = directoryByName.get(logicalName);
+            const published = segment.rows
+              .map(publicFeedRowPublishedAt)
+              .sort();
+            if (
+              segment.rows.length !== expected?.count ||
+              published[0] !== expected.minPublishedAt ||
+              published.at(-1) !== expected.maxPublishedAt
+            ) {
+              throw new Error(`public feed segment directory mismatch: ${logicalName}`);
+            }
+            rows = segment.rows;
+          },
+        });
+        return rows!;
+      },
+    );
+    const rows = rowShards.flat();
+    if (new Set(rows.map(publicFeedRowId)).size !== rows.length) {
+      return scope.rejectRelease(new Error("duplicate public feed row"));
+    }
+    return feedSnapshotResult(
+      scope.release,
+      queryPublicFeedRows(rows, query, { nowMs: Date.now() }),
+      parsed.search,
+    );
+  });
+  return scoped.value;
+}
+
+function feedSnapshotResult(
+  release: ResolvedPublicRelease,
+  result: PublicFeedResult,
+  search: string,
+): SnapshotCachedResult {
   return {
     ok: true,
     signal: etagSignal({
-      release: snapshot.release.ref.manifestSha256,
+      release: release.ref.manifestSha256,
       count: result.items.length,
       total: result.total,
       first_id: result.items[0]?.id ?? "",
-      latest_at: result.items[0]?.publishedAt ?? "",
-      qs: parsed.search,
+      latest_at: result.items[0]?.published_at ?? "",
+      qs: search,
     }),
     body: {
-      items: result.items.map((story) =>
-        toSnapshotPublicApiItem(story, parsed.data.locale),
-      ),
+      items: result.items,
       total: result.total,
       limit: result.limit,
       offset: result.offset,
@@ -142,31 +264,183 @@ export async function publicSearchSnapshotRequestResult(
       status: 422,
     };
   }
-  const snapshot = await readPublicSnapshot();
-  const result = queryPublicFeed(
-    snapshot.state,
-    searchFeedQueryFromParams(parsed.data),
-    { nowMs: Date.now() },
-  );
+  const query = searchFeedQueryFromParams(parsed.data);
+  const nowMs = Date.now();
+  const reader = publicSnapshotReader();
+  const scoped = await reader.readReleaseScoped(async (scope) => {
+    if (!hasDirectLexicalSearchArtifacts(scope.release)) {
+      const snapshot = await scope.readCanonicalState();
+      return lexicalSearchSnapshotResult(
+        snapshot.release,
+        parsed.search,
+        parsed.data.q,
+        parsed.data.locale,
+        queryPublicFeed(snapshot.state, query, { nowMs }),
+      );
+    }
+
+    assertCompleteLexicalSearchManifest(scope);
+    const rowShards = await mapWithConcurrency(
+      publicLexicalShardLogicalNames(),
+      PUBLIC_LEXICAL_SHARD_COUNT,
+      async (logicalName) => {
+        let rows: PublicLexicalRow[] | undefined;
+        await scope.readLogicalArtifact(logicalName, {
+          required: true,
+          validate: (bytes) => {
+            rows = parsePublicLexicalShard(logicalName, bytes).rows;
+          },
+        });
+        return rows!;
+      },
+    );
+    const rows = rowShards.flat();
+    const rowsById = new Map(rows.map((row) => [publicLexicalRowId(row), row]));
+    if (rowsById.size !== rows.length) {
+      return scope.rejectRelease(new Error("duplicate public lexical row"));
+    }
+    const hits = queryPublicLexicalRows(rows, query, { nowMs });
+    const stories = await hydratePublicLexicalHits(
+      scope,
+      hits.ids,
+      rowsById,
+      parsed.data.locale,
+      nowMs,
+    );
+    return lexicalSearchSnapshotResult(
+      scope.release,
+      parsed.search,
+      parsed.data.q,
+      parsed.data.locale,
+      {
+        items: stories,
+        total: hits.total,
+        limit: hits.limit,
+        offset: hits.offset,
+      },
+    );
+  });
+  return scoped.value;
+}
+
+function lexicalSearchSnapshotResult(
+  release: ResolvedPublicRelease,
+  search: string,
+  q: string,
+  locale: AppLocale,
+  result: {
+    items: Story[];
+    total: number;
+    limit: number;
+    offset: number;
+  },
+): SnapshotCachedResult {
   return {
     ok: true,
     signal: etagSignal({
-      release: snapshot.release.ref.manifestSha256,
-      qs: parsed.search,
+      release: release.ref.manifestSha256,
+      qs: search,
       total: result.total,
       first: result.items[0]?.id ?? "",
     }),
     body: {
       mode: "lexical",
-      q: parsed.data.q,
+      q,
       items: result.items.map((story) =>
-        toSnapshotPublicApiItem(story, parsed.data.locale),
+        toSnapshotPublicApiItem(story, locale),
       ),
       total: result.total,
       limit: result.limit,
       offset: result.offset,
     },
   };
+}
+
+async function hydratePublicLexicalHits(
+  scope: PublicReleaseReadScope,
+  ids: readonly number[],
+  rowsById: ReadonlyMap<number, PublicLexicalRow>,
+  locale: AppLocale,
+  nowMs: number,
+): Promise<Story[]> {
+  if (ids.length === 0) return [];
+  const wantedIds = new Set(ids);
+  const itemLogicalNames = [
+    ...new Set(
+      ids.map((id) => publicEntityShardLogicalName("item", String(id))),
+    ),
+  ];
+  const [sources, itemShards] = await Promise.all([
+    readSourceShard(scope),
+    mapWithConcurrency(itemLogicalNames, 16, (logicalName) =>
+      readItemShardByLogicalName(scope, logicalName),
+    ),
+  ]);
+  const items = itemShards.flat().filter(({ id }) => wantedIds.has(id));
+  const itemsById = new Map(items.map((item) => [item.id, item]));
+  if (itemsById.size !== ids.length) {
+    return scope.rejectRelease(new Error("missing public lexical hit item"));
+  }
+
+  const eventIds = [
+    ...new Set(
+      items
+        .map(({ eventId }) => eventId)
+        .filter((id): id is number => id !== null),
+    ),
+  ];
+  const eventShards = await mapWithConcurrency(eventIds, 16, (id) =>
+    readEventShard(scope, id),
+  );
+  const wantedEventIds = new Set(eventIds);
+  const events = eventShards
+    .flat()
+    .filter(({ id }) => wantedEventIds.has(id));
+  const eventsById = new Map(events.map((event) => [event.id, event]));
+  if (eventsById.size !== eventIds.length) {
+    return scope.rejectRelease(new Error("missing public lexical hit event"));
+  }
+  const sourcesById = new Map(sources.map((source) => [source.id, source]));
+
+  for (const id of ids) {
+    const item = itemsById.get(id)!;
+    const event = item.eventId === null ? undefined : eventsById.get(item.eventId);
+    const source = sourcesById.get(item.sourceId);
+    const row = rowsById.get(id);
+    if (!source || !row) {
+      return scope.rejectRelease(new Error("missing public lexical hit relation"));
+    }
+    if (event && !event.memberItemIds.includes(item.id)) {
+      return scope.rejectRelease(new Error("invalid public lexical hit event"));
+    }
+    let expected: PublicLexicalRow;
+    try {
+      expected = publicLexicalRowFromEntities(item, event, source);
+    } catch (error) {
+      return scope.rejectRelease(
+        error instanceof Error
+          ? error
+          : new Error("invalid public lexical hit metadata"),
+      );
+    }
+    if (JSON.stringify(expected) !== JSON.stringify(row)) {
+      return scope.rejectRelease(new Error("public lexical hit metadata mismatch"));
+    }
+  }
+
+  const index = {
+    state: directReadState({ items, events, sources }),
+    itemsById,
+    eventsById,
+    sourcesById,
+  };
+  return ids.map((id) =>
+    publicStoryFromItem(index, itemsById.get(id)!, {
+      locale,
+      includeSourceGroup: true,
+      nowMs,
+    }),
+  );
 }
 
 export async function publicSourcesSnapshotResult(): Promise<SnapshotCachedResult> {
@@ -226,10 +500,17 @@ function parsePublicSourceRows(bytes: Uint8Array) {
   return shard.entities;
 }
 
-export function activeSourcesSnapshotBody(
-  snapshot: PublicCanonicalStateResult,
+export async function readActiveSourcesSnapshotBody(): Promise<unknown> {
+  const scoped = await publicSnapshotReader().readReleaseScoped(async (scope) =>
+    activeSourcesBody(await readDirectPublicSources(scope)),
+  );
+  return scoped.value;
+}
+
+function activeSourcesBody(
+  rows: CanonicalPublicState["sources"],
 ): unknown {
-  const sources = snapshot.state.sources
+  const sources = rows
     .filter((source) => source.enabled)
     .sort(
       (left, right) =>
@@ -246,6 +527,58 @@ export function activeSourcesSnapshotBody(
       locale: source.locale,
     }));
   return { sources, total: sources.length };
+}
+
+export async function publicItemSnapshotRequestResult(
+  rawId: string,
+): Promise<SnapshotCachedResult> {
+  const parsed = parsePositiveRouteId(rawId);
+  if (!parsed.ok) return { ok: false, error: parsed.error, status: 400 };
+  const reader = publicSnapshotReader();
+  const scoped = await reader.readReleaseScoped(async (scope) => {
+    if (!supportsDirectItemRead(scope.release)) {
+      return publicItemSnapshotResult(
+        await scope.readCanonicalState(),
+        rawId,
+        reader,
+      );
+    }
+
+    const item = (await readItemShard(scope, parsed.id)).find(
+      ({ id }) => id === parsed.id,
+    );
+    if (!item) return { ok: false, error: "not_found", status: 404 } as const;
+    const [sources, events, bodyMd] = await Promise.all([
+      readSourceShard(scope),
+      item.eventId === null
+        ? Promise.resolve([])
+        : readEventShard(scope, item.eventId),
+      readItemBodyShard(scope, item.id),
+    ]);
+    const source =
+      sources.find(({ id }) => id === item.sourceId) ??
+      scope.rejectRelease(new Error(`missing public source: ${item.sourceId}`));
+    const event =
+      item.eventId === null
+        ? null
+        : events.find(({ id }) => id === item.eventId) ?? null;
+    if (
+      item.eventId !== null &&
+      (!event || !event.memberItemIds.includes(item.id))
+    ) {
+      return scope.rejectRelease(
+        new Error(`missing public event: ${item.eventId}`),
+      );
+    }
+    return publicItemEntityResult(
+      scope.release,
+      item,
+      source,
+      event,
+      bodyMd,
+    );
+  });
+  return scoped.value;
 }
 
 export async function publicItemSnapshotResult(
@@ -266,6 +599,22 @@ export async function publicItemSnapshotResult(
   }
   const bodyMd =
     item.bodyMd ?? await reader.readItemBody(snapshot.release, item.id);
+  return publicItemEntityResult(
+    snapshot.release,
+    item,
+    source,
+    event ?? null,
+    bodyMd,
+  );
+}
+
+function publicItemEntityResult(
+  release: ResolvedPublicRelease,
+  item: CanonicalPublicState["items"][number],
+  source: CanonicalPublicState["sources"][number],
+  event: CanonicalPublicState["events"][number] | null,
+  bodyMd: string | null,
+): SnapshotCachedResult {
   const publicEvent =
     event && event.coverage > 1
       ? {
@@ -284,7 +633,7 @@ export async function publicItemSnapshotResult(
   return {
     ok: true,
     signal: etagSignal({
-      release: snapshot.release.ref.manifestSha256,
+      release: release.ref.manifestSha256,
       id: item.id,
       enriched_at: item.enrichedAt,
       commentary_at: item.commentaryAt,
@@ -342,47 +691,332 @@ export function publicEventMembersSnapshotResult(
     parsed.clusterId,
     getPublicEventMembers(snapshot.state, parsed.clusterId, parsed.locale),
   );
+  return eventMembersSnapshotResult(
+    snapshot.release,
+    payload,
+    options.listOnly,
+  );
+}
+
+export async function publicEventMembersSnapshotRequestResult(
+  req: Request,
+  options: { rawId: string; defaultLocale: AppLocale; listOnly?: boolean },
+): Promise<SnapshotCachedResult> {
+  const parsed = parseEventMemberRouteParams({
+    rawId: options.rawId,
+    rawLocale: new URL(req.url).searchParams.get("locale"),
+    defaultLocale: options.defaultLocale,
+  });
+  if (!parsed.ok) return { ok: false, error: parsed.error, status: 400 };
+
+  const reader = publicSnapshotReader();
+  const scoped = await reader.readReleaseScoped(async (scope) => {
+    if (!supportsDirectEntityRead(scope.release)) {
+      return publicEventMembersSnapshotResult(
+        await scope.readCanonicalState(),
+        req,
+        options,
+      );
+    }
+
+    const event = (await readEventShard(scope, parsed.clusterId)).find(
+      ({ id }) => id === parsed.clusterId,
+    );
+    if (!event) {
+      return eventMembersSnapshotResult(
+        scope.release,
+        toEventMembersPayload(parsed.clusterId, []),
+        options.listOnly,
+      );
+    }
+    const itemLogicalNames = [
+      ...new Set(
+        event.memberItemIds.map((id) =>
+          publicEntityShardLogicalName("item", String(id)),
+        ),
+      ),
+    ];
+    const [sources, itemShards] = await Promise.all([
+      readSourceShard(scope),
+      Promise.all(
+        itemLogicalNames.map((logicalName) =>
+          readItemShardByLogicalName(scope, logicalName),
+        ),
+      ),
+    ]);
+    const memberIds = new Set(event.memberItemIds);
+    const items = itemShards.flat().filter(({ id }) => memberIds.has(id));
+    const itemsById = new Map(items.map((item) => [item.id, item]));
+    const sourcesById = new Map(sources.map((source) => [source.id, source]));
+    for (const memberId of event.memberItemIds) {
+      const item =
+        itemsById.get(memberId) ??
+        scope.rejectRelease(new Error(`missing public event member: ${memberId}`));
+      if (item.eventId !== event.id) {
+        return scope.rejectRelease(
+          new Error(`missing public event member: ${memberId}`),
+        );
+      }
+      if (!sourcesById.has(item.sourceId)) {
+        return scope.rejectRelease(
+          new Error(`missing public source: ${item.sourceId}`),
+        );
+      }
+    }
+    const state = directReadState({ items, events: [event], sources });
+    const payload = toEventMembersPayload(
+      parsed.clusterId,
+      publicEventMembersFromIndex(
+        {
+          state,
+          itemsById,
+          eventsById: new Map([[event.id, event]]),
+          sourcesById,
+        },
+        parsed.clusterId,
+        parsed.locale,
+      ),
+    );
+    return eventMembersSnapshotResult(
+      scope.release,
+      payload,
+      options.listOnly,
+    );
+  });
+  return scoped.value;
+}
+
+function eventMembersSnapshotResult(
+  release: ResolvedPublicRelease,
+  payload: ReturnType<typeof toEventMembersPayload>,
+  listOnly: boolean | undefined,
+): SnapshotCachedResult {
   return {
     ok: true,
     signal: etagSignal({
-      release: snapshot.release.ref.manifestSha256,
+      release: release.ref.manifestSha256,
       ...eventMembersCacheSignalParts(payload),
     }),
-    body: options.listOnly ? toEventMembersListEnvelope(payload) : payload,
+    body: listOnly ? toEventMembersListEnvelope(payload) : payload,
   };
 }
 
-export function latestDailySnapshotResult(
-  snapshot: PublicCanonicalStateResult,
-  req: Request,
-): SnapshotCachedResult {
-  const locale = parseDailyLocale(req);
-  if (!locale.ok) return locale;
-  const daily = getLatestPublicDaily(snapshot.state, locale.locale);
-  if (!daily) return { ok: false, error: "no_daily_yet", status: 404 };
-  return dailyResult(snapshot, daily);
+function supportsDirectFeedRead(release: ResolvedPublicRelease): boolean {
+  return (
+    release.manifest.artifacts[PUBLIC_FEED_DIRECTORY_LOGICAL_NAME] !== undefined &&
+    APP_LOCALES.every(
+      (locale) =>
+        release.manifest.artifacts[publicFeedDefaultLogicalName(locale)] !==
+        undefined,
+    )
+  );
 }
 
-export function dailyByDateSnapshotResult(
-  snapshot: PublicCanonicalStateResult,
+function assertCompleteFeedDirectory(
+  scope: PublicReleaseReadScope,
+  directory: PublicFeedDirectory,
+): void {
+  const declared = directory.segments.map(({ logicalName }) => logicalName).sort();
+  const manifest = Object.keys(scope.release.manifest.artifacts)
+    .filter((logicalName) => logicalName.startsWith("feeds/segments/"))
+    .sort();
+  if (
+    new Set(declared).size !== declared.length ||
+    declared.length !== manifest.length ||
+    declared.some((logicalName, index) => logicalName !== manifest[index])
+  ) {
+    scope.rejectRelease(new Error("public feed directory is incomplete"));
+  }
+}
+
+function hasDirectLexicalSearchArtifacts(
+  release: ResolvedPublicRelease,
+): boolean {
+  return Object.keys(release.manifest.artifacts).some((logicalName) =>
+    logicalName.startsWith("search/lexical/"),
+  );
+}
+
+function assertCompleteLexicalSearchManifest(
+  scope: PublicReleaseReadScope,
+): void {
+  const expected = publicLexicalShardLogicalNames();
+  const manifest = Object.keys(scope.release.manifest.artifacts)
+    .filter((logicalName) => logicalName.startsWith("search/lexical/"))
+    .sort();
+  if (
+    manifest.length !== PUBLIC_LEXICAL_SHARD_COUNT ||
+    manifest.some((logicalName, index) => logicalName !== expected[index])
+  ) {
+    scope.rejectRelease(new Error("public lexical shard family is incomplete"));
+  }
+}
+
+function supportsDirectEntityRead(release: ResolvedPublicRelease): boolean {
+  return release.manifest.numericShardCount === PUBLIC_NUMERIC_SHARD_COUNT;
+}
+
+function supportsDirectItemRead(release: ResolvedPublicRelease): boolean {
+  return (
+    supportsDirectEntityRead(release) &&
+    release.manifest.artifacts["bodies/items/00"] !== undefined
+  );
+}
+
+async function readItemShard(
+  scope: PublicReleaseReadScope,
+  id: number,
+): Promise<CanonicalPublicState["items"]> {
+  return readItemShardByLogicalName(
+    scope,
+    publicEntityShardLogicalName("item", String(id)),
+  );
+}
+
+async function readItemShardByLogicalName(
+  scope: PublicReleaseReadScope,
+  logicalName: string,
+): Promise<CanonicalPublicState["items"]> {
+  let rows: CanonicalPublicState["items"] | undefined;
+  const artifact = await scope.readLogicalArtifact(logicalName, {
+    validate: (bytes) => {
+      const shard = parsePublicEntityShardValue(logicalName, parseJson(bytes));
+      if (shard.entityType !== "item") {
+        throw new Error("public item artifact has the wrong entity type");
+      }
+      rows = shard.entities;
+    },
+  });
+  return artifact ? rows! : [];
+}
+
+async function readEventShard(
+  scope: PublicReleaseReadScope,
+  id: number,
+): Promise<CanonicalPublicState["events"]> {
+  const logicalName = publicEntityShardLogicalName("event", String(id));
+  let rows: CanonicalPublicState["events"] | undefined;
+  const artifact = await scope.readLogicalArtifact(logicalName, {
+    validate: (bytes) => {
+      const shard = parsePublicEntityShardValue(logicalName, parseJson(bytes));
+      if (shard.entityType !== "event") {
+        throw new Error("public event artifact has the wrong entity type");
+      }
+      rows = shard.entities;
+    },
+  });
+  return artifact ? rows! : [];
+}
+
+async function readSourceShard(
+  scope: PublicReleaseReadScope,
+): Promise<CanonicalPublicState["sources"]> {
+  let rows: CanonicalPublicState["sources"] | undefined;
+  await scope.readLogicalArtifact("state/sources", {
+    required: true,
+    validate: (bytes) => {
+      rows = [...parsePublicSourceRows(bytes)];
+    },
+  });
+  return rows!;
+}
+
+async function readItemBodyShard(
+  scope: PublicReleaseReadScope,
+  id: number,
+): Promise<string | null> {
+  const logicalName = publicItemBodyShardLogicalName(String(id));
+  let bodyMd: string | null | undefined;
+  await scope.readLogicalArtifact(logicalName, {
+    required: true,
+    validate: (bytes) => {
+      const shard = parsePublicItemBodyShardValue(
+        logicalName,
+        parseJson(bytes),
+      );
+      bodyMd = shard.entities.find((entity) => entity.id === id)?.bodyMd ?? null;
+    },
+  });
+  return bodyMd!;
+}
+
+function directReadState(input: {
+  items: CanonicalPublicState["items"];
+  events: CanonicalPublicState["events"];
+  sources: CanonicalPublicState["sources"];
+}): CanonicalPublicState {
+  return {
+    schemaVersion: 1,
+    ...input,
+    newsletters: [],
+    policies: [],
+  };
+}
+
+function parseJson(bytes: Uint8Array): unknown {
+  return JSON.parse(new TextDecoder().decode(bytes)) as unknown;
+}
+
+async function mapWithConcurrency<T, R>(
+  values: readonly T[],
+  concurrency: number,
+  map: (value: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(values.length);
+  let next = 0;
+  async function worker(): Promise<void> {
+    for (;;) {
+      const index = next++;
+      if (index >= values.length) return;
+      results[index] = await map(values[index]!);
+    }
+  }
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, values.length) }, worker),
+  );
+  return results;
+}
+
+export async function latestDailySnapshotRequestResult(
+  req: Request,
+): Promise<SnapshotCachedResult> {
+  const locale = parseDailyLocale(req);
+  if (!locale.ok) return locale;
+  const scoped = await publicSnapshotReader().readReleaseScoped(async (scope) => {
+    const rows = await readDirectDailyRows(scope, locale.locale);
+    const daily = rows[0];
+    return daily
+      ? dailyResult(scope.release, daily)
+      : { ok: false as const, error: "no_daily_yet", status: 404 };
+  });
+  return scoped.value;
+}
+
+export async function dailyByDateSnapshotRequestResult(
   req: Request,
   rawDate: string,
-): SnapshotCachedResult {
+): Promise<SnapshotCachedResult> {
   const date = dailyDateSchema.safeParse(rawDate);
   if (!date.success) return { ok: false, error: "invalid_date", status: 400 };
   const locale = parseDailyLocale(req);
   if (!locale.ok) return locale;
-  const daily = getPublicDailyByDate(snapshot.state, date.data, locale.locale);
-  if (!daily) {
-    return { ok: false, error: `no_daily_for_${date.data}`, status: 404 };
-  }
-  return dailyResult(snapshot, daily);
+  const scoped = await publicSnapshotReader().readReleaseScoped(async (scope) => {
+    const rows = await readDirectDailyRows(scope, locale.locale);
+    const daily = rows.find((row) => row.date === date.data);
+    return daily
+      ? dailyResult(scope.release, daily)
+      : {
+          ok: false as const,
+          error: `no_daily_for_${date.data}`,
+          status: 404,
+        };
+  });
+  return scoped.value;
 }
 
-export function dailyIndexSnapshotResult(
-  snapshot: PublicCanonicalStateResult,
+export async function dailyIndexSnapshotRequestResult(
   req: Request,
-): SnapshotCachedResult {
+): Promise<SnapshotCachedResult> {
   const parsed = dailyIndexQuerySchema.safeParse(queryParamsRecord(req));
   if (!parsed.success) {
     return {
@@ -391,19 +1025,52 @@ export function dailyIndexSnapshotResult(
       status: 400,
     };
   }
-  const body = listPublicDailyIndex(snapshot.state, parsed.data);
-  return {
-    ok: true,
-    signal: etagSignal({
-      release: snapshot.release.ref.manifestSha256,
-      count: body.count,
-      first_id: body.items[0]?.id ?? "",
-      first_gen: body.items[0]?.generated_at ?? "",
-      locale: parsed.data.locale,
-      take: parsed.data.take,
-    }),
-    body,
-  };
+  const scoped = await publicSnapshotReader().readReleaseScoped(async (scope) => {
+    const rows = (
+      await readDirectDailyRows(scope, parsed.data.locale)
+    ).slice(0, parsed.data.take);
+    const body = {
+      count: rows.length,
+      items: rows.map((row) => ({
+        id: row.id,
+        date: row.date,
+        generated_at: row.generated_at,
+        title: row.title,
+        theme_tag: row.theme_tag,
+        story_count: row.story_count,
+      })),
+    };
+    return {
+      ok: true as const,
+      signal: etagSignal({
+        release: scope.release.ref.manifestSha256,
+        count: body.count,
+        first_id: body.items[0]?.id ?? "",
+        first_gen: body.items[0]?.generated_at ?? "",
+        locale: parsed.data.locale,
+        take: parsed.data.take,
+      }),
+      body,
+    };
+  });
+  return scoped.value;
+}
+
+async function readDirectDailyRows(
+  scope: PublicReleaseReadScope,
+  locale: AppLocale,
+): Promise<PublicDailyColumn[]> {
+  if (supportsDirectPublicRouteReads(scope.release)) {
+    const model = await readScopedMaterializedPageModel<{
+      rows: PublicDailyColumn[];
+    }>(scope, materializedPageLogicalName.daily(locale));
+    return model.rows;
+  }
+  const newsletters = await readDirectPublicNewsletters(scope);
+  return listPublicDailyColumnsFromNewsletters(newsletters, {
+    locale,
+    take: newsletters.length,
+  });
 }
 
 function parseDailyLocale(
@@ -419,7 +1086,7 @@ function parseDailyLocale(
 }
 
 function dailyResult(
-  snapshot: PublicCanonicalStateResult,
+  release: ResolvedPublicRelease,
   body: ReturnType<typeof getLatestPublicDaily> extends infer T
     ? Exclude<T, null>
     : never,
@@ -427,7 +1094,7 @@ function dailyResult(
   return {
     ok: true,
     signal: etagSignal({
-      release: snapshot.release.ref.manifestSha256,
+      release: release.ref.manifestSha256,
       id: body.id,
       generated: body.generated_at,
     }),

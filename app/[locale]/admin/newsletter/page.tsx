@@ -4,7 +4,7 @@ import { AdminTableFrame } from "@/components/admin/table-frame";
 import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
 import { getNewsletterAdminStats } from "@/lib/email/admin-stats";
-import { getShellChromeData } from "@/lib/shell/chrome-data";
+import { getAdminShellChromeData } from "@/lib/shell/admin-chrome-data";
 import { formatCoarseRelativeTime } from "@/lib/time/relative";
 import { appLocaleFromParam } from "@/lib/types";
 
@@ -30,7 +30,7 @@ export default async function AdminNewsletterPage({
 
   const [stats, chrome] = await Promise.all([
     getNewsletterAdminStats(),
-    getShellChromeData(),
+    getAdminShellChromeData(),
   ]);
 
   const churned =

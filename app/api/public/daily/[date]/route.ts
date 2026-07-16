@@ -6,8 +6,7 @@
  */
 import { publicCachedRoute } from "@/lib/api/public-helpers";
 import {
-  dailyByDateSnapshotResult,
-  readPublicSnapshot,
+  dailyByDateSnapshotRequestResult,
 } from "@/lib/public-content/http";
 
 export const dynamic = "force-dynamic";
@@ -23,11 +22,7 @@ export async function GET(
     label: "api/public/daily/:date",
     load: async () => {
       const { date: rawDate } = await ctx.params;
-      return dailyByDateSnapshotResult(
-        await readPublicSnapshot(),
-        req,
-        rawDate,
-      );
+      return dailyByDateSnapshotRequestResult(req, rawDate);
     },
   });
 }

@@ -10,10 +10,7 @@
  */
 import { DEFAULT_PUBLIC_EVENT_MEMBERS_LOCALE } from "@/lib/event-members/query-defaults";
 import { publicCachedRoute } from "@/lib/api/public-helpers";
-import {
-  publicEventMembersSnapshotResult,
-  readPublicSnapshot,
-} from "@/lib/public-content/http";
+import { publicEventMembersSnapshotRequestResult } from "@/lib/public-content/http";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -28,7 +25,7 @@ export async function GET(
     label: "api/public/events/:id/members",
     load: async () => {
       const { id: idRaw } = await ctx.params;
-      return publicEventMembersSnapshotResult(await readPublicSnapshot(), req, {
+      return publicEventMembersSnapshotRequestResult(req, {
         rawId: idRaw,
         defaultLocale: DEFAULT_PUBLIC_EVENT_MEMBERS_LOCALE,
       });

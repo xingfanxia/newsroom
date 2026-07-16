@@ -7,16 +7,14 @@ import {
 const liveSource = read("lib/items/live.ts");
 const pageModelBuildersSrc = read("lib/public-content/page-model-builders.ts");
 
-// Each reader page coerces its params, then a page-model builder runs the feed
-// query. The exact-source-id filter lives in the page (home/all/curated) or in
-// the builder (podcasts keys off activeChannel, x-monitor off the handle), so
-// the invariant is asserted over the page AND its builder together.
-const READER_PAGE_BUILDERS: Record<string, string> = {
-  "app/[locale]/page.tsx": "buildPublicHomePageModelFromSnapshot",
-  "app/[locale]/all/page.tsx": "buildAllPageModel",
-  "app/[locale]/curated/page.tsx": "buildCuratedPageModel",
-  "app/[locale]/podcasts/page.tsx": "buildPodcastsPageModel",
-  "app/[locale]/x-monitor/page.tsx": "buildXMonitorPageModel",
+// Each reader page coerces its params, then a shared feed-query builder supplies
+// both canonical and direct-artifact reads. Assert the page and query together.
+const READER_PAGE_QUERIES: Record<string, string> = {
+  "app/[locale]/page.tsx": "publicHomePageFeedQuery",
+  "app/[locale]/all/page.tsx": "allPageFeedQuery",
+  "app/[locale]/curated/page.tsx": "curatedPageFeedQuery",
+  "app/[locale]/podcasts/page.tsx": "podcastsPageFeedQuery",
+  "app/[locale]/x-monitor/page.tsx": "xMonitorPageFeedQuery",
 };
 
 describe("feed source filters source wiring", () => {
@@ -28,10 +26,10 @@ describe("feed source filters source wiring", () => {
   });
 
   test("reader pages pass exact source ids instead of matching publisher labels", () => {
-    for (const [path, builderFn] of Object.entries(READER_PAGE_BUILDERS)) {
+    for (const [path, queryFn] of Object.entries(READER_PAGE_QUERIES)) {
       const source = `${read(path)}\n${exportedFunctionSection(
         pageModelBuildersSrc,
-        builderFn,
+        queryFn,
       )}`;
 
       expect(source).toContain("sourceId");

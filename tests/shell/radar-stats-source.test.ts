@@ -20,11 +20,10 @@ const homePageModelBuilder = exportedFunctionSection(
   "buildPublicHomePageModelFromSnapshot",
 );
 
-// Chrome loads either directly from the shell helper (admin/saved pages) or via
-// the public-content page-model layer (anonymous pages), which itself builds
-// chrome with shellChromeDataFromSnapshot. Either import proves the page pulls
-// chrome from a shared helper rather than hand-rolling radar stats inline.
-const SHARED_CHROME_SOURCE_RE = /@\/lib\/shell\/chrome-data|@\/lib\/public-content\//;
+// Admin pages deliberately use the Turso-backed admin helper; saved and
+// anonymous pages use the public snapshot helper or page-model layer.
+const SHARED_CHROME_SOURCE_RE =
+  /@\/lib\/shell\/(?:admin-)?chrome-data|@\/lib\/public-content\//;
 
 // Each pulse-enabled page's chrome is built with `pulse: true`. Anonymous pages
 // request it inside their page-model builder; saved requests it in its

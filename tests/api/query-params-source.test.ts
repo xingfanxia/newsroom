@@ -12,7 +12,7 @@ describe("query param source wiring", () => {
 
     const dailies = read("app/api/public/dailies/route.ts");
     const publicContentHttp = read("lib/public-content/http.ts");
-    expect(dailies).toContain("dailyIndexSnapshotResult");
+    expect(dailies).toContain("dailyIndexSnapshotRequestResult");
     expect(dailies).not.toContain("@/lib/api/query-params");
     expect(publicContentHttp).toContain("@/lib/api/query-params");
     expect(publicContentHttp).toContain("queryParamsRecord(req)");

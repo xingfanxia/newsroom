@@ -6,7 +6,7 @@ import { IterationRunner } from "@/components/admin/iteration-runner";
 import { VersionTimeline } from "@/components/admin/version-timeline";
 import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
-import { getShellChromeData } from "@/lib/shell/chrome-data";
+import { getAdminShellChromeData } from "@/lib/shell/admin-chrome-data";
 import { getFeedbackCounts, getRecentFeedback } from "@/lib/feedback/metrics";
 import {
   getActiveSkill,
@@ -55,7 +55,7 @@ export default async function IterationsPage({
     getActiveSkill(SKILL_NAME),
     listSkillVersions(SKILL_NAME),
     getLatestIterationRun(SKILL_NAME),
-    getShellChromeData(),
+    getAdminShellChromeData(),
   ]);
 
   const { total, agreed, disagreed } = counts;

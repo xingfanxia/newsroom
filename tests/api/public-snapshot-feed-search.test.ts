@@ -3,14 +3,22 @@ import { GET as getPublicFeed } from "@/app/api/public/feed/route";
 import { GET as getPublicSearch } from "@/app/api/public/search/route";
 import { GET as getOpenApi } from "@/app/openapi.yaml/route";
 import { GET as getSkill } from "@/app/skill.md/route";
-import { canonicalJsonBytes } from "@/lib/public-content/canonical";
+import { computeEtag, etagSignal } from "@/lib/api/public-helpers";
+import { canonicalJsonBytes, sha256Hex } from "@/lib/public-content/canonical";
 import {
+  manifestSchema,
+  publicEntityShardLogicalName,
   snapshotPointerSchema,
   type CanonicalPublicState,
 } from "@/lib/public-content/contracts";
-import { CURRENT_POINTER_KEY, releaseManifestKey } from "@/lib/public-content/paths";
+import {
+  CURRENT_POINTER_KEY,
+  objectKey,
+  releaseManifestKey,
+} from "@/lib/public-content/paths";
 import { buildPublicRelease } from "@/lib/public-content/publisher/build-release";
 import type { PublicEntityChange } from "@/lib/public-content/publisher/types";
+import { publicLexicalShardLogicalName } from "@/lib/public-content/lexical-search-artifacts";
 import { MemoryPublicSnapshotHttp } from "@/lib/public-content/testing/memory-store";
 import { __resetPublicBuckets } from "@/lib/rate-limit/public";
 import { PUBLIC_SEMANTIC_SEARCH_ERROR } from "@/lib/search/query-defaults";
@@ -23,9 +31,11 @@ import {
 const originalFetch = globalThis.fetch;
 const originalBaseUrl = process.env.R2_PUBLIC_BASE_URL;
 let http: MemoryPublicSnapshotHttp;
+let primaryHttp: MemoryPublicSnapshotHttp;
 
 beforeAll(async () => {
-  http = await feedSearchFixture();
+  primaryHttp = await feedSearchFixture();
+  http = primaryHttp;
   const routedFetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(input instanceof Request ? input.url : input.toString());
     if (url.origin !== http.baseUrl) {
@@ -41,6 +51,7 @@ beforeAll(async () => {
 
 beforeEach(() => {
   __resetPublicBuckets();
+  http = primaryHttp;
   process.env.R2_PUBLIC_BASE_URL = http.baseUrl;
 });
 
@@ -127,6 +138,7 @@ describe("snapshot-backed public feed and lexical search", () => {
   });
 
   test("preserves lexical wildcard, filters, localization and stable totals", async () => {
+    http.clearRequests();
     const wildcard = await getPublicSearch(
       request("/api/public/search?q=a_00&tier=all&limit=50"),
     );
@@ -139,6 +151,40 @@ describe("snapshot-backed public feed and lexical search", () => {
       limit: 50,
       offset: 0,
     });
+    const requested = requestedObjectKeys(http);
+    const lexicalKeys = Object.entries(
+      (await feedSearchFixtureRelease()).manifest.artifacts,
+    )
+      .filter(([logicalName]) => logicalName.startsWith("search/lexical/"))
+      .map(([, descriptor]) => descriptor.key);
+    expect(lexicalKeys).toHaveLength(32);
+    expect(lexicalKeys.every((key) => requested.has(key))).toBeTrue();
+    expect(requested).toHaveLength(34);
+    const requestedStateNames = Object.entries(
+      (await feedSearchFixtureRelease()).manifest.artifacts,
+    )
+      .filter(
+        ([logicalName, descriptor]) =>
+          logicalName.startsWith("state/") && requested.has(descriptor.key),
+      )
+      .map(([logicalName]) => logicalName);
+    expect(requestedStateNames).toHaveLength(2);
+    expect(requestedStateNames).toContain("state/sources");
+    expect(
+      requestedStateNames.some((logicalName) =>
+        logicalName.startsWith("state/items/"),
+      ),
+    ).toBeTrue();
+    const forbiddenStateKeys = Object.entries(
+      (await feedSearchFixtureRelease()).manifest.artifacts,
+    )
+      .filter(
+        ([logicalName]) =>
+          logicalName.startsWith("state/newsletters/") ||
+          logicalName.startsWith("state/policies/"),
+      )
+      .map(([, descriptor]) => descriptor.key);
+    expect(forbiddenStateKeys.some((key) => requested.has(key))).toBeFalse();
 
     const alphaZh = await getPublicSearch(
       request("/api/public/search?q=Alpha&tier=all&locale=zh&limit=1"),
@@ -162,6 +208,124 @@ describe("snapshot-backed public feed and lexical search", () => {
     const invalid = await getPublicSearch(request("/api/public/search?limit=2"));
     expect(invalid.status).toBe(400);
     expect((await invalid.json()).error).toContain("invalid_query:");
+  });
+
+  test("legacy releases retain the release-scoped canonical fallback", async () => {
+    const legacy = await buildPublicRelease({
+      previousManifest: null,
+      sourceWatermark: 19,
+      changes: allChanges(PARITY_STATE),
+      loadArtifact: async () => {
+        throw new Error("fixture cannot load a prior artifact");
+      },
+    });
+    useHttp(singleReleaseStore("https://search-legacy.test", legacy));
+
+    const response = await getPublicSearch(
+      request("/api/public/search?q=Alpha&tier=all&limit=50"),
+    );
+    expect(response.status).toBe(200);
+    expect(ids(await response.json())).not.toHaveLength(0);
+    const requested = requestedObjectKeys(http);
+    expect(
+      Object.entries(legacy.manifest.artifacts).some(
+        ([logicalName, descriptor]) =>
+          logicalName.startsWith("state/") && requested.has(descriptor.key),
+      ),
+    ).toBeTrue();
+  });
+
+  test("corrupt active lexical or hydration artifacts retry the whole previous release", async () => {
+    const corruptIndex = await searchFallbackFixture("index");
+    useHttp(corruptIndex.http);
+    const indexFallback = await getPublicSearch(
+      request("/api/public/search?q=Alpha&tier=all&limit=50"),
+    );
+    expect(indexFallback.status).toBe(200);
+    const indexBody = await indexFallback.json();
+    expect(indexFallback.headers.get("etag")).toBe(
+      computeEtag(
+        "public-search",
+        etagSignal({
+          release: corruptIndex.previous.manifestSha256,
+          qs: "?q=Alpha&tier=all&limit=50",
+          total: indexBody.total,
+          first: indexBody.items[0]?.id ?? "",
+        }),
+      ),
+    );
+
+    const corruptItem = await searchFallbackFixture("item");
+    useHttp(corruptItem.http);
+    const hydrationFallback = await getPublicSearch(
+      request("/api/public/search?q=ActiveOnly&tier=all&limit=50"),
+    );
+    expect(hydrationFallback.status).toBe(200);
+    expect(await hydrationFallback.json()).toMatchObject({
+      mode: "lexical",
+      q: "ActiveOnly",
+      items: [],
+      total: 0,
+    });
+
+    const partialFamily = await searchFallbackFixture("partial");
+    useHttp(partialFamily.http);
+    const partialFallback = await getPublicSearch(
+      request("/api/public/search?q=ActiveOnly&tier=all&limit=50"),
+    );
+    expect(partialFallback.status).toBe(200);
+    expect(await partialFallback.json()).toMatchObject({ items: [], total: 0 });
+    const partialRequested = requestedObjectKeys(partialFamily.http);
+    expect(
+      Object.entries(partialFamily.active.manifest.artifacts).some(
+        ([logicalName, descriptor]) =>
+          logicalName.startsWith("state/") &&
+          partialRequested.has(descriptor.key),
+      ),
+    ).toBeFalse();
+
+    const inconsistentRelation = await searchFallbackFixture("relation");
+    useHttp(inconsistentRelation.http);
+    const relationFallback = await getPublicSearch(
+      request("/api/public/search?q=ActiveOnly&tier=all&limit=50"),
+    );
+    expect(relationFallback.status).toBe(200);
+    expect(await relationFallback.json()).toMatchObject({ items: [], total: 0 });
+    expect(requestedObjectKeys(inconsistentRelation.http)).toContain(
+      inconsistentRelation.relationObjectKey!,
+    );
+  });
+
+  test("terminal corruption fails closed and a warm process can use its LKG", async () => {
+    const release = await buildFixtureRelease();
+    const corrupt = singleReleaseStore("https://search-terminal.test", release);
+    corrupt.put(
+      release.manifest.artifacts[publicLexicalShardLogicalName(0)]!.key,
+      canonicalJsonBytes({ invalid: true }),
+    );
+    useHttp(corrupt);
+    const unavailable = await getPublicSearch(
+      request("/api/public/search?q=Alpha&tier=all&limit=50"),
+    );
+    expect(unavailable.status).toBe(503);
+    expect(await unavailable.json()).toEqual({ error: "snapshot_unavailable" });
+
+    const warmRelease = await buildFixtureRelease();
+    const warm = singleReleaseStore("https://search-warm-lkg.test", warmRelease);
+    useHttp(warm);
+    const first = await getPublicSearch(
+      request("/api/public/search?q=Alpha&tier=all&limit=50"),
+    );
+    const firstBody = await first.json();
+    expect(first.status).toBe(200);
+    warm.delete(CURRENT_POINTER_KEY);
+    warm.clearRequests();
+    __resetPublicBuckets();
+    const fallback = await getPublicSearch(
+      request("/api/public/search?q=Alpha&tier=all&limit=50"),
+    );
+    expect(fallback.status).toBe(200);
+    expect(await fallback.json()).toEqual(firstBody);
   });
 
   test("rejects semantic mode before any snapshot, DB or embedding access", async () => {
@@ -214,18 +378,50 @@ function ids(body: { items: Array<{ id: string }> }): number[] {
   return body.items.map(({ id }) => Number(id));
 }
 
-async function feedSearchFixture(): Promise<MemoryPublicSnapshotHttp> {
-  const release = await buildPublicRelease({
+function requestedObjectKeys(store: MemoryPublicSnapshotHttp): Set<string> {
+  return new Set(
+    store.requests
+      .map(({ key }) => key)
+      .filter((key) => key.includes("/objects/")),
+  );
+}
+
+function useHttp(next: MemoryPublicSnapshotHttp): void {
+  http = next;
+  process.env.R2_PUBLIC_BASE_URL = next.baseUrl;
+  next.clearRequests();
+  __resetPublicBuckets();
+}
+
+let fixtureRelease: Awaited<ReturnType<typeof buildFixtureRelease>> | undefined;
+
+async function feedSearchFixtureRelease() {
+  fixtureRelease ??= await buildFixtureRelease();
+  return fixtureRelease;
+}
+
+function buildFixtureRelease() {
+  return buildPublicRelease({
     previousManifest: null,
     sourceWatermark: 20,
     changes: allChanges(PARITY_STATE),
+    generatedAtMs: Date.parse("2026-07-14T12:00:00.000Z"),
     loadArtifact: async () => {
       throw new Error("fixture cannot load a prior artifact");
     },
   });
-  const store = new MemoryPublicSnapshotHttp(
-    "https://feed-search-content.test",
-  );
+}
+
+async function feedSearchFixture(): Promise<MemoryPublicSnapshotHttp> {
+  const release = await feedSearchFixtureRelease();
+  return singleReleaseStore("https://feed-search-content.test", release);
+}
+
+function singleReleaseStore(
+  baseUrl: string,
+  release: Awaited<ReturnType<typeof buildPublicRelease>>,
+): MemoryPublicSnapshotHttp {
+  const store = new MemoryPublicSnapshotHttp(baseUrl);
   for (const artifact of release.artifacts) {
     store.put(artifact.descriptor.key, artifact.bytes);
   }
@@ -243,11 +439,138 @@ async function feedSearchFixture(): Promise<MemoryPublicSnapshotHttp> {
         },
         previous: null,
         publishedAt: "2026-07-14T12:00:00.000Z",
-        sourceWatermark: 20,
+        sourceWatermark: release.manifest.sourceWatermark,
       }),
     ),
   );
   return store;
+}
+
+async function searchFallbackFixture(
+  corrupt: "index" | "item" | "partial" | "relation",
+) {
+  const previous = await buildFixtureRelease();
+  const objectBytes = new Map(
+    previous.artifacts.map(({ descriptor, bytes }) => [descriptor.key, bytes]),
+  );
+  const item = PARITY_STATE.items.find(({ id }) => id === 1)!;
+  const active = await buildPublicRelease({
+    previousManifest: previous.manifest,
+    sourceWatermark: 21,
+    changes: [
+      {
+        entityType: "item",
+        entityKey: "1",
+        value: {
+          ...item,
+          title: {
+            ...item.title,
+            raw: "ActiveOnly lexical title",
+            en: "ActiveOnly lexical title",
+          },
+        },
+      },
+    ],
+    generatedAtMs: Date.parse("2026-07-14T12:01:00.000Z"),
+    loadArtifact: async (_logicalName, descriptor) => {
+      const bytes = objectBytes.get(descriptor.key);
+      if (!bytes) throw new Error(`missing fixture object: ${descriptor.key}`);
+      return bytes;
+    },
+  });
+  for (const artifact of active.artifacts) {
+    objectBytes.set(artifact.descriptor.key, artifact.bytes);
+  }
+  const store = new MemoryPublicSnapshotHttp(
+    `https://search-${corrupt}-fallback.test`,
+  );
+  for (const [key, bytes] of objectBytes) store.put(key, bytes);
+  const previousManifestKey = releaseManifestKey(previous.releaseId);
+  const activeManifestKey = releaseManifestKey(active.releaseId);
+  store.put(previousManifestKey, previous.manifestBytes);
+  let activeManifest = active.manifest;
+  let relationObjectKey: string | null = null;
+  if (corrupt === "relation") {
+    const eventId = item.eventId!;
+    const eventLogicalName = publicEntityShardLogicalName(
+      "event",
+      String(eventId),
+    );
+    const eventDescriptor = activeManifest.artifacts[eventLogicalName]!;
+    const eventBytes = objectBytes.get(eventDescriptor.key)!;
+    const eventShard = JSON.parse(new TextDecoder().decode(eventBytes)) as {
+      entities: Array<{
+        id: number;
+        leadItemId: number;
+        memberItemIds: number[];
+      }>;
+    };
+    const event = eventShard.entities.find(({ id }) => id === eventId)!;
+    event.leadItemId =
+      event.memberItemIds.find((memberId) => memberId !== item.id) ??
+      item.id + 10_000;
+    const inconsistentBytes = canonicalJsonBytes(eventShard);
+    const inconsistentSha256 = await sha256Hex(inconsistentBytes);
+    const inconsistentDescriptor = {
+      ...eventDescriptor,
+      key: objectKey(inconsistentSha256, "json"),
+      sha256: inconsistentSha256,
+      byteLength: inconsistentBytes.byteLength,
+    };
+    objectBytes.set(inconsistentDescriptor.key, inconsistentBytes);
+    store.put(inconsistentDescriptor.key, inconsistentBytes);
+    relationObjectKey = inconsistentDescriptor.key;
+    activeManifest = manifestSchema.parse({
+      ...activeManifest,
+      artifacts: {
+        ...activeManifest.artifacts,
+        [eventLogicalName]: inconsistentDescriptor,
+      },
+    });
+  }
+  let activeManifestBytes = canonicalJsonBytes(activeManifest);
+  let activeManifestSha256 = await sha256Hex(activeManifestBytes);
+  if (corrupt === "partial") {
+    const artifacts = { ...activeManifest.artifacts };
+    delete artifacts[publicLexicalShardLogicalName(31)];
+    const partialManifest = manifestSchema.parse({
+      ...activeManifest,
+      artifacts,
+    });
+    activeManifestBytes = canonicalJsonBytes(partialManifest);
+    activeManifestSha256 = await sha256Hex(activeManifestBytes);
+  } else if (corrupt === "index" || corrupt === "item") {
+    const corruptLogicalName =
+      corrupt === "index"
+        ? publicLexicalShardLogicalName(1)
+        : "state/items/01";
+    store.put(
+      active.manifest.artifacts[corruptLogicalName]!.key,
+      canonicalJsonBytes({ invalid: true }),
+    );
+  }
+  store.put(activeManifestKey, activeManifestBytes);
+  store.put(
+    CURRENT_POINTER_KEY,
+    canonicalJsonBytes(
+      snapshotPointerSchema.parse({
+        schemaVersion: 1,
+        active: {
+          releaseId: active.releaseId,
+          manifestKey: activeManifestKey,
+          manifestSha256: activeManifestSha256,
+        },
+        previous: {
+          releaseId: previous.releaseId,
+          manifestKey: previousManifestKey,
+          manifestSha256: previous.manifestSha256,
+        },
+        publishedAt: "2026-07-14T12:01:00.000Z",
+        sourceWatermark: 21,
+      }),
+    ),
+  );
+  return { active, http: store, previous, relationObjectKey };
 }
 
 function allChanges(state: CanonicalPublicState): PublicEntityChange[] {

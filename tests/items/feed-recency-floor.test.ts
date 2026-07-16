@@ -137,28 +137,28 @@ describe("count + fetch pin the SAME feed index (no pagination-total drift)", ()
 });
 
 describe("page-model builders pass the W8 recency floor (wiring tripwire)", () => {
-  // The floor is derived and wired into queryPublicFeed inside each page's
-  // model builder now; the server components just coerce params and delegate.
+  // The floor is derived by each page's shared feed-query builder; both the
+  // canonical model path and direct artifact path consume the same query.
   const buildersSrc = readSource("lib/public-content/page-model-builders.ts");
-  const homeBuilder = exportedFunctionSection(
+  const homeQuery = exportedFunctionSection(
     buildersSrc,
-    "buildPublicHomePageModelFromSnapshot",
+    "publicHomePageFeedQuery",
   );
-  const allBuilder = exportedFunctionSection(buildersSrc, "buildAllPageModel");
-  const curatedBuilder = exportedFunctionSection(
+  const allQuery = exportedFunctionSection(buildersSrc, "allPageFeedQuery");
+  const curatedQuery = exportedFunctionSection(
     buildersSrc,
-    "buildCuratedPageModel",
+    "curatedPageFeedQuery",
   );
 
   it("home: 7d today / 30d daily-highlights, skipped for source views", () => {
-    expect(homeBuilder).toContain("recencyFloorDays");
-    expect(homeBuilder).toMatch(/dailyHighlights\s*\?\s*30\s*:\s*7/);
-    expect(homeBuilder).toContain('input.sourceId || input.sourcePreset !== "all"');
+    expect(homeQuery).toContain("recencyFloorDays");
+    expect(homeQuery).toMatch(/dailyHighlights\s*\?\s*30\s*:\s*7/);
+    expect(homeQuery).toContain('input.sourceId || input.sourcePreset !== "all"');
   });
 
   it("all + curated: 30d default, skipped when a source filter is active", () => {
-    expect(allBuilder).toMatch(/recencyFloorDays:\s*[\s\S]*?30/);
-    expect(curatedBuilder).toMatch(
+    expect(allQuery).toMatch(/recencyFloorDays:\s*[\s\S]*?30/);
+    expect(curatedQuery).toMatch(
       /recencyFloorDays:\s*input\.sourceId\s*\?\s*undefined\s*:\s*30/,
     );
   });

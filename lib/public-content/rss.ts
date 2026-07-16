@@ -1,7 +1,6 @@
 import { dailyColumnIssueRoute } from "@/lib/daily-column/routes";
 import type { PublicDailyColumn } from "@/lib/public-content/public-dailies";
 import { canonicalStateSchema } from "@/lib/public-content/contracts";
-import { createPublicStateIndex } from "@/lib/public-content/public-items";
 import { queryPublicFeed } from "@/lib/public-content/query";
 import {
   legacyRssFeedMeta,
@@ -38,7 +37,6 @@ export function renderMainPublicRss(
   locale: AppLocale,
   nowMs: number,
 ): PublicRssArtifact {
-  const meta = mainRssFeedMeta(locale);
   let stories = queryPublicFeed(
     value,
     {
@@ -56,6 +54,15 @@ export function renderMainPublicRss(
       { nowMs },
     ).items;
   }
+  return renderMainPublicRssFromStories(stories, locale, nowMs);
+}
+
+export function renderMainPublicRssFromStories(
+  stories: readonly Story[],
+  locale: AppLocale,
+  nowMs: number,
+): PublicRssArtifact {
+  const meta = mainRssFeedMeta(locale);
   const items = stories.map(mainRssItem);
   return artifact(
     renderRssFeed({
@@ -77,9 +84,19 @@ export function renderStructuredNewsletterPublicRss(
   locale: AppLocale,
   nowMs: number,
 ): PublicRssArtifact {
-  const rows = canonicalStateSchema
-    .parse(value)
-    .newsletters.filter(
+  return renderStructuredNewsletterPublicRssFromNewsletters(
+    canonicalStateSchema.parse(value).newsletters,
+    locale,
+    nowMs,
+  );
+}
+
+export function renderStructuredNewsletterPublicRssFromNewsletters(
+  newsletters: CanonicalNewsletters,
+  locale: AppLocale,
+  nowMs: number,
+): PublicRssArtifact {
+  const rows = newsletters.filter(
       (row): row is StructuredNewsletter =>
         row.format === "structured" && row.locale === locale,
     )
@@ -112,10 +129,13 @@ export function renderLegacyPublicRss(
   slug: LegacyRssSlug,
   nowMs: number,
 ): PublicRssArtifact {
-  const items =
-    slug === "daily"
-      ? legacyDailyItems(value)
-      : queryPublicFeed(
+  if (slug === "daily") {
+    return renderLegacyDailyPublicRssFromNewsletters(
+      canonicalStateSchema.parse(value).newsletters,
+      nowMs,
+    );
+  }
+  const stories = queryPublicFeed(
           value,
           {
             tier: "all",
@@ -124,7 +144,48 @@ export function renderLegacyPublicRss(
             limit: 50,
           },
           { nowMs },
-        ).items.map(legacyLaneRssItem);
+        ).items;
+  return renderLegacyPublicRssFromStories(stories, slug, nowMs);
+}
+
+function renderLegacyDailyPublicRssFromNewsletters(
+  newsletters: CanonicalNewsletters,
+  nowMs: number,
+): PublicRssArtifact {
+  return renderLegacyDailyPublicRssFromRows(
+    legacyDailyRows(newsletters),
+    nowMs,
+  );
+}
+
+export function renderLegacyDailyPublicRssFromRows(
+  rows: readonly PublicDailyColumn[],
+  nowMs: number,
+): PublicRssArtifact {
+  return renderLegacyPublicRssItems(
+    "daily",
+    rows.map(dailyColumnRssItem),
+    nowMs,
+  );
+}
+
+export function renderLegacyPublicRssFromStories(
+  stories: readonly Story[],
+  slug: Exclude<LegacyRssSlug, "daily">,
+  nowMs: number,
+): PublicRssArtifact {
+  return renderLegacyPublicRssItems(
+    slug,
+    stories.map(legacyLaneRssItem),
+    nowMs,
+  );
+}
+
+function renderLegacyPublicRssItems(
+  slug: LegacyRssSlug,
+  items: RssItem[],
+  nowMs: number,
+): PublicRssArtifact {
   const meta = legacyRssFeedMeta(slug);
   return artifact(
     renderRssFeed({
@@ -261,17 +322,17 @@ function legacyLaneRssItem(story: Story): RssItem {
   };
 }
 
-function legacyDailyItems(value: unknown): RssItem[] {
-  const state = createPublicStateIndex(value).state;
-  return state.newsletters
+function legacyDailyRows(
+  newsletters: CanonicalNewsletters,
+): PublicDailyColumn[] {
+  return newsletters
     .filter(
       (row): row is DailyNewsletter =>
         row.format === "daily_column" && row.locale === "zh",
     )
     .sort((left, right) => right.periodStart.localeCompare(left.periodStart))
     .slice(0, 50)
-    .map((row) =>
-      dailyColumnRssItem({
+    .map((row) => ({
         id: row.id,
         locale: row.locale,
         date: row.periodStart.slice(0, 10),
@@ -285,14 +346,17 @@ function legacyDailyItems(value: unknown): RssItem[] {
         featured_item_ids: [...row.featuredItemIds],
         item_ids: [...row.itemIds],
         story_count: row.storyCount,
-      }),
-    );
+      }));
 }
 
 type DailyNewsletter = Extract<
   ReturnType<typeof canonicalStateSchema.parse>["newsletters"][number],
   { format: "daily_column" }
 >;
+
+type CanonicalNewsletters = ReturnType<
+  typeof canonicalStateSchema.parse
+>["newsletters"];
 
 function dailyColumnRssItem(row: PublicDailyColumn): RssItem {
   const link = publicUrl(dailyColumnIssueRoute(row.date));

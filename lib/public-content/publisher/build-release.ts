@@ -21,6 +21,8 @@ import {
   publicItemSchema,
   type PublicEntityType,
 } from "@/lib/public-content/contracts";
+import { buildPublicFeedArtifactValues } from "@/lib/public-content/feed-artifacts";
+import { buildPublicLexicalArtifactValues } from "@/lib/public-content/lexical-search-artifacts";
 import { objectKey } from "@/lib/public-content/paths";
 import { buildMaterializedPageModels } from "./materialize-pages";
 import type { PublicEntityChange } from "./types";
@@ -191,6 +193,18 @@ export async function buildPublicRelease(
     built.push(artifact);
   }
 
+  if (
+    input.generatedAtMs === undefined &&
+    input.changes.some(({ entityType }) =>
+      ["item", "event", "source"].includes(entityType),
+    )
+  ) {
+    for (const logicalName of Object.keys(nextDescriptors)) {
+      if (logicalName.startsWith("feeds/")) delete nextDescriptors[logicalName];
+      if (logicalName.startsWith("search/")) delete nextDescriptors[logicalName];
+    }
+  }
+
   if (input.generatedAtMs !== undefined) {
     const reconstructed = await reconstructCanonicalState(
       nextDescriptors,
@@ -207,6 +221,31 @@ export async function buildPublicRelease(
     loadedArtifactCount += bodies.loadedArtifactCount;
     for (const logicalName of Object.keys(nextDescriptors)) {
       if (logicalName.startsWith("views/")) delete nextDescriptors[logicalName];
+      if (logicalName.startsWith("feeds/")) delete nextDescriptors[logicalName];
+      if (logicalName.startsWith("search/")) delete nextDescriptors[logicalName];
+    }
+    for (const feed of buildPublicFeedArtifactValues(
+      reconstructed.state,
+      input.generatedAtMs,
+    )) {
+      const artifact = await buildMaterializedArtifact(
+        feed.logicalName,
+        feed.value,
+        previous?.artifacts[feed.logicalName],
+      );
+      nextDescriptors[feed.logicalName] = artifact.descriptor;
+      built.push(artifact);
+    }
+    for (const lexical of buildPublicLexicalArtifactValues(
+      reconstructed.state,
+    )) {
+      const artifact = await buildMaterializedArtifact(
+        lexical.logicalName,
+        lexical.value,
+        previous?.artifacts[lexical.logicalName],
+      );
+      nextDescriptors[lexical.logicalName] = artifact.descriptor;
+      built.push(artifact);
     }
     for (const view of await buildMaterializedPageModels(
       reconstructed.state,

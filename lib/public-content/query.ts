@@ -221,8 +221,7 @@ function matchesDateBounds(
 
 function matchesSearch(candidate: Candidate, searchText: string): boolean {
   const { item, event } = candidate;
-  const pattern = sqliteLikePattern(`%${searchText}%`);
-  return [
+  return matchesSqliteLikeTextValues([
     item.title.raw,
     item.title.zh,
     item.title.en,
@@ -230,7 +229,20 @@ function matchesSearch(candidate: Candidate, searchText: string): boolean {
     item.summary.en,
     event?.canonicalTitle.zh,
     event?.canonicalTitle.en,
-  ].some((value) => value !== null && value !== undefined && pattern.test(asciiFold(value)));
+  ], searchText);
+}
+
+export function matchesSqliteLikeTextValues(
+  values: readonly (string | null | undefined)[],
+  searchText: string,
+): boolean {
+  const pattern = sqliteLikePattern(`%${searchText}%`);
+  return values.some(
+    (value) =>
+      value !== null &&
+      value !== undefined &&
+      pattern.test(asciiFold(value)),
+  );
 }
 
 function sqliteLikePattern(pattern: string): RegExp {

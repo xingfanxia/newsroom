@@ -88,7 +88,8 @@ describe("daily-column API source wiring", () => {
       const source = readSource(path);
 
       expect(source).toContain("@/lib/public-content/http");
-      expect(source).toContain("readPublicSnapshot");
+      expect(source).not.toContain("readPublicSnapshot");
+      expect(source).toContain("SnapshotRequestResult");
       expect(source).not.toContain(".select({");
       expect(source).not.toContain("from(newsletters)");
       expect(source).not.toContain("function dateKey");
@@ -101,17 +102,16 @@ describe("daily-column API source wiring", () => {
       expect(source).not.toContain("new URL(req.url)");
       expect(source).not.toContain("queryParamsRecord(req)");
       expect(source).not.toContain('searchParams.get("locale")');
-      expect(source).toContain("SnapshotResult");
       expect(source).not.toContain("if (!result.ok) return result");
     }
     expect(readSource("app/api/public/daily/route.ts")).toContain(
-      "latestDailySnapshotResult",
+      "latestDailySnapshotRequestResult",
     );
     expect(readSource("app/api/public/daily/[date]/route.ts")).toContain(
-      "dailyByDateSnapshotResult",
+      "dailyByDateSnapshotRequestResult",
     );
     expect(readSource("app/api/public/dailies/route.ts")).toContain(
-      "dailyIndexSnapshotResult",
+      "dailyIndexSnapshotRequestResult",
     );
   });
 
@@ -129,7 +129,8 @@ describe("daily-column API source wiring", () => {
     }
     // The snapshot read + public-dailies helpers now live one layer down, in
     // the page-model readers and their builders.
-    expect(pageModelsSrc).toContain("readPublicPageSnapshot");
+    expect(pageModelsSrc).toContain("readScopedMaterializedPageModel");
+    expect(pageModelsSrc).not.toContain("readPublicPageSnapshot");
     expect(pageModelBuildersSrc).toContain("@/lib/public-content/public-dailies");
     expect(dailyIndexBuilder).toContain("listPublicDailyColumns");
     expect(dailyLandingPage).toContain("@/lib/time/relative");

@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { canonicalJsonBytes, sha256Hex } from "@/lib/public-content/canonical";
 import {
+  manifestSchema,
+  publicEntityShardLogicalName,
   publicItemBodyShardLogicalName,
   snapshotPointerSchema,
 } from "@/lib/public-content/contracts";
@@ -133,6 +135,201 @@ describe("public snapshot reader", () => {
 
     expect(await reader.readItemBody(release, 1)).toBe("Changed body bytes");
     expect(fixture.http.requestCount(CURRENT_POINTER_KEY)).toBe(0);
+  });
+
+  test("pins dependent scoped reads to one release across a pointer flip", async () => {
+    const fixture = await snapshotFixture();
+    const reader = fixture.reader();
+    const itemLogicalName = publicEntityShardLogicalName("item", "1");
+
+    const result = await reader.readReleaseScoped(async (scope) => {
+      const item = await scope.readLogicalArtifact(itemLogicalName, {
+        required: true,
+      });
+      const repointed = snapshotPointerSchema.parse({
+        schemaVersion: 1,
+        active: releaseRef(fixture.previous),
+        previous: null,
+        publishedAt: PUBLISHED_AT,
+        sourceWatermark: fixture.previous.manifest.sourceWatermark,
+      });
+      fixture.http.put(CURRENT_POINTER_KEY, canonicalJsonBytes(repointed));
+      const body = await scope.readLogicalArtifact(
+        publicItemBodyShardLogicalName("1"),
+        { required: true },
+      );
+      return {
+        item: JSON.parse(new TextDecoder().decode(item!.bytes)) as {
+          entities: Array<{ title: { en: string | null } }>;
+        },
+        body: JSON.parse(new TextDecoder().decode(body!.bytes)) as {
+          entities: Array<{ bodyMd: string }>;
+        },
+      };
+    });
+
+    expect(result.release.source).toBe("active");
+    expect(result.value.item.entities[0]?.title.en).toBe("Changed title");
+    expect(result.value.body.entities[0]?.bodyMd).toBe("Changed body bytes");
+    expect(fixture.http.requestCount(CURRENT_POINTER_KEY)).toBe(1);
+    expect(
+      fixture.http.requestCount(releaseManifestKey(fixture.previous.releaseId)),
+    ).toBe(0);
+  });
+
+  test("retries a scoped multi-artifact operation against previous as one release", async () => {
+    const fixture = await snapshotFixture();
+    const logicalName = publicEntityShardLogicalName("item", "1");
+    const activeDescriptor = fixture.active.manifest.artifacts[logicalName]!;
+    fixture.http.put(
+      activeDescriptor.key,
+      new TextEncoder().encode('{"schemaVersion":1,"corrupt":true}\n'),
+    );
+
+    const result = await fixture.reader().readReleaseScoped(async (scope) => {
+      const item = await scope.readLogicalArtifact(logicalName, {
+        required: true,
+      });
+      const body = await scope.readLogicalArtifact(
+        publicItemBodyShardLogicalName("1"),
+        { required: true },
+      );
+      return {
+        item: JSON.parse(new TextDecoder().decode(item!.bytes)) as {
+          entities: Array<{ title: { en: string | null } }>;
+        },
+        body: JSON.parse(new TextDecoder().decode(body!.bytes)) as {
+          entities: Array<{ bodyMd: string }>;
+        },
+      };
+    });
+
+    expect(result.release.source).toBe("previous");
+    expect(result.value.item.entities[0]?.title.en).toBe(
+      fixture.previousState.items[0]?.title.en,
+    );
+    expect(result.value.body.entities[0]?.bodyMd).toBe(
+      fixture.previousState.items[0]?.bodyMd,
+    );
+  });
+
+  test("keeps legacy canonical fallback inside the selected release scope", async () => {
+    const fixture = await snapshotFixture();
+    const reader = fixture.reader();
+
+    const result = await reader.readReleaseScoped((scope) =>
+      scope.readCanonicalState(),
+    );
+
+    expect(result.release.source).toBe("active");
+    expect(result.value.state.items[0]?.title.en).toBe("Changed title");
+    expect(result.value.release).toBe(result.release);
+    expect(fixture.http.requestCount(CURRENT_POINTER_KEY)).toBe(1);
+  });
+
+  test("uses the warm last-known-good release for scoped reads", async () => {
+    const fixture = await snapshotFixture();
+    const reader = fixture.reader(5);
+    const logicalName = publicEntityShardLogicalName("item", "1");
+    const warm = await reader.readReleaseScoped((scope) =>
+      scope.readLogicalArtifact(logicalName, { required: true }),
+    );
+    fixture.http.hang(CURRENT_POINTER_KEY);
+
+    const fallback = await reader.readReleaseScoped((scope) =>
+      scope.readLogicalArtifact(logicalName, { required: true }),
+    );
+
+    expect(warm.release.source).toBe("active");
+    expect(fallback.release.source).toBe("last-known-good");
+    expect(fallback.release.ref.releaseId).toBe(warm.release.ref.releaseId);
+  });
+
+  test("returns a missing optional scoped artifact without release fallback", async () => {
+    const fixture = await snapshotFixture();
+    let attempts = 0;
+
+    const result = await fixture.reader().readReleaseScoped(async (scope) => {
+      attempts += 1;
+      return scope.readLogicalArtifact("future/optional");
+    });
+
+    expect(result.release.source).toBe("active");
+    expect(result.value).toBeNull();
+    expect(attempts).toBe(1);
+  });
+
+  test("retries a required scoped artifact missing from active on previous", async () => {
+    const fixture = await snapshotFixture();
+    const logicalName = publicItemBodyShardLogicalName("1");
+    const manifest = manifestSchema.parse({
+      ...fixture.active.manifest,
+      artifacts: Object.fromEntries(
+        Object.entries(fixture.active.manifest.artifacts).filter(
+          ([candidate]) => candidate !== logicalName,
+        ),
+      ),
+    });
+    const manifestBytes = canonicalJsonBytes(manifest);
+    const pointer = snapshotPointerSchema.parse({
+      ...fixture.pointer,
+      active: {
+        ...fixture.pointer.active,
+        manifestSha256: await sha256Hex(manifestBytes),
+      },
+    });
+    fixture.http.put(pointer.active.manifestKey, manifestBytes);
+    fixture.http.put(CURRENT_POINTER_KEY, canonicalJsonBytes(pointer));
+    fixture.http.clearRequests();
+    const attempts: string[] = [];
+
+    const result = await fixture.reader().readReleaseScoped(async (scope) => {
+      attempts.push(scope.release.source);
+      return scope.readLogicalArtifact(logicalName, { required: true });
+    });
+
+    expect(result.release.source).toBe("previous");
+    expect(result.value).not.toBeNull();
+    expect(attempts).toEqual(["active", "previous"]);
+  });
+
+  test("does not retry or mask a scoped callback programming error", async () => {
+    const fixture = await snapshotFixture();
+    const injected = new TypeError("injected consumer bug");
+    let attempts = 0;
+
+    await expect(
+      fixture.reader().readReleaseScoped(async (scope) => {
+        attempts += 1;
+        await scope.readLogicalArtifact("state/sources", { required: true });
+        throw injected;
+      }),
+    ).rejects.toBe(injected);
+    expect(attempts).toBe(1);
+    expect(
+      fixture.http.requestCount(releaseManifestKey(fixture.previous.releaseId)),
+    ).toBe(0);
+  });
+
+  test("rejects an invalid scoped logical name once without object reads", async () => {
+    const fixture = await snapshotFixture();
+    const objectKeys = new Set(
+      Object.values(fixture.active.manifest.artifacts).map(({ key }) => key),
+    );
+    let attempts = 0;
+
+    await expect(
+      fixture.reader().readReleaseScoped((scope) => {
+        attempts += 1;
+        return scope.readLogicalArtifact("../private/secret", {
+          required: true,
+        });
+      }),
+    ).rejects.toBeInstanceOf(PublicSnapshotUnavailableError);
+    expect(attempts).toBe(1);
+    expect(
+      fixture.http.requests.some(({ key }) => objectKeys.has(key)),
+    ).toBeFalse();
   });
 
   test("rejects corrupt release-pinned body bytes", async () => {
