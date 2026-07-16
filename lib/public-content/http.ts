@@ -35,6 +35,21 @@ import {
   listPublicDailyIndex,
 } from "@/lib/public-content/public-dailies";
 import {
+  PUBLIC_FEED_DIRECTORY_LOGICAL_NAME,
+  isDefaultPublicFeedQuery,
+  parsePublicFeedDefault,
+  parsePublicFeedDirectory,
+  parsePublicFeedSegment,
+  publicFeedApiItemFromStory,
+  publicFeedDefaultLogicalName,
+  publicFeedRowId,
+  queryPublicFeedRows,
+  selectPublicFeedSegmentLogicalNames,
+  type PublicFeedDirectory,
+  type PublicFeedResult,
+  type PublicFeedRow,
+} from "@/lib/public-content/feed-artifacts";
+import {
   PUBLIC_NUMERIC_SHARD_COUNT,
   parsePublicEntityShardValue,
   parsePublicItemBodyShardValue,
@@ -110,26 +125,95 @@ export async function publicFeedSnapshotRequestResult(
       status: 400,
     };
   }
-  const snapshot = await readPublicSnapshot();
-  const result = queryPublicFeed(
-    snapshot.state,
-    feedQueryFromParams(parsed.data),
-    { nowMs: Date.now() },
-  );
+  const query = feedQueryFromParams(parsed.data);
+  const reader = publicSnapshotReader();
+  const scoped = await reader.readReleaseScoped(async (scope) => {
+    if (!supportsDirectFeedRead(scope.release)) {
+      const snapshot = await scope.readCanonicalState();
+      const result = queryPublicFeed(snapshot.state, query, { nowMs: Date.now() });
+      return feedSnapshotResult(
+        snapshot.release,
+        {
+          ...result,
+          items: result.items.map((story) =>
+            publicFeedApiItemFromStory(story, query.locale ?? "zh"),
+          ),
+        },
+        parsed.search,
+      );
+    }
+    if (isDefaultPublicFeedQuery(query)) {
+      const locale = query.locale ?? "zh";
+      let result: PublicFeedResult | undefined;
+      await scope.readLogicalArtifact(publicFeedDefaultLogicalName(locale), {
+        required: true,
+        validate: (bytes) => {
+          result = parsePublicFeedDefault(locale, bytes).result;
+        },
+      });
+      return feedSnapshotResult(scope.release, result!, parsed.search);
+    }
+
+    let directory: PublicFeedDirectory | undefined;
+    await scope.readLogicalArtifact(PUBLIC_FEED_DIRECTORY_LOGICAL_NAME, {
+      required: true,
+      validate: (bytes) => {
+        directory = parsePublicFeedDirectory(bytes);
+      },
+    });
+    assertCompleteFeedDirectory(scope, directory!);
+    const logicalNames = selectPublicFeedSegmentLogicalNames(directory!, query);
+    const directoryByName = new Map(
+      directory!.segments.map((segment) => [segment.logicalName, segment]),
+    );
+    const rowShards = await mapWithConcurrency(
+      logicalNames,
+      16,
+      async (logicalName) => {
+        let rows: PublicFeedRow[] | undefined;
+        await scope.readLogicalArtifact(logicalName, {
+          required: true,
+          validate: (bytes) => {
+            const segment = parsePublicFeedSegment(logicalName, bytes);
+            if (segment.rows.length !== directoryByName.get(logicalName)?.count) {
+              throw new Error(`public feed segment count mismatch: ${logicalName}`);
+            }
+            rows = segment.rows;
+          },
+        });
+        return rows!;
+      },
+    );
+    const rows = rowShards.flat();
+    if (new Set(rows.map(publicFeedRowId)).size !== rows.length) {
+      return scope.rejectRelease(new Error("duplicate public feed row"));
+    }
+    return feedSnapshotResult(
+      scope.release,
+      queryPublicFeedRows(rows, query, { nowMs: Date.now() }),
+      parsed.search,
+    );
+  });
+  return scoped.value;
+}
+
+function feedSnapshotResult(
+  release: ResolvedPublicRelease,
+  result: PublicFeedResult,
+  search: string,
+): SnapshotCachedResult {
   return {
     ok: true,
     signal: etagSignal({
-      release: snapshot.release.ref.manifestSha256,
+      release: release.ref.manifestSha256,
       count: result.items.length,
       total: result.total,
       first_id: result.items[0]?.id ?? "",
-      latest_at: result.items[0]?.publishedAt ?? "",
-      qs: parsed.search,
+      latest_at: result.items[0]?.published_at ?? "",
+      qs: search,
     }),
     body: {
-      items: result.items.map((story) =>
-        toSnapshotPublicApiItem(story, parsed.data.locale),
-      ),
+      items: result.items,
       total: result.total,
       limit: result.limit,
       offset: result.offset,
@@ -534,6 +618,34 @@ function eventMembersSnapshotResult(
   };
 }
 
+function supportsDirectFeedRead(release: ResolvedPublicRelease): boolean {
+  return (
+    release.manifest.artifacts[PUBLIC_FEED_DIRECTORY_LOGICAL_NAME] !== undefined &&
+    APP_LOCALES.every(
+      (locale) =>
+        release.manifest.artifacts[publicFeedDefaultLogicalName(locale)] !==
+        undefined,
+    )
+  );
+}
+
+function assertCompleteFeedDirectory(
+  scope: PublicReleaseReadScope,
+  directory: PublicFeedDirectory,
+): void {
+  const declared = directory.segments.map(({ logicalName }) => logicalName).sort();
+  const manifest = Object.keys(scope.release.manifest.artifacts)
+    .filter((logicalName) => logicalName.startsWith("feeds/segments/"))
+    .sort();
+  if (
+    new Set(declared).size !== declared.length ||
+    declared.length !== manifest.length ||
+    declared.some((logicalName, index) => logicalName !== manifest[index])
+  ) {
+    scope.rejectRelease(new Error("public feed directory is incomplete"));
+  }
+}
+
 function supportsDirectEntityRead(release: ResolvedPublicRelease): boolean {
   return release.manifest.numericShardCount === PUBLIC_NUMERIC_SHARD_COUNT;
 }
@@ -637,6 +749,26 @@ function directReadState(input: {
 
 function parseJson(bytes: Uint8Array): unknown {
   return JSON.parse(new TextDecoder().decode(bytes)) as unknown;
+}
+
+async function mapWithConcurrency<T, R>(
+  values: readonly T[],
+  concurrency: number,
+  map: (value: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(values.length);
+  let next = 0;
+  async function worker(): Promise<void> {
+    for (;;) {
+      const index = next++;
+      if (index >= values.length) return;
+      results[index] = await map(values[index]!);
+    }
+  }
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, values.length) }, worker),
+  );
+  return results;
 }
 
 export function latestDailySnapshotResult(

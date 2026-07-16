@@ -1,6 +1,6 @@
 # Public Cold Route Reads — Source Plan
 
-Status: PCR-3 in progress
+Status: PCR-4 in progress
 
 Branch: `perf/public-cold-route-reads`
 
@@ -91,6 +91,27 @@ active→previous→warm-LKG behavior, all cross-artifact consistency failures,
 valid empty shards, corrupt/missing dependencies, and controlled terminal 503s
 are covered. The first independent review found one Low test-coverage gap; it
 was fully resolved, and the second review was clean.
+
+PCR-3 publishes compact route rows in UTC publication month × four stable ID
+buckets, a complete directory, and bounded default artifacts for both locales.
+The default API path reads exactly pointer + active manifest + one default
+artifact; filtered and all-time pagination reads only the directory and
+intersecting compact segments. Date/range selection conservatively loads whole
+intersecting months before exact row filtering, so directory range metadata
+cannot silently omit history. Legacy releases retain release-pinned canonical
+fallback; corrupt active default/directory/segment artifacts retry the complete
+operation on previous, then warm LKG, and terminal corruption returns 503.
+
+The same builder was measured read-only against live release
+`r1036-c5325fdf281f80fb9e6d` (8,896 items, 475 events, 55 sources): 128 segments
+total 9,737,295 B, the largest is 857,319 B, the directory is 21,869 B, and the
+zh/en defaults are 40,902 B / 43,331 B. A zero-change legacy release migrates
+the family through the normal pointer-last publisher under the 500-write
+preflight. In the incremental fixture, one historical item changes exactly one
+segment while the other six feed artifacts reuse their SHA. The first review
+found one Medium directory-integrity gap; path/month/bucket, uniqueness and
+ordered bounds validation plus publisher/runtime regression tests resolved it,
+and the second review was clean.
 
 The baseline request set was release-tied by fetching `current.json`, then its
 active manifest, before the public responses. Capture form was
@@ -280,8 +301,8 @@ this ledger is updated in that same commit.
 |---|---|---|---|
 | PCR-1 | inventory, production baseline, exact contracts, release-scoped reader primitive | done | this phase commit; 23 reader tests; reviewer rounds 1–3 clean |
 | PCR-2 | release-pinned item and both event-member routes | done | this phase commit; 55 focused tests; typecheck/lint clean; reviewer rounds 1–2 clean |
-| PCR-3 | compact segmented feed artifacts, default first page, publisher incrementality | in progress | pending |
-| PCR-4 | compact sharded lexical index and hit hydration | pending | pending |
+| PCR-3 | compact segmented feed artifacts, default first page, publisher incrementality | done | this phase commit; 88 related tests; live default 43,331 B max; reviewer rounds 1–2 clean |
+| PCR-4 | compact sharded lexical index and hit hydration | in progress | pending |
 | PCR-5 | daily, sources/active, RSS, shell, page variants; static/runtime no-full-state verifier | pending | pending |
 | PCR-6 | full verification, final review, PR/CI/merge/deploy, true-cold and admin evidence, closeout PR | pending | pending |
 

@@ -12,6 +12,14 @@ import {
   snapshotPointerSchema,
 } from "@/lib/public-content/contracts";
 import {
+  PUBLIC_FEED_DIRECTORY_LOGICAL_NAME,
+  parsePublicFeedDefault,
+  parsePublicFeedDirectory,
+  parsePublicFeedSegment,
+  publicFeedDefaultLogicalName,
+} from "@/lib/public-content/feed-artifacts";
+import { APP_LOCALES } from "@/lib/types";
+import {
   CURRENT_POINTER_KEY,
   releaseManifestKey,
 } from "@/lib/public-content/paths";
@@ -103,9 +111,10 @@ export async function publishIncrementalSnapshot(
 
   if (
     context.batch.changes.length === 0 &&
-    !requiresNumericShardMigration(previousManifest) &&
-    !requiresBodySplitMigration(previousManifest) &&
-    hasRequiredMaterializedPages(previousManifest)
+      !requiresNumericShardMigration(previousManifest) &&
+      !requiresBodySplitMigration(previousManifest) &&
+      hasRequiredMaterializedPages(previousManifest) &&
+      hasRequiredPublicFeedArtifacts(previousManifest)
   ) {
     try {
       await input.source.acknowledgeThrough(context.batch.toWatermark);
@@ -261,6 +270,17 @@ export async function uploadChangedReleaseArtifacts(
       );
     } else if (artifact.logicalName.startsWith("views/")) {
       parseMaterializedPageArtifact(stored.bytes);
+    } else if (artifact.logicalName === PUBLIC_FEED_DIRECTORY_LOGICAL_NAME) {
+      parsePublicFeedDirectory(stored.bytes);
+    } else if (artifact.logicalName.startsWith("feeds/segments/")) {
+      parsePublicFeedSegment(artifact.logicalName, stored.bytes);
+    } else if (artifact.logicalName.startsWith("feeds/default/")) {
+      const locale = APP_LOCALES.find(
+        (candidate) =>
+          publicFeedDefaultLogicalName(candidate) === artifact.logicalName,
+      );
+      if (!locale) throw new Error("unknown public feed default artifact");
+      parsePublicFeedDefault(locale, stored.bytes);
     }
     if (put.status === "uploaded") {
       metrics.uploaded += 1;
@@ -275,6 +295,17 @@ export async function uploadChangedReleaseArtifacts(
 function hasRequiredMaterializedPages(manifest: PublicReleaseManifest): boolean {
   return REQUIRED_MATERIALIZED_PAGE_LOGICAL_NAMES.every(
     (logicalName) => logicalName in manifest.artifacts,
+  );
+}
+
+function hasRequiredPublicFeedArtifacts(
+  manifest: PublicReleaseManifest,
+): boolean {
+  return (
+    PUBLIC_FEED_DIRECTORY_LOGICAL_NAME in manifest.artifacts &&
+    APP_LOCALES.every(
+      (locale) => publicFeedDefaultLogicalName(locale) in manifest.artifacts,
+    )
   );
 }
 

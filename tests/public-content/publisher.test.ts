@@ -15,19 +15,30 @@ import {
   parseMaterializedPageArtifact,
 } from "@/lib/public-content/materialized-artifact";
 import {
+  PUBLIC_FEED_DIRECTORY_LOGICAL_NAME,
+  publicFeedDefaultLogicalName,
+} from "@/lib/public-content/feed-artifacts";
+import {
   CURRENT_POINTER_KEY,
   objectKey,
   releaseManifestKey,
   runReceiptKey,
 } from "@/lib/public-content/paths";
-import { buildPublicRelease } from "@/lib/public-content/publisher/build-release";
+import {
+  buildPublicRelease,
+  type BuiltPublicRelease,
+} from "@/lib/public-content/publisher/build-release";
 import type {
   ImmutablePutInput,
   PointerCasInput,
   PublisherObjectStore,
   StoredPublisherObject,
 } from "@/lib/public-content/publisher/object-store";
-import { publishIncrementalSnapshot } from "@/lib/public-content/publisher/publish";
+import {
+  emptyPublicPublisherObjectMetrics,
+  publishIncrementalSnapshot,
+  uploadChangedReleaseArtifacts,
+} from "@/lib/public-content/publisher/publish";
 import { runIncrementalPublicPublisher } from "@/lib/public-content/publisher/runtime";
 import type {
   PublicContentPublisherSource,
@@ -492,6 +503,107 @@ describe("pointer-last incremental publisher", () => {
     ]);
   });
 
+  test("zero-change work migrates a release that predates direct feed artifacts", async () => {
+    const fixture = await seededFixture();
+    const artifacts = Object.fromEntries(
+      Object.entries(fixture.release.manifest.artifacts).filter(
+        ([logicalName]) => !logicalName.startsWith("feeds/"),
+      ),
+    );
+    const legacyManifest = manifestSchema.parse({
+      ...fixture.release.manifest,
+      releaseId: "r10-00000000000000000000",
+      artifacts,
+    });
+    const legacyManifestBytes = canonicalJsonBytes(legacyManifest);
+    const legacyManifestKey = releaseManifestKey(legacyManifest.releaseId);
+    fixture.store.seed(legacyManifestKey, legacyManifestBytes);
+    const legacyPointer = snapshotPointerSchema.parse({
+      ...fixture.pointer,
+      active: {
+        releaseId: legacyManifest.releaseId,
+        manifestKey: legacyManifestKey,
+        manifestSha256: await sha256Hex(legacyManifestBytes),
+      },
+    });
+    fixture.store.seed(CURRENT_POINTER_KEY, canonicalJsonBytes(legacyPointer));
+    fixture.store.clearEvents();
+    const source = new FakeSource(batch(10, 10, []), fixture.events);
+
+    const receipt = await run(fixture, source);
+
+    expect(receipt.status).toBe("succeeded");
+    expect(receipt.releaseId).not.toBeNull();
+    expect(source.ackCalls).toEqual([10]);
+    const currentObject = fixture.store.objects.get(CURRENT_POINTER_KEY)!;
+    const current = snapshotPointerSchema.parse(
+      JSON.parse(new TextDecoder().decode(currentObject.bytes)),
+    );
+    const manifestObject = fixture.store.objects.get(current.active.manifestKey)!;
+    const manifest = manifestSchema.parse(
+      JSON.parse(new TextDecoder().decode(manifestObject.bytes)),
+    );
+    expect(manifest.artifacts[PUBLIC_FEED_DIRECTORY_LOGICAL_NAME]).toBeDefined();
+    expect(manifest.artifacts[publicFeedDefaultLogicalName("en")]).toBeDefined();
+    expect(manifest.artifacts[publicFeedDefaultLogicalName("zh")]).toBeDefined();
+  });
+
+  test("feed directory metadata is rejected during artifact upload verification", async () => {
+    const events: string[] = [];
+    const store = new FakeStore(events);
+    const invalid = await jsonFixtureArtifact(
+      {
+        schemaVersion: 1,
+        kind: "public-feed-directory",
+        segments: [
+          {
+            logicalName: "feeds/segments/2026-07/0",
+            month: "2026-06",
+            bucket: 0,
+            count: 1,
+            minPublishedAt: "2026-07-14T00:00:00.000Z",
+            maxPublishedAt: "2026-07-14T01:00:00.000Z",
+          },
+        ],
+      },
+      { kind: "singleton" },
+    );
+    const releaseId = "r10-11111111111111111111";
+    const manifest = manifestSchema.parse({
+      schemaVersion: 1,
+      releaseId,
+      sourceWatermark: 10,
+      numericShardCount: PUBLIC_NUMERIC_SHARD_COUNT,
+      artifacts: {
+        [PUBLIC_FEED_DIRECTORY_LOGICAL_NAME]: invalid.descriptor,
+      },
+    });
+    const manifestBytes = canonicalJsonBytes(manifest);
+    const release: BuiltPublicRelease = {
+      releaseId,
+      manifest,
+      manifestBytes,
+      manifestSha256: await sha256Hex(manifestBytes),
+      loadedArtifactCount: 0,
+      artifacts: [
+        {
+          logicalName: PUBLIC_FEED_DIRECTORY_LOGICAL_NAME,
+          descriptor: invalid.descriptor,
+          bytes: invalid.bytes,
+          unchanged: false,
+        },
+      ],
+    };
+
+    await expect(
+      uploadChangedReleaseArtifacts(
+        store,
+        release,
+        emptyPublicPublisherObjectMetrics(),
+      ),
+    ).rejects.toThrow("directory metadata mismatch");
+  });
+
   test("conditionally swaps to the validated previous release and can restore", async () => {
     const fixture = await seededFixture();
     const source = new FakeSource(
@@ -604,7 +716,7 @@ describe("pointer-last incremental publisher", () => {
 
   test("publishes exactly 497 changed artifacts within the 500-write runtime cap", async () => {
     const fixture = await seededFixture();
-    const changes = bucketFanoutChanges(fixture.state, 87);
+    const changes = bucketFanoutChanges(fixture.state, 82);
     const candidate = await buildPublicRelease({
       previousManifest: fixture.release.manifest,
       sourceWatermark: 10 + changes.length,
@@ -641,7 +753,7 @@ describe("pointer-last incremental publisher", () => {
 
   test("rejects 498 changed artifacts before runtime writes only its receipt", async () => {
     const fixture = await seededFixture();
-    const changes = bucketFanoutChanges(fixture.state, 88);
+    const changes = bucketFanoutChanges(fixture.state, 83);
     const candidate = await buildPublicRelease({
       previousManifest: fixture.release.manifest,
       sourceWatermark: 10 + changes.length,

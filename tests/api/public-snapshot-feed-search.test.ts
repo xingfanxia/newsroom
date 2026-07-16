@@ -219,6 +219,7 @@ async function feedSearchFixture(): Promise<MemoryPublicSnapshotHttp> {
     previousManifest: null,
     sourceWatermark: 20,
     changes: allChanges(PARITY_STATE),
+    generatedAtMs: Date.parse("2026-07-14T12:00:00.000Z"),
     loadArtifact: async () => {
       throw new Error("fixture cannot load a prior artifact");
     },
