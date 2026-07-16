@@ -170,6 +170,27 @@ is the only remaining consumer of the 0.56 MiB family. These are pre-deploy
 descriptor facts; PCR-6 still measures application latency on the deployed
 release.
 
+PCR-6 pre-PR verification is complete. The final frozen runtime diff passes
+`verify:public-boundary` with 145 source files inspected, zero contaminated
+entrypoints, the full-state boundary clean, and the rebuilt Next NFT graph
+clean. The hermetic repository gate passes typecheck, lint, production build,
+dead files/exports/types, and 1,577 tests with zero failures. Its final stage
+sentinel is `HERMETIC_VERIFY_TEST_9f5c71a3-8e87-466d-9853-3fed1e217067`, followed
+by the required outer `HERMETIC_VERIFY_COMPLETE` sentinel.
+
+The independent final review required three rounds. Round 1 found a Medium
+podcast-detail compatibility regression and a Low feed-directory integrity
+gap. Existing non-podcast IDs under `/podcasts/[id]` now preserve their prior
+detail behavior through a bounded item/source/body/optional-event read, while a
+real podcast item missing from its materialized bucket rejects the whole active
+release and retries previous. The feed API now validates each loaded segment's
+exact count/min/max timestamps against the directory. Round 2 found that an
+event-backed non-podcast detail was incorrectly reparsed as a complete
+canonical state; direct hydration now exposes only the three lightweight
+relation maps consumed by the detail serializer. Eventless and event-backed
+non-podcast IDs, unknown IDs, missing-podcast-entry fallback, and hash-valid
+wrong feed bounds all have regressions. Round 3 was clean.
+
 The baseline request set was release-tied by fetching `current.json`, then its
 active manifest, before the public responses. Capture form was
 `/usr/bin/curl -fsS -D <name>.headers '<url>' -o <name>.body`, followed by
@@ -361,7 +382,7 @@ this ledger is updated in that same commit.
 | PCR-3 | compact segmented feed artifacts, default first page, publisher incrementality | done | this phase commit; 88 related tests; live default 43,331 B max; reviewer rounds 1–2 clean |
 | PCR-4 | compact sharded lexical index and hit hydration | done | phase commit; 79 related tests; live index 8,325,002 B / 32 shards; reviewer rounds 1–2 clean |
 | PCR-5 | daily, sources/active, RSS, shell, page variants; static/runtime no-full-state verifier | done | 73 related tests / 657 assertions; typecheck/lint/source + full-state boundaries clean; reviewer round 1 two Medium findings resolved; round 2 clean |
-| PCR-6 | full verification, final review, PR/CI/merge/deploy, true-cold and admin evidence, closeout PR | pending | pending |
+| PCR-6 | full verification, final review, PR/CI/merge/deploy, true-cold and admin evidence, closeout PR | in progress | local boundary + hermetic gates clean; final review round 1 Medium + Low resolved, round 2 Medium resolved, round 3 clean; PR/production evidence pending |
 
 ## 7. Verification and production acceptance
 

@@ -1,6 +1,7 @@
 import { unstable_cache } from "next/cache";
 import {
   readDirectPublicFeedStories,
+  readDirectPublicItem,
   supportsDirectPublicRouteReads,
 } from "@/lib/public-content/direct-route-read";
 import {
@@ -33,6 +34,7 @@ import {
   parsePublicItemBodyShardValue,
   publicItemBodyShardLogicalName,
 } from "@/lib/public-content/contracts";
+import { publicPageItemDetailFromIndex } from "@/lib/public-content/page-data";
 import type { PublicReleaseReadScope } from "@/lib/public-content/reader/types";
 import { DEFAULT_PODCAST_TIER } from "@/lib/feed/podcast-filters";
 import type { AppLocale } from "@/lib/types";
@@ -253,8 +255,24 @@ async function readPodcastDetailPageModelUncached(input: {
       scope,
       materializedPageLogicalName.podcastDetails(input.id),
     );
+    const detail = published.detailsById[String(input.id)]?.[input.locale];
+    if (detail) return { detail, chrome: published.chrome };
+
+    const direct = await readDirectPublicItem(scope, input.id);
+    if (!direct) return { detail: null, chrome: published.chrome };
+    if (direct.source.group === "podcast") {
+      return scope.rejectRelease(
+        new Error(`missing materialized podcast detail: ${input.id}`),
+      );
+    }
     return {
-      detail: published.detailsById[String(input.id)]?.[input.locale] ?? null,
+      detail: publicPageItemDetailFromIndex(
+        direct.index,
+        input.id,
+        input.locale,
+        nowMs,
+        direct.bodyMd,
+      ),
       chrome: published.chrome,
     };
   });

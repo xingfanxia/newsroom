@@ -26,7 +26,7 @@ import {
 } from "@/lib/types";
 
 export const PUBLIC_FEED_DIRECTORY_LOGICAL_NAME = "feeds/directory";
-export const PUBLIC_FEED_SEGMENT_BUCKET_COUNT = 4;
+const PUBLIC_FEED_SEGMENT_BUCKET_COUNT = 4;
 const DAY_MS = 86_400_000;
 
 const localizedTupleSchema = <T extends z.ZodTypeAny>(value: T) =>
@@ -36,7 +36,7 @@ const publicHkrSchema = z
   .strictObject({ h: z.boolean(), k: z.boolean(), r: z.boolean() })
   .nullable();
 
-export const publicFeedApiItemSchema = z.strictObject({
+const publicFeedApiItemSchema = z.strictObject({
   id: z.string().regex(/^\d+$/),
   title: z.string(),
   summary: z.string(),
@@ -86,7 +86,7 @@ const ROW = {
   canonicalTitle: 20,
 } as const;
 
-export const publicFeedRowSchema = z.tuple([
+const publicFeedRowSchema = z.tuple([
   z.number().int().positive(),
   z.string().datetime(),
   z.number().int(),
@@ -110,7 +110,7 @@ export const publicFeedRowSchema = z.tuple([
   localizedTupleSchema(z.string().nullable()),
 ]);
 
-export const publicFeedSegmentSchema = z.strictObject({
+const publicFeedSegmentSchema = z.strictObject({
   schemaVersion: z.literal(1),
   kind: z.literal("public-feed-segment"),
   month: z.string().regex(/^\d{4}-\d{2}$/),
@@ -127,7 +127,7 @@ const publicFeedDirectoryEntrySchema = z.strictObject({
   maxPublishedAt: z.string().datetime(),
 });
 
-export const publicFeedDirectorySchema = z.strictObject({
+const publicFeedDirectorySchema = z.strictObject({
   schemaVersion: z.literal(1),
   kind: z.literal("public-feed-directory"),
   segments: z.array(publicFeedDirectoryEntrySchema),
@@ -141,7 +141,7 @@ const publicFeedResultSchema = z.strictObject({
   view: z.enum(["archive", "today"]),
 });
 
-export const publicFeedDefaultSchema = z.strictObject({
+const publicFeedDefaultSchema = z.strictObject({
   schemaVersion: z.literal(1),
   kind: z.literal("public-feed-default"),
   locale: z.enum(APP_LOCALES),
@@ -170,7 +170,7 @@ export function publicFeedRowPublishedAt(row: PublicFeedRow): string {
   return row[ROW.publishedAt];
 }
 
-export function publicFeedSegmentLogicalName(
+function publicFeedSegmentLogicalName(
   month: string,
   bucket: number,
 ): string {
@@ -471,7 +471,7 @@ export function publicFeedApiItemFromStory(story: Story, locale: AppLocale) {
   });
 }
 
-export function publicFeedApiItemFromRow(
+function publicFeedApiItemFromRow(
   row: PublicFeedRow,
   locale: AppLocale,
 ) {

@@ -43,7 +43,7 @@ export function publicPageItemDetail(
 }
 
 export function publicPageItemDetailFromIndex(
-  index: PublicStateIndex,
+  index: Pick<PublicStateIndex, "itemsById" | "eventsById" | "sourcesById">,
   id: number,
   locale: AppLocale,
   nowMs: number,

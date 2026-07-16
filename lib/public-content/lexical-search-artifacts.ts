@@ -31,7 +31,7 @@ const ROW = {
 
 const nullableTextSchema = z.string().nullable();
 
-export const publicLexicalRowSchema = z.tuple([
+const publicLexicalRowSchema = z.tuple([
   z.number().int().positive(),
   z.string().datetime(),
   z.number().int(),
@@ -48,7 +48,7 @@ export const publicLexicalRowSchema = z.tuple([
   nullableTextSchema,
 ]);
 
-export const publicLexicalShardSchema = z.strictObject({
+const publicLexicalShardSchema = z.strictObject({
   schemaVersion: z.literal(1),
   kind: z.literal("public-lexical-shard"),
   bucket: z.number().int().min(0).max(PUBLIC_LEXICAL_SHARD_COUNT - 1),

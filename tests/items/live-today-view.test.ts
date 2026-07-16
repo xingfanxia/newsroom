@@ -16,11 +16,11 @@ import { describe, expect, it } from "bun:test";
 import { exportedFunctionSection, readSource } from "@/tests/helpers/source";
 
 const liveSrc = readSource("lib/items/live.ts");
-// The home page coerces its params and delegates to this builder, which now
-// owns the daily-highlights guard and the recent-day-rescue wiring.
-const homeBuilderSrc = exportedFunctionSection(
+// The home page and direct-artifact reader share this query builder, which owns
+// the daily-highlights guard and recent-day-rescue wiring.
+const homeQuerySrc = exportedFunctionSection(
   readSource("lib/public-content/page-model-builders.ts"),
-  "buildPublicHomePageModelFromSnapshot",
+  "publicHomePageFeedQuery",
 );
 
 describe("view=today filter — fresh-but-cold rescue clause", () => {
@@ -85,12 +85,12 @@ describe("daily-highlights mode (minImportance + maxPerDay)", () => {
     // feed for their slice. The home builder guards with:
     //   !activeDate && !sourceId && sourcePreset === 'all' && tier === DEFAULT_HOME_TIER
     // so opening /zh?source=media or /zh?date=2026-04-21 stays unfiltered.
-    expect(homeBuilderSrc).toContain("dailyHighlights");
-    expect(homeBuilderSrc).toMatch(
+    expect(homeQuerySrc).toContain("dailyHighlights");
+    expect(homeQuerySrc).toMatch(
       /!input\.activeDate\s*&&\s*!input\.sourceId\s*&&\s*input\.sourcePreset === "all"\s*&&\s*input\.tier === DEFAULT_HOME_TIER/,
     );
-    expect(homeBuilderSrc).toContain("minImportance: 80");
-    expect(homeBuilderSrc).toContain("maxPerDay: 3");
+    expect(homeQuerySrc).toContain("minImportance: 80");
+    expect(homeQuerySrc).toContain("maxPerDay: 3");
   });
 });
 
@@ -119,6 +119,6 @@ describe("recent-day rescue (recentDayRescueDays)", () => {
     // 3 covers today + yesterday + 2 days ago — the typical scoring-lag
     // window. Day with weak news ingest (e.g. 04-25 max imp = 76) still
     // surfaces top-3 by importance instead of being skipped entirely.
-    expect(homeBuilderSrc).toContain("recentDayRescueDays: 3");
+    expect(homeQuerySrc).toContain("recentDayRescueDays: 3");
   });
 });

@@ -30,13 +30,13 @@ const allPage = readSource("app/[locale]/all/page.tsx");
 const pageModelBuildersSrc = readSource(
   "lib/public-content/page-model-builders.ts",
 );
-const homePageBuilder = exportedFunctionSection(
+const homePageFeedQuery = exportedFunctionSection(
   pageModelBuildersSrc,
-  "buildPublicHomePageModelFromSnapshot",
+  "publicHomePageFeedQuery",
 );
-const allPageBuilder = exportedFunctionSection(
+const allPageFeedQuery = exportedFunctionSection(
   pageModelBuildersSrc,
-  "buildAllPageModel",
+  "allPageFeedQuery",
 );
 const liveItems = readSource("lib/items/live.ts");
 const savedItems = readSource("lib/items/saved.ts");
@@ -153,15 +153,15 @@ describe("feed tier/view source wiring", () => {
     for (const source of [homePage, allPage, homeFilters]) {
       expect(source).toContain("@/lib/feed/source-presets");
     }
-    // Pages coerce the preset param; the preset→feed-filter mapping runs one
-    // layer down in the page-model builder — but still through the typed helper.
+    // Pages coerce the preset param; the preset→feed-filter mapping runs in the
+    // shared page-model query builder through the typed helper.
     for (const source of [homePage, allPage]) {
       expect(source).toContain("coerceSourcePreset");
     }
-    for (const source of [homePageBuilder, allPageBuilder]) {
+    for (const source of [homePageFeedQuery, allPageFeedQuery]) {
       expect(source).toContain("sourcePresetToFeedFilter");
     }
-    for (const source of [homePage, allPage, homePageBuilder, allPageBuilder]) {
+    for (const source of [homePage, allPage, homePageFeedQuery, allPageFeedQuery]) {
       expect(source).not.toContain("function presetToFilter");
       expect(source).not.toContain("new Set<SourcePreset>");
       expect(source).not.toContain(
@@ -194,8 +194,8 @@ describe("feed tier/view source wiring", () => {
     expect(homePage).toContain("coerceHomeView");
     // The home page defers its default tier to coerceHomeTier above; the
     // explicit DEFAULT_HOME_TIER reference for the home flow (daily-highlights
-    // guard + day-count tier) now lives in the page-model builder.
-    expect(homePageBuilder).toContain("DEFAULT_HOME_TIER");
+    // guard now lives in the shared page-model query builder.
+    expect(homePageFeedQuery).toContain("DEFAULT_HOME_TIER");
     expect(homePage).not.toContain("function coerceTier");
     expect(homePage).not.toContain("function coerceView");
     expect(allPage).toContain("DEFAULT_HOME_TIER");

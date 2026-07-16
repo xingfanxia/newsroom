@@ -336,6 +336,45 @@ describe("direct public feed artifacts", () => {
     ).toBeFalse();
   });
 
+  test("hash-valid active directory timestamp bounds retry the previous release", async () => {
+    const fallback = await feedFallbackFixture("none");
+    const activeDirectory = fallback.active.artifacts.find(
+      ({ logicalName }) => logicalName === "feeds/directory",
+    )!;
+    const value = JSON.parse(new TextDecoder().decode(activeDirectory.bytes)) as {
+      segments: Array<{
+        count: number;
+        minPublishedAt: string;
+        maxPublishedAt: string;
+      }>;
+    };
+    const changed = value.segments.find(({ count }) => count > 1)!;
+    changed.minPublishedAt = changed.maxPublishedAt;
+    await installActiveDirectory(fallback, value);
+    useFixture(fallback.http);
+
+    const response = await getPublicFeed(
+      new Request(
+        "https://newsroom.test/api/public/feed?tier=all&limit=100",
+      ),
+    );
+    const expected = queryPublicFeedRows(
+      publicFeedRowsFromState(PARITY_STATE, PARITY_NOW_MS),
+      {
+        tier: "all",
+        locale: "en",
+        view: "archive",
+        hotWindowHours: 24,
+        limit: 100,
+        offset: 0,
+        includeSourceGroup: true,
+      },
+      { nowMs: PARITY_NOW_MS },
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(expected);
+  });
+
   test("corrupt directory or segment artifacts fail closed without canonical aggregation", async () => {
     const corruptDirectory = await directFeedFixture(
       "https://feed-directory-terminal.test",
@@ -524,6 +563,38 @@ async function feedFallbackFixture(
     canonicalJsonBytes(pointer),
   );
   return { active, http, pointer, previous };
+}
+
+async function installActiveDirectory(
+  fallback: Awaited<ReturnType<typeof feedFallbackFixture>>,
+  value: unknown,
+): Promise<void> {
+  const bytes = canonicalJsonBytes(value);
+  const sha256 = await sha256Hex(bytes);
+  const descriptor = {
+    ...fallback.active.manifest.artifacts["feeds/directory"]!,
+    key: objectKey(sha256, "json"),
+    sha256,
+    byteLength: bytes.byteLength,
+  };
+  const manifest = manifestSchema.parse({
+    ...fallback.active.manifest,
+    artifacts: {
+      ...fallback.active.manifest.artifacts,
+      "feeds/directory": descriptor,
+    },
+  });
+  const manifestBytes = canonicalJsonBytes(manifest);
+  const pointer = snapshotPointerSchema.parse({
+    ...fallback.pointer,
+    active: {
+      ...fallback.pointer.active,
+      manifestSha256: await sha256Hex(manifestBytes),
+    },
+  });
+  fallback.http.put(descriptor.key, bytes);
+  fallback.http.put(pointer.active.manifestKey, manifestBytes);
+  fallback.http.put(CURRENT_POINTER_KEY, canonicalJsonBytes(pointer));
 }
 
 function allChanges(state: CanonicalPublicState): PublicEntityChange[] {

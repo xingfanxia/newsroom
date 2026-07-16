@@ -40,7 +40,7 @@ export function listPublicDailyIndex(
   );
 }
 
-export function listPublicDailyIndexFromNewsletters(
+function listPublicDailyIndexFromNewsletters(
   newsletters: CanonicalNewsletters,
   options: { locale?: AppLocale; take?: number } = {},
 ): PublicDailyColumnIndex {
@@ -103,7 +103,7 @@ export function getPublicDailyByDate(
   );
 }
 
-export function getPublicDailyByDateFromNewsletters(
+function getPublicDailyByDateFromNewsletters(
   newsletters: CanonicalNewsletters,
   date: string,
   locale: AppLocale = "zh",
@@ -125,7 +125,7 @@ export function getLatestPublicDaily(
   );
 }
 
-export function getLatestPublicDailyFromNewsletters(
+function getLatestPublicDailyFromNewsletters(
   newsletters: CanonicalNewsletters,
   locale: AppLocale = "zh",
 ): PublicDailyColumn | null {

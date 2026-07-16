@@ -14,7 +14,9 @@ import {
 import {
   PUBLIC_NUMERIC_SHARD_COUNT,
   parsePublicEntityShardValue,
+  parsePublicItemBodyShardValue,
   publicEntityShardLogicalName,
+  publicItemBodyShardLogicalName,
   type CanonicalPublicState,
 } from "@/lib/public-content/contracts";
 import {
@@ -34,6 +36,14 @@ export type DirectPublicFeedResult = {
   limit: number;
   offset: number;
   view: "archive" | "today";
+};
+
+export type DirectPublicItemRead = {
+  index: Pick<PublicStateIndex, "itemsById" | "eventsById" | "sourcesById">;
+  item: CanonicalPublicState["items"][number];
+  source: CanonicalPublicState["sources"][number];
+  event: CanonicalPublicState["events"][number] | null;
+  bodyMd: string | null;
 };
 
 export function supportsDirectPublicRouteReads(
@@ -155,6 +165,58 @@ export async function readDirectPublicSources(
     },
   });
   return sources!;
+}
+
+export async function readDirectPublicItem(
+  scope: PublicReleaseReadScope,
+  id: number,
+): Promise<DirectPublicItemRead | null> {
+  const itemLogicalName = publicEntityShardLogicalName("item", String(id));
+  const item = (await readEntityRows(scope, itemLogicalName, "item")).find(
+    (candidate) => candidate.id === id,
+  );
+  if (!item) return null;
+
+  const [sources, events, bodyMd] = await Promise.all([
+    readDirectPublicSources(scope),
+    item.eventId === null
+      ? Promise.resolve([])
+      : readEntityRows(
+          scope,
+          publicEntityShardLogicalName("event", String(item.eventId)),
+          "event",
+        ),
+    readDirectPublicItemBody(scope, id),
+  ]);
+  const source = sources.find((candidate) => candidate.id === item.sourceId);
+  if (!source) {
+    return scope.rejectRelease(
+      new Error(`missing direct public item source: ${item.sourceId}`),
+    );
+  }
+  const event =
+    item.eventId === null
+      ? null
+      : events.find((candidate) => candidate.id === item.eventId) ?? null;
+  if (
+    item.eventId !== null &&
+    (!event || !event.memberItemIds.includes(item.id))
+  ) {
+    return scope.rejectRelease(
+      new Error(`missing direct public item event: ${item.eventId}`),
+    );
+  }
+  return {
+    index: {
+      itemsById: new Map([[item.id, item]]),
+      eventsById: event ? new Map([[event.id, event]]) : new Map(),
+      sourcesById: new Map(sources.map((candidate) => [candidate.id, candidate])),
+    },
+    item,
+    source,
+    event,
+    bodyMd,
+  };
 }
 
 function assertCompleteFeedDirectory(
@@ -280,6 +342,25 @@ async function readEntityRows<T extends "item" | "event">(
     },
   });
   return rows!;
+}
+
+async function readDirectPublicItemBody(
+  scope: PublicReleaseReadScope,
+  id: number,
+): Promise<string | null> {
+  const logicalName = publicItemBodyShardLogicalName(String(id));
+  let bodyMd: string | null | undefined;
+  await scope.readLogicalArtifact(logicalName, {
+    required: true,
+    validate: (bytes) => {
+      const shard = parsePublicItemBodyShardValue(
+        logicalName,
+        JSON.parse(new TextDecoder().decode(bytes)) as unknown,
+      );
+      bodyMd = shard.entities.find((entity) => entity.id === id)?.bodyMd ?? null;
+    },
+  });
+  return bodyMd!;
 }
 
 function parseEntityShard(logicalName: string, bytes: Uint8Array) {

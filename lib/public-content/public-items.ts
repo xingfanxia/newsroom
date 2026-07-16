@@ -51,7 +51,7 @@ export function createPublicStateIndex(value: unknown): PublicStateIndex {
 }
 
 export function publicStoryFromItem(
-  index: PublicStateIndex,
+  index: Pick<PublicStateIndex, "itemsById" | "eventsById" | "sourcesById">,
   item: PublicItem,
   options: {
     locale: AppLocale;

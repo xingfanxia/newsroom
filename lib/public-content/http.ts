@@ -31,9 +31,6 @@ import {
 } from "@/lib/daily-column/query-defaults";
 import {
   getLatestPublicDaily,
-  getLatestPublicDailyFromNewsletters,
-  getPublicDailyByDateFromNewsletters,
-  listPublicDailyIndexFromNewsletters,
   listPublicDailyColumnsFromNewsletters,
   type PublicDailyColumn,
 } from "@/lib/public-content/public-dailies";
@@ -46,6 +43,7 @@ import {
   publicFeedApiItemFromStory,
   publicFeedDefaultLogicalName,
   publicFeedRowId,
+  publicFeedRowPublishedAt,
   queryPublicFeedRows,
   selectPublicFeedSegmentLogicalNames,
   type PublicFeedDirectory,
@@ -193,8 +191,16 @@ export async function publicFeedSnapshotRequestResult(
           required: true,
           validate: (bytes) => {
             const segment = parsePublicFeedSegment(logicalName, bytes);
-            if (segment.rows.length !== directoryByName.get(logicalName)?.count) {
-              throw new Error(`public feed segment count mismatch: ${logicalName}`);
+            const expected = directoryByName.get(logicalName);
+            const published = segment.rows
+              .map(publicFeedRowPublishedAt)
+              .sort();
+            if (
+              segment.rows.length !== expected?.count ||
+              published[0] !== expected.minPublishedAt ||
+              published.at(-1) !== expected.maxPublishedAt
+            ) {
+              throw new Error(`public feed segment directory mismatch: ${logicalName}`);
             }
             rows = segment.rows;
           },
@@ -492,12 +498,6 @@ function parsePublicSourceRows(bytes: Uint8Array) {
     throw new Error("public sources artifact has the wrong entity type");
   }
   return shard.entities;
-}
-
-export function activeSourcesSnapshotBody(
-  snapshot: PublicCanonicalStateResult,
-): unknown {
-  return activeSourcesBody(snapshot.state.sources);
 }
 
 export async function readActiveSourcesSnapshotBody(): Promise<unknown> {
@@ -977,29 +977,6 @@ async function mapWithConcurrency<T, R>(
   return results;
 }
 
-export function latestDailySnapshotResult(
-  snapshot: PublicCanonicalStateResult,
-  req: Request,
-): SnapshotCachedResult {
-  return latestDailyRowsResult(
-    snapshot.state.newsletters,
-    snapshot.release,
-    req,
-  );
-}
-
-function latestDailyRowsResult(
-  newsletters: CanonicalPublicState["newsletters"],
-  release: ResolvedPublicRelease,
-  req: Request,
-): SnapshotCachedResult {
-  const locale = parseDailyLocale(req);
-  if (!locale.ok) return locale;
-  const daily = getLatestPublicDailyFromNewsletters(newsletters, locale.locale);
-  if (!daily) return { ok: false, error: "no_daily_yet", status: 404 };
-  return dailyResult(release, daily);
-}
-
 export async function latestDailySnapshotRequestResult(
   req: Request,
 ): Promise<SnapshotCachedResult> {
@@ -1013,40 +990,6 @@ export async function latestDailySnapshotRequestResult(
       : { ok: false as const, error: "no_daily_yet", status: 404 };
   });
   return scoped.value;
-}
-
-export function dailyByDateSnapshotResult(
-  snapshot: PublicCanonicalStateResult,
-  req: Request,
-  rawDate: string,
-): SnapshotCachedResult {
-  return dailyByDateRowsResult(
-    snapshot.state.newsletters,
-    snapshot.release,
-    req,
-    rawDate,
-  );
-}
-
-function dailyByDateRowsResult(
-  newsletters: CanonicalPublicState["newsletters"],
-  release: ResolvedPublicRelease,
-  req: Request,
-  rawDate: string,
-): SnapshotCachedResult {
-  const date = dailyDateSchema.safeParse(rawDate);
-  if (!date.success) return { ok: false, error: "invalid_date", status: 400 };
-  const locale = parseDailyLocale(req);
-  if (!locale.ok) return locale;
-  const daily = getPublicDailyByDateFromNewsletters(
-    newsletters,
-    date.data,
-    locale.locale,
-  );
-  if (!daily) {
-    return { ok: false, error: `no_daily_for_${date.data}`, status: 404 };
-  }
-  return dailyResult(release, daily);
 }
 
 export async function dailyByDateSnapshotRequestResult(
@@ -1069,45 +1012,6 @@ export async function dailyByDateSnapshotRequestResult(
         };
   });
   return scoped.value;
-}
-
-export function dailyIndexSnapshotResult(
-  snapshot: PublicCanonicalStateResult,
-  req: Request,
-): SnapshotCachedResult {
-  return dailyIndexRowsResult(
-    snapshot.state.newsletters,
-    snapshot.release,
-    req,
-  );
-}
-
-function dailyIndexRowsResult(
-  newsletters: CanonicalPublicState["newsletters"],
-  release: ResolvedPublicRelease,
-  req: Request,
-): SnapshotCachedResult {
-  const parsed = dailyIndexQuerySchema.safeParse(queryParamsRecord(req));
-  if (!parsed.success) {
-    return {
-      ok: false,
-      error: invalidQueryError(parsed.error.issues),
-      status: 400,
-    };
-  }
-  const body = listPublicDailyIndexFromNewsletters(newsletters, parsed.data);
-  return {
-    ok: true,
-    signal: etagSignal({
-      release: release.ref.manifestSha256,
-      count: body.count,
-      first_id: body.items[0]?.id ?? "",
-      first_gen: body.items[0]?.generated_at ?? "",
-      locale: parsed.data.locale,
-      take: parsed.data.take,
-    }),
-    body,
-  };
 }
 
 export async function dailyIndexSnapshotRequestResult(

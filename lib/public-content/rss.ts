@@ -148,7 +148,7 @@ export function renderLegacyPublicRss(
   return renderLegacyPublicRssFromStories(stories, slug, nowMs);
 }
 
-export function renderLegacyDailyPublicRssFromNewsletters(
+function renderLegacyDailyPublicRssFromNewsletters(
   newsletters: CanonicalNewsletters,
   nowMs: number,
 ): PublicRssArtifact {
