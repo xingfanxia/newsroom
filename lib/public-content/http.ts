@@ -31,8 +31,11 @@ import {
 } from "@/lib/daily-column/query-defaults";
 import {
   getLatestPublicDaily,
-  getPublicDailyByDate,
-  listPublicDailyIndex,
+  getLatestPublicDailyFromNewsletters,
+  getPublicDailyByDateFromNewsletters,
+  listPublicDailyIndexFromNewsletters,
+  listPublicDailyColumnsFromNewsletters,
+  type PublicDailyColumn,
 } from "@/lib/public-content/public-dailies";
 import {
   PUBLIC_FEED_DIRECTORY_LOGICAL_NAME,
@@ -49,6 +52,15 @@ import {
   type PublicFeedResult,
   type PublicFeedRow,
 } from "@/lib/public-content/feed-artifacts";
+import {
+  readDirectPublicNewsletters,
+  readDirectPublicSources,
+  supportsDirectPublicRouteReads,
+} from "@/lib/public-content/direct-route-read";
+import {
+  materializedPageLogicalName,
+  readScopedMaterializedPageModel,
+} from "@/lib/public-content/materialized-artifact";
 import {
   PUBLIC_NUMERIC_SHARD_COUNT,
   parsePublicEntityShardValue,
@@ -119,10 +131,6 @@ const dailyIndexQuerySchema = z.object({
     .optional()
     .default(DEFAULT_DAILY_COLUMN_QUERY_LOCALE),
 });
-
-export async function readPublicSnapshot(): Promise<PublicCanonicalStateResult> {
-  return publicSnapshotReader().readCanonicalState();
-}
 
 export async function publicFeedSnapshotRequestResult(
   req: Request,
@@ -489,7 +497,20 @@ function parsePublicSourceRows(bytes: Uint8Array) {
 export function activeSourcesSnapshotBody(
   snapshot: PublicCanonicalStateResult,
 ): unknown {
-  const sources = snapshot.state.sources
+  return activeSourcesBody(snapshot.state.sources);
+}
+
+export async function readActiveSourcesSnapshotBody(): Promise<unknown> {
+  const scoped = await publicSnapshotReader().readReleaseScoped(async (scope) =>
+    activeSourcesBody(await readDirectPublicSources(scope)),
+  );
+  return scoped.value;
+}
+
+function activeSourcesBody(
+  rows: CanonicalPublicState["sources"],
+): unknown {
+  const sources = rows
     .filter((source) => source.enabled)
     .sort(
       (left, right) =>
@@ -960,11 +981,38 @@ export function latestDailySnapshotResult(
   snapshot: PublicCanonicalStateResult,
   req: Request,
 ): SnapshotCachedResult {
+  return latestDailyRowsResult(
+    snapshot.state.newsletters,
+    snapshot.release,
+    req,
+  );
+}
+
+function latestDailyRowsResult(
+  newsletters: CanonicalPublicState["newsletters"],
+  release: ResolvedPublicRelease,
+  req: Request,
+): SnapshotCachedResult {
   const locale = parseDailyLocale(req);
   if (!locale.ok) return locale;
-  const daily = getLatestPublicDaily(snapshot.state, locale.locale);
+  const daily = getLatestPublicDailyFromNewsletters(newsletters, locale.locale);
   if (!daily) return { ok: false, error: "no_daily_yet", status: 404 };
-  return dailyResult(snapshot, daily);
+  return dailyResult(release, daily);
+}
+
+export async function latestDailySnapshotRequestResult(
+  req: Request,
+): Promise<SnapshotCachedResult> {
+  const locale = parseDailyLocale(req);
+  if (!locale.ok) return locale;
+  const scoped = await publicSnapshotReader().readReleaseScoped(async (scope) => {
+    const rows = await readDirectDailyRows(scope, locale.locale);
+    const daily = rows[0];
+    return daily
+      ? dailyResult(scope.release, daily)
+      : { ok: false as const, error: "no_daily_yet", status: 404 };
+  });
+  return scoped.value;
 }
 
 export function dailyByDateSnapshotResult(
@@ -972,19 +1020,71 @@ export function dailyByDateSnapshotResult(
   req: Request,
   rawDate: string,
 ): SnapshotCachedResult {
+  return dailyByDateRowsResult(
+    snapshot.state.newsletters,
+    snapshot.release,
+    req,
+    rawDate,
+  );
+}
+
+function dailyByDateRowsResult(
+  newsletters: CanonicalPublicState["newsletters"],
+  release: ResolvedPublicRelease,
+  req: Request,
+  rawDate: string,
+): SnapshotCachedResult {
   const date = dailyDateSchema.safeParse(rawDate);
   if (!date.success) return { ok: false, error: "invalid_date", status: 400 };
   const locale = parseDailyLocale(req);
   if (!locale.ok) return locale;
-  const daily = getPublicDailyByDate(snapshot.state, date.data, locale.locale);
+  const daily = getPublicDailyByDateFromNewsletters(
+    newsletters,
+    date.data,
+    locale.locale,
+  );
   if (!daily) {
     return { ok: false, error: `no_daily_for_${date.data}`, status: 404 };
   }
-  return dailyResult(snapshot, daily);
+  return dailyResult(release, daily);
+}
+
+export async function dailyByDateSnapshotRequestResult(
+  req: Request,
+  rawDate: string,
+): Promise<SnapshotCachedResult> {
+  const date = dailyDateSchema.safeParse(rawDate);
+  if (!date.success) return { ok: false, error: "invalid_date", status: 400 };
+  const locale = parseDailyLocale(req);
+  if (!locale.ok) return locale;
+  const scoped = await publicSnapshotReader().readReleaseScoped(async (scope) => {
+    const rows = await readDirectDailyRows(scope, locale.locale);
+    const daily = rows.find((row) => row.date === date.data);
+    return daily
+      ? dailyResult(scope.release, daily)
+      : {
+          ok: false as const,
+          error: `no_daily_for_${date.data}`,
+          status: 404,
+        };
+  });
+  return scoped.value;
 }
 
 export function dailyIndexSnapshotResult(
   snapshot: PublicCanonicalStateResult,
+  req: Request,
+): SnapshotCachedResult {
+  return dailyIndexRowsResult(
+    snapshot.state.newsletters,
+    snapshot.release,
+    req,
+  );
+}
+
+function dailyIndexRowsResult(
+  newsletters: CanonicalPublicState["newsletters"],
+  release: ResolvedPublicRelease,
   req: Request,
 ): SnapshotCachedResult {
   const parsed = dailyIndexQuerySchema.safeParse(queryParamsRecord(req));
@@ -995,11 +1095,11 @@ export function dailyIndexSnapshotResult(
       status: 400,
     };
   }
-  const body = listPublicDailyIndex(snapshot.state, parsed.data);
+  const body = listPublicDailyIndexFromNewsletters(newsletters, parsed.data);
   return {
     ok: true,
     signal: etagSignal({
-      release: snapshot.release.ref.manifestSha256,
+      release: release.ref.manifestSha256,
       count: body.count,
       first_id: body.items[0]?.id ?? "",
       first_gen: body.items[0]?.generated_at ?? "",
@@ -1008,6 +1108,65 @@ export function dailyIndexSnapshotResult(
     }),
     body,
   };
+}
+
+export async function dailyIndexSnapshotRequestResult(
+  req: Request,
+): Promise<SnapshotCachedResult> {
+  const parsed = dailyIndexQuerySchema.safeParse(queryParamsRecord(req));
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: invalidQueryError(parsed.error.issues),
+      status: 400,
+    };
+  }
+  const scoped = await publicSnapshotReader().readReleaseScoped(async (scope) => {
+    const rows = (
+      await readDirectDailyRows(scope, parsed.data.locale)
+    ).slice(0, parsed.data.take);
+    const body = {
+      count: rows.length,
+      items: rows.map((row) => ({
+        id: row.id,
+        date: row.date,
+        generated_at: row.generated_at,
+        title: row.title,
+        theme_tag: row.theme_tag,
+        story_count: row.story_count,
+      })),
+    };
+    return {
+      ok: true as const,
+      signal: etagSignal({
+        release: scope.release.ref.manifestSha256,
+        count: body.count,
+        first_id: body.items[0]?.id ?? "",
+        first_gen: body.items[0]?.generated_at ?? "",
+        locale: parsed.data.locale,
+        take: parsed.data.take,
+      }),
+      body,
+    };
+  });
+  return scoped.value;
+}
+
+async function readDirectDailyRows(
+  scope: PublicReleaseReadScope,
+  locale: AppLocale,
+): Promise<PublicDailyColumn[]> {
+  if (supportsDirectPublicRouteReads(scope.release)) {
+    const model = await readScopedMaterializedPageModel<{
+      rows: PublicDailyColumn[];
+    }>(scope, materializedPageLogicalName.daily(locale));
+    return model.rows;
+  }
+  const newsletters = await readDirectPublicNewsletters(scope);
+  return listPublicDailyColumnsFromNewsletters(newsletters, {
+    locale,
+    take: newsletters.length,
+  });
 }
 
 function parseDailyLocale(
@@ -1023,7 +1182,7 @@ function parseDailyLocale(
 }
 
 function dailyResult(
-  snapshot: PublicCanonicalStateResult,
+  release: ResolvedPublicRelease,
   body: ReturnType<typeof getLatestPublicDaily> extends infer T
     ? Exclude<T, null>
     : never,
@@ -1031,7 +1190,7 @@ function dailyResult(
   return {
     ok: true,
     signal: etagSignal({
-      release: snapshot.release.ref.manifestSha256,
+      release: release.ref.manifestSha256,
       id: body.id,
       generated: body.generated_at,
     }),

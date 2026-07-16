@@ -2,7 +2,7 @@ import { setRequestLocale } from "next-intl/server";
 import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
 import { ComingSoonPanel } from "@/components/shell/coming-soon-panel";
-import { getShellChromeData } from "@/lib/shell/chrome-data";
+import { getAdminShellChromeData } from "@/lib/shell/admin-chrome-data";
 import { appLocaleFromParam } from "@/lib/types";
 
 // Admin pages render per-request — they read live stats and contain client
@@ -19,7 +19,7 @@ export default async function UsersPage({
   const { locale } = await params;
   const appLocale = appLocaleFromParam(locale);
   setRequestLocale(appLocale);
-  const chrome = await getShellChromeData();
+  const chrome = await getAdminShellChromeData();
 
   return (
     <ViewShell

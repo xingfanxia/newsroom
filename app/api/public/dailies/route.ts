@@ -10,8 +10,7 @@
  */
 import { publicCachedRoute } from "@/lib/api/public-helpers";
 import {
-  dailyIndexSnapshotResult,
-  readPublicSnapshot,
+  dailyIndexSnapshotRequestResult,
 } from "@/lib/public-content/http";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +21,6 @@ export async function GET(req: Request) {
     endpoint: "dailies",
     etagFamily: "public-dailies",
     label: "api/public/dailies",
-    load: async () =>
-      dailyIndexSnapshotResult(await readPublicSnapshot(), req),
+    load: async () => dailyIndexSnapshotRequestResult(req),
   });
 }

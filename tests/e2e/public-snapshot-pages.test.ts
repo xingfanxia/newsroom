@@ -153,7 +153,7 @@ describe("snapshot-backed anonymous pages", () => {
     const model = await readPodcastDetailPageModel({ locale: "en", id: 1 });
 
     expect(model.detail?.bodyMd).toBe("Alpha public body");
-    expect(fallback.requestCount(CURRENT_POINTER_KEY)).toBe(2);
+    expect(fallback.requestCount(CURRENT_POINTER_KEY)).toBe(1);
   });
 
   test("fails closed when no active, previous or warm snapshot exists", async () => {
@@ -206,6 +206,10 @@ async function pageFixture(): Promise<MemoryPublicSnapshotHttp> {
   for (const artifact of release.artifacts) {
     store.put(artifact.descriptor.key, artifact.bytes);
   }
+  // PCR-5 guard: every page variant must remain available when an unrelated
+  // canonical shard is unreadable. Materialized/default support and direct
+  // feed hydration do not need policy state at request time.
+  store.delete(release.manifest.artifacts["state/policies"]!.key);
   const manifestKey = releaseManifestKey(release.releaseId);
   store.put(manifestKey, release.manifestBytes);
   store.put(
@@ -267,6 +271,9 @@ async function pointerFlipPageFixture(): Promise<
 
   const oldArtifacts = { ...oldRelease.manifest.artifacts };
   delete oldArtifacts[materializedPageLogicalName.podcastDetails(1)];
+  for (const logicalName of Object.keys(oldArtifacts)) {
+    if (logicalName.startsWith("feeds/")) delete oldArtifacts[logicalName];
+  }
   const oldManifest = manifestSchema.parse({
     ...oldRelease.manifest,
     artifacts: oldArtifacts,

@@ -1,5 +1,12 @@
-import { publicSnapshotReader } from "@/lib/public-content/reader";
-import type { AppLocale } from "@/lib/types";
+import { z } from "zod";
+import type { PublicReleaseReadScope } from "@/lib/public-content/reader/types";
+import { publicSourceSchema } from "@/lib/public-content/contracts";
+import {
+  APP_LOCALES,
+  SOURCE_KINDS,
+  VISIBLE_ITEM_TIERS,
+  type AppLocale,
+} from "@/lib/types";
 
 export const materializedPageLogicalName = {
   home: (locale: AppLocale) => `views/home/${locale}`,
@@ -60,6 +67,7 @@ export function materializedPageArtifact<T>(
 
 export function parseMaterializedPageArtifact<T = unknown>(
   bytes: Uint8Array,
+  logicalName?: string,
 ): MaterializedPageArtifact<T> {
   const value = JSON.parse(new TextDecoder().decode(bytes)) as unknown;
   if (
@@ -71,18 +79,149 @@ export function parseMaterializedPageArtifact<T = unknown>(
   ) {
     throw new Error("invalid materialized page artifact");
   }
-  return value as MaterializedPageArtifact<T>;
+  const artifact = value as MaterializedPageArtifact<unknown>;
+  return {
+    schemaVersion: 1,
+    model: logicalName
+      ? parseMaterializedPageModel(logicalName, artifact.model) as T
+      : artifact.model as T,
+  };
 }
 
-export async function readMaterializedPageModel<T>(
+export async function readScopedMaterializedPageModel<T>(
+  scope: PublicReleaseReadScope,
   logicalName: string,
-): Promise<T | null> {
-  try {
-    const artifact = await publicSnapshotReader().readLogicalArtifact(logicalName);
-    return artifact ? parseMaterializedPageArtifact<T>(artifact.bytes).model : null;
-  } catch {
-    // A release created before materialized views (or a corrupt derived object)
-    // can safely fall back to the canonical snapshot path during migration.
-    return null;
+): Promise<T> {
+  let model: T | undefined;
+  await scope.readLogicalArtifact(logicalName, {
+    required: true,
+    validate: (bytes) => {
+      model = parseMaterializedPageArtifact<T>(bytes, logicalName).model;
+    },
+  });
+  return model!;
+}
+
+const passthrough = <T extends z.ZodRawShape>(shape: T) =>
+  z.object(shape).passthrough();
+
+const chromeSchema = passthrough({
+  radarStats: passthrough({
+    items_today: z.number().int().nonnegative(),
+    items_p1: z.number().int().nonnegative(),
+    items_featured: z.number().int().nonnegative(),
+    tracked_sources: z.number().int().nonnegative(),
+  }),
+  topBarStats: passthrough({
+    tracked_sources: z.number().int().nonnegative(),
+    signal_ratio: z.number().min(0).max(1),
+  }),
+  pulse: z.array(passthrough({ h: z.number().int(), c: z.number().int().nonnegative() })).optional(),
+});
+
+const storySchema = passthrough({
+  id: z.string().regex(/^\d+$/),
+  sourceId: z.string(),
+  source: passthrough({
+    publisher: z.string(),
+    kindCode: z.enum(SOURCE_KINDS),
+    localeCode: z.string(),
+    groupCode: z.string().optional(),
+  }),
+  featured: z.boolean(),
+  title: z.string(),
+  summary: z.string(),
+  tags: z.array(z.string()),
+  importance: z.number().int(),
+  tier: z.enum(VISIBLE_ITEM_TIERS),
+  publishedAt: z.string().datetime(),
+  url: z.string(),
+  locale: z.string(),
+});
+
+const daySchema = passthrough({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  count: z.number().int().nonnegative(),
+});
+
+const dailySchema = passthrough({
+  id: z.number().int().positive(),
+  locale: z.enum(APP_LOCALES),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  generated_at: z.string().datetime(),
+  window_start: z.string().datetime(),
+  window_end: z.string().datetime(),
+  title: z.string().nullable(),
+  theme_tag: z.string().nullable(),
+  summary_md: z.string().nullable(),
+  narrative_md: z.string().nullable(),
+  featured_item_ids: z.array(z.number().int().positive()),
+  item_ids: z.array(z.number().int().positive()),
+  story_count: z.number().int().nonnegative(),
+});
+
+const storyListModelSchema = passthrough({
+  stories: z.array(storySchema),
+  chrome: chromeSchema,
+});
+
+function parseMaterializedPageModel(logicalName: string, model: unknown): unknown {
+  if (logicalName.startsWith("views/home/")) {
+    return storyListModelSchema.extend({
+      topics: z.array(passthrough({ tag: z.string(), count: z.number().int(), hot: z.boolean() })),
+      policy: passthrough({ version: z.string(), lastIterAt: z.string().nullable() }),
+      tickerItems: z.array(passthrough({ lab: z.string(), val: z.string() })),
+      days: z.array(daySchema),
+    }).parse(model);
   }
+  if (
+    logicalName.startsWith("views/all/") ||
+    logicalName.startsWith("views/curated/")
+  ) {
+    return storyListModelSchema.extend({ days: z.array(daySchema) }).parse(model);
+  }
+  if (logicalName === materializedPageLogicalName.sources) {
+    return passthrough({ live: z.array(publicSourceSchema), chrome: chromeSchema }).parse(model);
+  }
+  if (logicalName.startsWith("views/podcasts/")) {
+    return storyListModelSchema.extend({
+      channels: z.array(passthrough({
+        id: z.string(),
+        nameEn: z.string(),
+        nameZh: z.string(),
+        count: z.number().int().nonnegative(),
+      })),
+      activeChannel: z.string().nullable(),
+    }).parse(model);
+  }
+  if (logicalName.startsWith("views/x-monitor/")) {
+    return storyListModelSchema.extend({
+      handles: z.array(passthrough({
+        id: z.string(),
+        handle: z.string(),
+        nameEn: z.string(),
+        nameZh: z.string(),
+        last24h: z.number().int().nonnegative(),
+        total: z.number().int().nonnegative(),
+      })),
+      activeIsValid: z.boolean(),
+    }).parse(model);
+  }
+  if (logicalName.startsWith("views/daily/")) {
+    return passthrough({ rows: z.array(dailySchema), chrome: chromeSchema }).parse(model);
+  }
+  if (logicalName === materializedPageLogicalName.agents) {
+    return passthrough({ chrome: chromeSchema }).parse(model);
+  }
+  if (logicalName.startsWith("views/podcast-details/")) {
+    const detailSchema = passthrough({ story: storySchema, bodyMd: z.string().nullable() });
+    return passthrough({
+      detailsById: z.record(
+        z.string(),
+        passthrough({ en: detailSchema, zh: detailSchema }),
+      ),
+      chrome: chromeSchema,
+    }).parse(model);
+  }
+  throw new Error(`unknown materialized page artifact: ${logicalName}`);
 }

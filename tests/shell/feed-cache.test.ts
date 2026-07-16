@@ -205,7 +205,8 @@ describe("public page call sites derive from snapshots", () => {
     expect(pageSrc).toContain("readCachedPublicHomePageModel");
     expect(pageSrc).not.toContain("@/lib/shell/feed-cache");
     const modelSrc = readSource("lib/public-content/home-page-model.ts");
-    expect(modelSrc).toContain("readPublicPageSnapshot");
+    expect(modelSrc).toContain("readDirectPublicFeedStories");
+    expect(modelSrc).not.toContain("readPublicPageSnapshot");
     const builderSrc = readSource("lib/public-content/page-model-builders.ts");
     expect(builderSrc).toContain("deriveDayCounts");
     expect(builderSrc).toContain("deriveTopTopics");

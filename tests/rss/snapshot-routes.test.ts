@@ -178,6 +178,7 @@ async function rssFixture(): Promise<MemoryPublicSnapshotHttp> {
     previousManifest: null,
     sourceWatermark: 30,
     changes: allChanges(PARITY_STATE),
+    generatedAtMs: Date.parse(PARITY_NOW_ISO),
     loadArtifact: async () => {
       throw new Error("fixture cannot load a prior artifact");
     },
@@ -186,6 +187,9 @@ async function rssFixture(): Promise<MemoryPublicSnapshotHttp> {
   for (const artifact of release.artifacts) {
     store.put(artifact.descriptor.key, artifact.bytes);
   }
+  // PCR-5 guard: every RSS variant must use bounded feed/newsletter reads,
+  // never aggregate an unrelated canonical shard.
+  store.delete(release.manifest.artifacts["state/policies"]!.key);
   const manifestKey = releaseManifestKey(release.releaseId);
   store.put(manifestKey, release.manifestBytes);
   store.put(

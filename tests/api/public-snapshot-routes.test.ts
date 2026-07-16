@@ -27,6 +27,7 @@ import {
   releaseManifestKey,
 } from "@/lib/public-content/paths";
 import { buildPublicRelease } from "@/lib/public-content/publisher/build-release";
+import { materializedPageLogicalName } from "@/lib/public-content/materialized-artifact";
 import type { PublicEntityChange } from "@/lib/public-content/publisher/types";
 import { publicSnapshotReader } from "@/lib/public-content/reader";
 import { MemoryPublicSnapshotHttp } from "@/lib/public-content/testing/memory-store";
@@ -452,6 +453,10 @@ describe("snapshot-backed public JSON routes", () => {
 
   test("legacy manifests keep exact item/event behavior through scoped canonical fallback", async () => {
     const legacy = await routeFixture("https://legacy-direct-content.test");
+    const policyArtifact = legacy.release.artifacts.find(
+      ({ logicalName }) => logicalName === "state/policies",
+    )!;
+    legacy.http.put(policyArtifact.descriptor.key, policyArtifact.bytes);
     const legacyManifestValue = { ...legacy.release.manifest };
     delete legacyManifestValue.numericShardCount;
     const manifest = manifestSchema.parse(legacyManifestValue);
@@ -775,6 +780,7 @@ describe("snapshot-backed public JSON routes", () => {
   });
 
   test("serves latest, dated and indexed daily columns with validation", async () => {
+    fixture.http.clearRequests();
     const latest = await getPublicDaily(publicRequest("/api/public/daily"));
     expect(await latest.json()).toMatchObject({
       id: 4,
@@ -821,6 +827,13 @@ describe("snapshot-backed public JSON routes", () => {
       publicRequest("/api/public/dailies?take=0"),
     );
     expect(invalidIndex.status).toBe(400);
+    expect(requestedObjectKeys(fixture.http)).toEqual(
+      new Set([
+        fixture.release.manifest.artifacts[
+          materializedPageLogicalName.daily("zh")
+        ]!.key,
+      ]),
+    );
   });
 
   test("serves the active source picker from the same snapshot", async () => {
@@ -896,6 +909,7 @@ async function routeFixture(
     previousManifest: null,
     sourceWatermark: 10,
     changes: allChanges(state),
+    generatedAtMs: Date.parse("2026-07-14T12:00:00.000Z"),
     loadArtifact: async () => {
       throw new Error("fixture cannot load a prior artifact");
     },
@@ -904,6 +918,9 @@ async function routeFixture(
   for (const artifact of release.artifacts) {
     http.put(artifact.descriptor.key, artifact.bytes);
   }
+  // PCR-5 guard: daily and active-source reads must not aggregate unrelated
+  // canonical state.
+  http.delete(release.manifest.artifacts["state/policies"]!.key);
   const manifestKey = releaseManifestKey(release.releaseId);
   http.put(manifestKey, release.manifestBytes);
   const pointer = snapshotPointerSchema.parse({

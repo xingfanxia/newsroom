@@ -34,12 +34,22 @@ export function listPublicDailyIndex(
   value: unknown,
   options: { locale?: AppLocale; take?: number } = {},
 ): PublicDailyColumnIndex {
+  return listPublicDailyIndexFromNewsletters(
+    createPublicStateIndex(value).state.newsletters,
+    options,
+  );
+}
+
+export function listPublicDailyIndexFromNewsletters(
+  newsletters: CanonicalNewsletters,
+  options: { locale?: AppLocale; take?: number } = {},
+): PublicDailyColumnIndex {
   const locale = options.locale ?? "zh";
   const take = options.take ?? 20;
   if (!Number.isSafeInteger(take) || take < 0) {
     throw new TypeError("take must be a non-negative safe integer");
   }
-  const rows = dailyRows(value, locale).slice(0, take);
+  const rows = dailyRowsFromNewsletters(newsletters, locale).slice(0, take);
   return {
     count: rows.length,
     items: rows.map((row) => ({
@@ -57,6 +67,16 @@ export function listPublicDailyColumns(
   value: unknown,
   options: { locale?: AppLocale; take?: number; offset?: number } = {},
 ): PublicDailyColumn[] {
+  return listPublicDailyColumnsFromNewsletters(
+    createPublicStateIndex(value).state.newsletters,
+    options,
+  );
+}
+
+export function listPublicDailyColumnsFromNewsletters(
+  newsletters: CanonicalNewsletters,
+  options: { locale?: AppLocale; take?: number; offset?: number } = {},
+): PublicDailyColumn[] {
   const locale = options.locale ?? "zh";
   const take = options.take ?? 20;
   const offset = options.offset ?? 0;
@@ -66,7 +86,9 @@ export function listPublicDailyColumns(
   if (!Number.isSafeInteger(offset) || offset < 0) {
     throw new TypeError("offset must be a non-negative safe integer");
   }
-  return dailyRows(value, locale).slice(offset, offset + take).map(toPublicDaily);
+  return dailyRowsFromNewsletters(newsletters, locale)
+    .slice(offset, offset + take)
+    .map(toPublicDaily);
 }
 
 export function getPublicDailyByDate(
@@ -74,8 +96,20 @@ export function getPublicDailyByDate(
   date: string,
   locale: AppLocale = "zh",
 ): PublicDailyColumn | null {
+  return getPublicDailyByDateFromNewsletters(
+    createPublicStateIndex(value).state.newsletters,
+    date,
+    locale,
+  );
+}
+
+export function getPublicDailyByDateFromNewsletters(
+  newsletters: CanonicalNewsletters,
+  date: string,
+  locale: AppLocale = "zh",
+): PublicDailyColumn | null {
   assertDate(date);
-  const row = dailyRows(value, locale).find(
+  const row = dailyRowsFromNewsletters(newsletters, locale).find(
     (candidate) => candidate.periodStart.slice(0, 10) === date,
   );
   return row ? toPublicDaily(row) : null;
@@ -85,7 +119,17 @@ export function getLatestPublicDaily(
   value: unknown,
   locale: AppLocale = "zh",
 ): PublicDailyColumn | null {
-  const row = dailyRows(value, locale)[0];
+  return getLatestPublicDailyFromNewsletters(
+    createPublicStateIndex(value).state.newsletters,
+    locale,
+  );
+}
+
+export function getLatestPublicDailyFromNewsletters(
+  newsletters: CanonicalNewsletters,
+  locale: AppLocale = "zh",
+): PublicDailyColumn | null {
+  const row = dailyRowsFromNewsletters(newsletters, locale)[0];
   return row ? toPublicDaily(row) : null;
 }
 
@@ -102,9 +146,15 @@ type DailyRow = Extract<
   { format: "daily_column" }
 >;
 
-function dailyRows(value: unknown, locale: AppLocale): DailyRow[] {
-  return createPublicStateIndex(value)
-    .state.newsletters.filter(
+type CanonicalNewsletters = ReturnType<
+  typeof canonicalStateSchema.parse
+>["newsletters"];
+
+function dailyRowsFromNewsletters(
+  newsletters: CanonicalNewsletters,
+  locale: AppLocale,
+): DailyRow[] {
+  return newsletters.filter(
       (row): row is DailyRow => row.format === "daily_column" && row.locale === locale,
     )
     .sort((left, right) => right.periodStart.localeCompare(left.periodStart));

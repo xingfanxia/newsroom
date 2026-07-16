@@ -7,8 +7,8 @@ describe("active sources route source wiring", () => {
   test("delegates payload lookup and plain JSON envelopes", () => {
     expect(source).toContain("@/lib/api/plain-response");
     expect(source).toContain("@/lib/public-content/http");
-    expect(source).toContain("activeSourcesSnapshotBody");
-    expect(source).toContain("readPublicSnapshot");
+    expect(source).toContain("readActiveSourcesSnapshotBody");
+    expect(source).not.toContain("readPublicSnapshot");
     expect(source).toContain("plainJson");
     expect(source).toContain("runPlainRoute");
     expect(source).toContain('serverErrorLabel: "api/sources/active"');

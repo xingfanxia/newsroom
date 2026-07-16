@@ -4,18 +4,7 @@ import {
   publicStoryFromItem,
   type PublicStateIndex,
 } from "@/lib/public-content/public-items";
-import { publicSnapshotReader } from "@/lib/public-content/reader";
-import type { PublicCanonicalStateResult } from "@/lib/public-content/reader/types";
 import type { AppLocale } from "@/lib/types";
-
-export type PublicPageSnapshot = PublicCanonicalStateResult & {
-  nowMs: number;
-};
-
-export async function readPublicPageSnapshot(): Promise<PublicPageSnapshot> {
-  const snapshot = await publicSnapshotReader().readCanonicalState();
-  return { ...snapshot, nowMs: Date.now() };
-}
 
 export function publicPolicySummary(
   value: unknown,

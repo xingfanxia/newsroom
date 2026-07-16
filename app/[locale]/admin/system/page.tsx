@@ -3,7 +3,7 @@ import { AdminSectionHeader as SectionHeader } from "@/components/admin/section-
 import { AdminTableFrame } from "@/components/admin/table-frame";
 import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
-import { getShellChromeData } from "@/lib/shell/chrome-data";
+import { getAdminShellChromeData } from "@/lib/shell/admin-chrome-data";
 import { getSystemSnapshot } from "@/lib/shell/system-stats";
 import { appLocaleFromParam } from "@/lib/types";
 
@@ -35,7 +35,7 @@ export default async function SystemPage({
 
   const [snap, chrome] = await Promise.all([
     getSystemSnapshot(),
-    getShellChromeData(),
+    getAdminShellChromeData(),
   ]);
 
   const totalSvc = snap.services.length;

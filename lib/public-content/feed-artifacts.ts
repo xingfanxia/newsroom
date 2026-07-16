@@ -166,6 +166,10 @@ export function publicFeedRowId(row: PublicFeedRow): number {
   return row[ROW.id];
 }
 
+export function publicFeedRowPublishedAt(row: PublicFeedRow): string {
+  return row[ROW.publishedAt];
+}
+
 export function publicFeedSegmentLogicalName(
   month: string,
   bucket: number,
@@ -364,11 +368,26 @@ export function isDefaultPublicFeedQuery(query: PublicFeedQuery): boolean {
 export function selectPublicFeedSegmentLogicalNames(
   directory: PublicFeedDirectory,
   query: PublicFeedQuery,
+  options?: { nowMs: number },
 ): string[] {
   if (query.date) {
     const month = query.date.slice(0, 7);
     return directory.segments
       .filter((segment) => segment.month === month)
+      .map(({ logicalName }) => logicalName);
+  }
+  if (
+    !query.dateFrom &&
+    !query.dateTo &&
+    query.recencyFloorDays !== undefined &&
+    query.recencyFloorDays > 0 &&
+    options
+  ) {
+    const floorMonth = new Date(
+      options.nowMs - query.recencyFloorDays * DAY_MS,
+    ).toISOString().slice(0, 7);
+    return directory.segments
+      .filter((segment) => segment.month >= floorMonth)
       .map(({ logicalName }) => logicalName);
   }
   if (!query.dateFrom && !query.dateTo) {

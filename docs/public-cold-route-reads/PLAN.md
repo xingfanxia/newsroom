@@ -1,6 +1,6 @@
 # Public Cold Route Reads — Source Plan
 
-Status: PCR-5 in progress
+Status: PCR-6 in progress
 
 Branch: `perf/public-cold-route-reads`
 
@@ -13,9 +13,10 @@ not implementation authority.
 
 Eliminate the 33.7 MB canonical-state aggregation from the normal successful
 path of every anonymous route while preserving the current public contracts.
-The private/admin/authenticated/write/cron surfaces remain unchanged and may
-continue to query Turso. Anonymous routes remain R2-only and must never add a
-Turso fallback.
+The private/admin/authenticated/write/cron surfaces remain Turso-backed.
+Anonymous routes remain R2-only and must never add a Turso fallback. Admin
+chrome is explicitly Turso-backed as well, so an R2/public-release failure
+cannot block an operator page.
 
 Hard boundaries:
 
@@ -137,6 +138,37 @@ fallback, incomplete/corrupt active families, corrupt hydration, schema-valid
 cross-artifact inconsistency, previous/LKG, terminal 503, and semantic/invalid
 zero-read behavior. Review round 1 found one Medium exception-to-fallback gap;
 the release rejection fix and regression resolved it, and round 2 was clean.
+
+PCR-5 closes every remaining normal anonymous full-state path without adding a
+publisher artifact family. Default pages, daily APIs, legacy daily RSS, and
+shell chrome reuse the existing validated `views/*` models. Non-default home,
+all, curated, podcast, and X-monitor variants select IDs from compact feed
+segments and hydrate only the selected item/event buckets plus `state/sources`.
+Fourteen- and thirty-day recency reads conservatively select complete UTC
+months; every loaded segment must match the directory's exact count/min/max,
+so corrupt directory bounds cannot silently hide history. Main and legacy lane
+RSS reuse the same hydrated story reader; structured-newsletter RSS reads the
+small newsletter shard family in one bounded parallel wave. Active sources
+read only `state/sources`.
+
+Every known materialized view family now has runtime structural validation
+inside the release-scoped artifact read. A hash-valid but semantically invalid
+active view therefore retries the previous whole release rather than throwing
+after validation. The static full-state boundary is part of
+`verify:public-boundary` and rejects aggregate helpers in anonymous
+entrypoints/direct readers as well as public-R2 chrome imports in admin pages.
+The six admin pages now load chrome through `getAdminShellChromeData()`, which
+queries Turso alongside their primary admin data and has no pointer, manifest,
+or R2 dependency.
+
+A read-only descriptor check of the naturally advanced live release
+`r1084-05c5e2a327349880dd17` (watermark 1084) measured the already-published
+`views/agents` chrome model at 545 B, `state/sources` at 24,818 B, and 58
+newsletter shards at 589,700 B total. New-release daily APIs and daily RSS read
+one locale daily view instead of that shard family; structured-newsletter RSS
+is the only remaining consumer of the 0.56 MiB family. These are pre-deploy
+descriptor facts; PCR-6 still measures application latency on the deployed
+release.
 
 The baseline request set was release-tied by fetching `current.json`, then its
 active manifest, before the public responses. Capture form was
@@ -292,12 +324,12 @@ new writes. The concrete production-migration allocation is:
 | feed segment directory | 1 | 1 | 0 | 0 |
 | 32 lexical ID shards | 32 | 1 | 32 | 32 |
 | locale default-feed artifacts | 2 | 2 | 2 | 2 |
-| shell chrome singleton | 1 | 0 | 0 | 1 |
+| shell chrome addition | 0 (reuse `views/agents`) | 0 | 0 | 0 |
 | daily/RSS/active-sources additions | 0 | 0 | 0 | 0 |
 | changed canonical slim/body/source/event | 0 on no-change migration | 2 | 1 | 1 |
 | existing materialized page artifacts (conservative) | 30 | 30 | 30 | 30 |
 | manifest + pointer CAS + receipt | 3 | 3 | 3 | 3 |
-| **worst total** | **197** | **40** | **196** | **197** |
+| **worst total** | **196** | **40** | **196** | **196** |
 
 Event/source rows use the conservative maximum fanout across every feed and
 lexical bucket; observed fanout should be lower. The migration's 128 segment
@@ -313,7 +345,7 @@ next tick. A hypothetical new
 greenfield bootstrap containing both the existing 473-artifact layout and this
 family would require staged immutable uploads before its first pointer and is
 not silently forced through the current one-run bootstrap; production already
-has a valid active release, so this goal's authorized path is the ≤197-write
+has a valid active release, so this goal's authorized path is the ≤196-write
 incremental migration above.
 
 ## 6. Phases and commit ledger
@@ -328,7 +360,7 @@ this ledger is updated in that same commit.
 | PCR-2 | release-pinned item and both event-member routes | done | this phase commit; 55 focused tests; typecheck/lint clean; reviewer rounds 1–2 clean |
 | PCR-3 | compact segmented feed artifacts, default first page, publisher incrementality | done | this phase commit; 88 related tests; live default 43,331 B max; reviewer rounds 1–2 clean |
 | PCR-4 | compact sharded lexical index and hit hydration | done | phase commit; 79 related tests; live index 8,325,002 B / 32 shards; reviewer rounds 1–2 clean |
-| PCR-5 | daily, sources/active, RSS, shell, page variants; static/runtime no-full-state verifier | in progress | pending |
+| PCR-5 | daily, sources/active, RSS, shell, page variants; static/runtime no-full-state verifier | done | 73 related tests / 657 assertions; typecheck/lint/source + full-state boundaries clean; reviewer round 1 two Medium findings resolved; round 2 clean |
 | PCR-6 | full verification, final review, PR/CI/merge/deploy, true-cold and admin evidence, closeout PR | pending | pending |
 
 ## 7. Verification and production acceptance

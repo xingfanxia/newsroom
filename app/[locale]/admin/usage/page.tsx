@@ -2,7 +2,7 @@ import Link from "next/link";
 import { setRequestLocale } from "next-intl/server";
 import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
-import { getShellChromeData } from "@/lib/shell/chrome-data";
+import { getAdminShellChromeData } from "@/lib/shell/admin-chrome-data";
 import {
   getUsageDashboardSummary,
   USAGE_WINDOWS,
@@ -48,7 +48,7 @@ export default async function UsagePage({
 
   const [usage, chrome] = await Promise.all([
     getUsageDashboardSummary(range, { recentLimit: 25, dailyDays: 30 }),
-    getShellChromeData(),
+    getAdminShellChromeData(),
   ]);
   const { selected, dailySpend: daily } = usage;
   const { today, week, month, all } = usage.windowTotals;

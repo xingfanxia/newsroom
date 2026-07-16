@@ -4,7 +4,7 @@ import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
 import { PolicyEditor } from "@/components/admin/policy-editor";
 import { getActiveSkill } from "@/lib/policy/skill";
-import { getShellChromeData } from "@/lib/shell/chrome-data";
+import { getAdminShellChromeData } from "@/lib/shell/admin-chrome-data";
 import { SKILL_NAME } from "@/workers/agent/iterate";
 import { appLocaleFromParam } from "@/lib/types";
 
@@ -26,7 +26,7 @@ export default async function PolicyPage({
   } catch (err) {
     error = err instanceof Error ? err.message : String(err);
   }
-  const chrome = await getShellChromeData();
+  const chrome = await getAdminShellChromeData();
 
   return (
     <ViewShell

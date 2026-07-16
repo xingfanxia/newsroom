@@ -14,7 +14,10 @@ import {
   getPublicDailyByDate,
   listPublicDailyColumns,
 } from "@/lib/public-content/public-dailies";
-import { queryPublicFeed } from "@/lib/public-content/query";
+import {
+  queryPublicFeed,
+  type PublicFeedQuery,
+} from "@/lib/public-content/query";
 import { feedPageLimitForDate } from "@/lib/feed/page-query";
 import {
   DEFAULT_HOME_TIER,
@@ -53,37 +56,8 @@ export function buildPublicHomePageModelFromSnapshot(
   nowMs: number,
   input: PublicHomePageModelInput,
 ): PublicHomePageModel {
-  const dailyHighlights =
-    !input.activeDate &&
-    !input.sourceId &&
-    input.sourcePreset === "all" &&
-    input.tier === DEFAULT_HOME_TIER &&
-    input.homeView === "daily";
-  const sourceFilter = input.sourceId
-    ? { sourceId: input.sourceId }
-    : sourcePresetToFeedFilter(input.sourcePreset);
-  const recencyFloorDays =
-    input.sourceId || input.sourcePreset !== "all"
-      ? undefined
-      : dailyHighlights
-        ? 30
-        : 7;
-  let stories = queryPublicFeed(
-    state,
-    {
-      tier: input.tier,
-      locale: input.locale,
-      limit: feedPageLimitForDate(input.activeDate, 120),
-      date: input.activeDate,
-      view: input.activeDate || dailyHighlights ? "archive" : "today",
-      recencyFloorDays,
-      ...(dailyHighlights
-        ? { minImportance: 80, maxPerDay: 3, recentDayRescueDays: 3 }
-        : {}),
-      ...sourceFilter,
-    },
-    { nowMs },
-  ).items;
+  const query = publicHomePageFeedQuery(input);
+  let stories = queryPublicFeed(state, query, { nowMs }).items;
   if (
     stories.length === 0 &&
     input.tier === DEFAULT_HOME_TIER &&
@@ -107,6 +81,38 @@ export function buildPublicHomePageModelFromSnapshot(
   };
 }
 
+export function publicHomePageFeedQuery(
+  input: PublicHomePageModelInput,
+): PublicFeedQuery {
+  const dailyHighlights =
+    !input.activeDate &&
+    !input.sourceId &&
+    input.sourcePreset === "all" &&
+    input.tier === DEFAULT_HOME_TIER &&
+    input.homeView === "daily";
+  const sourceFilter = input.sourceId
+    ? { sourceId: input.sourceId }
+    : sourcePresetToFeedFilter(input.sourcePreset);
+  const recencyFloorDays =
+    input.sourceId || input.sourcePreset !== "all"
+      ? undefined
+      : dailyHighlights
+        ? 30
+        : 7;
+  return {
+      tier: input.tier,
+      locale: input.locale,
+      limit: feedPageLimitForDate(input.activeDate, 120),
+      date: input.activeDate,
+      view: input.activeDate || dailyHighlights ? "archive" : "today",
+      recencyFloorDays,
+      ...(dailyHighlights
+        ? { minImportance: 80, maxPerDay: 3, recentDayRescueDays: 3 }
+        : {}),
+      ...sourceFilter,
+  };
+}
+
 export type AllPageModelInput = {
   locale: AppLocale;
   sourceId?: string;
@@ -120,22 +126,26 @@ export function buildAllPageModel(
   nowMs: number,
   input: AllPageModelInput,
 ) {
+  return {
+    stories: queryPublicFeed(state, allPageFeedQuery(input), { nowMs }).items,
+    chrome: shellChromeDataFromSnapshot(state, nowMs, { pulse: true }),
+    days: deriveDayCounts(state, 60, {}, nowMs),
+  };
+}
+
+export function allPageFeedQuery(input: AllPageModelInput): PublicFeedQuery {
   const sourceFilter = input.sourceId
     ? { sourceId: input.sourceId }
     : sourcePresetToFeedFilter(input.sourcePreset);
   return {
-    stories: queryPublicFeed(state, {
-      tier: "all",
-      locale: input.locale,
-      limit: feedPageLimitForDate(input.activeDate),
-      offset: input.offset,
-      date: input.activeDate,
-      recencyFloorDays:
-        input.sourceId || input.sourcePreset !== "all" ? undefined : 30,
-      ...sourceFilter,
-    }, { nowMs }).items,
-    chrome: shellChromeDataFromSnapshot(state, nowMs, { pulse: true }),
-    days: deriveDayCounts(state, 60, {}, nowMs),
+    tier: "all",
+    locale: input.locale,
+    limit: feedPageLimitForDate(input.activeDate),
+    offset: input.offset,
+    date: input.activeDate,
+    recencyFloorDays:
+      input.sourceId || input.sourcePreset !== "all" ? undefined : 30,
+    ...sourceFilter,
   };
 }
 
@@ -152,18 +162,24 @@ export function buildCuratedPageModel(
   input: CuratedPageModelInput,
 ) {
   return {
-    stories: queryPublicFeed(state, {
-      tier: "all",
-      locale: input.locale,
-      limit: feedPageLimitForDate(input.activeDate),
-      offset: input.offset,
-      date: input.activeDate,
-      curatedOnly: true,
-      sourceId: input.sourceId,
-      recencyFloorDays: input.sourceId ? undefined : 30,
-    }, { nowMs }).items,
+    stories: queryPublicFeed(state, curatedPageFeedQuery(input), { nowMs }).items,
     chrome: shellChromeDataFromSnapshot(state, nowMs, { pulse: true }),
     days: deriveDayCounts(state, 60, { curatedOnly: true }, nowMs),
+  };
+}
+
+export function curatedPageFeedQuery(
+  input: CuratedPageModelInput,
+): PublicFeedQuery {
+  return {
+    tier: "all",
+    locale: input.locale,
+    limit: feedPageLimitForDate(input.activeDate),
+    offset: input.offset,
+    date: input.activeDate,
+    curatedOnly: true,
+    sourceId: input.sourceId,
+    recencyFloorDays: input.sourceId ? undefined : 30,
   };
 }
 
@@ -189,22 +205,37 @@ export function buildPodcastsPageModel(
   input: PodcastsPageModelInput,
 ) {
   const channels = derivePodcastChannels(state);
-  const activeChannel =
-    input.source && channels.some(({ id }) => id === input.source)
-      ? input.source
-      : null;
+  const activeChannel = activePodcastChannel(channels, input.source);
   return {
     channels,
     activeChannel,
-    stories: queryPublicFeed(state, {
-      tier: input.tier,
-      locale: input.locale,
-      sourceGroup: activeChannel ? undefined : "podcast",
-      sourceId: activeChannel ?? undefined,
-      includeSourceGroup: true,
-      limit: activeChannel ? 300 : 120,
-    }, { nowMs }).items,
+    stories: queryPublicFeed(
+      state,
+      podcastsPageFeedQuery(input, activeChannel),
+      { nowMs },
+    ).items,
     chrome: shellChromeDataFromSnapshot(state, nowMs, { pulse: true }),
+  };
+}
+
+export function activePodcastChannel(
+  channels: Array<{ id: string }>,
+  source: string | undefined,
+): string | null {
+  return source && channels.some(({ id }) => id === source) ? source : null;
+}
+
+export function podcastsPageFeedQuery(
+  input: PodcastsPageModelInput,
+  activeChannel: string | null,
+): PublicFeedQuery {
+  return {
+    tier: input.tier,
+    locale: input.locale,
+    sourceGroup: activeChannel ? undefined : "podcast",
+    sourceId: activeChannel ?? undefined,
+    includeSourceGroup: true,
+    limit: activeChannel ? 300 : 120,
   };
 }
 
@@ -234,20 +265,36 @@ export function buildXMonitorPageModel(
   input: XMonitorPageModelInput,
 ) {
   const handles = deriveXHandles(state, nowMs);
-  const activeIsValid = input.handle
-    ? handles.some(({ id }) => id === input.handle)
-    : false;
+  const activeIsValid = isActiveXHandle(handles, input.handle);
   return {
     handles,
     activeIsValid,
-    stories: queryPublicFeed(state, {
-      tier: "all",
-      locale: input.locale,
-      sourceId: activeIsValid ? input.handle : undefined,
-      sourceKind: activeIsValid ? undefined : "x-api",
-      limit: activeIsValid ? 200 : 80,
-    }, { nowMs }).items,
+    stories: queryPublicFeed(
+      state,
+      xMonitorPageFeedQuery(input, activeIsValid),
+      { nowMs },
+    ).items,
     chrome: shellChromeDataFromSnapshot(state, nowMs, { pulse: true }),
+  };
+}
+
+export function isActiveXHandle(
+  handles: Array<{ id: string }>,
+  handle: string | undefined,
+): boolean {
+  return handle ? handles.some(({ id }) => id === handle) : false;
+}
+
+export function xMonitorPageFeedQuery(
+  input: XMonitorPageModelInput,
+  activeIsValid: boolean,
+): PublicFeedQuery {
+  return {
+    tier: "all",
+    locale: input.locale,
+    sourceId: activeIsValid ? input.handle : undefined,
+    sourceKind: activeIsValid ? undefined : "x-api",
+    limit: activeIsValid ? 200 : 80,
   };
 }
 
