@@ -12,6 +12,7 @@
     { "path": "/api/cron/score-backfill", "schedule": "25 6 * * 1" },
     { "path": "/api/cron/cluster", "schedule": "55 4,12,20 * * *" },
     { "path": "/api/cron/newsletter-daily", "schedule": "0 5 * * *" },
+    { "path": "/api/cron/newsletter-send", "schedule": "40 5 * * *" },
     { "path": "/api/cron/newsletter-monthly", "schedule": "37 9 1 * *" },
     { "path": "/api/cron/publish-public", "schedule": "12,27,42,57 * * * *" }
   ]

@@ -21,6 +21,7 @@ import {
   clusters,
   items,
   newsletters,
+  newsletterEmailSends,
   rawItems,
   sources,
   sourceHealth,
@@ -196,6 +197,24 @@ export async function getSystemSnapshot(): Promise<SystemSnapshot> {
     })
     .from(newsletters);
 
+  // Annotate-and-continue: newsletter_email_sends ships via a gated
+  // operator migration (NLE-7), so a deploy that races it (previews)
+  // must degrade this one signal, not kill the whole ops page.
+  let lastEmailSendAt: number | null = null;
+  try {
+    const [sendRow] = await client
+      .select({
+        lastEmailSendAt: sql<number | null>`max(${newsletterEmailSends.sentAt})`,
+      })
+      .from(newsletterEmailSends);
+    lastEmailSendAt = sendRow?.lastEmailSendAt ?? null;
+  } catch (error) {
+    console.error(
+      "[system-stats] newsletter_email_sends unavailable (migration not applied yet?):",
+      error,
+    );
+  }
+
   const queues: SystemQueue[] = [
     systemQueueSnapshot("normalize", queueRow?.rawPending ?? 0),
     systemQueueSnapshot("article-body", itemsRow?.bodyPrefetchPending ?? 0),
@@ -231,6 +250,7 @@ export async function getSystemSnapshot(): Promise<SystemSnapshot> {
       "score-backfill": NO_DURABLE_CRON_ACTIVITY_SIGNAL,
       cluster: msToDate(clustersRow?.lastClusterActivityAt),
       "newsletter-daily": msToDate(newsletterRow?.lastDailyNewsletterAt),
+      "newsletter-send": msToDate(lastEmailSendAt),
       "newsletter-monthly": msToDate(newsletterRow?.lastMonthlyNewsletterAt),
     },
     snapshotAt,

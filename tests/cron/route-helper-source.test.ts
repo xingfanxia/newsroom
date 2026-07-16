@@ -12,6 +12,7 @@ const cronJsonRouteFiles = [
   "enrich",
   "newsletter-daily",
   "newsletter-monthly",
+  "newsletter-send",
   "normalize",
   "score-backfill",
 ] as const;
