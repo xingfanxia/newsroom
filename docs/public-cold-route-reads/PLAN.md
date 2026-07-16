@@ -621,6 +621,6 @@ probe. That is a separate admin-query optimization opportunity, not a public
 snapshot dependency or regression introduced by this work. Anonymous routes
 remain R2-only, while admin remains independently Turso-backed as required.
 
-All production acceptance lines are therefore met. The only implementation
-PR was `#59`; the docs-only closeout PR URL is added to this section before its
-final merge.
+All production acceptance lines are therefore met. The implementation shipped
+through [`#59`](https://github.com/xingfanxia/newsroom/pull/59); docs-only
+closeout is [`#60`](https://github.com/xingfanxia/newsroom/pull/60).
