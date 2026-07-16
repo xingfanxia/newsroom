@@ -23,7 +23,7 @@ afterEach(cleanupFixtures);
 describe("public serving entrypoint inventory", () => {
   test("freezes the approved 24 snapshot-only readers and all access classes", () => {
     expect(SNAPSHOT_ONLY_ENTRYPOINTS).toHaveLength(24);
-    expect(PUBLIC_SERVING_ENTRYPOINTS).toHaveLength(66);
+    expect(PUBLIC_SERVING_ENTRYPOINTS).toHaveLength(67);
 
     const counts = Object.groupBy(
       PUBLIC_SERVING_ENTRYPOINTS,
@@ -31,7 +31,7 @@ describe("public serving entrypoint inventory", () => {
     );
     expect(counts["snapshot-only"]).toHaveLength(24);
     expect(counts["static-public"]).toHaveLength(7);
-    expect(counts["private-authenticated"]).toHaveLength(22);
+    expect(counts["private-authenticated"]).toHaveLength(23);
     expect(counts["operator-authenticated"]).toHaveLength(13);
 
     const snapshotPaths = SNAPSHOT_ONLY_ENTRYPOINTS.map(
@@ -96,8 +96,8 @@ describe("public serving entrypoint inventory", () => {
       inventory: PUBLIC_SERVING_ENTRYPOINTS,
     });
 
-    expect(result.sourceEntrypoints).toHaveLength(65);
-    expect(result.builtEntrypoints).toHaveLength(66);
+    expect(result.sourceEntrypoints).toHaveLength(66);
+    expect(result.builtEntrypoints).toHaveLength(67);
     expect(result.unclassifiedSource).toEqual([]);
     expect(result.unclassifiedBuild).toEqual([]);
     expect(result.missingFromBuild).toEqual([]);

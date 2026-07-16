@@ -5,21 +5,17 @@
  */
 
 /** 每日日报 (the daily column) + 每日精选 (featured/p1 picks with 锐评). */
-const EMAIL_KINDS = ["daily_digest", "daily_featured"] as const;
-export type EmailKind = (typeof EMAIL_KINDS)[number];
+export type EmailKind = "daily_digest" | "daily_featured";
 
 /** Per-recipient send-ledger outcome. */
-const SEND_STATUSES = ["sent", "failed"] as const;
-export type SendStatus = (typeof SEND_STATUSES)[number];
+export type SendStatus = "sent" | "failed";
 
-const SUBSCRIBER_STATUSES = [
-  "pending",
-  "active",
-  "unsubscribed",
-  "bounced",
-  "complained",
-] as const;
-export type SubscriberStatus = (typeof SUBSCRIBER_STATUSES)[number];
+export type SubscriberStatus =
+  | "pending"
+  | "active"
+  | "unsubscribed"
+  | "bounced"
+  | "complained";
 
 /** Verified sending domain — receiving is disabled, so no reply handling. */
 export const EMAIL_FROM_DAILY_DIGEST = "AX 的 AI 雷达 <daily@news.ax0x.ai>";

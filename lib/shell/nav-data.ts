@@ -46,6 +46,7 @@ export const NAV_PRIMARY: NavItem[] = [
 export const NAV_ADMIN: NavItem[] = [
   { id: "usage",      href: "/admin/usage",      label: "usage",      cjk: "用量" },
   { id: "system",     href: "/admin/system",     label: "system",     cjk: "系统" },
+  { id: "newsletter-admin", href: "/admin/newsletter", label: "newsletter", cjk: "订阅管理" },
   { id: "policy",     href: "/admin/policy",     label: "curation",   cjk: "精选策略" },
   { id: "iterations", href: "/admin/iterations", label: "iterations", cjk: "策略迭代" },
   { id: "users",      href: "/admin/users",      label: "users",      cjk: "用户" },

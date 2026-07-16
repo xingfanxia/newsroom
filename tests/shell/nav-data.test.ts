@@ -33,6 +33,7 @@ describe("activeNavId", () => {
 
   it("matches admin routes", () => {
     expect(activeNavId("/en/admin/system")).toBe("system");
+    expect(activeNavId("/en/admin/newsletter")).toBe("newsletter-admin");
     expect(activeNavId("/en/admin/iterations")).toBe("iterations");
     expect(activeNavId("/en/admin/usage")).toBe("usage");
     expect(activeNavId("/en/admin/policy")).toBe("policy");
@@ -69,9 +70,10 @@ describe("nav data shape", () => {
     expect(NAV_PRIMARY.find((n) => n.id === "newsletter")).toBeDefined();
   });
 
-  it("exposes 5 admin nav items (including the new usage route)", () => {
-    expect(NAV_ADMIN).toHaveLength(5);
+  it("exposes 6 admin nav items (including the new usage route)", () => {
+    expect(NAV_ADMIN).toHaveLength(6);
     expect(NAV_ADMIN.find((n) => n.id === "usage")).toBeDefined();
+    expect(NAV_ADMIN.find((n) => n.id === "newsletter-admin")).toBeDefined();
   });
 
   it("every nav item has bilingual labels", () => {

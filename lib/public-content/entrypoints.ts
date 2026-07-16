@@ -138,6 +138,7 @@ const STATIC_PUBLIC = [
 
 const PRIVATE_PAGES = [
   page("private-authenticated", "/[locale]/admin/iterations/page", "/[locale]/admin/iterations", "app/[locale]/admin/iterations/page.tsx"),
+  page("private-authenticated", "/[locale]/admin/newsletter/page", "/[locale]/admin/newsletter", "app/[locale]/admin/newsletter/page.tsx"),
   page("private-authenticated", "/[locale]/admin/policy/page", "/[locale]/admin/policy", "app/[locale]/admin/policy/page.tsx"),
   page("private-authenticated", "/[locale]/admin/system/page", "/[locale]/admin/system", "app/[locale]/admin/system/page.tsx"),
   page("private-authenticated", "/[locale]/admin/usage/page", "/[locale]/admin/usage", "app/[locale]/admin/usage/page.tsx"),
