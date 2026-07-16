@@ -49,6 +49,7 @@ export type PublicCanonicalStateResult = {
  */
 export type PublicReleaseReadScope = {
   release: ResolvedPublicRelease;
+  rejectRelease(cause: unknown): never;
   readLogicalArtifact(
     logicalName: string,
     options?: PublicLogicalArtifactReadOptions,

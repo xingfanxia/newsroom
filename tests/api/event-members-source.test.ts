@@ -14,8 +14,8 @@ describe("event member route source wiring", () => {
       const source = read(path);
 
       expect(source).toContain("@/lib/public-content/http");
-      expect(source).toContain("publicEventMembersSnapshotResult");
-      expect(source).toContain("readPublicSnapshot");
+      expect(source).toContain("publicEventMembersSnapshotRequestResult");
+      expect(source).not.toContain("readPublicSnapshot");
       expect(source).not.toContain("getEventMembersRoutePayload");
       expect(source).not.toContain("parseEventMemberRouteParams");
       expect(source).not.toContain("toEventMemberApiItems");
@@ -92,12 +92,12 @@ describe("event member route source wiring", () => {
     const source = read("app/api/public/events/[id]/members/route.ts");
 
     expect(source).toContain("publicCachedRoute");
-    expect(source).toContain("publicEventMembersSnapshotResult");
+    expect(source).toContain("publicEventMembersSnapshotRequestResult");
     expect(source).toContain('endpoint: "eventMembers"');
     expect(source).not.toContain("publicEndpointRateLimit(");
     expect(source).not.toContain("publicCachedJson(req,");
     expect(source).not.toContain("if (!result.ok) return result");
-    expect(source).toContain("readPublicSnapshot");
+    expect(source).not.toContain("readPublicSnapshot");
     expect(source).not.toContain("body.members[body.members.length");
   });
 

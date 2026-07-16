@@ -11,8 +11,8 @@ const storyItemFieldsModule = readSource("lib/api/story-item-fields.ts");
 describe("item detail route source wiring", () => {
   test("public detail route delegates snapshot lookup and serialization", () => {
     expect(publicItemRoute).toContain("@/lib/public-content/http");
-    expect(publicItemRoute).toContain("publicItemSnapshotResult");
-    expect(publicItemRoute).toContain("readPublicSnapshot");
+    expect(publicItemRoute).toContain("publicItemSnapshotRequestResult");
+    expect(publicItemRoute).not.toContain("readPublicSnapshot");
     expect(publicItemRoute).not.toContain("parseItemDetailRouteId");
     expect(publicItemRoute).not.toContain("getItemDetailRow");
     expect(publicItemRoute).not.toContain("getItemDetailRouteRow");

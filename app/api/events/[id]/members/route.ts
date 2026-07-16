@@ -22,10 +22,7 @@ import {
   plainJson,
   runPlainRoute,
 } from "@/lib/api/plain-response";
-import {
-  publicEventMembersSnapshotResult,
-  readPublicSnapshot,
-} from "@/lib/public-content/http";
+import { publicEventMembersSnapshotRequestResult } from "@/lib/public-content/http";
 
 export async function GET(
   req: Request,
@@ -33,8 +30,7 @@ export async function GET(
 ) {
   return runPlainRoute(async () => {
     const { id: idRaw } = await ctx.params;
-    const result = publicEventMembersSnapshotResult(
-      await readPublicSnapshot(),
+    const result = await publicEventMembersSnapshotRequestResult(
       req,
       {
         rawId: idRaw,

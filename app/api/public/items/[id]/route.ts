@@ -8,10 +8,7 @@
  *   - body_md kept (transcript / article text); body_rss (raw HTML) dropped
  */
 import { publicCachedRoute } from "@/lib/api/public-helpers";
-import {
-  publicItemSnapshotResult,
-  readPublicSnapshot,
-} from "@/lib/public-content/http";
+import { publicItemSnapshotRequestResult } from "@/lib/public-content/http";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -26,10 +23,7 @@ export async function GET(
     label: "api/public/items/:id",
     load: async () => {
       const { id: idRaw } = await ctx.params;
-      return await publicItemSnapshotResult(
-        await readPublicSnapshot(),
-        idRaw,
-      );
+      return publicItemSnapshotRequestResult(idRaw);
     },
   });
 }

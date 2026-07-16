@@ -34,8 +34,18 @@ import {
   getPublicDailyByDate,
   listPublicDailyIndex,
 } from "@/lib/public-content/public-dailies";
-import { parsePublicEntityShardValue } from "@/lib/public-content/contracts";
-import { createPublicStateIndex } from "@/lib/public-content/public-items";
+import {
+  PUBLIC_NUMERIC_SHARD_COUNT,
+  parsePublicEntityShardValue,
+  parsePublicItemBodyShardValue,
+  publicEntityShardLogicalName,
+  publicItemBodyShardLogicalName,
+  type CanonicalPublicState,
+} from "@/lib/public-content/contracts";
+import {
+  createPublicStateIndex,
+  publicEventMembersFromIndex,
+} from "@/lib/public-content/public-items";
 import {
   getPublicEventMembers,
   queryPublicFeed,
@@ -45,7 +55,11 @@ import {
   publicSnapshotReader,
   type PublicSnapshotReader,
 } from "@/lib/public-content/reader";
-import type { PublicCanonicalStateResult } from "@/lib/public-content/reader/types";
+import type {
+  PublicCanonicalStateResult,
+  PublicReleaseReadScope,
+  ResolvedPublicRelease,
+} from "@/lib/public-content/reader/types";
 import { APP_LOCALES, type AppLocale } from "@/lib/types";
 import { PUBLIC_SEMANTIC_SEARCH_ERROR } from "@/lib/search/query-defaults";
 
@@ -248,6 +262,58 @@ export function activeSourcesSnapshotBody(
   return { sources, total: sources.length };
 }
 
+export async function publicItemSnapshotRequestResult(
+  rawId: string,
+): Promise<SnapshotCachedResult> {
+  const parsed = parsePositiveRouteId(rawId);
+  if (!parsed.ok) return { ok: false, error: parsed.error, status: 400 };
+  const reader = publicSnapshotReader();
+  const scoped = await reader.readReleaseScoped(async (scope) => {
+    if (!supportsDirectItemRead(scope.release)) {
+      return publicItemSnapshotResult(
+        await scope.readCanonicalState(),
+        rawId,
+        reader,
+      );
+    }
+
+    const item = (await readItemShard(scope, parsed.id)).find(
+      ({ id }) => id === parsed.id,
+    );
+    if (!item) return { ok: false, error: "not_found", status: 404 } as const;
+    const [sources, events, bodyMd] = await Promise.all([
+      readSourceShard(scope),
+      item.eventId === null
+        ? Promise.resolve([])
+        : readEventShard(scope, item.eventId),
+      readItemBodyShard(scope, item.id),
+    ]);
+    const source =
+      sources.find(({ id }) => id === item.sourceId) ??
+      scope.rejectRelease(new Error(`missing public source: ${item.sourceId}`));
+    const event =
+      item.eventId === null
+        ? null
+        : events.find(({ id }) => id === item.eventId) ?? null;
+    if (
+      item.eventId !== null &&
+      (!event || !event.memberItemIds.includes(item.id))
+    ) {
+      return scope.rejectRelease(
+        new Error(`missing public event: ${item.eventId}`),
+      );
+    }
+    return publicItemEntityResult(
+      scope.release,
+      item,
+      source,
+      event,
+      bodyMd,
+    );
+  });
+  return scoped.value;
+}
+
 export async function publicItemSnapshotResult(
   snapshot: PublicCanonicalStateResult,
   rawId: string,
@@ -266,6 +332,22 @@ export async function publicItemSnapshotResult(
   }
   const bodyMd =
     item.bodyMd ?? await reader.readItemBody(snapshot.release, item.id);
+  return publicItemEntityResult(
+    snapshot.release,
+    item,
+    source,
+    event ?? null,
+    bodyMd,
+  );
+}
+
+function publicItemEntityResult(
+  release: ResolvedPublicRelease,
+  item: CanonicalPublicState["items"][number],
+  source: CanonicalPublicState["sources"][number],
+  event: CanonicalPublicState["events"][number] | null,
+  bodyMd: string | null,
+): SnapshotCachedResult {
   const publicEvent =
     event && event.coverage > 1
       ? {
@@ -284,7 +366,7 @@ export async function publicItemSnapshotResult(
   return {
     ok: true,
     signal: etagSignal({
-      release: snapshot.release.ref.manifestSha256,
+      release: release.ref.manifestSha256,
       id: item.id,
       enriched_at: item.enrichedAt,
       commentary_at: item.commentaryAt,
@@ -342,14 +424,219 @@ export function publicEventMembersSnapshotResult(
     parsed.clusterId,
     getPublicEventMembers(snapshot.state, parsed.clusterId, parsed.locale),
   );
+  return eventMembersSnapshotResult(
+    snapshot.release,
+    payload,
+    options.listOnly,
+  );
+}
+
+export async function publicEventMembersSnapshotRequestResult(
+  req: Request,
+  options: { rawId: string; defaultLocale: AppLocale; listOnly?: boolean },
+): Promise<SnapshotCachedResult> {
+  const parsed = parseEventMemberRouteParams({
+    rawId: options.rawId,
+    rawLocale: new URL(req.url).searchParams.get("locale"),
+    defaultLocale: options.defaultLocale,
+  });
+  if (!parsed.ok) return { ok: false, error: parsed.error, status: 400 };
+
+  const reader = publicSnapshotReader();
+  const scoped = await reader.readReleaseScoped(async (scope) => {
+    if (!supportsDirectEntityRead(scope.release)) {
+      return publicEventMembersSnapshotResult(
+        await scope.readCanonicalState(),
+        req,
+        options,
+      );
+    }
+
+    const event = (await readEventShard(scope, parsed.clusterId)).find(
+      ({ id }) => id === parsed.clusterId,
+    );
+    if (!event) {
+      return eventMembersSnapshotResult(
+        scope.release,
+        toEventMembersPayload(parsed.clusterId, []),
+        options.listOnly,
+      );
+    }
+    const itemLogicalNames = [
+      ...new Set(
+        event.memberItemIds.map((id) =>
+          publicEntityShardLogicalName("item", String(id)),
+        ),
+      ),
+    ];
+    const [sources, itemShards] = await Promise.all([
+      readSourceShard(scope),
+      Promise.all(
+        itemLogicalNames.map((logicalName) =>
+          readItemShardByLogicalName(scope, logicalName),
+        ),
+      ),
+    ]);
+    const memberIds = new Set(event.memberItemIds);
+    const items = itemShards.flat().filter(({ id }) => memberIds.has(id));
+    const itemsById = new Map(items.map((item) => [item.id, item]));
+    const sourcesById = new Map(sources.map((source) => [source.id, source]));
+    for (const memberId of event.memberItemIds) {
+      const item =
+        itemsById.get(memberId) ??
+        scope.rejectRelease(new Error(`missing public event member: ${memberId}`));
+      if (item.eventId !== event.id) {
+        return scope.rejectRelease(
+          new Error(`missing public event member: ${memberId}`),
+        );
+      }
+      if (!sourcesById.has(item.sourceId)) {
+        return scope.rejectRelease(
+          new Error(`missing public source: ${item.sourceId}`),
+        );
+      }
+    }
+    const state = directReadState({ items, events: [event], sources });
+    const payload = toEventMembersPayload(
+      parsed.clusterId,
+      publicEventMembersFromIndex(
+        {
+          state,
+          itemsById,
+          eventsById: new Map([[event.id, event]]),
+          sourcesById,
+        },
+        parsed.clusterId,
+        parsed.locale,
+      ),
+    );
+    return eventMembersSnapshotResult(
+      scope.release,
+      payload,
+      options.listOnly,
+    );
+  });
+  return scoped.value;
+}
+
+function eventMembersSnapshotResult(
+  release: ResolvedPublicRelease,
+  payload: ReturnType<typeof toEventMembersPayload>,
+  listOnly: boolean | undefined,
+): SnapshotCachedResult {
   return {
     ok: true,
     signal: etagSignal({
-      release: snapshot.release.ref.manifestSha256,
+      release: release.ref.manifestSha256,
       ...eventMembersCacheSignalParts(payload),
     }),
-    body: options.listOnly ? toEventMembersListEnvelope(payload) : payload,
+    body: listOnly ? toEventMembersListEnvelope(payload) : payload,
   };
+}
+
+function supportsDirectEntityRead(release: ResolvedPublicRelease): boolean {
+  return release.manifest.numericShardCount === PUBLIC_NUMERIC_SHARD_COUNT;
+}
+
+function supportsDirectItemRead(release: ResolvedPublicRelease): boolean {
+  return (
+    supportsDirectEntityRead(release) &&
+    release.manifest.artifacts["bodies/items/00"] !== undefined
+  );
+}
+
+async function readItemShard(
+  scope: PublicReleaseReadScope,
+  id: number,
+): Promise<CanonicalPublicState["items"]> {
+  return readItemShardByLogicalName(
+    scope,
+    publicEntityShardLogicalName("item", String(id)),
+  );
+}
+
+async function readItemShardByLogicalName(
+  scope: PublicReleaseReadScope,
+  logicalName: string,
+): Promise<CanonicalPublicState["items"]> {
+  let rows: CanonicalPublicState["items"] | undefined;
+  const artifact = await scope.readLogicalArtifact(logicalName, {
+    validate: (bytes) => {
+      const shard = parsePublicEntityShardValue(logicalName, parseJson(bytes));
+      if (shard.entityType !== "item") {
+        throw new Error("public item artifact has the wrong entity type");
+      }
+      rows = shard.entities;
+    },
+  });
+  return artifact ? rows! : [];
+}
+
+async function readEventShard(
+  scope: PublicReleaseReadScope,
+  id: number,
+): Promise<CanonicalPublicState["events"]> {
+  const logicalName = publicEntityShardLogicalName("event", String(id));
+  let rows: CanonicalPublicState["events"] | undefined;
+  const artifact = await scope.readLogicalArtifact(logicalName, {
+    validate: (bytes) => {
+      const shard = parsePublicEntityShardValue(logicalName, parseJson(bytes));
+      if (shard.entityType !== "event") {
+        throw new Error("public event artifact has the wrong entity type");
+      }
+      rows = shard.entities;
+    },
+  });
+  return artifact ? rows! : [];
+}
+
+async function readSourceShard(
+  scope: PublicReleaseReadScope,
+): Promise<CanonicalPublicState["sources"]> {
+  let rows: CanonicalPublicState["sources"] | undefined;
+  await scope.readLogicalArtifact("state/sources", {
+    required: true,
+    validate: (bytes) => {
+      rows = [...parsePublicSourceRows(bytes)];
+    },
+  });
+  return rows!;
+}
+
+async function readItemBodyShard(
+  scope: PublicReleaseReadScope,
+  id: number,
+): Promise<string | null> {
+  const logicalName = publicItemBodyShardLogicalName(String(id));
+  let bodyMd: string | null | undefined;
+  await scope.readLogicalArtifact(logicalName, {
+    required: true,
+    validate: (bytes) => {
+      const shard = parsePublicItemBodyShardValue(
+        logicalName,
+        parseJson(bytes),
+      );
+      bodyMd = shard.entities.find((entity) => entity.id === id)?.bodyMd ?? null;
+    },
+  });
+  return bodyMd!;
+}
+
+function directReadState(input: {
+  items: CanonicalPublicState["items"];
+  events: CanonicalPublicState["events"];
+  sources: CanonicalPublicState["sources"];
+}): CanonicalPublicState {
+  return {
+    schemaVersion: 1,
+    ...input,
+    newsletters: [],
+    policies: [],
+  };
+}
+
+function parseJson(bytes: Uint8Array): unknown {
+  return JSON.parse(new TextDecoder().decode(bytes)) as unknown;
 }
 
 export function latestDailySnapshotResult(

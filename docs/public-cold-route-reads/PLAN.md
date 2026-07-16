@@ -1,6 +1,6 @@
 # Public Cold Route Reads — Source Plan
 
-Status: PCR-2 in progress
+Status: PCR-3 in progress
 
 Branch: `perf/public-cold-route-reads`
 
@@ -69,6 +69,28 @@ top out at 282 KB. Feed rows span 37 UTC months; month plus bounded sub-bucket
 segmentation keeps individual rewrites bounded while the migration artifact
 count remains below the 500-write ceiling. These are projections, not shipped
 acceptance measurements, and will be re-measured from built artifacts.
+
+PCR-2 re-read the naturally advanced live release
+`r1026-ec8bc48c81279270bf22` to validate the direct-read budget against real
+descriptors. Pointer and manifest are 514 B and 148,177 B. Item 44779 (no
+event) needs three content artifacts and totals 848,877 B across five R2
+objects including pointer/manifest. Event-backed item 44598 needs four content
+artifacts and totals 908,630 B across six objects. Event 49175 has two members
+in two distinct item buckets; it needs four content artifacts and totals
+687,825 B across six objects. These pre-deploy descriptor sums prove the shape
+fits the item byte/object target; PCR-6 must still measure deployed application
+telemetry and true-cold latency.
+
+PCR-2 now serves item detail and both anonymous event-member envelopes through
+one release-scoped transaction. Successful event-backed item reads are exactly
+six HTTP object requests (pointer, active manifest, item/body/source/event);
+successful two-bucket event reads are also six. Route tests delete an unrelated
+canonical artifact while these direct reads succeed, so a hidden full-state
+aggregation cannot pass. Exact serializer/ETag parity, legacy fallback,
+active→previous→warm-LKG behavior, all cross-artifact consistency failures,
+valid empty shards, corrupt/missing dependencies, and controlled terminal 503s
+are covered. The first independent review found one Low test-coverage gap; it
+was fully resolved, and the second review was clean.
 
 The baseline request set was release-tied by fetching `current.json`, then its
 active manifest, before the public responses. Capture form was
@@ -257,8 +279,8 @@ this ledger is updated in that same commit.
 | Phase | Scope | Status | Commit/evidence |
 |---|---|---|---|
 | PCR-1 | inventory, production baseline, exact contracts, release-scoped reader primitive | done | this phase commit; 23 reader tests; reviewer rounds 1–3 clean |
-| PCR-2 | release-pinned item and both event-member routes | in progress | pending |
-| PCR-3 | compact segmented feed artifacts, default first page, publisher incrementality | pending | pending |
+| PCR-2 | release-pinned item and both event-member routes | done | this phase commit; 55 focused tests; typecheck/lint clean; reviewer rounds 1–2 clean |
+| PCR-3 | compact segmented feed artifacts, default first page, publisher incrementality | in progress | pending |
 | PCR-4 | compact sharded lexical index and hit hydration | pending | pending |
 | PCR-5 | daily, sources/active, RSS, shell, page variants; static/runtime no-full-state verifier | pending | pending |
 | PCR-6 | full verification, final review, PR/CI/merge/deploy, true-cold and admin evidence, closeout PR | pending | pending |

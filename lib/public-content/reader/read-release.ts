@@ -71,9 +71,7 @@ export class PublicSnapshotReader {
   }
 
   async readRelease(): Promise<ResolvedPublicRelease> {
-    const candidates = await this.#candidateReleases();
-    const release = candidates[0];
-    if (release) {
+    for await (const release of this.#candidateReleases()) {
       this.#lastKnownGoodRelease = release;
       return release;
     }
@@ -90,18 +88,11 @@ export class PublicSnapshotReader {
     if (!isSafeLogicalName(logicalName)) {
       throw new PublicSnapshotUnavailableError();
     }
-    const candidates = await this.#candidateReleases();
-    const active = candidates.find(({ source }) => source === "active");
-    if (
-      active &&
-      !(logicalName in active.manifest.artifacts) &&
-      !options.required
-    ) {
-      return null;
-    }
-
-    for (const release of candidates) {
+    for await (const release of this.#candidateReleases()) {
       const descriptor = release.manifest.artifacts[logicalName];
+      if (!descriptor && release.source === "active" && !options.required) {
+        return null;
+      }
       if (!descriptor) continue;
       try {
         const bytes = await this.#readArtifactBytes(descriptor);
@@ -139,8 +130,7 @@ export class PublicSnapshotReader {
   async readReleaseScoped<T>(
     read: (scope: PublicReleaseReadScope) => Promise<T> | T,
   ): Promise<PublicReleaseScopedResult<T>> {
-    const candidates = await this.#candidateReleases();
-    for (const release of candidates) {
+    for await (const release of this.#candidateReleases()) {
       try {
         const value = await read(this.#releaseScope(release));
         this.#lastKnownGoodRelease = release;
@@ -164,8 +154,7 @@ export class PublicSnapshotReader {
   }
 
   async readCanonicalState(): Promise<PublicCanonicalStateResult> {
-    const candidates = await this.#candidateReleases();
-    for (const release of candidates) {
+    for await (const release of this.#candidateReleases()) {
       try {
         const state = await this.#readStateCached(release);
         const result = { state, release };
@@ -200,6 +189,9 @@ export class PublicSnapshotReader {
   #releaseScope(release: ResolvedPublicRelease): PublicReleaseReadScope {
     return Object.freeze({
       release,
+      rejectRelease: (cause: unknown): never => {
+        throw new RetryablePublicReleaseReadError(cause);
+      },
       readLogicalArtifact: (
         logicalName: string,
         options: PublicLogicalArtifactReadOptions = {},
@@ -244,7 +236,7 @@ export class PublicSnapshotReader {
     }
   }
 
-  async #candidateReleases(): Promise<ResolvedPublicRelease[]> {
+  async *#candidateReleases(): AsyncGenerator<ResolvedPublicRelease> {
     let pointer: SnapshotPointer;
     try {
       const object = await this.#fetcher.read(CURRENT_POINTER_KEY, {
@@ -253,10 +245,9 @@ export class PublicSnapshotReader {
       });
       pointer = snapshotPointerSchema.parse(parseJson(object.bytes));
     } catch {
-      return [];
+      return;
     }
 
-    const candidates: ResolvedPublicRelease[] = [];
     const refs: Array<{
       ref: SnapshotReleaseRef;
       source: Exclude<PublicSnapshotReadSource, "last-known-good">;
@@ -273,12 +264,11 @@ export class PublicSnapshotReader {
         ) {
           continue;
         }
-        candidates.push({ ref, manifest, pointer, source });
+        yield { ref, manifest, pointer, source };
       } catch {
         // Corrupt/missing active is not terminal while previous or LKG exists.
       }
     }
-    return candidates;
   }
 
   async #readManifest(ref: SnapshotReleaseRef): Promise<SnapshotManifest> {

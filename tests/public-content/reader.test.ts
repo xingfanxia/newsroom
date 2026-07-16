@@ -172,6 +172,9 @@ describe("public snapshot reader", () => {
     expect(result.value.item.entities[0]?.title.en).toBe("Changed title");
     expect(result.value.body.entities[0]?.bodyMd).toBe("Changed body bytes");
     expect(fixture.http.requestCount(CURRENT_POINTER_KEY)).toBe(1);
+    expect(
+      fixture.http.requestCount(releaseManifestKey(fixture.previous.releaseId)),
+    ).toBe(0);
   });
 
   test("retries a scoped multi-artifact operation against previous as one release", async () => {
@@ -303,6 +306,9 @@ describe("public snapshot reader", () => {
       }),
     ).rejects.toBe(injected);
     expect(attempts).toBe(1);
+    expect(
+      fixture.http.requestCount(releaseManifestKey(fixture.previous.releaseId)),
+    ).toBe(0);
   });
 
   test("rejects an invalid scoped logical name once without object reads", async () => {
