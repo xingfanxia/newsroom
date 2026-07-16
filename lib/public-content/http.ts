@@ -39,7 +39,10 @@ import {
   getPublicEventMembers,
   queryPublicFeed,
 } from "@/lib/public-content/query";
-import { publicSnapshotReader } from "@/lib/public-content/reader";
+import {
+  publicSnapshotReader,
+  type PublicSnapshotReader,
+} from "@/lib/public-content/reader";
 import type { PublicCanonicalStateResult } from "@/lib/public-content/reader/types";
 import { APP_LOCALES, type AppLocale } from "@/lib/types";
 import { PUBLIC_SEMANTIC_SEARCH_ERROR } from "@/lib/search/query-defaults";
@@ -229,10 +232,11 @@ export function activeSourcesSnapshotBody(
   return { sources, total: sources.length };
 }
 
-export function publicItemSnapshotResult(
+export async function publicItemSnapshotResult(
   snapshot: PublicCanonicalStateResult,
   rawId: string,
-): SnapshotCachedResult {
+  reader: Pick<PublicSnapshotReader, "readItemBody"> = publicSnapshotReader(),
+): Promise<SnapshotCachedResult> {
   const parsed = parsePositiveRouteId(rawId);
   if (!parsed.ok) return { ok: false, error: parsed.error, status: 400 };
   const index = createPublicStateIndex(snapshot.state);
@@ -244,6 +248,8 @@ export function publicItemSnapshotResult(
   if (item.eventId !== null && !event) {
     throw new Error(`missing public event: ${item.eventId}`);
   }
+  const bodyMd =
+    item.bodyMd ?? await reader.readItemBody(snapshot.release, item.id);
   const publicEvent =
     event && event.coverage > 1
       ? {
@@ -298,7 +304,7 @@ export function publicItemSnapshotResult(
       published_at: item.publishedAt,
       enriched_at: item.enrichedAt,
       commentary_at: item.commentaryAt,
-      body_md: item.bodyMd,
+      body_md: bodyMd,
       hkr: item.hkr ? { ...item.hkr } : null,
       event: publicEvent,
     },

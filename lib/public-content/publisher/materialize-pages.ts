@@ -105,13 +105,25 @@ export function buildMaterializedPageModels(
   for (const item of state.items) {
     if (!podcastSourceIds.has(item.sourceId)) continue;
     const id = item.id;
-    const en = publicPageItemDetailFromIndex(stateIndex, id, "en", nowMs);
-    const zh = publicPageItemDetailFromIndex(stateIndex, id, "zh", nowMs);
-    if (!en || !zh) continue;
     const bodyMd = item.bodyMd ?? getBody(id);
+    const en = publicPageItemDetailFromIndex(
+      stateIndex,
+      id,
+      "en",
+      nowMs,
+      bodyMd,
+    );
+    const zh = publicPageItemDetailFromIndex(
+      stateIndex,
+      id,
+      "zh",
+      nowMs,
+      bodyMd,
+    );
+    if (!en || !zh) continue;
     detailBuckets[id % MATERIALIZED_PODCAST_DETAIL_BUCKET_COUNT]![String(id)] = {
-      en: { ...en, bodyMd },
-      zh: { ...zh, bodyMd },
+      en,
+      zh,
     };
   }
   for (let bucket = 0; bucket < detailBuckets.length; bucket += 1) {
