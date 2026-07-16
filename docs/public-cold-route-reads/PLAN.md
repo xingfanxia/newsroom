@@ -1,10 +1,12 @@
 # Public Cold Route Reads — Source Plan
 
-Status: PCR-6 in progress
+Status: done
 
 Branch: `perf/public-cold-route-reads`
 
 Started: 2026-07-16
+
+Completed: 2026-07-16
 
 Source of truth: this file plus runtime code. Historical plans are evidence,
 not implementation authority.
@@ -382,7 +384,7 @@ this ledger is updated in that same commit.
 | PCR-3 | compact segmented feed artifacts, default first page, publisher incrementality | done | this phase commit; 88 related tests; live default 43,331 B max; reviewer rounds 1–2 clean |
 | PCR-4 | compact sharded lexical index and hit hydration | done | phase commit; 79 related tests; live index 8,325,002 B / 32 shards; reviewer rounds 1–2 clean |
 | PCR-5 | daily, sources/active, RSS, shell, page variants; static/runtime no-full-state verifier | done | 73 related tests / 657 assertions; typecheck/lint/source + full-state boundaries clean; reviewer round 1 two Medium findings resolved; round 2 clean |
-| PCR-6 | full verification, final review, PR/CI/merge/deploy, true-cold and admin evidence, closeout PR | in progress | local boundary + hermetic gates clean; final review round 1 Medium + Low resolved, round 2 Medium resolved, round 3 clean; PR/production evidence pending |
+| PCR-6 | full verification, final review, PR/CI/merge/deploy, true-cold and admin evidence, closeout PR | done | commits `e7ef257` / merge `9c89f83`; local boundary + hermetic gates clean; final review round 1 Medium + Low resolved, round 2 Medium resolved, round 3 clean; production acceptance below |
 
 ## 7. Verification and production acceptance
 
@@ -413,3 +415,212 @@ without another approval prompt. Production publication remains pointer-last
 and ≤500 writes. A closeout PR records deployment, release, artifact sizes/read
 counts, warm samples, true-cold samples and telemetry proof, parity results,
 admin non-regression, rollback readiness, and any residual limitations.
+
+### 7.1 Release and deployment ledger
+
+The implementation shipped through ready PR
+[`#59`](https://github.com/xingfanxia/newsroom/pull/59), merged as
+`9c89f8386e1077e9a05dd87600c291095cbd954a` at
+`2026-07-16T22:05:28Z`. Vercel first deployed that merge as
+`dpl_B2gDmR6yZr1miKD51MmkJcz4PkF7`; the same commit's current production
+redeploy is `dpl_7h1QxkdUWjt5ZnAsKotriJyzuXEo`. Production publisher cron then
+advanced pointer-last from legacy-layout `r1084-05c5e2a327349880dd17` to the
+first new-layout release `r1088-5e0d031b4c967849baf1` at
+`2026-07-16T22:14:01.931Z`. The fetched manifest SHA-256 exactly matched the
+pointer value `60179997bb71845a9947ac06531e025c4c3c2f5e3eaaebebe674d9513640b282`.
+
+The next natural publisher run advanced to
+`r1098-34c6ec39d41b66537b45` at `2026-07-16T22:27:25.405Z`, with manifest
+SHA-256 `55ca17c2650b7b2450b9c3a192932f6e858502ba486cc36a84f8f4c4b5394fab`.
+Its pointer retains `r1088-5e0d031b4c967849baf1` as `previous`, so the normal
+rollback and reader fallback chain remain available.
+
+### 7.2 Deployed artifact and read budgets
+
+The `r1088` manifest contains 636 artifacts. Its deployed families are:
+
+| Family | Count | Total bytes | Largest artifact |
+|---|---:|---:|---:|
+| canonical `state/*` reference baseline | 315 | 33,763,241 | 302,387 |
+| split item bodies | 128 | 62,782,764 | 681,846 |
+| default feed, en / zh | 2 | 43,377 / 40,855 | 43,377 |
+| feed directory | 1 | 21,869 | 21,869 |
+| feed segments | 128 | 9,742,657 | 857,319 |
+| lexical search | 32 | 8,329,691 | 280,681 |
+| `state/sources` | 1 | 24,818 | 24,818 |
+| newsletter shards | 58 | 589,700 | 18,957 |
+| `views/agents` | 1 | 545 | 545 |
+
+The search index is 7.94 MiB, 31% below the 12 MB acceptance line and 75%
+smaller than canonical `state/*`. Production traces on fresh deployment
+`dpl_3yXTsJ29VFkxQmvqfahsQYYmKpfV` proved the exact logical read counts below;
+the byte totals come from the hash-verified `r1098` descriptors and include the
+514-byte pointer plus 198,085-byte manifest.
+
+| Representative request | HTTP objects | Transferred artifact bytes | Acceptance |
+|---|---:|---:|---|
+| default zh feed | 3 | 239,454 | pass, ≤500 KB |
+| eventless item 44779 | 5 | 898,785 | pass, ≤1.5 MB / ≤6 |
+| event-backed item 44598 | 6 | 958,538 | pass, ≤1.5 MB / ≤6 |
+| event 49175, two member buckets | 6 | 737,733 | pass, event + source + two item buckets |
+| sources | 3 | 223,417 | bounded singleton |
+| search `OpenAI`, 20 hits | 58 | 13,097,200 | 32 index + 18 item + 5 event + source + pointer/manifest |
+
+The search trace's 58 GET spans exactly equal that descriptor plan. Search
+hydration reads no bodies, newsletters, policies, feed segments, or unrelated
+canonical buckets. Event-member reads grow with distinct member item buckets,
+not the corpus.
+
+The migration from `r1084` reused 435 unchanged descriptors, changed 38
+existing descriptors, added exactly 131 feed plus 32 search descriptors, and
+removed none. The same publisher preflight therefore admitted exactly
+`38 + 163 + 3 = 204` planned writes including manifest, pointer CAS, and
+receipt, safely below 500.
+
+### 7.3 Production response parity
+
+The post-migration capture was pinned to `r1088` and used uncached HTTP 200
+responses. Item 44779, public event 49175, its legacy envelope, and active
+sources are byte-for-byte identical to their pre-migration bodies; their
+SHA-256 values remain `79b10fc0a5e4ab31d855dd783e253d10ea440ef80126213b1f070a5655a9ccdf`,
+`6fc861c1a1471219d526cb36ca8623b4a24d2487bad66eb167b00e48f1873b83`,
+`0d3ce6e14d00e9a5e4f84ca6b524f4f89792e3fe117987907c2a48e666da2e94`,
+and `c0b943767a00a0f6a453f2ed840dbb41d25b07fc951209cecb2d3d7310f30b63`.
+This includes exact item `body_md` preservation.
+
+The only non-byte-identical production bodies correspond to real source data
+between baseline watermark 1022 and deployed watermark 1088:
+
+- feed total moved 3,112 → 3,117; five newly published IDs entered the first
+  page and the five oldest page IDs moved to the next page;
+- `OpenAI` search total moved 1,093 → 1,094; item 44778 entered and the former
+  twentieth hit moved to the next page;
+- sources retained the same 55 rows and schema; only health timestamps,
+  counters, and failure streaks advanced;
+- RSS advanced through the same newly published feed rows.
+
+Envelope keys, status, content type, ordering, pagination size, locale,
+legacy/public event shape, and weak-ETag family remained intact; ETag values
+rotated with the release hash as designed. The fixture parity matrix and 304,
+invalid, fallback, corruption, and terminal-503 cases are covered by the final
+1,577-test hermetic gate.
+
+### 7.4 Warm production timing
+
+Three adjacent CDN-warm requests per representative route were 65–216 ms.
+More importantly, three adjacent function-warm requests used explicit,
+documented cache-bypass query keys solely to prevent CDN hits; every response
+was `x-vercel-cache: MISS`, and this set is not used as cold evidence:
+
+| Route | Three function-warm totals, seconds | Max |
+|---|---|---:|
+| default feed | 0.162, 0.159, 0.146 | 0.162 |
+| filtered/today feed | 0.442, 0.256, 0.309 | 0.442 |
+| item | 0.106, 0.114, 0.109 | 0.114 |
+| event | 0.121, 0.107, 0.107 | 0.121 |
+| sources | 0.121, 0.108, 0.104 | 0.121 |
+| search | 0.359, 0.335, 0.321 | 0.359 |
+
+All 18 function-warm observations are below 0.5 seconds and produced stable
+body hashes.
+
+### 7.5 True-cold timing and platform/application split
+
+Five production-target deployments were built from the clean merge SHA with
+automatic custom production-domain promotion disabled. For each deployment,
+the five
+exact route URLs were issued concurrently as the first requests through
+Vercel's authenticated deployment bypass. There were no cache-busting query
+parameters or no-cache headers. Historical deployment logs show exactly those
+five HTTP 200 / `x-vercel-cache: MISS` requests and no earlier requests; one
+publisher cron appeared only after the measured batch on one deployment.
+
+The fresh deployments were:
+
+- `dpl_FxUtgKYncVaEyYeDVM7BkfpekVU8`
+- `dpl_5jMqhqvadkQtMVBxZmyo2xpbPqv1`
+- `dpl_2vEuxJYxt4EdjBQtTEDiEJoJQsZq`
+- `dpl_AfspktqD6U1MNAvckE6742rtqAyE`
+- `dpl_5fKQCjbP6EPAqSojhDmAYY8YYt7N`
+
+With five samples, nearest-rank p95 is the conservative maximum:
+
+| Route | Cold totals, seconds, sorted | p50 | p95 / max | Target |
+|---|---|---:|---:|---|
+| feed | 0.922, 1.053, 1.097, 1.157, 1.190 | 1.097 | 1.190 | pass, <2 |
+| item | 0.987, 1.022, 1.160, 1.219, 1.338 | 1.160 | 1.338 | pass, <2 |
+| event | 0.978, 1.069, 1.214, 1.243, 1.443 | 1.214 | 1.443 | pass, <2 |
+| sources | 1.024, 1.127, 1.205, 1.211, 1.243 | 1.205 | 1.243 | pass, <2 |
+| search | 2.178, 2.390, 2.442, 2.514, 2.630 | 2.442 | 2.630 | pass, <3 |
+
+A sixth untouched production-target deployment,
+`dpl_3yXTsJ29VFkxQmvqfahsQYYmKpfV`, captured Vercel session traces for the same
+first concurrent batch. Trace IDs are feed
+`524c05974a10361f7fd1131d13b0f245`, item
+`4bad05e99eb96d95260804157c65472d`, event
+`96713af82b9488ddb883c95a90e9e730`, sources
+`7367923c7af04fc79713f048ee8ea999`, and search
+`299dbce9c19832dae1b4cee05c2f4cf7`.
+
+| Route | Edge total ms | Function invoke ms | Artifact GETs | Fetch critical path ms | VM / Node / user-code init ms |
+|---|---:|---:|---:|---:|---|
+| feed | 666 | 511 | 3 | 206 | shared first batch; no separate start span |
+| item | 1,162 | 819 | 5 | 321 | 197 / 136 / 110 |
+| event | 1,077 | 758 | 6 | 238 | 162 / 160 / 124 |
+| sources | 1,111 | 722 | 3 | 218 | 200 / 165 / 124 |
+| search | 2,252 | 1,835 | 58 | 1,345 | 187 / 162 / 122 |
+
+Deployment resolution was 120–185 ms and PDX-edge → SFO-function routing was
+10.6–11.0 ms. Vercel's paid aggregate `start_type` metric was unavailable on
+this plan, but the session traces provide stronger request-level `Start VM`,
+`Spawn Node.js`, `Init User Code`, `Invoke Function`, region-routing, and every
+outbound artifact GET span.
+
+A separate ten-iteration CPU probe used the exact hash-verified production
+bytes and the runtime parsers. It is local CPU evidence, not substituted for
+the Vercel E2E result:
+
+| Route | Content artifacts / bytes | SHA-256 p95 ms | parse p95 ms | query/serialize p95 ms |
+|---|---:|---:|---:|---:|
+| feed | 1 / 40,855 | 0.07 | 0.23 | 0.03 |
+| item | 3 / 700,186 | 0.30 | 1.88 | <0.01 |
+| event | 4 / 539,134 | 0.44 | 2.15 | <0.01 |
+| sources | 1 / 24,818 | 0.04 | 0.24 | <0.01 |
+| search | 56 / 12,898,601 | 2.16 | 25.96 | 13.33 |
+
+This confirms that search cold time is network/fetch dominated; compact-index
+parse/query work is tens of milliseconds rather than seconds.
+
+### 7.6 Natural publisher reuse
+
+The natural `r1088` → `r1098` release kept all 636 logical names, reused 605
+SHA descriptors (95.1%), changed 31, and added/removed zero. Reuse by family:
+
+- default feeds 2/2, directory 1/1, feed segments 128/128;
+- lexical search 32/32;
+- item shards 128/128, event shards 127/127, body shards 128/128;
+- `state/sources` changed once and all 30 materialized views changed in
+  response to source-health updates.
+
+Thus every feed, search-index, item, event, and body artifact reused its SHA on
+the next natural release; only the directly affected source/view facts changed.
+
+### 7.7 Admin non-regression and residual note
+
+Production password exchange returned HTTP 200 and an authenticated
+`/en/admin/users` returned HTTP 200 with a 34,315-byte page. Request-level trace
+`4ef4bfb75478d1bda58c8a047529639d` shows exactly two external POSTs to
+`newsroom-v2-xingfanxia.aws-us-west-2.turso.io/v2/pipeline` (219 ms and 70 ms)
+and zero `content.ax0x.ai`, public manifest, or R2/suspense-cache reads. This
+matches the static boundary and the six admin pages' direct
+`getAdminShellChromeData()` → Turso source wiring.
+
+The heavier `/en/admin/system` page also returned HTTP 200 and 101,381 bytes;
+its existing multi-query Turso workload took about 159 seconds during this
+probe. That is a separate admin-query optimization opportunity, not a public
+snapshot dependency or regression introduced by this work. Anonymous routes
+remain R2-only, while admin remains independently Turso-backed as required.
+
+All production acceptance lines are therefore met. The implementation shipped
+through [`#59`](https://github.com/xingfanxia/newsroom/pull/59); docs-only
+closeout is [`#60`](https://github.com/xingfanxia/newsroom/pull/60).
