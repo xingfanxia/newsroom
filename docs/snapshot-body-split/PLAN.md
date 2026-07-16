@@ -175,7 +175,7 @@ news.ax0x.ai 的所有匿名读取来自 R2 公共快照(`https://content.ax0x.a
 | SBS-3 | reader release-pinned body 读取 | done | `perf(public-content): add release-pinned body reads` |
 | SBS-4 | item API + podcast 详情消费者 | done | `perf(public-content): hydrate split bodies for consumers` |
 | SBS-5 | sources 直读 | done | `perf(public-content): read sources shard directly` |
-| SBS-6 | verify + PR + merge + 生产迁移验证 | pending | |
+| SBS-6 | verify + PR + merge + 生产迁移验证 | in progress (local verification/review complete) | `chore(public-content): enforce snapshot write budget` |
 
 ## 8. 关键文件地图(行号为 2026-07-16 快照,可能漂移,以符号为准)
 

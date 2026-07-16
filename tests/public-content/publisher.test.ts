@@ -18,6 +18,7 @@ import {
   CURRENT_POINTER_KEY,
   objectKey,
   releaseManifestKey,
+  runReceiptKey,
 } from "@/lib/public-content/paths";
 import { buildPublicRelease } from "@/lib/public-content/publisher/build-release";
 import type {
@@ -27,6 +28,7 @@ import type {
   StoredPublisherObject,
 } from "@/lib/public-content/publisher/object-store";
 import { publishIncrementalSnapshot } from "@/lib/public-content/publisher/publish";
+import { runIncrementalPublicPublisher } from "@/lib/public-content/publisher/runtime";
 import type {
   PublicContentPublisherSource,
   PublicEntityChange,
@@ -374,6 +376,73 @@ async function run(
   });
 }
 
+async function runRuntime(
+  fixture: Awaited<ReturnType<typeof seededFixture>>,
+  source: FakeSource,
+  runId: string,
+) {
+  return runIncrementalPublicPublisher({
+    source,
+    store: fixture.store,
+    runId,
+    now: () => NOW,
+  });
+}
+
+function bucketFanoutChanges(
+  state: ReturnType<typeof canonicalStateSchema.parse>,
+  newsletterCount: number,
+): PublicEntityChange[] {
+  const seedItem = state.items[0]!;
+  const seedEvent = state.events[0]!;
+  const seedNewsletter = state.newsletters[0]!;
+  if (seedNewsletter.format !== "daily_column") {
+    throw new Error("expected daily-column fixture");
+  }
+  const changes: PublicEntityChange[] = [];
+  for (let id = 1; id <= 248; id += 1) {
+    changes.push({
+      entityType: "item",
+      entityKey: String(id),
+      value: {
+        ...seedItem,
+        id,
+        eventId: Math.ceil(id / 2),
+        title: { ...seedItem.title, raw: `Item ${id}` },
+        url: `https://example.com/items/${id}`,
+        canonicalUrl: `https://example.com/items/${id}`,
+      },
+    });
+  }
+  for (let id = 1; id <= 124; id += 1) {
+    const leadItemId = id * 2 - 1;
+    changes.push({
+      entityType: "event",
+      entityKey: String(id),
+      value: {
+        ...seedEvent,
+        id,
+        leadItemId,
+        memberItemIds: [leadItemId, leadItemId + 1],
+        coverage: 2,
+      },
+    });
+  }
+  for (let id = 1; id <= newsletterCount; id += 1) {
+    changes.push({
+      entityType: "newsletter",
+      entityKey: String(id),
+      value: {
+        ...seedNewsletter,
+        id,
+        itemIds: [1],
+        featuredItemIds: [1],
+      },
+    });
+  }
+  return changes;
+}
+
 describe("pointer-last incremental publisher", () => {
   test("uploads and validates content before manifest, then commits and acks", async () => {
     const fixture = await seededFixture();
@@ -531,6 +600,81 @@ describe("pointer-last incremental publisher", () => {
         scenario.stage,
       ).toEqual(before);
     }
+  });
+
+  test("publishes exactly 497 changed artifacts within the 500-write runtime cap", async () => {
+    const fixture = await seededFixture();
+    const changes = bucketFanoutChanges(fixture.state, 87);
+    const candidate = await buildPublicRelease({
+      previousManifest: fixture.release.manifest,
+      sourceWatermark: 10 + changes.length,
+      changes,
+      generatedAtMs: NOW,
+      loadArtifact: async (logicalName, descriptor) => {
+        const stored = fixture.store.objects.get(descriptor.key);
+        if (!stored) throw new Error(`missing fixture artifact: ${logicalName}`);
+        return stored.bytes;
+      },
+    });
+    expect(
+      candidate.artifacts.filter(({ unchanged }) => !unchanged),
+    ).toHaveLength(497);
+    const source = new FakeSource(
+      batch(10, 10 + changes.length, changes),
+      fixture.events,
+    );
+    const runId = "run-at-write-cap";
+
+    const receipt = await runRuntime(fixture, source, runId);
+
+    expect(receipt).toMatchObject({ status: "succeeded", failureStage: null });
+    expect(source.ackCalls).toEqual([10 + changes.length]);
+    expect(
+      fixture.events.filter(
+        (event) => event.startsWith("put:") || event.startsWith("cas:"),
+      ),
+    ).toHaveLength(500);
+    expect(fixture.events).toContain(
+      `put:${runReceiptKey("2026-07-14", runId)}`,
+    );
+  });
+
+  test("rejects 498 changed artifacts before runtime writes only its receipt", async () => {
+    const fixture = await seededFixture();
+    const changes = bucketFanoutChanges(fixture.state, 88);
+    const candidate = await buildPublicRelease({
+      previousManifest: fixture.release.manifest,
+      sourceWatermark: 10 + changes.length,
+      changes,
+      generatedAtMs: NOW,
+      loadArtifact: async (logicalName, descriptor) => {
+        const stored = fixture.store.objects.get(descriptor.key);
+        if (!stored) throw new Error(`missing fixture artifact: ${logicalName}`);
+        return stored.bytes;
+      },
+    });
+    expect(
+      candidate.artifacts.filter(({ unchanged }) => !unchanged),
+    ).toHaveLength(498);
+    const source = new FakeSource(
+      batch(10, 10 + changes.length, changes),
+      fixture.events,
+    );
+    const runId = "run-over-write-cap";
+
+    const receipt = await runRuntime(fixture, source, runId);
+
+    expect(receipt).toMatchObject({
+      status: "failed",
+      failureStage: "upload_objects",
+      objects: { uploaded: 0, reused: 0 },
+    });
+    expect(source.ackCalls).toEqual([]);
+    expect(
+      fixture.events.filter(
+        (event) => event.startsWith("put:") || event.startsWith("cas:"),
+      ),
+    ).toEqual([`put:${runReceiptKey("2026-07-14", runId)}`]);
   });
 
   test("resolves an ambiguous CAS only when reread proves the intended release", async () => {
@@ -712,6 +856,17 @@ describe("incremental release scale", () => {
     const fixtureState = canonicalState();
     const state = canonicalStateSchema.parse({
       ...fixtureState,
+      items: Array.from({ length: PUBLIC_NUMERIC_SHARD_COUNT }, (_, index) => {
+        const id = index + 1;
+        return {
+          ...item(id),
+          eventId: null,
+          url: `https://example.com/podcast/${id}`,
+          canonicalUrl: `https://example.com/podcast/${id}`,
+        };
+      }),
+      events: [],
+      newsletters: [],
       sources: fixtureState.sources.map((value) => ({
         ...value,
         group: "podcast",
@@ -719,11 +874,25 @@ describe("incremental release scale", () => {
     });
     const rebuiltFixture = await seededFixture(state);
     const expectedBody = state.items[0]!.bodyMd!;
-    await downgradeToLegacyFatItems(rebuiltFixture);
+    const legacy = await downgradeToLegacyFatItems(rebuiltFixture);
+    expect(
+      Object.keys(legacy.manifest.artifacts).filter((logicalName) =>
+        logicalName.startsWith("state/items/"),
+      ),
+    ).toHaveLength(PUBLIC_NUMERIC_SHARD_COUNT);
     const source = new FakeSource(batch(10, 10, []), rebuiltFixture.events);
 
-    const receipt = await run(rebuiltFixture, source);
+    const receipt = await runRuntime(
+      rebuiltFixture,
+      source,
+      "run-full-body-split-migration",
+    );
     expect(receipt).toMatchObject({ status: "succeeded", failureStage: null });
+    expect(
+      rebuiltFixture.events.filter(
+        (event) => event.startsWith("put:") || event.startsWith("cas:"),
+      ),
+    ).toHaveLength(259);
     const pointer = snapshotPointerSchema.parse(
       JSON.parse(
         new TextDecoder().decode(

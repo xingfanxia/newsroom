@@ -37,6 +37,10 @@ import type {
 type SnapshotPointer = z.infer<typeof snapshotPointerSchema>;
 export type PublicPublisherReceipt = z.infer<typeof runReceiptSchema>;
 
+const MAX_INCREMENTAL_OBJECT_WRITES = 500;
+// Manifest + current.json CAS + the runtime receipt persisted after this call.
+const INCREMENTAL_RELEASE_FIXED_WRITES = 3;
+
 export type IncrementalPublishInput = {
   source: PublicContentPublisherSource;
   store: PublisherObjectStore;
@@ -134,6 +138,10 @@ export async function publishIncrementalSnapshot(
     return receipt(context, "failed", "derive", null);
   }
 
+  if (plannedIncrementalObjectWrites(release) > MAX_INCREMENTAL_OBJECT_WRITES) {
+    return receipt(context, "failed", "upload_objects", null);
+  }
+
   try {
     await uploadChangedReleaseArtifacts(input.store, release, context.objects);
   } catch {
@@ -174,6 +182,13 @@ export async function publishIncrementalSnapshot(
     return receipt(context, "failed", "ack_outbox", release.releaseId);
   }
   return receipt(context, "succeeded", null, release.releaseId);
+}
+
+function plannedIncrementalObjectWrites(release: BuiltPublicRelease): number {
+  return (
+    release.artifacts.filter(({ unchanged }) => !unchanged).length +
+    INCREMENTAL_RELEASE_FIXED_WRITES
+  );
 }
 
 type PointerRecord = {

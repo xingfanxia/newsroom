@@ -86,6 +86,15 @@ describe("public snapshot documentation contracts", () => {
     expect(operations).toContain("<13,699 rows/hour");
   });
 
+  test("documents the split item-body artifact layout and compatibility path", () => {
+    expect(operations).toContain("`state/items/<00-7f>`");
+    expect(operations).toContain("`bodies/items/<00-7f>`");
+    expect(operations).toContain("`bodyMd: null`");
+    expect(operations).toContain("release-pinned");
+    expect(operations).toContain("all 128 body shards");
+    expect(operations).toContain("`state/sources`");
+  });
+
   test("uses hermetic focused tests and receipt-backed production criteria", () => {
     expect(agentAccess).not.toContain("bun test --env-file=.env.local");
     expect(testing).toContain("smallest focused hermetic test");
