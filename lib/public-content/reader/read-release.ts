@@ -24,11 +24,26 @@ const MANIFEST_MAX_BYTES = 4 * 1024 * 1024;
 const ARTIFACT_MAX_BYTES = 64 * 1024 * 1024;
 const MAX_STATE_ARTIFACTS = 800;
 const STATE_FETCH_CONCURRENCY = 16;
+/** active + previous — a third release id evicts the oldest entry. */
+const STATE_CACHE_MAX_RELEASES = 2;
 
 export class PublicSnapshotReader {
   readonly #fetcher: PublicSnapshotHttpFetcher;
   readonly #manifestCache = new Map<string, Promise<SnapshotManifest>>();
   readonly #artifactCache = new Map<string, Promise<Uint8Array>>();
+  /**
+   * Parsed-state memo keyed by release identity. Shard BYTES were always
+   * cached, but the multi-MB JSON.parse + zod validation re-ran on every
+   * readCanonicalState() call — the dominant per-request cost for every
+   * consumer (page chrome, page models, public API, RSS). Releases are
+   * immutable, so the parse is safe to run once per release. Callers
+   * receive a SHARED state object and must treat it as read-only (the
+   * last-known-good path already shared state this way).
+   */
+  readonly #stateCache = new Map<
+    string,
+    Promise<ReturnType<typeof canonicalStateSchema.parse>>
+  >();
   #lastKnownGoodRelease: ResolvedPublicRelease | null = null;
   #lastKnownGoodState: PublicCanonicalStateResult | null = null;
 
@@ -96,7 +111,7 @@ export class PublicSnapshotReader {
     const candidates = await this.#candidateReleases();
     for (const release of candidates) {
       try {
-        const state = await this.#readStateFromRelease(release);
+        const state = await this.#readStateCached(release);
         const result = { state, release };
         this.#lastKnownGoodRelease = release;
         this.#lastKnownGoodState = result;
@@ -202,6 +217,28 @@ export class PublicSnapshotReader {
       return (await loading).slice();
     } catch (error) {
       this.#artifactCache.delete(cacheKey);
+      throw error;
+    }
+  }
+
+  async #readStateCached(
+    release: ResolvedPublicRelease,
+  ): Promise<ReturnType<typeof canonicalStateSchema.parse>> {
+    const cacheKey = `${release.ref.releaseId}:${release.ref.manifestSha256}`;
+    const cached = this.#stateCache.get(cacheKey);
+    if (cached) return cached;
+    const loading = this.#readStateFromRelease(release);
+    this.#stateCache.set(cacheKey, loading);
+    try {
+      const state = await loading;
+      while (this.#stateCache.size > STATE_CACHE_MAX_RELEASES) {
+        const oldest = this.#stateCache.keys().next().value;
+        if (oldest === undefined) break;
+        this.#stateCache.delete(oldest);
+      }
+      return state;
+    } catch (error) {
+      this.#stateCache.delete(cacheKey);
       throw error;
     }
   }

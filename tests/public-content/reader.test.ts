@@ -61,6 +61,50 @@ describe("public snapshot reader", () => {
     ).toHaveLength(immutableReads);
   });
 
+  test("memoizes the PARSED state per release — repeat reads skip the JSON+zod pass", async () => {
+    const fixture = await snapshotFixture();
+    const reader = fixture.reader();
+    const first = await reader.readCanonicalState();
+    const second = await reader.readCanonicalState();
+    // Identity, not equality: the multi-MB parse/validate must run once
+    // per release, not once per request (this was the 2-5s page cost).
+    expect(second.state).toBe(first.state);
+
+    // Concurrent cold reads share one in-flight parse.
+    const cold = fixture.reader();
+    const [a, b] = await Promise.all([
+      cold.readCanonicalState(),
+      cold.readCanonicalState(),
+    ]);
+    expect(b.state).toBe(a.state);
+  });
+
+  test("a pointer release change replaces the memoized state", async () => {
+    const fixture = await snapshotFixture();
+    const reader = fixture.reader();
+    const first = await reader.readCanonicalState();
+
+    const repointed = snapshotPointerSchema.parse({
+      schemaVersion: 1,
+      active: {
+        releaseId: fixture.previous.releaseId,
+        manifestKey: releaseManifestKey(fixture.previous.releaseId),
+        manifestSha256: fixture.previous.manifestSha256,
+      },
+      previous: null,
+      publishedAt: PUBLISHED_AT,
+      sourceWatermark: 10,
+    });
+    fixture.http.put(CURRENT_POINTER_KEY, canonicalJsonBytes(repointed));
+
+    const next = await reader.readCanonicalState();
+    expect(next.state).not.toBe(first.state);
+    expect(next.release.ref.releaseId).toBe(fixture.previous.releaseId);
+    expect(next.state.items[0]?.title.en).toBe(
+      fixture.previousState.items[0]?.title.en,
+    );
+  });
+
   test("falls back to previous when the active manifest is corrupt", async () => {
     const fixture = await snapshotFixture();
     fixture.http.put(
