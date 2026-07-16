@@ -29,6 +29,11 @@ const STATE_FETCH_CONCURRENCY = 16;
 /** active + previous — a third release id evicts the oldest entry. */
 const STATE_CACHE_MAX_RELEASES = 2;
 
+type LogicalArtifactReadOptions = {
+  required?: boolean;
+  validate?: (bytes: Uint8Array) => void;
+};
+
 export class PublicSnapshotReader {
   readonly #fetcher: PublicSnapshotHttpFetcher;
   readonly #manifestCache = new Map<string, Promise<SnapshotManifest>>();
@@ -72,19 +77,27 @@ export class PublicSnapshotReader {
 
   async readLogicalArtifact(
     logicalName: string,
+    options: LogicalArtifactReadOptions = {},
   ): Promise<PublicLogicalArtifact | null> {
     if (!isSafeLogicalName(logicalName)) {
       throw new PublicSnapshotUnavailableError();
     }
     const candidates = await this.#candidateReleases();
     const active = candidates.find(({ source }) => source === "active");
-    if (active && !(logicalName in active.manifest.artifacts)) return null;
+    if (
+      active &&
+      !(logicalName in active.manifest.artifacts) &&
+      !options.required
+    ) {
+      return null;
+    }
 
     for (const release of candidates) {
       const descriptor = release.manifest.artifacts[logicalName];
       if (!descriptor) continue;
       try {
         const bytes = await this.#readArtifactBytes(descriptor);
+        options.validate?.(bytes);
         this.#lastKnownGoodRelease = release;
         return { logicalName, descriptor, bytes, release };
       } catch {
@@ -94,16 +107,16 @@ export class PublicSnapshotReader {
     if (this.#lastKnownGoodRelease) {
       const release = asLastKnownGood(this.#lastKnownGoodRelease);
       const descriptor = release.manifest.artifacts[logicalName];
-      if (!descriptor) return null;
-      try {
-        return {
-          logicalName,
-          descriptor,
-          bytes: await this.#readArtifactBytes(descriptor),
-          release,
-        };
-      } catch {
-        // Terminal controlled-unavailable below.
+      if (!descriptor) {
+        if (!options.required) return null;
+      } else {
+        try {
+          const bytes = await this.#readArtifactBytes(descriptor);
+          options.validate?.(bytes);
+          return { logicalName, descriptor, bytes, release };
+        } catch {
+          // Terminal controlled-unavailable below.
+        }
       }
     }
     throw new PublicSnapshotUnavailableError();

@@ -16,6 +16,7 @@ import { readSource } from "@/tests/helpers/source";
 
 const v1SourcesRoute = readSource("app/api/v1/sources/route.ts");
 const publicSourcesRoute = readSource("app/api/public/sources/route.ts");
+const publicContentHttp = readSource("lib/public-content/http.ts");
 const agentsTabs = readSource("app/[locale]/agents/_tabs.tsx");
 const mainFeedRssRoute = readSource("app/api/feed/[locale]/rss.xml/route.ts");
 const sourcesPage = readSource("app/[locale]/sources/page.tsx");
@@ -37,13 +38,16 @@ function inlineEnum(values: readonly (string | null)[]): string {
 }
 
 describe("source catalog source wiring", () => {
-  test("public sources use snapshots while v1 keeps the live source module", () => {
+  test("public sources read the singleton snapshot shard while v1 stays live", () => {
     expect(v1SourcesRoute).toContain("@/lib/api/source-catalog");
     expect(v1SourcesRoute).toContain("listSourceCatalogRows");
     expect(v1SourcesRoute).toContain("rows.map(toV1SourceApiItem)");
     expect(publicSourcesRoute).toContain("@/lib/public-content/http");
     expect(publicSourcesRoute).toContain("publicSourcesSnapshotResult");
-    expect(publicSourcesRoute).toContain("readPublicSnapshot");
+    expect(publicSourcesRoute).not.toContain("readPublicSnapshot");
+    expect(publicContentHttp).toContain("readLogicalArtifact(");
+    expect(publicContentHttp).toContain('"state/sources"');
+    expect(publicContentHttp).toContain("parsePublicEntityShardValue");
     for (const source of [v1SourcesRoute, publicSourcesRoute]) {
       expect(source).not.toContain(".select({");
       expect(source).not.toContain("sourceHealth.");

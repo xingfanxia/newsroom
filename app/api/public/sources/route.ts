@@ -6,10 +6,7 @@
  * "does AX Radar cover X publisher?" before issuing a filtered feed query.
  */
 import { publicCachedRoute } from "@/lib/api/public-helpers";
-import {
-  publicSourcesSnapshotResult,
-  readPublicSnapshot,
-} from "@/lib/public-content/http";
+import { publicSourcesSnapshotResult } from "@/lib/public-content/http";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -19,6 +16,6 @@ export async function GET(req: Request) {
     endpoint: "sources",
     etagFamily: "public-sources",
     label: "api/public/sources",
-    load: async () => publicSourcesSnapshotResult(await readPublicSnapshot()),
+    load: publicSourcesSnapshotResult,
   });
 }
