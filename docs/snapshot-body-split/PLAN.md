@@ -175,7 +175,31 @@ news.ax0x.ai 的所有匿名读取来自 R2 公共快照(`https://content.ax0x.a
 | SBS-3 | reader release-pinned body 读取 | done | `perf(public-content): add release-pinned body reads` |
 | SBS-4 | item API + podcast 详情消费者 | done | `perf(public-content): hydrate split bodies for consumers` |
 | SBS-5 | sources 直读 | done | `perf(public-content): read sources shard directly` |
-| SBS-6 | verify + PR + merge + 生产迁移验证 | in progress (local verification/review complete) | `chore(public-content): enforce snapshot write budget` |
+| SBS-6 | verify + PR + merge + 生产迁移验证 | done | `chore(public-content): enforce snapshot write budget` + [PR #57](https://github.com/xingfanxia/newsroom/pull/57) |
+
+### 7.1 SBS-6 生产收口证据(2026-07-16)
+
+- 用户于 `2026-07-16T18:44Z` 明确要求立即发布以恢复加载速度,覆盖原定
+  `2026-07-17T08:00:00Z` 等待窗口;授权记录在 PR body。PR #57 于
+  `2026-07-16T18:44:52Z` 合并,merge commit 为 `7170f457`;Vercel
+  production deployment `dpl_LdFjJcPiiif3prreTFKFeBD1mpqp` 为 Ready。
+- 最终本地门禁:`bun run verify` 输出 `HERMETIC_VERIFY_COMPLETE`(1,524
+  pass / 2 skip / 0 fail);`bun run verify:public-boundary` 的 source 与 build
+  扫描均为零污染。
+- 首次迁移 release `r1009-919bfb84de8c919d25d3` 成功:128 个
+  `bodies/items/*`;315 个 `state/*` 共 **33,743,498 bytes**(迁移前
+  96,134,110 bytes,硬门 <45,000,000);publisher 上传 256、复用 30 个对象。
+- 基线 item `44743` 的 `body_md` 迁移前后 `cmp` 为空:11,316 bytes,
+  SHA-256 `61ce4859240e87fb1d69ea37c77a3ca36c6410a292e7c7c53c624015db194a14`。
+- 首轮三次 warm 延迟(秒):feed `0.079493 / 0.144396 / 0.076267`;item
+  `0.087549 / 0.145177 / 0.081885`;sources
+  `0.063542 / 0.152709 / 0.066822`,全部 <0.5s。
+- 下一班自然增量 release `r1011-9f06362d2a7aea060779` 仍有 128 个 body
+  分片与 33,746,776 bytes state;相对迁移 release **127/128 body shard SHA
+  复用**,仅一个受影响桶变化;基线 body 再次逐字节一致。
+- 额外观测:此前未访问的 production search deployment probe 首发约 4-5s,
+  紧邻 warm 约 0.074s。cold <3s 在 §4 中不是硬门;本次已消除“每次都慢”,
+  但若要进一步压低实例首发,需在独立 follow-up 中让 feed/search 直读更小产物。
 
 ## 8. 关键文件地图(行号为 2026-07-16 快照,可能漂移,以符号为准)
 
