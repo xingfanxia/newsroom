@@ -102,6 +102,7 @@ const SNAPSHOT_PAGES = [
   page("snapshot-only", "/[locale]/curated/page", "/[locale]/curated", "app/[locale]/curated/page.tsx"),
   page("snapshot-only", "/[locale]/daily/[date]/page", "/[locale]/daily/[date]", "app/[locale]/daily/[date]/page.tsx"),
   page("snapshot-only", "/[locale]/daily/page", "/[locale]/daily", "app/[locale]/daily/page.tsx"),
+  page("snapshot-only", "/[locale]/newsletter/page", "/[locale]/newsletter", "app/[locale]/newsletter/page.tsx"),
   page("snapshot-only", "/[locale]/page", "/[locale]", "app/[locale]/page.tsx"),
   page("snapshot-only", "/[locale]/podcasts/[id]/page", "/[locale]/podcasts/[id]", "app/[locale]/podcasts/[id]/page.tsx"),
   page("snapshot-only", "/[locale]/podcasts/page", "/[locale]/podcasts", "app/[locale]/podcasts/page.tsx"),
@@ -146,6 +147,11 @@ const PRIVATE_PAGES = [
 
 const PRIVATE_ROUTES = [
   route("private-authenticated", "/api/admin/collections/route", "/api/admin/collections", "app/api/admin/collections/route.ts"),
+  // Newsletter token links: anonymous-reachable but capability-URL
+  // authenticated (32-byte unguessable token IS the credential); they
+  // read/write the PRIVATE subscriber tables, never the snapshot.
+  route("private-authenticated", "/api/newsletter/confirm/route", "/api/newsletter/confirm", "app/api/newsletter/confirm/route.ts"),
+  route("private-authenticated", "/api/newsletter/unsubscribe/route", "/api/newsletter/unsubscribe", "app/api/newsletter/unsubscribe/route.ts"),
   route("private-authenticated", "/api/admin/iterations/[id]/route", "/api/admin/iterations/[id]", "app/api/admin/iterations/[id]/route.ts"),
   route("private-authenticated", "/api/mcp/route", "/api/mcp", "app/api/mcp/route.ts"),
   route("private-authenticated", "/api/saved/export/route", "/api/saved/export", "app/api/saved/export/route.ts"),
@@ -171,6 +177,7 @@ const OPERATOR_ROUTES = [
   "fetch-weekly",
   "newsletter-daily",
   "newsletter-monthly",
+  "newsletter-send",
   "normalize",
   "publish-public",
   "score-backfill",

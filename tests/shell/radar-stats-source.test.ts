@@ -5,7 +5,41 @@ import {
   signalRatioFromRadar,
   topBarStatsFromRadar,
 } from "@/lib/shell/top-bar-stats";
-import { readSource } from "@/tests/helpers/source";
+import { exportedFunctionSection, readSource } from "@/tests/helpers/source";
+
+// Anonymous pages now load chrome through the public-content page-model layer,
+// whose build functions live here and all delegate to
+// shellChromeDataFromSnapshot (@/lib/shell/chrome-data). Assertions that used
+// to inspect a page file's inline chrome wiring re-point at the builder that
+// now owns it.
+const PAGE_MODEL_BUILDERS_SRC = readSource(
+  "lib/public-content/page-model-builders.ts",
+);
+const homePageModelBuilder = exportedFunctionSection(
+  PAGE_MODEL_BUILDERS_SRC,
+  "buildPublicHomePageModelFromSnapshot",
+);
+
+// Chrome loads either directly from the shell helper (admin/saved pages) or via
+// the public-content page-model layer (anonymous pages), which itself builds
+// chrome with shellChromeDataFromSnapshot. Either import proves the page pulls
+// chrome from a shared helper rather than hand-rolling radar stats inline.
+const SHARED_CHROME_SOURCE_RE = /@\/lib\/shell\/chrome-data|@\/lib\/public-content\//;
+
+// Each pulse-enabled page's chrome is built with `pulse: true`. Anonymous pages
+// request it inside their page-model builder; saved requests it in its
+// authorization boundary. Maps a page path to the source that owns that request.
+const PULSE_BUILDER_FN: Record<string, string> = {
+  "app/[locale]/page.tsx": "buildPublicHomePageModelFromSnapshot",
+  "app/[locale]/curated/page.tsx": "buildCuratedPageModel",
+  "app/[locale]/sources/page.tsx": "buildSourcesPageModel",
+  "app/[locale]/all/page.tsx": "buildAllPageModel",
+  "app/[locale]/x-monitor/page.tsx": "buildXMonitorPageModel",
+  "app/[locale]/agents/page.tsx": "buildAgentsPageModel",
+  "app/[locale]/daily/page.tsx": "buildDailyIndexPageModel",
+  "app/[locale]/daily/[date]/page.tsx": "buildDailyDatePageModel",
+  "app/[locale]/podcasts/page.tsx": "buildPodcastsPageModel",
+};
 
 const RADAR_FALLBACK_PAGE_PATHS = [
   "app/[locale]/page.tsx",
@@ -78,7 +112,10 @@ describe("radar stats shell contract", () => {
     for (const path of RADAR_FALLBACK_PAGE_PATHS) {
       const source = readSource(path);
 
-      expect(source).toContain("@/lib/shell/chrome-data");
+      // Chrome must come from a shared helper — either the shell chrome-data
+      // module directly or the public-content page-model layer that delegates
+      // to it — never hand-rolled radar stats inline.
+      expect(source).toMatch(SHARED_CHROME_SOURCE_RE);
       expect(source).not.toContain("@/lib/shell/radar-stats");
       expect(source).not.toContain("getRadarStats().catch");
       expect(source).not.toMatch(INLINE_EMPTY_RADAR_STATS_RE);
@@ -87,13 +124,18 @@ describe("radar stats shell contract", () => {
 
   it("keeps pulse-enabled pages explicit about loading pulse data", () => {
     for (const path of PULSE_CHROME_PAGE_PATHS) {
-      const source =
-        path === "app/[locale]/saved/page.tsx"
-          ? `${readSource(path)}\n${readSource("lib/auth/saved-page-boundary.ts")}`
-          : readSource(path);
+      // Every pulse-enabled page passes the pulse series to its shell.
+      expect(readSource(path)).toContain("pulse={chrome.pulse}");
 
-      expect(source).toContain("pulse: true");
-      expect(source).toContain("pulse={chrome.pulse}");
+      // The pulse REQUEST (`pulse: true`) now lives with whoever builds that
+      // page's chrome: the page-model builder for anonymous pages, the
+      // authorization boundary for the saved page.
+      const pulseRequestSource =
+        path === "app/[locale]/saved/page.tsx"
+          ? readSource("lib/auth/saved-page-boundary.ts")
+          : exportedFunctionSection(PAGE_MODEL_BUILDERS_SRC, PULSE_BUILDER_FN[path]);
+
+      expect(pulseRequestSource).toContain("pulse: true");
     }
   });
 
@@ -214,10 +256,12 @@ describe("radar stats shell contract", () => {
   });
 
   it("keeps the home signal-ratio derivation inside the shell helper", () => {
-    const source = readSource("app/[locale]/page.tsx");
-
-    expect(source).toContain("shellChromeDataFromSnapshot");
-    expect(source).toContain('signalRatio: "fromRadar"');
-    expect(source).not.toContain("signalRatioFromRadar(");
+    // The home page's chrome (and its signal-ratio option) is built in the
+    // page-model builder now; the ratio itself is still derived inside the
+    // shell helper via `signalRatio: "fromRadar"`, never inlined at the model
+    // layer with signalRatioFromRadar(.
+    expect(homePageModelBuilder).toContain("shellChromeDataFromSnapshot");
+    expect(homePageModelBuilder).toContain('signalRatio: "fromRadar"');
+    expect(homePageModelBuilder).not.toContain("signalRatioFromRadar(");
   });
 });

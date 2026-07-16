@@ -198,20 +198,35 @@ describe("public page call sites derive from snapshots", () => {
   });
 
   it("home derives day counts + topics + ticker from one snapshot", () => {
-    const src = readSource("app/[locale]/page.tsx");
-    expect(src).toContain("readPublicPageSnapshot");
-    expect(src).toContain("deriveDayCounts");
-    expect(src).toContain("deriveTopTopics");
-    expect(src).toContain("deriveRecentTickerItems");
-    expect(src).not.toContain("@/lib/shell/feed-cache");
+    // R2 materialized-page cutover: the page delegates to
+    // readCachedPublicHomePageModel; the single-snapshot derivation
+    // lives in home-page-model.ts + the home builder.
+    const pageSrc = readSource("app/[locale]/page.tsx");
+    expect(pageSrc).toContain("readCachedPublicHomePageModel");
+    expect(pageSrc).not.toContain("@/lib/shell/feed-cache");
+    const modelSrc = readSource("lib/public-content/home-page-model.ts");
+    expect(modelSrc).toContain("readPublicPageSnapshot");
+    const builderSrc = readSource("lib/public-content/page-model-builders.ts");
+    expect(builderSrc).toContain("deriveDayCounts");
+    expect(builderSrc).toContain("deriveTopTopics");
+    expect(builderSrc).toContain("deriveRecentTickerItems");
+    expect(builderSrc).not.toContain("@/lib/shell/feed-cache");
   });
 
   it("/all + /curated derive their day counts from snapshots", () => {
+    // Same cutover: pages call read*PageModel; deriveDayCounts lives in
+    // the all/curated builders (asserted per-builder in
+    // tests/shell/calendar-counts.test.ts).
     expect(readSource("app/[locale]/all/page.tsx")).toContain(
-      "deriveDayCounts",
+      "readAllPageModel",
     );
     expect(readSource("app/[locale]/curated/page.tsx")).toContain(
-      "deriveDayCounts",
+      "readCuratedPageModel",
+    );
+    const builderSrc = readSource("lib/public-content/page-model-builders.ts");
+    expect(builderSrc).toContain("deriveDayCounts(state, 60, {}, nowMs)");
+    expect(builderSrc).toContain(
+      "deriveDayCounts(state, 60, { curatedOnly: true }, nowMs)",
     );
   });
 });

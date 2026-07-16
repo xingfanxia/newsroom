@@ -25,7 +25,7 @@ export type SubscribeInput = {
   wantsDailyFeatured?: boolean;
 };
 
-export type SubscribeOutcome =
+type SubscribeOutcome =
   | "created"
   | "pending_again"
   | "already_active"

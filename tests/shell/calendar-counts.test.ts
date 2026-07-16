@@ -9,7 +9,7 @@
  * expressions and each page wires its filters into the calendar call.
  */
 import { describe, expect, it } from "bun:test";
-import { readSource } from "@/tests/helpers/source";
+import { exportedFunctionSection, readSource } from "@/tests/helpers/source";
 
 const statsSrc = readSource("lib/shell/dashboard-stats.ts");
 
@@ -74,8 +74,15 @@ describe("dashboard stats display helpers", () => {
 });
 
 describe("page calendars pass the same filters as their feed", () => {
-  const homeSrc = readSource("app/[locale]/page.tsx");
-  const curatedSrc = readSource("app/[locale]/curated/page.tsx");
+  // The calendar (deriveDayCounts) and feed (queryPublicFeed) are composed
+  // together inside each page's model builder now, so the shared-filter
+  // invariant is asserted on the builder that owns both calls.
+  const buildersSrc = readSource("lib/public-content/page-model-builders.ts");
+  const homeSrc = exportedFunctionSection(
+    buildersSrc,
+    "buildPublicHomePageModelFromSnapshot",
+  );
+  const curatedSrc = exportedFunctionSection(buildersSrc, "buildCuratedPageModel");
 
   // [\s\S]*? is the cross-target-compatible substitute for `.` with the `s`
   // (dotAll) flag — the project targets ES2017 and `s` is ES2018+. Lazy

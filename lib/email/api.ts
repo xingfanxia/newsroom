@@ -28,13 +28,13 @@ export const NEWSLETTER_SUBSCRIBE_RATE_LIMIT = {
   max: 10,
 } satisfies RateLimitConfig;
 
-export const NEWSLETTER_TOKEN_RATE_LIMIT = {
+const NEWSLETTER_TOKEN_RATE_LIMIT = {
   family: "newsletter-token",
   windowMs: 60_000,
   max: 60,
 } satisfies RateLimitConfig;
 
-export const subscribeBodySchema = z.object({
+const subscribeBodySchema = z.object({
   email: z.string().trim().toLowerCase().email().max(254),
   locale: z.enum(["zh", "en"]).optional(),
   wantsDailyDigest: z.boolean().optional(),

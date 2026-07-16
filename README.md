@@ -31,6 +31,7 @@ AX's AI RADAR is a dashboard for editors and analysts who cover the AI industry.
 | `/{locale}/saved` | 收藏 — **user-named collections** with inbox + tags + move/export MD |
 | `/{locale}/sources` | 信源 — grouped tables or card grid (`?view=cards`) |
 | `/{locale}/podcasts` | 播客 · 视频 — podcast/video feed with per-channel filter pills |
+| `/{locale}/newsletter` | 邮件订阅 — double-opt-in email signup (每日日报 + 每日精选, sent 13:40 北京时间 via Resend). See [`docs/newsletter-email/PLAN.md`](./docs/newsletter-email/PLAN.md) |
 | `/{locale}/agents` | Agent 接入 — 3-tab integration page (Skill / RSS / REST API). See [`docs/agent-access/`](./docs/agent-access/) |
 | `/{locale}/admin/usage` | 用量 — LLM spend cards (today / 7d / 30d / all-time), task/model breakdowns, and recent-call model labels |
 | `/{locale}/admin/system` | 系统 — Source health, queues, cron schedules + recent activity, and recent errors |
@@ -50,7 +51,7 @@ AX's AI RADAR is a dashboard for editors and analysts who cover the AI industry.
   - Azure AI Foundry DeepSeek V4 Flash for low-value item treatment and cheap arbitration work.
   - Azure OpenAI `text-embedding-3-large` remains the embedding provider; `gpt-5.5-standard` is kept as a compatibility/probe deployment, not the default prose model.
   - Anthropic Claude Opus 4.7 + Google Gemini 3.1 Pro Preview are wired as optional fallbacks.
-- **Vercel Cron** route handlers are declared in `vercel.json`: fetch hourly/daily/weekly, normalize, article-body, enrich, commentary, score-backfill, cluster, and newsletter daily/monthly.
+- **Vercel Cron** route handlers are declared in `vercel.json`: fetch hourly/daily/weekly, normalize, article-body, enrich, commentary, score-backfill, cluster, newsletter daily/monthly, and newsletter-send (email delivery via Resend, 40 min after the daily column generates).
 - **bun** for install / build / dev / tests
 
 ### Design system
@@ -87,6 +88,7 @@ See [`.env.example`](./.env.example) for the complete template. Run `vercel env 
 - **Task routing** (`AIHOT_ENRICH_PROVIDER` / `_SCORE_PROVIDER` / `_EMBED_PROVIDER`) — enrich/score default to `azure-deepseek`; embeddings default to `azure-openai`. Allowed provider ids are the runtime `LLM_PROVIDERS` tuple in `lib/llm/types.ts`; invalid env values fail fast before any model call.
 - **LLM safety knobs** (`LLM_CALL_TIMEOUT_MS`) — optional per-call timeout override; default is 90s.
 - **Fallback providers** (`ANTHROPIC_API_KEY`, `GEMINI_API_KEY`) — wired but not on the default production route.
+- **Resend** (`RESEND_API_KEY`) — newsletter email delivery from the verified `news.ax0x.ai` domain; optional `NEWSLETTER_REPLY_TO` (domain receiving is disabled).
 
 ### Roadmap status
 
@@ -135,6 +137,7 @@ AX 的 AI 雷达是一款面向 AI 行业编辑和分析师的情报工作台，
 | `/{locale}/saved` | 收藏 — **自定义收藏夹**，支持收件箱、标签、移动、导出 Markdown |
 | `/{locale}/sources` | 信源 — 分组表格或卡片网格（`?view=cards`） |
 | `/{locale}/podcasts` | 播客 · 视频 — 节目流 + 频道过滤 |
+| `/{locale}/newsletter` | 邮件订阅 — 双重确认邮件订阅（每日日报 + 每日精选，每天 13:40 北京时间经 Resend 发送），见 [`docs/newsletter-email/PLAN.md`](./docs/newsletter-email/PLAN.md) |
 | `/{locale}/agents` | Agent 接入 — 3-tab 集成页面（Skill / RSS / REST API），见 [`docs/agent-access/`](./docs/agent-access/) |
 | `/{locale}/admin/usage` | 用量 — LLM 花费卡片（今日 / 7 天 / 30 天 / 全量）、任务/模型拆分、最近调用模型 |
 | `/{locale}/admin/system` | 系统 — 信源健康、队列、cron 调度与最近活动、近期错误 |

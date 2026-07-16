@@ -13,9 +13,15 @@
  * the day-aligned rescue clause.
  */
 import { describe, expect, it } from "bun:test";
-import { readSource } from "@/tests/helpers/source";
+import { exportedFunctionSection, readSource } from "@/tests/helpers/source";
 
 const liveSrc = readSource("lib/items/live.ts");
+// The home page coerces its params and delegates to this builder, which now
+// owns the daily-highlights guard and the recent-day-rescue wiring.
+const homeBuilderSrc = exportedFunctionSection(
+  readSource("lib/public-content/page-model-builders.ts"),
+  "buildPublicHomePageModelFromSnapshot",
+);
 
 describe("view=today filter — fresh-but-cold rescue clause", () => {
   it("includes a day-aligned rescue clause for items published since start of yesterday", () => {
@@ -76,16 +82,15 @@ describe("daily-highlights mode (minImportance + maxPerDay)", () => {
 
   it("daily-highlights only kicks in for the unfiltered home (preserves drill-ins)", () => {
     // Tab/source/date drill-ins must keep returning the full chronological
-    // feed for their slice. The home page guards with:
+    // feed for their slice. The home builder guards with:
     //   !activeDate && !sourceId && sourcePreset === 'all' && tier === DEFAULT_HOME_TIER
     // so opening /zh?source=media or /zh?date=2026-04-21 stays unfiltered.
-    const homeSrc = readSource("app/[locale]/page.tsx");
-    expect(homeSrc).toContain("dailyHighlights");
-    expect(homeSrc).toMatch(
-      /!activeDate\s*&&\s*!sourceId\s*&&\s*sourcePreset === "all"\s*&&\s*tier === DEFAULT_HOME_TIER/,
+    expect(homeBuilderSrc).toContain("dailyHighlights");
+    expect(homeBuilderSrc).toMatch(
+      /!input\.activeDate\s*&&\s*!input\.sourceId\s*&&\s*input\.sourcePreset === "all"\s*&&\s*input\.tier === DEFAULT_HOME_TIER/,
     );
-    expect(homeSrc).toContain("minImportance: 80");
-    expect(homeSrc).toContain("maxPerDay: 3");
+    expect(homeBuilderSrc).toContain("minImportance: 80");
+    expect(homeBuilderSrc).toContain("maxPerDay: 3");
   });
 });
 
@@ -110,11 +115,10 @@ describe("recent-day rescue (recentDayRescueDays)", () => {
     );
   });
 
-  it("home page passes recentDayRescueDays alongside daily-highlights filters", () => {
-    const homeSrc = readSource("app/[locale]/page.tsx");
+  it("home builder passes recentDayRescueDays alongside daily-highlights filters", () => {
     // 3 covers today + yesterday + 2 days ago — the typical scoring-lag
     // window. Day with weak news ingest (e.g. 04-25 max imp = 76) still
     // surfaces top-3 by importance instead of being skipped entirely.
-    expect(homeSrc).toContain("recentDayRescueDays: 3");
+    expect(homeBuilderSrc).toContain("recentDayRescueDays: 3");
   });
 });

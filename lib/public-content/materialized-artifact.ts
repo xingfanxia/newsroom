@@ -15,7 +15,7 @@ export const materializedPageLogicalName = {
 } as const;
 
 export const MATERIALIZED_PODCAST_DETAIL_BUCKET_COUNT = 16;
-export const MATERIALIZED_PODCAST_DETAIL_LOGICAL_NAMES = Array.from(
+const MATERIALIZED_PODCAST_DETAIL_LOGICAL_NAMES = Array.from(
   { length: MATERIALIZED_PODCAST_DETAIL_BUCKET_COUNT },
   (_, bucket) => `views/podcast-details/${bucket.toString(16).padStart(2, "0")}`,
 );

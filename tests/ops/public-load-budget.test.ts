@@ -34,9 +34,9 @@ afterEach(() => {
 describe("bounded anonymous load evidence", () => {
   test("builds deterministic 1x/10x/100x inventory sessions below the hard cap", () => {
     expect(assertPublicRuntimeCorpusComplete).not.toThrow();
-    expect(buildAnonymousLoadPlan(1)).toHaveLength(71);
-    expect(buildAnonymousLoadPlan(10)).toHaveLength(710);
-    expect(buildAnonymousLoadPlan(100)).toHaveLength(7_100);
+    expect(buildAnonymousLoadPlan(1)).toHaveLength(74);
+    expect(buildAnonymousLoadPlan(10)).toHaveLength(740);
+    expect(buildAnonymousLoadPlan(100)).toHaveLength(7_400);
     expect(buildAnonymousLoadPlan(100).length).toBeLessThanOrEqual(
       PUBLIC_SPEND_CAPS.publicHttpRequests,
     );
@@ -53,7 +53,7 @@ describe("bounded anonymous load evidence", () => {
       podcastId: 4,
     });
     const paths = new Set(plan.map(({ path }) => path));
-    expect(plan).toHaveLength(71);
+    expect(plan).toHaveLength(74);
     expect(paths).toContain("/zh/daily/2026-07-13");
     expect(paths).toContain("/api/public/daily/2026-07-13?locale=zh");
     expect(paths).toContain("/api/events/12181/members?locale=en");

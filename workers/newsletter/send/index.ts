@@ -45,7 +45,7 @@ const FEATURED_CAP = 10;
  *  realm of possibility — replaced per recipient after rendering. */
 const UNSUB_TOKEN_PLACEHOLDER = "__NLE_UNSUB_TOKEN_c9d51f__";
 
-export type SendKindResult = {
+type SendKindResult = {
   kind: EmailKind;
   /** 'failed' = recipients existed but zero chunks were delivered. */
   status: "sent" | "skipped" | "failed";

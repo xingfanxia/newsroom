@@ -5,14 +5,14 @@
  */
 
 /** 每日日报 (the daily column) + 每日精选 (featured/p1 picks with 锐评). */
-export const EMAIL_KINDS = ["daily_digest", "daily_featured"] as const;
+const EMAIL_KINDS = ["daily_digest", "daily_featured"] as const;
 export type EmailKind = (typeof EMAIL_KINDS)[number];
 
 /** Per-recipient send-ledger outcome. */
-export const SEND_STATUSES = ["sent", "failed"] as const;
+const SEND_STATUSES = ["sent", "failed"] as const;
 export type SendStatus = (typeof SEND_STATUSES)[number];
 
-export const SUBSCRIBER_STATUSES = [
+const SUBSCRIBER_STATUSES = [
   "pending",
   "active",
   "unsubscribed",
@@ -36,16 +36,3 @@ export type RenderedEmail = {
   text: string;
 };
 
-export type Subscriber = {
-  id: number;
-  email: string;
-  locale: string;
-  wantsDailyDigest: boolean;
-  wantsDailyFeatured: boolean;
-  status: SubscriberStatus;
-  confirmToken: string;
-  unsubscribeToken: string;
-  createdAt: number;
-  confirmedAt: number | null;
-  unsubscribedAt: number | null;
-};

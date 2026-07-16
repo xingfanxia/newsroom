@@ -1,8 +1,8 @@
 # Newsletter Email Feature — Implementation Plan (NLE)
 
-> Status: **approved plan, not yet executed** (2026-07-16). Execution happens in a
-> /goal session; this doc is the single source of truth for that session.
-> Naming: phases are `NLE-1 … NLE-7`.
+> Status: **NLE-1…6 SHIPPED 2026-07-16** (feat/newsletter-email); NLE-7 gated
+> ops (prod migration apply → Vercel env → deploy → prod smoke) remains and
+> requires per-step user confirmation (§8). Naming: phases are `NLE-1 … NLE-7`.
 >
 > What this adds: email delivery for the EXISTING newsletter content pipeline.
 > `workers/newsletter/` already generates a zh daily column (每日日报) into the
@@ -284,7 +284,7 @@ Gates: `bun run verify` (all 7 stages) + `bun run verify:public-boundary` green.
 | NLE-3 API | subscribe/confirm/unsubscribe routes, rate-limit family, subscribers repo | route+repo tests green; no-enumeration verified | **done** 2026-07-16 |
 | NLE-4 Send pipeline | send worker, cron route, vercel.json, run-cron.ts, system-stats signal | worker tests green incl. idempotency; `bun scripts/ops/run-cron.ts newsletter-send` works locally w/ dryRun | **done** 2026-07-16 |
 | NLE-5 UI | subscribe card, /newsletter page, daily-page embed, nav, i18n both locales | visual verify (screenshot sweep zh+en covering every §5b state); lint/build green | **done** 2026-07-16 |
-| NLE-6 Verify+docs | full `bun run verify` + `verify:public-boundary`; update README surfaces table, docs/architecture/overview.md, docs/agent-access if API surface documented, `.env.example`; this PLAN marked shipped | all gates green; docs consistent | pending |
+| NLE-6 Verify+docs | full `bun run verify` + `verify:public-boundary`; update README surfaces table, docs/architecture/overview.md, docs/agent-access if API surface documented, `.env.example`; this PLAN marked shipped | all gates green; docs consistent | **done** 2026-07-16 |
 | NLE-7 Ops (GATED) | see runbook §8 | prod smoke evidence | pending |
 
 Dependencies: NLE-2,3 ← NLE-1; NLE-4 ← NLE-1+2; NLE-5 ← NLE-3; NLE-6 ← all; NLE-7 last.
