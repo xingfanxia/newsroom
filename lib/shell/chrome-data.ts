@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import {
   derivePulseData,
   deriveRadarStats,
@@ -49,4 +50,24 @@ export async function getShellChromeData(
 ): Promise<ShellChromeData> {
   const snapshot = await publicSnapshotReader().readCanonicalState();
   return shellChromeDataFromSnapshot(snapshot.state, Date.now(), opts);
+}
+
+const readCachedChrome = unstable_cache(
+  async (pulse: boolean): Promise<ShellChromeData> =>
+    getShellChromeData({ pulse }),
+  ["shell-chrome:v1"],
+  { revalidate: 60, tags: ["shell-chrome"] },
+);
+
+/**
+ * 60s-cached chrome for anonymous public pages. The uncached
+ * getShellChromeData fetches + parses the FULL R2 canonical snapshot
+ * per request (2-5s) — fine for low-traffic authed admin views, wrong
+ * for public routes. Derived chrome is tiny, so cache the derivation
+ * like every other anonymous page model does.
+ */
+export async function getCachedShellChromeData(
+  opts: { pulse?: boolean } = {},
+): Promise<ShellChromeData> {
+  return readCachedChrome(opts.pulse ?? false);
 }

@@ -1,4 +1,4 @@
-import { desc, eq, sql } from "drizzle-orm";
+import { desc, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import * as schema from "@/db/schema";
 import type { EmailKind, SubscriberStatus } from "@/lib/email/contracts";
@@ -121,15 +121,4 @@ export async function getNewsletterAdminStats(
     },
     recentSubscribers,
   };
-}
-
-/** Lightweight count for cross-project fleet tracking. */
-export async function getActiveSubscriberCount(
-  dbc: EmailDb = db(),
-): Promise<number> {
-  const [row] = await dbc
-    .select({ n: sql<number>`count(*)` })
-    .from(subscribers)
-    .where(eq(subscribers.status, "active"));
-  return Number(row?.n ?? 0);
 }
