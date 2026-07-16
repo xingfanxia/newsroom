@@ -30,6 +30,7 @@ export type MaterializedPageModel = {
 export function buildMaterializedPageModels(
   state: CanonicalPublicState,
   nowMs: number,
+  getBody: (id: number) => string | null,
 ): MaterializedPageModel[] {
   const artifacts: MaterializedPageModel[] = [];
   const locales: AppLocale[] = ["en", "zh"];
@@ -107,9 +108,10 @@ export function buildMaterializedPageModels(
     const en = publicPageItemDetailFromIndex(stateIndex, id, "en", nowMs);
     const zh = publicPageItemDetailFromIndex(stateIndex, id, "zh", nowMs);
     if (!en || !zh) continue;
+    const bodyMd = item.bodyMd ?? getBody(id);
     detailBuckets[id % MATERIALIZED_PODCAST_DETAIL_BUCKET_COUNT]![String(id)] = {
-      en,
-      zh,
+      en: { ...en, bodyMd },
+      zh: { ...zh, bodyMd },
     };
   }
   for (let bucket = 0; bucket < detailBuckets.length; bucket += 1) {

@@ -7,6 +7,7 @@ import {
 import {
   manifestSchema,
   parsePublicEntityShardValue,
+  parsePublicItemBodyShardValue,
   runReceiptSchema,
   snapshotPointerSchema,
 } from "@/lib/public-content/contracts";
@@ -16,6 +17,7 @@ import {
 } from "@/lib/public-content/paths";
 import {
   buildPublicRelease,
+  requiresBodySplitMigration,
   requiresNumericShardMigration,
   verifyDescriptorBytes,
   type BuiltPublicRelease,
@@ -98,6 +100,7 @@ export async function publishIncrementalSnapshot(
   if (
     context.batch.changes.length === 0 &&
     !requiresNumericShardMigration(previousManifest) &&
+    !requiresBodySplitMigration(previousManifest) &&
     hasRequiredMaterializedPages(previousManifest)
   ) {
     try {
@@ -236,6 +239,11 @@ export async function uploadChangedReleaseArtifacts(
     }
     if (artifact.logicalName.startsWith("state/")) {
       parsePublicEntityShardValue(artifact.logicalName, parseJson(stored.bytes));
+    } else if (artifact.logicalName.startsWith("bodies/items/")) {
+      parsePublicItemBodyShardValue(
+        artifact.logicalName,
+        parseJson(stored.bytes),
+      );
     } else if (artifact.logicalName.startsWith("views/")) {
       parseMaterializedPageArtifact(stored.bytes);
     }
