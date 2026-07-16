@@ -23,6 +23,10 @@ trust code and update the doc in the same change.
 
 ## Active Implementation Plan
 
+- [`newsletter-email/PLAN.md`](./newsletter-email/PLAN.md) — approved 2026-07-16
+  newsletter EMAIL feature plan (subscribers + Resend delivery + 日报/精选 daily
+  sends + subscribe UI). Not yet executed; phases NLE-1…7. The existing
+  `workers/newsletter/` content pipeline is unchanged by this plan.
 - [`R2-PUBLIC-READ-PLAN-2026-07-14.md`](./R2-PUBLIC-READ-PLAN-2026-07-14.md) —
   approved public-read decoupling authority. The implementation is complete in
   the feature branch and the R2 custom domain/cache rule is provisioned, but the
