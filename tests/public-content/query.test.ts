@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { canonicalPublicStateSha256 } from "@/lib/public-content/canonical";
+import { createPublicStateIndex } from "@/lib/public-content/public-items";
 import {
   getPublicEventMembers,
   queryPublicFeed,
@@ -16,6 +17,28 @@ function ids(query: Parameters<typeof queryPublicFeed>[1] = {}): number[] {
     (story) => Number(story.id),
   );
 }
+
+describe("public state index memoization", () => {
+  test("reuses one index (one schema parse) per state object identity", () => {
+    const first = createPublicStateIndex(PARITY_STATE);
+    const second = createPublicStateIndex(PARITY_STATE);
+    expect(second).toBe(first);
+    expect(second.state).toBe(first.state);
+  });
+
+  test("distinct state objects build distinct indexes", () => {
+    const clone = structuredClone(PARITY_STATE);
+    const first = createPublicStateIndex(PARITY_STATE);
+    const other = createPublicStateIndex(clone);
+    expect(other).not.toBe(first);
+    expect(other.state).not.toBe(first.state);
+  });
+
+  test("still rejects invalid state shapes on first sight", () => {
+    expect(() => createPublicStateIndex({ schemaVersion: 1 })).toThrow();
+    expect(() => createPublicStateIndex(null)).toThrow();
+  });
+});
 
 describe("pure public feed query", () => {
   test("uses a hash-frozen independent canonical corpus", async () => {

@@ -1,6 +1,7 @@
 import { dailyColumnIssueRoute } from "@/lib/daily-column/routes";
 import type { PublicDailyColumn } from "@/lib/public-content/public-dailies";
 import { canonicalStateSchema } from "@/lib/public-content/contracts";
+import { createPublicStateIndex } from "@/lib/public-content/public-items";
 import { queryPublicFeed } from "@/lib/public-content/query";
 import {
   legacyRssFeedMeta,
@@ -261,7 +262,7 @@ function legacyLaneRssItem(story: Story): RssItem {
 }
 
 function legacyDailyItems(value: unknown): RssItem[] {
-  const state = canonicalStateSchema.parse(value);
+  const state = createPublicStateIndex(value).state;
   return state.newsletters
     .filter(
       (row): row is DailyNewsletter =>

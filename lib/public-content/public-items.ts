@@ -22,14 +22,32 @@ export type PublicStateIndex = {
   sourcesById: ReadonlyMap<string, PublicSource>;
 };
 
+/**
+ * Index memo keyed by input object identity. Every consumer (feed/search/
+ * item/event routes, derive*, dailies, RSS) funnels through here, and the
+ * full-state zod parse below is the dominant cost — the reader already
+ * memoizes ITS parse per release and hands every caller the SAME state
+ * object, so re-validating that object per call re-paid the multi-MB parse
+ * on every request. State objects are immutable once built (consumers are
+ * read-only; the WeakMap frees entries when the reader evicts a release).
+ */
+const stateIndexCache = new WeakMap<object, PublicStateIndex>();
+
 export function createPublicStateIndex(value: unknown): PublicStateIndex {
+  const cacheable = typeof value === "object" && value !== null;
+  if (cacheable) {
+    const cached = stateIndexCache.get(value);
+    if (cached) return cached;
+  }
   const state = canonicalStateSchema.parse(value);
-  return {
+  const index: PublicStateIndex = {
     state,
     itemsById: new Map(state.items.map((item) => [item.id, item])),
     eventsById: new Map(state.events.map((event) => [event.id, event])),
     sourcesById: new Map(state.sources.map((source) => [source.id, source])),
   };
+  if (cacheable) stateIndexCache.set(value, index);
+  return index;
 }
 
 export function publicStoryFromItem(

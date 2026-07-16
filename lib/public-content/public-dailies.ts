@@ -1,4 +1,5 @@
 import { canonicalStateSchema } from "@/lib/public-content/contracts";
+import { createPublicStateIndex } from "@/lib/public-content/public-items";
 import type { AppLocale } from "@/lib/types";
 
 export type PublicDailyColumn = {
@@ -102,9 +103,8 @@ type DailyRow = Extract<
 >;
 
 function dailyRows(value: unknown, locale: AppLocale): DailyRow[] {
-  return canonicalStateSchema
-    .parse(value)
-    .newsletters.filter(
+  return createPublicStateIndex(value)
+    .state.newsletters.filter(
       (row): row is DailyRow => row.format === "daily_column" && row.locale === locale,
     )
     .sort((left, right) => right.periodStart.localeCompare(left.periodStart));
