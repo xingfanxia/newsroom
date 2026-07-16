@@ -58,8 +58,18 @@ import {
   type CanonicalPublicState,
 } from "@/lib/public-content/contracts";
 import {
+  parsePublicLexicalShard,
+  PUBLIC_LEXICAL_SHARD_COUNT,
+  publicLexicalRowFromEntities,
+  publicLexicalRowId,
+  publicLexicalShardLogicalNames,
+  queryPublicLexicalRows,
+  type PublicLexicalRow,
+} from "@/lib/public-content/lexical-search-artifacts";
+import {
   createPublicStateIndex,
   publicEventMembersFromIndex,
+  publicStoryFromItem,
 } from "@/lib/public-content/public-items";
 import {
   getPublicEventMembers,
@@ -75,7 +85,7 @@ import type {
   PublicReleaseReadScope,
   ResolvedPublicRelease,
 } from "@/lib/public-content/reader/types";
-import { APP_LOCALES, type AppLocale } from "@/lib/types";
+import { APP_LOCALES, type AppLocale, type Story } from "@/lib/types";
 import { PUBLIC_SEMANTIC_SEARCH_ERROR } from "@/lib/search/query-defaults";
 
 type SnapshotCachedResult =
@@ -240,31 +250,183 @@ export async function publicSearchSnapshotRequestResult(
       status: 422,
     };
   }
-  const snapshot = await readPublicSnapshot();
-  const result = queryPublicFeed(
-    snapshot.state,
-    searchFeedQueryFromParams(parsed.data),
-    { nowMs: Date.now() },
-  );
+  const query = searchFeedQueryFromParams(parsed.data);
+  const nowMs = Date.now();
+  const reader = publicSnapshotReader();
+  const scoped = await reader.readReleaseScoped(async (scope) => {
+    if (!hasDirectLexicalSearchArtifacts(scope.release)) {
+      const snapshot = await scope.readCanonicalState();
+      return lexicalSearchSnapshotResult(
+        snapshot.release,
+        parsed.search,
+        parsed.data.q,
+        parsed.data.locale,
+        queryPublicFeed(snapshot.state, query, { nowMs }),
+      );
+    }
+
+    assertCompleteLexicalSearchManifest(scope);
+    const rowShards = await mapWithConcurrency(
+      publicLexicalShardLogicalNames(),
+      PUBLIC_LEXICAL_SHARD_COUNT,
+      async (logicalName) => {
+        let rows: PublicLexicalRow[] | undefined;
+        await scope.readLogicalArtifact(logicalName, {
+          required: true,
+          validate: (bytes) => {
+            rows = parsePublicLexicalShard(logicalName, bytes).rows;
+          },
+        });
+        return rows!;
+      },
+    );
+    const rows = rowShards.flat();
+    const rowsById = new Map(rows.map((row) => [publicLexicalRowId(row), row]));
+    if (rowsById.size !== rows.length) {
+      return scope.rejectRelease(new Error("duplicate public lexical row"));
+    }
+    const hits = queryPublicLexicalRows(rows, query, { nowMs });
+    const stories = await hydratePublicLexicalHits(
+      scope,
+      hits.ids,
+      rowsById,
+      parsed.data.locale,
+      nowMs,
+    );
+    return lexicalSearchSnapshotResult(
+      scope.release,
+      parsed.search,
+      parsed.data.q,
+      parsed.data.locale,
+      {
+        items: stories,
+        total: hits.total,
+        limit: hits.limit,
+        offset: hits.offset,
+      },
+    );
+  });
+  return scoped.value;
+}
+
+function lexicalSearchSnapshotResult(
+  release: ResolvedPublicRelease,
+  search: string,
+  q: string,
+  locale: AppLocale,
+  result: {
+    items: Story[];
+    total: number;
+    limit: number;
+    offset: number;
+  },
+): SnapshotCachedResult {
   return {
     ok: true,
     signal: etagSignal({
-      release: snapshot.release.ref.manifestSha256,
-      qs: parsed.search,
+      release: release.ref.manifestSha256,
+      qs: search,
       total: result.total,
       first: result.items[0]?.id ?? "",
     }),
     body: {
       mode: "lexical",
-      q: parsed.data.q,
+      q,
       items: result.items.map((story) =>
-        toSnapshotPublicApiItem(story, parsed.data.locale),
+        toSnapshotPublicApiItem(story, locale),
       ),
       total: result.total,
       limit: result.limit,
       offset: result.offset,
     },
   };
+}
+
+async function hydratePublicLexicalHits(
+  scope: PublicReleaseReadScope,
+  ids: readonly number[],
+  rowsById: ReadonlyMap<number, PublicLexicalRow>,
+  locale: AppLocale,
+  nowMs: number,
+): Promise<Story[]> {
+  if (ids.length === 0) return [];
+  const wantedIds = new Set(ids);
+  const itemLogicalNames = [
+    ...new Set(
+      ids.map((id) => publicEntityShardLogicalName("item", String(id))),
+    ),
+  ];
+  const [sources, itemShards] = await Promise.all([
+    readSourceShard(scope),
+    mapWithConcurrency(itemLogicalNames, 16, (logicalName) =>
+      readItemShardByLogicalName(scope, logicalName),
+    ),
+  ]);
+  const items = itemShards.flat().filter(({ id }) => wantedIds.has(id));
+  const itemsById = new Map(items.map((item) => [item.id, item]));
+  if (itemsById.size !== ids.length) {
+    return scope.rejectRelease(new Error("missing public lexical hit item"));
+  }
+
+  const eventIds = [
+    ...new Set(
+      items
+        .map(({ eventId }) => eventId)
+        .filter((id): id is number => id !== null),
+    ),
+  ];
+  const eventShards = await mapWithConcurrency(eventIds, 16, (id) =>
+    readEventShard(scope, id),
+  );
+  const wantedEventIds = new Set(eventIds);
+  const events = eventShards
+    .flat()
+    .filter(({ id }) => wantedEventIds.has(id));
+  const eventsById = new Map(events.map((event) => [event.id, event]));
+  if (eventsById.size !== eventIds.length) {
+    return scope.rejectRelease(new Error("missing public lexical hit event"));
+  }
+  const sourcesById = new Map(sources.map((source) => [source.id, source]));
+
+  for (const id of ids) {
+    const item = itemsById.get(id)!;
+    const event = item.eventId === null ? undefined : eventsById.get(item.eventId);
+    const source = sourcesById.get(item.sourceId);
+    const row = rowsById.get(id);
+    if (!source || !row) {
+      return scope.rejectRelease(new Error("missing public lexical hit relation"));
+    }
+    if (event && !event.memberItemIds.includes(item.id)) {
+      return scope.rejectRelease(new Error("invalid public lexical hit event"));
+    }
+    let expected: PublicLexicalRow;
+    try {
+      expected = publicLexicalRowFromEntities(item, event, source);
+    } catch (error) {
+      return scope.rejectRelease(
+        error instanceof Error
+          ? error
+          : new Error("invalid public lexical hit metadata"),
+      );
+    }
+    if (JSON.stringify(expected) !== JSON.stringify(row)) {
+      return scope.rejectRelease(new Error("public lexical hit metadata mismatch"));
+    }
+  }
+
+  const index = {
+    state: directReadState({ items, events, sources }),
+    itemsById,
+    eventsById,
+    sourcesById,
+  };
+  return ids.map((id) =>
+    publicStoryFromItem(index, itemsById.get(id)!, {
+      locale,
+      includeSourceGroup: true,
+      nowMs,
+    }),
+  );
 }
 
 export async function publicSourcesSnapshotResult(): Promise<SnapshotCachedResult> {
@@ -643,6 +805,29 @@ function assertCompleteFeedDirectory(
     declared.some((logicalName, index) => logicalName !== manifest[index])
   ) {
     scope.rejectRelease(new Error("public feed directory is incomplete"));
+  }
+}
+
+function hasDirectLexicalSearchArtifacts(
+  release: ResolvedPublicRelease,
+): boolean {
+  return Object.keys(release.manifest.artifacts).some((logicalName) =>
+    logicalName.startsWith("search/lexical/"),
+  );
+}
+
+function assertCompleteLexicalSearchManifest(
+  scope: PublicReleaseReadScope,
+): void {
+  const expected = publicLexicalShardLogicalNames();
+  const manifest = Object.keys(scope.release.manifest.artifacts)
+    .filter((logicalName) => logicalName.startsWith("search/lexical/"))
+    .sort();
+  if (
+    manifest.length !== PUBLIC_LEXICAL_SHARD_COUNT ||
+    manifest.some((logicalName, index) => logicalName !== expected[index])
+  ) {
+    scope.rejectRelease(new Error("public lexical shard family is incomplete"));
   }
 }
 

@@ -1,6 +1,6 @@
 # Public Cold Route Reads — Source Plan
 
-Status: PCR-4 in progress
+Status: PCR-5 in progress
 
 Branch: `perf/public-cold-route-reads`
 
@@ -112,6 +112,31 @@ segment while the other six feed artifacts reuse their SHA. The first review
 found one Medium directory-integrity gap; path/month/bucket, uniqueness and
 ordered bounds validation plus publisher/runtime regression tests resolved it,
 and the second review was clean.
+
+PCR-4 publishes exactly 32 stable item-ID-bucket lexical shards. Each row is a
+14-position tuple containing only item ID, publication/effective rank fields,
+source filter fields, and the raw/zh/en title, summary, and event-title text
+used by the existing SQLite-LIKE matcher. `%`, `_`, and ASCII folding reuse the
+canonical match implementation. Search scans the compact family in one bounded
+parallel wave, selects IDs with exact tier/source/date/order/pagination/total
+semantics, then hydrates only the selected page's distinct item/event buckets
+plus `state/sources`. An eventless one-hit fixture reads exactly 34 content
+objects (32 lexical + one item + sources), or 36 HTTP objects including pointer
+and active manifest; no newsletter, policy, body, feed, or unrelated entity
+artifact is read.
+
+The builder was re-measured read-only against live release
+`r1074-6133868bbf87e33c82dd` (watermark 1074; 8,896 items, 475 events, 55
+sources): all 32 lexical shards total 8,325,002 B (7.94 MiB), and the largest,
+`search/lexical/0a`, is 280,681 B. This is 31% below the 12 MB acceptance line
+and about 75% fewer index-stage bytes than the 33,748,096 B canonical state.
+A zero-change legacy release migrates through the normal publisher; one item
+title change rewrites exactly its lexical bucket while 31 reuse their SHA; the
+497/498 changed-artifact write-boundary tests remain exact. Tests cover legacy
+fallback, incomplete/corrupt active families, corrupt hydration, schema-valid
+cross-artifact inconsistency, previous/LKG, terminal 503, and semantic/invalid
+zero-read behavior. Review round 1 found one Medium exception-to-fallback gap;
+the release rejection fix and regression resolved it, and round 2 was clean.
 
 The baseline request set was release-tied by fetching `current.json`, then its
 active manifest, before the public responses. Capture form was
@@ -302,8 +327,8 @@ this ledger is updated in that same commit.
 | PCR-1 | inventory, production baseline, exact contracts, release-scoped reader primitive | done | this phase commit; 23 reader tests; reviewer rounds 1–3 clean |
 | PCR-2 | release-pinned item and both event-member routes | done | this phase commit; 55 focused tests; typecheck/lint clean; reviewer rounds 1–2 clean |
 | PCR-3 | compact segmented feed artifacts, default first page, publisher incrementality | done | this phase commit; 88 related tests; live default 43,331 B max; reviewer rounds 1–2 clean |
-| PCR-4 | compact sharded lexical index and hit hydration | in progress | pending |
-| PCR-5 | daily, sources/active, RSS, shell, page variants; static/runtime no-full-state verifier | pending | pending |
+| PCR-4 | compact sharded lexical index and hit hydration | done | phase commit; 79 related tests; live index 8,325,002 B / 32 shards; reviewer rounds 1–2 clean |
+| PCR-5 | daily, sources/active, RSS, shell, page variants; static/runtime no-full-state verifier | in progress | pending |
 | PCR-6 | full verification, final review, PR/CI/merge/deploy, true-cold and admin evidence, closeout PR | pending | pending |
 
 ## 7. Verification and production acceptance

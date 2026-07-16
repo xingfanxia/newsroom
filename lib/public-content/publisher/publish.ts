@@ -18,6 +18,10 @@ import {
   parsePublicFeedSegment,
   publicFeedDefaultLogicalName,
 } from "@/lib/public-content/feed-artifacts";
+import {
+  parsePublicLexicalShard,
+  publicLexicalShardLogicalNames,
+} from "@/lib/public-content/lexical-search-artifacts";
 import { APP_LOCALES } from "@/lib/types";
 import {
   CURRENT_POINTER_KEY,
@@ -114,7 +118,8 @@ export async function publishIncrementalSnapshot(
       !requiresNumericShardMigration(previousManifest) &&
       !requiresBodySplitMigration(previousManifest) &&
       hasRequiredMaterializedPages(previousManifest) &&
-      hasRequiredPublicFeedArtifacts(previousManifest)
+      hasRequiredPublicFeedArtifacts(previousManifest) &&
+      hasRequiredPublicLexicalArtifacts(previousManifest)
   ) {
     try {
       await input.source.acknowledgeThrough(context.batch.toWatermark);
@@ -281,6 +286,8 @@ export async function uploadChangedReleaseArtifacts(
       );
       if (!locale) throw new Error("unknown public feed default artifact");
       parsePublicFeedDefault(locale, stored.bytes);
+    } else if (artifact.logicalName.startsWith("search/lexical/")) {
+      parsePublicLexicalShard(artifact.logicalName, stored.bytes);
     }
     if (put.status === "uploaded") {
       metrics.uploaded += 1;
@@ -306,6 +313,19 @@ function hasRequiredPublicFeedArtifacts(
     APP_LOCALES.every(
       (locale) => publicFeedDefaultLogicalName(locale) in manifest.artifacts,
     )
+  );
+}
+
+function hasRequiredPublicLexicalArtifacts(
+  manifest: PublicReleaseManifest,
+): boolean {
+  const expected = publicLexicalShardLogicalNames();
+  const actual = Object.keys(manifest.artifacts)
+    .filter((logicalName) => logicalName.startsWith("search/lexical/"))
+    .sort();
+  return (
+    actual.length === expected.length &&
+    actual.every((logicalName, index) => logicalName === expected[index])
   );
 }
 
