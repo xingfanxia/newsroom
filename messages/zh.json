@@ -283,5 +283,55 @@
       "Benchmark": "评测",
       "Commentary": "观点"
     }
+  },
+  "newsletter": {
+    "head": {
+      "tagline": "每天 13:40(北京时间)一封邮件 · 日报 + 精选 · 一键退订 ·"
+    },
+    "emailLabel": "邮箱地址",
+    "emailPlaceholder": "you@example.com",
+    "kinds": {
+      "legend": "订阅内容",
+      "digest": {
+        "label": "每日日报",
+        "desc": "当天 AI 圈重点的 2500-4500 字叙事日报,朋友视角讲人话"
+      },
+      "featured": {
+        "label": "每日精选",
+        "desc": "当天 featured/p1 条目 + 200 字锐评,直达原文链接"
+      }
+    },
+    "submit": "订阅",
+    "submitInline": "订阅",
+    "success": {
+      "title": "去邮箱点一下确认链接就生效",
+      "body": "确认邮件已发到 {email},没收到的话看看垃圾箱。"
+    },
+    "errors": {
+      "invalid": "邮箱格式不对。",
+      "rate": "请求太频繁,稍后再试。",
+      "server": "出错了,稍后再试。"
+    },
+    "inlineCaption": "每天 13:40 邮件送达当天日报。",
+    "inlineMore": "选择订阅内容 →",
+    "status": {
+      "confirmed": "订阅已生效 — 明天 13:40 见 📡",
+      "confirmedLink": "去看今日日报",
+      "unsubscribed": "已退订,不再打扰。想回来随时在下面重新订阅。",
+      "invalid": "链接无效或已过期 — 在下面重新订阅即可。"
+    },
+    "explainer": {
+      "title": "你会收到什么",
+      "digest": {
+        "name": "每日日报",
+        "desc": "AI 圈当天重点的叙事长文,主笔视角,先讲人话再给判断。"
+      },
+      "featured": {
+        "name": "每日精选",
+        "desc": "当天最重要的几条(featured/p1),每条配 200 字锐评,链接直达原文。"
+      },
+      "preview": "预览最近一期 →",
+      "time": "每天 13:40(北京时间)发送 · 双重确认订阅 · 每封邮件底部一键退订"
+    }
   }
 }

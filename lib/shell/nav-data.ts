@@ -39,6 +39,7 @@ export const NAV_PRIMARY: NavItem[] = [
   },
   { id: "saved",      href: "/saved",        label: "saved",      cjk: "收藏" },
   { id: "sources",    href: "/sources",      label: "sources",    cjk: "信源" },
+  { id: "newsletter", href: "/newsletter",   label: "newsletter", cjk: "邮件订阅" },
   { id: "agents",     href: "/agents",       label: "agent access", cjk: "Agent 接入" },
 ];
 

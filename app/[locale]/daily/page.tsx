@@ -2,6 +2,7 @@ import Link from "next/link";
 import { setRequestLocale } from "next-intl/server";
 import { ViewShell } from "@/components/shell/view-shell";
 import { PageHead } from "@/components/shell/page-head";
+import { SubscribeCard } from "@/components/newsletter/subscribe-card";
 import { readDailyIndexPageModel } from "@/lib/public-content/page-models";
 import {
   DAILY_COLUMN_INDEX_ROUTE,
@@ -84,6 +85,8 @@ export default async function DailyLandingPage({
             </span>
           }
         />
+
+        {isDailyColumnLocale ? <SubscribeCard variant="inline" /> : null}
 
         {!isDailyColumnLocale ? (
           <p className="my-8 text-[var(--fg-2)]">

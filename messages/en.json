@@ -283,5 +283,55 @@
       "Benchmark": "Benchmark",
       "Commentary": "Commentary"
     }
+  },
+  "newsletter": {
+    "head": {
+      "tagline": "One email a day at 13:40 (UTC+8) · digest + featured picks · one-click unsubscribe ·"
+    },
+    "emailLabel": "Email address",
+    "emailPlaceholder": "you@example.com",
+    "kinds": {
+      "legend": "What to subscribe to",
+      "digest": {
+        "label": "Daily digest",
+        "desc": "The day's AI news as a 2,500-4,500 字 narrative column (Chinese)"
+      },
+      "featured": {
+        "label": "Daily featured",
+        "desc": "The day's featured/p1 stories with sharp 200-字 takes, linking to originals"
+      }
+    },
+    "submit": "Subscribe",
+    "submitInline": "Subscribe",
+    "success": {
+      "title": "Check your inbox and click the confirm link",
+      "body": "We sent a confirmation email to {email}. Check spam if it doesn't show up."
+    },
+    "errors": {
+      "invalid": "That email doesn't look right.",
+      "rate": "Too many requests — try again in a minute.",
+      "server": "Something went wrong. Try again later."
+    },
+    "inlineCaption": "The daily column in your inbox at 13:40 (UTC+8).",
+    "inlineMore": "Choose what you get →",
+    "status": {
+      "confirmed": "Subscription confirmed — see you tomorrow at 13:40 📡",
+      "confirmedLink": "Read today's daily",
+      "unsubscribed": "Unsubscribed. Resubscribe below anytime.",
+      "invalid": "That link is invalid or expired — just resubscribe below."
+    },
+    "explainer": {
+      "title": "What you'll get",
+      "digest": {
+        "name": "Daily digest",
+        "desc": "A long-form narrative on the day's AI news, written in an editor's voice (Chinese)."
+      },
+      "featured": {
+        "name": "Daily featured",
+        "desc": "The day's most important stories (featured/p1), each with a sharp take and a link to the original."
+      },
+      "preview": "Preview a recent issue →",
+      "time": "Sent daily at 13:40 (UTC+8) · double opt-in · one-click unsubscribe in every email"
+    }
   }
 }
