@@ -13,6 +13,9 @@ import {
   PublicSnapshotUnavailableError,
   type PublicCanonicalStateResult,
   type PublicLogicalArtifact,
+  type PublicLogicalArtifactReadOptions,
+  type PublicReleaseReadScope,
+  type PublicReleaseScopedResult,
   type PublicSnapshotReadSource,
   type ResolvedPublicRelease,
   type SnapshotArtifactDescriptor,
@@ -29,10 +32,15 @@ const STATE_FETCH_CONCURRENCY = 16;
 /** active + previous — a third release id evicts the oldest entry. */
 const STATE_CACHE_MAX_RELEASES = 2;
 
-type LogicalArtifactReadOptions = {
-  required?: boolean;
-  validate?: (bytes: Uint8Array) => void;
-};
+class RetryablePublicReleaseReadError extends Error {
+  readonly cause: unknown;
+
+  constructor(cause: unknown) {
+    super("retryable public release read failed");
+    this.name = "RetryablePublicReleaseReadError";
+    this.cause = cause;
+  }
+}
 
 export class PublicSnapshotReader {
   readonly #fetcher: PublicSnapshotHttpFetcher;
@@ -77,7 +85,7 @@ export class PublicSnapshotReader {
 
   async readLogicalArtifact(
     logicalName: string,
-    options: LogicalArtifactReadOptions = {},
+    options: PublicLogicalArtifactReadOptions = {},
   ): Promise<PublicLogicalArtifact | null> {
     if (!isSafeLogicalName(logicalName)) {
       throw new PublicSnapshotUnavailableError();
@@ -122,6 +130,39 @@ export class PublicSnapshotReader {
     throw new PublicSnapshotUnavailableError();
   }
 
+  /**
+   * Execute dependent artifact reads against one immutable manifest. If any
+   * read or validation fails, the entire callback is retried on the pointer's
+   * previous release and then the warm last-known-good release. The callback
+   * must therefore remain read-only and safe to retry.
+   */
+  async readReleaseScoped<T>(
+    read: (scope: PublicReleaseReadScope) => Promise<T> | T,
+  ): Promise<PublicReleaseScopedResult<T>> {
+    const candidates = await this.#candidateReleases();
+    for (const release of candidates) {
+      try {
+        const value = await read(this.#releaseScope(release));
+        this.#lastKnownGoodRelease = release;
+        return { value, release };
+      } catch (error) {
+        if (!(error instanceof RetryablePublicReleaseReadError)) throw error;
+        // Retry the dependent operation against the previous whole release.
+      }
+    }
+    if (this.#lastKnownGoodRelease) {
+      const release = asLastKnownGood(this.#lastKnownGoodRelease);
+      try {
+        const value = await read(this.#releaseScope(release));
+        return { value, release };
+      } catch (error) {
+        if (!(error instanceof RetryablePublicReleaseReadError)) throw error;
+        // Terminal controlled-unavailable below.
+      }
+    }
+    throw new PublicSnapshotUnavailableError();
+  }
+
   async readCanonicalState(): Promise<PublicCanonicalStateResult> {
     const candidates = await this.#candidateReleases();
     for (const release of candidates) {
@@ -154,6 +195,53 @@ export class PublicSnapshotReader {
     const bytes = await this.#readArtifactBytes(descriptor);
     const shard = parsePublicItemBodyShardValue(logicalName, parseJson(bytes));
     return shard.entities.find((entity) => entity.id === id)?.bodyMd ?? null;
+  }
+
+  #releaseScope(release: ResolvedPublicRelease): PublicReleaseReadScope {
+    return Object.freeze({
+      release,
+      readLogicalArtifact: (
+        logicalName: string,
+        options: PublicLogicalArtifactReadOptions = {},
+      ) => this.#readLogicalArtifactFromRelease(release, logicalName, options),
+      readCanonicalState: () => this.#readCanonicalStateFromRelease(release),
+    });
+  }
+
+  async #readLogicalArtifactFromRelease(
+    release: ResolvedPublicRelease,
+    logicalName: string,
+    options: PublicLogicalArtifactReadOptions,
+  ): Promise<PublicLogicalArtifact | null> {
+    if (!isSafeLogicalName(logicalName)) {
+      throw new PublicSnapshotUnavailableError();
+    }
+    const descriptor = release.manifest.artifacts[logicalName];
+    if (!descriptor) {
+      if (options.required) {
+        throw new RetryablePublicReleaseReadError(
+          new Error(`required public artifact is missing: ${logicalName}`),
+        );
+      }
+      return null;
+    }
+    try {
+      const bytes = await this.#readArtifactBytes(descriptor);
+      options.validate?.(bytes);
+      return { logicalName, descriptor, bytes, release };
+    } catch (error) {
+      throw new RetryablePublicReleaseReadError(error);
+    }
+  }
+
+  async #readCanonicalStateFromRelease(
+    release: ResolvedPublicRelease,
+  ): Promise<PublicCanonicalStateResult> {
+    try {
+      return { state: await this.#readStateCached(release), release };
+    } catch (error) {
+      throw new RetryablePublicReleaseReadError(error);
+    }
   }
 
   async #candidateReleases(): Promise<ResolvedPublicRelease[]> {

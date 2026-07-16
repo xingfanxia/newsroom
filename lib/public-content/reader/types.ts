@@ -32,8 +32,32 @@ export type PublicLogicalArtifact = {
   release: ResolvedPublicRelease;
 };
 
+export type PublicLogicalArtifactReadOptions = {
+  required?: boolean;
+  validate?: (bytes: Uint8Array) => void;
+};
+
 export type PublicCanonicalStateResult = {
   state: CanonicalPublicState;
+  release: ResolvedPublicRelease;
+};
+
+/**
+ * A dependent read transaction pinned to one immutable release manifest.
+ * Implementations may retry the whole callback on previous/LKG, but an
+ * individual scope never re-reads the mutable current pointer.
+ */
+export type PublicReleaseReadScope = {
+  release: ResolvedPublicRelease;
+  readLogicalArtifact(
+    logicalName: string,
+    options?: PublicLogicalArtifactReadOptions,
+  ): Promise<PublicLogicalArtifact | null>;
+  readCanonicalState(): Promise<PublicCanonicalStateResult>;
+};
+
+export type PublicReleaseScopedResult<T> = {
+  value: T;
   release: ResolvedPublicRelease;
 };
 
