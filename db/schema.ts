@@ -23,6 +23,7 @@ import type {
   SourceGroup as TSourceGroup,
   Cadence as TCadence,
 } from "@/lib/types";
+import { scoreBackfillPendingSql } from "@/lib/items/score-backfill-predicate";
 
 // ── Storage conventions (Turso libSQL / SQLite — NEWSROOM-TURSO 2026-07-11) ──
 // Replaced Supabase Postgres. Mappings from the old pg-core schema:
@@ -264,6 +265,9 @@ export const rawItems = sqliteTable(
     unnormalizedIdx: index("raw_items_unnormalized_idx")
       .on(t.normalizedAt)
       .where(sql`${t.normalizedAt} IS NULL`),
+    normalizedActivityIdx: index("raw_items_normalized_activity_idx")
+      .on(t.normalizedAt)
+      .where(sql`${t.normalizedAt} IS NOT NULL`),
   }),
 );
 
@@ -362,6 +366,12 @@ export const clusters = sqliteTable(
     multiMemberIdx: index("clusters_multimember_idx")
       .on(t.memberCount, t.updatedAt)
       .where(sql`${t.memberCount} >= 2`),
+    eventCommentaryPendingIdx: index(
+      "clusters_event_commentary_pending_idx",
+    )
+      .on(t.eventTier, t.latestMemberAt, t.firstSeenAt)
+      .where(sql`${t.memberCount} >= 2 AND ${t.commentaryAt} IS NULL`),
+    updatedActivityIdx: index("clusters_updated_activity_idx").on(t.updatedAt),
   }),
 );
 
@@ -485,6 +495,12 @@ export const items = sqliteTable(
     unfetchedBodyIdx: index("items_unfetched_body_idx")
       .on(t.bodyFetchedAt)
       .where(sql`${t.bodyFetchedAt} IS NULL`),
+    bodyPrefetchPendingIdx: index("items_body_prefetch_pending_idx")
+      .on(t.bodyFetchedAt, t.canonicalUrl)
+      .where(sql`${t.bodyFetchedAt} IS NULL`),
+    bodyActivityIdx: index("items_body_activity_idx")
+      .on(t.bodyFetchedAt)
+      .where(sql`${t.bodyFetchedAt} IS NOT NULL`),
     unclusteredIdx: index("items_unclustered_idx")
       .on(t.clusteredAt)
       .where(sql`${t.clusteredAt} IS NULL AND ${t.embedding} IS NOT NULL`),
@@ -541,6 +557,12 @@ export const items = sqliteTable(
     commentaryPendingIdx: index("items_commentary_pending_idx")
       .on(t.tier, t.clusterId)
       .where(sql`${t.commentaryAt} IS NULL`),
+    commentaryActivityIdx: index("items_commentary_activity_idx")
+      .on(t.commentaryAt)
+      .where(sql`${t.commentaryAt} IS NOT NULL`),
+    scoreBackfillPendingIdx: index("items_score_backfill_pending_idx")
+      .on(t.id)
+      .where(scoreBackfillPendingSql(t)),
   }),
 );
 

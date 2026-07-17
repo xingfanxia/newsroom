@@ -12,6 +12,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { items } from "@/db/schema";
 import { generateStructured, profiles } from "@/lib/llm";
+import { scoreBackfillPendingSql } from "@/lib/items/score-backfill-predicate";
 import {
   scoreSchema,
   scoreSystem,
@@ -25,7 +26,6 @@ import {
   loadNeverExcludeSourceIds,
 } from "./source-tier";
 import { treatmentForScore, type EnrichTreatment } from "./treatment";
-import { scoreBackfillPendingSql } from "./pending-predicates";
 
 const CONCURRENCY = 30;
 const MAX_PER_RUN = 300;

@@ -81,10 +81,99 @@ const INDEXES = [
   `CREATE INDEX IF NOT EXISTS items_commentary_pending_idx
      ON items (tier, cluster_id)
      WHERE commentary_at IS NULL`,
+  // /admin/system activity probes and queue counts. These indexes keep exact
+  // operational metrics off raw_items/items payload pages.
+  `CREATE INDEX IF NOT EXISTS raw_items_normalized_activity_idx
+     ON raw_items (normalized_at)
+     WHERE normalized_at IS NOT NULL`,
+  `CREATE INDEX IF NOT EXISTS items_body_prefetch_pending_idx
+     ON items (body_fetched_at, canonical_url)
+     WHERE body_fetched_at IS NULL`,
+  `CREATE INDEX IF NOT EXISTS items_body_activity_idx
+     ON items (body_fetched_at)
+     WHERE body_fetched_at IS NOT NULL`,
+  `CREATE INDEX IF NOT EXISTS items_commentary_activity_idx
+     ON items (commentary_at)
+     WHERE commentary_at IS NOT NULL`,
+  `CREATE INDEX IF NOT EXISTS items_score_backfill_pending_idx
+     ON items (id)
+     WHERE enriched_at IS NOT NULL
+       AND (hkr IS NULL
+            OR reasoning_zh IS NULL
+            OR reasoning_en IS NULL
+            OR json_extract(hkr, '$.reasonsZh') IS NULL
+            OR json_extract(hkr, '$.reasonsEn') IS NULL)`,
+  `CREATE INDEX IF NOT EXISTS clusters_event_commentary_pending_idx
+     ON clusters (event_tier, latest_member_at, first_seen_at)
+     WHERE member_count >= 2 AND commentary_at IS NULL`,
+  `CREATE INDEX IF NOT EXISTS clusters_updated_activity_idx
+     ON clusters (updated_at)`,
 ];
 
 /** Hot query shapes and the index each one's plan must reference. */
 const PLAN_CHECKS: Array<{ name: string; index: string; sql: string }> = [
+  {
+    name: "admin normalize activity stays covering",
+    index: "raw_items_normalized_activity_idx",
+    sql: `SELECT normalized_at FROM raw_items
+          INDEXED BY raw_items_normalized_activity_idx
+          WHERE normalized_at IS NOT NULL
+          ORDER BY normalized_at DESC LIMIT 1`,
+  },
+  {
+    name: "admin body-prefetch depth stays covering",
+    index: "items_body_prefetch_pending_idx",
+    sql: `SELECT count(*) FROM items
+          INDEXED BY items_body_prefetch_pending_idx
+          WHERE body_fetched_at IS NULL
+            AND canonical_url IS NOT NULL
+            AND NOT (canonical_url LIKE '%x.com/%/status/%'
+                     OR canonical_url LIKE '%twitter.com/%/status/%')`,
+  },
+  {
+    name: "admin body activity stays covering",
+    index: "items_body_activity_idx",
+    sql: `SELECT body_fetched_at FROM items
+          INDEXED BY items_body_activity_idx
+          WHERE body_fetched_at IS NOT NULL
+          ORDER BY body_fetched_at DESC LIMIT 1`,
+  },
+  {
+    name: "admin commentary activity stays covering",
+    index: "items_commentary_activity_idx",
+    sql: `SELECT commentary_at FROM items
+          INDEXED BY items_commentary_activity_idx
+          WHERE commentary_at IS NOT NULL
+          ORDER BY commentary_at DESC LIMIT 1`,
+  },
+  {
+    name: "admin score queue uses its partial index",
+    index: "items_score_backfill_pending_idx",
+    sql: `SELECT count(*) FROM items
+          INDEXED BY items_score_backfill_pending_idx
+          WHERE enriched_at IS NOT NULL
+            AND (hkr IS NULL
+                 OR reasoning_zh IS NULL
+                 OR reasoning_en IS NULL
+                 OR json_extract(hkr, '$.reasonsZh') IS NULL
+                 OR json_extract(hkr, '$.reasonsEn') IS NULL)`,
+  },
+  {
+    name: "admin event-commentary depth stays covering",
+    index: "clusters_event_commentary_pending_idx",
+    sql: `SELECT count(*) FROM clusters
+          INDEXED BY clusters_event_commentary_pending_idx
+          WHERE event_tier IN ('featured', 'p1', 'all')
+            AND member_count >= 2 AND commentary_at IS NULL
+            AND COALESCE(latest_member_at, first_seen_at) >= 0`,
+  },
+  {
+    name: "admin cluster activity stays covering",
+    index: "clusters_updated_activity_idx",
+    sql: `SELECT updated_at FROM clusters
+          INDEXED BY clusters_updated_activity_idx
+          ORDER BY updated_at DESC LIMIT 1`,
+  },
   {
     name: "feed id-subquery (getFeaturedStories)",
     index: "items_feed_cover_idx",
