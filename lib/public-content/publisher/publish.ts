@@ -29,6 +29,8 @@ import {
 } from "@/lib/public-content/paths";
 import {
   buildPublicRelease,
+  PUBLIC_ARCHIVE_PAGE_SIZE_50_MARKER_LOGICAL_NAME,
+  PUBLIC_COMPACT_LEXICAL_V2_MARKER_LOGICAL_NAME,
   requiresBodySplitMigration,
   requiresNumericShardMigration,
   verifyDescriptorBytes,
@@ -300,8 +302,11 @@ export async function uploadChangedReleaseArtifacts(
 }
 
 function hasRequiredMaterializedPages(manifest: PublicReleaseManifest): boolean {
-  return REQUIRED_MATERIALIZED_PAGE_LOGICAL_NAMES.every(
-    (logicalName) => logicalName in manifest.artifacts,
+  return (
+    PUBLIC_ARCHIVE_PAGE_SIZE_50_MARKER_LOGICAL_NAME in manifest.artifacts &&
+    REQUIRED_MATERIALIZED_PAGE_LOGICAL_NAMES.every(
+      (logicalName) => logicalName in manifest.artifacts,
+    )
   );
 }
 
@@ -324,6 +329,7 @@ function hasRequiredPublicLexicalArtifacts(
     .filter((logicalName) => logicalName.startsWith("search/lexical/"))
     .sort();
   return (
+    PUBLIC_COMPACT_LEXICAL_V2_MARKER_LOGICAL_NAME in manifest.artifacts &&
     actual.length === expected.length &&
     actual.every((logicalName, index) => logicalName === expected[index])
   );

@@ -30,6 +30,8 @@ import {
 } from "@/lib/public-content/paths";
 import {
   buildPublicRelease,
+  PUBLIC_ARCHIVE_PAGE_SIZE_50_MARKER_LOGICAL_NAME,
+  PUBLIC_COMPACT_LEXICAL_V2_MARKER_LOGICAL_NAME,
   type BuiltPublicRelease,
 } from "@/lib/public-content/publisher/build-release";
 import type {
@@ -505,6 +507,66 @@ describe("pointer-last incremental publisher", () => {
       `read:${fixture.pointer.active.manifestKey}`,
       "ack:10",
     ]);
+  });
+
+  test("zero-change work migrates pre-format-marker page and search artifacts", async () => {
+    const fixture = await seededFixture();
+    const artifacts = Object.fromEntries(
+      Object.entries(fixture.release.manifest.artifacts).filter(
+        ([logicalName]) =>
+          logicalName !== PUBLIC_COMPACT_LEXICAL_V2_MARKER_LOGICAL_NAME &&
+          logicalName !== PUBLIC_ARCHIVE_PAGE_SIZE_50_MARKER_LOGICAL_NAME,
+      ),
+    );
+    const legacyManifest = manifestSchema.parse({
+      ...fixture.release.manifest,
+      releaseId: "r10-44444444444444444444",
+      artifacts,
+    });
+    const legacyBytes = canonicalJsonBytes(legacyManifest);
+    const legacyManifestKey = releaseManifestKey(legacyManifest.releaseId);
+    fixture.store.seed(legacyManifestKey, legacyBytes);
+    fixture.store.seed(
+      CURRENT_POINTER_KEY,
+      canonicalJsonBytes(
+        snapshotPointerSchema.parse({
+          ...fixture.pointer,
+          active: {
+            releaseId: legacyManifest.releaseId,
+            manifestKey: legacyManifestKey,
+            manifestSha256: await sha256Hex(legacyBytes),
+          },
+        }),
+      ),
+    );
+    fixture.store.clearEvents();
+
+    const receipt = await run(
+      fixture,
+      new FakeSource(batch(10, 10, []), fixture.events),
+    );
+
+    expect(receipt.status).toBe("succeeded");
+    const pointer = snapshotPointerSchema.parse(
+      JSON.parse(
+        new TextDecoder().decode(
+          fixture.store.objects.get(CURRENT_POINTER_KEY)!.bytes,
+        ),
+      ),
+    );
+    const manifest = manifestSchema.parse(
+      JSON.parse(
+        new TextDecoder().decode(
+          fixture.store.objects.get(pointer.active.manifestKey)!.bytes,
+        ),
+      ),
+    );
+    expect(
+      manifest.artifacts[PUBLIC_COMPACT_LEXICAL_V2_MARKER_LOGICAL_NAME],
+    ).toBeDefined();
+    expect(
+      manifest.artifacts[PUBLIC_ARCHIVE_PAGE_SIZE_50_MARKER_LOGICAL_NAME],
+    ).toBeDefined();
   });
 
   test("zero-change work migrates a release that predates direct feed and search artifacts", async () => {
