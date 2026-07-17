@@ -27,6 +27,11 @@ import { objectKey } from "@/lib/public-content/paths";
 import { buildMaterializedPageModels } from "./materialize-pages";
 import type { PublicEntityChange } from "./types";
 
+export const PUBLIC_COMPACT_LEXICAL_V2_MARKER_LOGICAL_NAME =
+  "meta/compact-lexical-v2";
+export const PUBLIC_ARCHIVE_PAGE_SIZE_50_MARKER_LOGICAL_NAME =
+  "meta/archive-page-size-50";
+
 type ArtifactDescriptor = z.infer<typeof artifactDescriptorSchema>;
 export type PublicReleaseManifest = z.infer<typeof manifestSchema>;
 
@@ -258,6 +263,18 @@ export async function buildPublicRelease(
         previous?.artifacts[view.logicalName],
       );
       nextDescriptors[view.logicalName] = artifact.descriptor;
+      built.push(artifact);
+    }
+    for (const [logicalName, format] of [
+      [PUBLIC_COMPACT_LEXICAL_V2_MARKER_LOGICAL_NAME, "compact-lexical-v2"],
+      [PUBLIC_ARCHIVE_PAGE_SIZE_50_MARKER_LOGICAL_NAME, "archive-page-size-50"],
+    ] as const) {
+      const artifact = await buildMaterializedArtifact(
+        logicalName,
+        { schemaVersion: 1, format },
+        previous?.artifacts[logicalName],
+      );
+      nextDescriptors[logicalName] = artifact.descriptor;
       built.push(artifact);
     }
   }
