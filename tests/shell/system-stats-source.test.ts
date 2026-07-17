@@ -5,6 +5,8 @@ const source = readSource("lib/shell/system-stats.ts");
 const enrichWorker = readSource("workers/enrich/index.ts");
 const scoreWorker = readSource("workers/enrich/score-backfill.ts");
 const pendingPredicates = readSource("workers/enrich/pending-predicates.ts");
+const schema = readSource("db/schema.ts");
+const dbOptimize = readSource("scripts/ops/db-optimize.ts");
 
 describe("admin system stats source wiring", () => {
   it("derives cron schedules from vercel.json", () => {
@@ -88,6 +90,33 @@ describe("admin system stats source wiring", () => {
     expect(source).not.toContain(
       "count(*) filter (where ${items.importance} is null)::int",
     );
+  });
+
+  it("batches independent system reads instead of serial full-table aggregates", () => {
+    expect(source).toContain("await client.batch([");
+    expect(source).not.toContain("rawTotal");
+    expect(source).not.toContain("profileQuery");
+    expect(source).not.toContain("max(${rawItems.normalizedAt})");
+    expect(source).not.toContain("max(${items.bodyFetchedAt})");
+    expect(source).not.toContain("max(${items.commentaryAt})");
+  });
+
+  it("pins every payload-heavy queue/activity probe to its ops index", () => {
+    const indexNames = [
+      "raw_items_normalized_activity_idx",
+      "items_body_prefetch_pending_idx",
+      "items_score_backfill_pending_idx",
+      "items_body_activity_idx",
+      "items_commentary_activity_idx",
+      "clusters_event_commentary_pending_idx",
+      "clusters_updated_activity_idx",
+    ];
+
+    for (const indexName of indexNames) {
+      expect(source).toContain(`INDEXED BY ${indexName}`);
+      expect(schema).toContain(indexName);
+      expect(dbOptimize).toContain(indexName);
+    }
   });
 
   it("keeps queue display metadata in the shared queue contract", () => {

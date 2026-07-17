@@ -15,7 +15,7 @@
  *  - **errors**: joins `source_health.last_error` with the failing source
  *    for an error-log view.
  */
-import { and, eq, inArray, isNotNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   clusters,
@@ -27,6 +27,7 @@ import {
   sourceHealth,
 } from "@/db/schema";
 import { EVENT_COMMENTARY_CRON_RECENCY_HOURS } from "@/lib/events/commentary-window";
+import { scoreBackfillPendingSql } from "@/lib/items/score-backfill-predicate";
 import {
   NO_DURABLE_CRON_ACTIVITY_SIGNAL,
   systemCronSnapshots,
@@ -40,10 +41,7 @@ import {
 } from "@/lib/time/relative";
 import { VISIBLE_ITEM_TIERS } from "@/lib/types";
 import { bodyPrefetchPendingSql } from "@/lib/urls/media-sql";
-import {
-  enrichClaimableSql,
-  scoreBackfillPendingSql,
-} from "@/workers/enrich/pending-predicates";
+import { enrichClaimableSql } from "@/workers/enrich/pending-predicates";
 
 type SystemService = {
   id: string;
@@ -88,23 +86,164 @@ export async function getSystemSnapshot(): Promise<SystemSnapshot> {
   const snapshotAt = new Date();
   const client = db();
 
-  // --- services from source_health + sources ---------------------
-  const hRows = await client
-    .select({
-      sourceId: sources.id,
-      nameEn: sources.nameEn,
-      kind: sources.kind,
-      cadence: sources.cadence,
-      enabled: sources.enabled,
-      status: sourceHealth.status,
-      consecutiveFailures: sourceHealth.consecutiveFailures,
-      lastSuccessAt: sourceHealth.lastSuccessAt,
-      lastFetchedAt: sourceHealth.lastFetchedAt,
-      lastError: sourceHealth.lastError,
-      totalItemsCount: sourceHealth.totalItemsCount,
-    })
-    .from(sources)
-    .leftJoin(sourceHealth, eq(sources.id, sourceHealth.sourceId));
+  // These metrics are independent, so send them as one libSQL batch instead of
+  // paying one HTTP round-trip per query. Payload-heavy tables are explicitly
+  // pinned because Turso cannot ANALYZE and therefore has no planner stats.
+  const [
+    hRows,
+    rawPendingRows,
+    lastNormalizedRows,
+    bodyPrefetchRows,
+    enrichRows,
+    itemCommentaryRows,
+    scoreRows,
+    lastBodyRows,
+    lastEnrichedRows,
+    lastItemCommentaryRows,
+    eventCommentaryRows,
+    lastClusterRows,
+    newsletterRows,
+    errRows,
+  ] = await client.batch([
+    client
+      .select({
+        sourceId: sources.id,
+        nameEn: sources.nameEn,
+        kind: sources.kind,
+        cadence: sources.cadence,
+        enabled: sources.enabled,
+        status: sourceHealth.status,
+        consecutiveFailures: sourceHealth.consecutiveFailures,
+        lastSuccessAt: sourceHealth.lastSuccessAt,
+        lastFetchedAt: sourceHealth.lastFetchedAt,
+        lastError: sourceHealth.lastError,
+        totalItemsCount: sourceHealth.totalItemsCount,
+      })
+      .from(sources)
+      .leftJoin(sourceHealth, eq(sources.id, sourceHealth.sourceId)),
+    client
+      .select({ rawPending: sql<number>`count(*)` })
+      .from(sql`${rawItems} INDEXED BY raw_items_unnormalized_idx`)
+      .where(isNull(rawItems.normalizedAt)),
+    client
+      .select({
+        lastNormalizedAt: sql<number | null>`${rawItems.normalizedAt}`,
+      })
+      .from(sql`${rawItems} INDEXED BY raw_items_normalized_activity_idx`)
+      .where(isNotNull(rawItems.normalizedAt))
+      .orderBy(desc(rawItems.normalizedAt))
+      .limit(1),
+    client
+      .select({ bodyPrefetchPending: sql<number>`count(*)` })
+      .from(sql`${items} INDEXED BY items_body_prefetch_pending_idx`)
+      .where(bodyPrefetchPendingSql(items.bodyFetchedAt, items.canonicalUrl)),
+    client
+      .select({ enrichClaimable: sql<number>`count(*)` })
+      .from(sql`${items} INDEXED BY items_unenriched_idx`)
+      .where(enrichClaimableSql(items)),
+    client
+      .select({ itemCommentaryPending: sql<number>`count(*)` })
+      .from(sql`${items} INDEXED BY items_commentary_pending_idx`)
+      .leftJoin(clusters, eq(items.clusterId, clusters.id))
+      .where(
+        and(
+          inArray(items.tier, VISIBLE_ITEM_TIERS),
+          isNull(items.commentaryAt),
+          sql`(
+            ${items.clusterId} is null
+            or coalesce(${clusters.memberCount}, 1) < 2
+          )`,
+        ),
+      ),
+    client
+      .select({ scoreBackfillPending: sql<number>`count(*)` })
+      .from(sql`${items} INDEXED BY items_score_backfill_pending_idx`)
+      .where(scoreBackfillPendingSql(items)),
+    client
+      .select({
+        lastBodyFetchedAt: sql<number | null>`${items.bodyFetchedAt}`,
+      })
+      .from(sql`${items} INDEXED BY items_body_activity_idx`)
+      .where(isNotNull(items.bodyFetchedAt))
+      .orderBy(desc(items.bodyFetchedAt))
+      .limit(1),
+    client
+      .select({ lastEnrichedAt: sql<number | null>`${items.enrichedAt}` })
+      .from(sql`${items} INDEXED BY items_feed_cover_idx`)
+      .where(isNotNull(items.enrichedAt))
+      .orderBy(desc(items.enrichedAt))
+      .limit(1),
+    client
+      .select({
+        lastItemCommentaryAt: sql<number | null>`${items.commentaryAt}`,
+      })
+      .from(sql`${items} INDEXED BY items_commentary_activity_idx`)
+      .where(isNotNull(items.commentaryAt))
+      .orderBy(desc(items.commentaryAt))
+      .limit(1),
+    client
+      .select({ eventCommentaryPending: sql<number>`count(*)` })
+      .from(
+        sql`${clusters} INDEXED BY clusters_event_commentary_pending_idx`,
+      )
+      .where(
+        and(
+          inArray(clusters.eventTier, VISIBLE_ITEM_TIERS),
+          sql`${clusters.memberCount} >= 2`,
+          isNull(clusters.commentaryAt),
+          sql`COALESCE(${clusters.latestMemberAt}, ${clusters.firstSeenAt}) >= ${Date.now()} - ${EVENT_COMMENTARY_CRON_RECENCY_HOURS * 3_600_000}`,
+        ),
+      ),
+    client
+      .select({
+        lastClusterActivityAt: sql<number | null>`${clusters.updatedAt}`,
+      })
+      .from(sql`${clusters} INDEXED BY clusters_updated_activity_idx`)
+      .orderBy(desc(clusters.updatedAt))
+      .limit(1),
+    client
+      .select({
+        lastDailyNewsletterAt: sql<number | null>`max(${newsletters.publishedAt}) filter (where ${newsletters.kind} = 'daily')`,
+        lastMonthlyNewsletterAt: sql<number | null>`max(${newsletters.publishedAt}) filter (where ${newsletters.kind} = 'monthly')`,
+      })
+      .from(newsletters),
+    client
+      .select({
+        sourceId: sources.id,
+        lastFetchedAt: sourceHealth.lastFetchedAt,
+        lastError: sourceHealth.lastError,
+        consecutiveFailures: sourceHealth.consecutiveFailures,
+        kind: sources.kind,
+      })
+      .from(sources)
+      .innerJoin(sourceHealth, eq(sources.id, sourceHealth.sourceId))
+      .where(and(isNotNull(sourceHealth.lastError), eq(sources.enabled, true)))
+      .orderBy(desc(sourceHealth.lastFetchedAt))
+      .limit(20),
+  ] as const);
+
+  const queueRow = {
+    rawPending: rawPendingRows[0]?.rawPending ?? 0,
+    lastNormalizedAt: lastNormalizedRows[0]?.lastNormalizedAt ?? null,
+  };
+  const itemsRow = {
+    bodyPrefetchPending: bodyPrefetchRows[0]?.bodyPrefetchPending ?? 0,
+    enrichClaimable: enrichRows[0]?.enrichClaimable ?? 0,
+    itemCommentaryPending:
+      itemCommentaryRows[0]?.itemCommentaryPending ?? 0,
+    scoreBackfillPending: scoreRows[0]?.scoreBackfillPending ?? 0,
+    lastBodyFetchedAt: lastBodyRows[0]?.lastBodyFetchedAt ?? null,
+    lastEnrichedAt: lastEnrichedRows[0]?.lastEnrichedAt ?? null,
+    lastItemCommentaryAt:
+      lastItemCommentaryRows[0]?.lastItemCommentaryAt ?? null,
+  };
+  const clustersRow = {
+    eventCommentaryPending:
+      eventCommentaryRows[0]?.eventCommentaryPending ?? 0,
+    lastClusterActivityAt:
+      lastClusterRows[0]?.lastClusterActivityAt ?? null,
+  };
+  const newsletterRow = newsletterRows[0];
 
   const services: SystemService[] = hRows
     .filter((r) => r.enabled)
@@ -144,58 +283,6 @@ export async function getSystemSnapshot(): Promise<SystemSnapshot> {
     idle: 3,
   };
   services.sort((a, b) => rank[a.status] - rank[b.status] || a.id.localeCompare(b.id));
-
-  // --- queues from items + raw_items ------------------------------
-  const [queueRow] = await client
-    .select({
-      rawPending: sql<number>`count(*) filter (where ${rawItems.normalizedAt} is null)`,
-      rawTotal: sql<number>`count(*)`,
-      lastNormalizedAt: sql<number | null>`max(${rawItems.normalizedAt})`,
-    })
-    .from(rawItems);
-
-  const [itemsRow] = await client
-    .select({
-      bodyPrefetchPending: sql<number>`count(*) filter (where ${bodyPrefetchPendingSql(items.bodyFetchedAt, items.canonicalUrl)})`,
-      enrichClaimable: sql<number>`count(*) filter (
-        where ${enrichClaimableSql(items)}
-      )`,
-      itemCommentaryPending: sql<number>`count(*) filter (
-        where ${inArray(items.tier, VISIBLE_ITEM_TIERS)}
-          and ${items.commentaryAt} is null
-          and (
-            ${items.clusterId} is null
-            or coalesce(${clusters.memberCount}, 1) < 2
-          )
-      )`,
-      scoreBackfillPending: sql<number>`count(*) filter (
-        where ${scoreBackfillPendingSql(items)}
-      )`,
-      lastBodyFetchedAt: sql<number | null>`max(${items.bodyFetchedAt})`,
-      lastEnrichedAt: sql<number | null>`max(${items.enrichedAt})`,
-      lastItemCommentaryAt: sql<number | null>`max(${items.commentaryAt})`,
-    })
-    .from(items)
-    .leftJoin(clusters, eq(items.clusterId, clusters.id));
-
-  const [clustersRow] = await client
-    .select({
-      eventCommentaryPending: sql<number>`count(*) filter (
-        where ${inArray(clusters.eventTier, VISIBLE_ITEM_TIERS)}
-          and ${clusters.memberCount} >= 2
-          and ${clusters.commentaryAt} is null
-          and COALESCE(${clusters.latestMemberAt}, ${clusters.firstSeenAt}) >= ${Date.now()} - ${EVENT_COMMENTARY_CRON_RECENCY_HOURS * 3_600_000}
-      )`,
-      lastClusterActivityAt: sql<number | null>`max(${clusters.updatedAt})`,
-    })
-    .from(clusters);
-
-  const [newsletterRow] = await client
-    .select({
-      lastDailyNewsletterAt: sql<number | null>`max(${newsletters.publishedAt}) filter (where ${newsletters.kind} = 'daily')`,
-      lastMonthlyNewsletterAt: sql<number | null>`max(${newsletters.publishedAt}) filter (where ${newsletters.kind} = 'monthly')`,
-    })
-    .from(newsletters);
 
   // Annotate-and-continue: newsletter_email_sends ships via a gated
   // operator migration (NLE-7), so a deploy that races it (previews)
@@ -240,36 +327,21 @@ export async function getSystemSnapshot(): Promise<SystemSnapshot> {
       "fetch-hourly": latestFetchForCadences(["live", "hourly"]),
       "fetch-daily": latestFetchForCadences(["daily"]),
       "fetch-weekly": latestFetchForCadences(["weekly"]),
-      normalize: msToDate(queueRow?.lastNormalizedAt),
-      "article-body": msToDate(itemsRow?.lastBodyFetchedAt),
-      enrich: msToDate(itemsRow?.lastEnrichedAt),
-      commentary: msToDate(itemsRow?.lastItemCommentaryAt),
+      normalize: msToDate(queueRow.lastNormalizedAt),
+      "article-body": msToDate(itemsRow.lastBodyFetchedAt),
+      enrich: msToDate(itemsRow.lastEnrichedAt),
+      commentary: msToDate(itemsRow.lastItemCommentaryAt),
       // Score-backfill has no dedicated run-log or `score_updated_at`.
       // Live enrich also emits score LLM usage, so deriving this from
       // `llm_usage.task = score` would create a false activity signal.
       "score-backfill": NO_DURABLE_CRON_ACTIVITY_SIGNAL,
-      cluster: msToDate(clustersRow?.lastClusterActivityAt),
+      cluster: msToDate(clustersRow.lastClusterActivityAt),
       "newsletter-daily": msToDate(newsletterRow?.lastDailyNewsletterAt),
       "newsletter-send": msToDate(lastEmailSendAt),
       "newsletter-monthly": msToDate(newsletterRow?.lastMonthlyNewsletterAt),
     },
     snapshotAt,
   );
-
-  // --- errors from source_health.last_error -----------------------
-  const errRows = await client
-    .select({
-      sourceId: sources.id,
-      lastFetchedAt: sourceHealth.lastFetchedAt,
-      lastError: sourceHealth.lastError,
-      consecutiveFailures: sourceHealth.consecutiveFailures,
-      kind: sources.kind,
-    })
-    .from(sources)
-    .innerJoin(sourceHealth, eq(sources.id, sourceHealth.sourceId))
-    .where(and(isNotNull(sourceHealth.lastError), eq(sources.enabled, true)))
-    .orderBy(sql`${sourceHealth.lastFetchedAt} desc`)
-    .limit(20);
 
   const errors: SystemError[] = errRows.map((r) => {
     const fails = r.consecutiveFailures ?? 0;

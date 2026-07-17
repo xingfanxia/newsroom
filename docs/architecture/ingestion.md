@@ -92,7 +92,10 @@ preserving any historical `raw_items`/`items` that still reference them.
   `raw_items.normalized_at`, `items.body_fetched_at`, `items.enriched_at`,
   commentary timestamps, cluster updates, and newsletter publishes). Jobs with
   no dedicated durable timestamp, such as `score-backfill`, are shown as
-  `no signal` instead of inventing a last-run time.
+  `no signal` instead of inventing a last-run time. Its independent queue and
+  activity probes run in one libSQL batch and pin the partial/covering indexes
+  maintained by `scripts/ops/db-optimize.ts`; do not recombine them into
+  multi-metric full-table aggregates over payload-heavy rows.
 - `scripts/ops/check-data-state.ts` reuses the same system snapshot for
   queue depths and cron activity, so operator pre-flight checks and the admin
   dashboard cannot drift on pending/pickup status.
