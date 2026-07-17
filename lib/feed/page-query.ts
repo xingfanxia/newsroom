@@ -25,3 +25,14 @@ export function feedPageLimitForDate(
 ): number {
   return activeDate ? FEED_DATE_DRILLDOWN_LIMIT : pageSize;
 }
+
+/**
+ * Keep readers safe while an older release still contains the former 200-card
+ * materialized page. New publishers emit 50 cards, but application deploys and
+ * public snapshot releases do not switch atomically.
+ */
+export function capFeedPageItems<T>(items: T[]): T[] {
+  return items.length > FEED_PAGE_SIZE
+    ? items.slice(0, FEED_PAGE_SIZE)
+    : items;
+}

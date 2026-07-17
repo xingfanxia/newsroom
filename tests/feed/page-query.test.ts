@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import {
+  capFeedPageItems,
   coerceFeedDateKey,
   coerceFeedOffset,
   feedPageLimitForDate,
@@ -42,6 +43,15 @@ describe("feed page query coercion", () => {
       FEED_DATE_DRILLDOWN_LIMIT,
     );
     expect(feedPageLimitForDate(undefined, 120)).toBe(120);
+  });
+
+  it("caps materialized rows from a previous 200-card release", () => {
+    const legacyRows = Array.from({ length: 200 }, (_, index) => index);
+
+    expect(capFeedPageItems(legacyRows)).toEqual(
+      legacyRows.slice(0, FEED_PAGE_SIZE),
+    );
+    expect(capFeedPageItems(legacyRows.slice(0, 10))).toHaveLength(10);
   });
 });
 
