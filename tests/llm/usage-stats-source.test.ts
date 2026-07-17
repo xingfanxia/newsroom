@@ -31,7 +31,7 @@ describe("usage stats surfaces", () => {
     expect(summary).toContain("DEFAULT_USAGE_WINDOW");
     expect(summary).toContain("export function usageWindowFromParam");
     expect(summary).toContain("toUsageWindowTotalsRecord");
-    expect(summary).toContain("USAGE_WINDOWS.map((usageWindow)");
+    expect(stats).toContain("USAGE_WINDOWS.map((usageWindow");
     expect(summary).not.toContain("windowTotals: { today, week, month, all }");
     expect(summary).not.toContain('export const USAGE_WINDOWS = ["today", "week", "month", "all"]');
     expect(route).toContain("parseUsageSummaryQueryRequest");
@@ -74,13 +74,24 @@ describe("usage stats surfaces", () => {
     expect(page).toContain("@/lib/api/usage-summary");
     expect(page).toContain("getUsageDashboardSummary");
     expect(summary).toContain("export async function getUsageDashboardSummary");
-    expect(summary).toContain("dailySpend(opts.dailyDays");
+    expect(summary).toContain("getUsageDashboardStats(window, opts)");
     expect(page).not.toContain("@/lib/llm/stats");
     expect(page).not.toContain("totalsByWindow(");
     expect(page).not.toContain("breakdownByTask(");
     expect(page).not.toContain("breakdownByModel(");
     expect(page).not.toContain("recentCalls(");
     expect(page).not.toContain("dailySpend(");
+  });
+
+  it("keeps admin usage aggregates on one rollup-backed Turso batch", () => {
+    const rollup = readSource("lib/llm/usage-rollup-sql.ts");
+
+    expect(stats).toContain("libsqlClient().batch");
+    expect(stats).toContain("usageTotalsStatement");
+    expect(stats).toContain("usageBreakdownStatement");
+    expect(rollup).toContain("llm_usage_daily_rollups");
+    expect(rollup).toContain("llm_usage_daily_rollup_ai");
+    expect(stats).not.toContain("FROM llm_usage INDEXED BY llm_usage_totals_cover_idx");
   });
 
   it("v1 and MCP usage share the same agent summary contract", () => {

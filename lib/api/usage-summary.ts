@@ -1,11 +1,8 @@
 import { z } from "zod";
 import { parseQueryParams } from "@/lib/api/query-params";
 import {
-  breakdownByModel,
-  breakdownByTask,
-  dailySpend,
-  recentCalls,
-  totalsByWindow,
+  getUsageDashboardStats,
+  getUsageWindowStats,
   USAGE_WINDOWS,
   type DailySpendPoint,
   type ModelBreakdown,
@@ -171,17 +168,12 @@ export async function getUsageSummary(
   window: WindowKey = DEFAULT_USAGE_WINDOW,
   opts: { recentLimit?: number } = {},
 ): Promise<UsageSummaryApi> {
-  const [totals, byTask, byModel, recent] = await Promise.all([
-    totalsByWindow(window),
-    breakdownByTask(window),
-    breakdownByModel(window),
-    recentCalls(opts.recentLimit ?? 10),
-  ]);
+  const stats = await getUsageWindowStats(window, opts);
   return toUsageSummaryApi({
-    totals,
-    byTask,
-    byModel,
-    recentCalls: recent,
+    totals: stats.totals,
+    byTask: stats.byTask,
+    byModel: stats.byModel,
+    recentCalls: stats.recentCalls,
   });
 }
 
@@ -189,35 +181,14 @@ export async function getUsageDashboardSummary(
   window: WindowKey = DEFAULT_USAGE_WINDOW,
   opts: { recentLimit?: number; dailyDays?: number } = {},
 ): Promise<UsageDashboardSummary> {
-  const [windowTotals, byTask, byModel, recent, daily] = await Promise.all([
-    Promise.all(
-      USAGE_WINDOWS.map((usageWindow) =>
-        withUsageFallback(totalsByWindow(usageWindow), null),
-      ),
-    ).then(toUsageWindowTotalsRecord),
-    withUsageFallback(breakdownByTask(window), []),
-    withUsageFallback(breakdownByModel(window), []),
-    withUsageFallback(recentCalls(opts.recentLimit ?? 25), []),
-    withUsageFallback(dailySpend(opts.dailyDays ?? 30), []),
-  ]);
+  const stats = await getUsageDashboardStats(window, opts);
 
   return {
-    selected: windowTotals[window] ?? emptyUsageWindowTotals(window),
-    windowTotals,
-    byTask,
-    byModel,
-    recentCalls: recent,
-    dailySpend: daily,
+    selected: stats.windowTotals[window],
+    windowTotals: stats.windowTotals,
+    byTask: stats.byTask,
+    byModel: stats.byModel,
+    recentCalls: stats.recentCalls,
+    dailySpend: stats.dailySpend,
   };
-}
-
-async function withUsageFallback<T>(
-  promise: Promise<T>,
-  fallback: T,
-): Promise<T> {
-  try {
-    return await promise;
-  } catch {
-    return fallback;
-  }
 }
