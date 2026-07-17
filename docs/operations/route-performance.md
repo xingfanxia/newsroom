@@ -67,9 +67,13 @@ Implemented controls:
   other unused item columns.
 - Remote RSS/Jina/X/AIHOT/pricing/snapshot reads enforce streaming byte caps;
   timeouts cover body reads. All JSON mutation routes share a 64 KiB cap.
-- Admin usage removes its duplicate selected-window aggregate. Admin policy
-  starts policy and chrome reads concurrently. Concurrent public-page proxy
-  probes share one pointer HEAD without weakening controlled-503 behavior.
+- Admin usage is served by a trigger-maintained UTC-day Turso rollup and one
+  libSQL read batch. Exact rolling week/month windows scan only their partial
+  boundary day from the raw append-only ledger instead of rescanning 371k+
+  calls; install/backfill with `bun run db:migrate:usage-rollups -- --apply`.
+  Admin policy starts policy and chrome reads concurrently. Concurrent
+  public-page proxy probes share one pointer HEAD without weakening
+  controlled-503 behavior.
 
 Largest accepted immutable artifacts in the audited production release were
 below 1 MiB: item body shards at about 682 KiB, feed segments at about 857 KiB,

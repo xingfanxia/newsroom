@@ -6,6 +6,7 @@ import {
   real,
   uniqueIndex,
   index,
+  primaryKey,
   customType,
 } from "drizzle-orm/sqlite-core";
 import {
@@ -753,6 +754,32 @@ export const llmUsage = sqliteTable(
       t.createdAt,
     ),
     taskIdx: index("llm_usage_task_idx").on(t.task, t.createdAt),
+  }),
+);
+
+/**
+ * Trigger-maintained UTC-day aggregates for usage dashboards. The raw
+ * llm_usage ledger remains authoritative and retains per-call detail; this
+ * compact table prevents admin/API summary reads from rescanning it.
+ * Empty task is the persisted representation of a null raw task because
+ * nullable SQLite columns do not conflict reliably inside composite keys.
+ */
+export const llmUsageDailyRollups = sqliteTable(
+  "llm_usage_daily_rollups",
+  {
+    dayIdx: integer("day_idx").notNull(),
+    task: text("task").notNull(),
+    provider: text("provider").notNull(),
+    model: text("model").notNull(),
+    calls: integer("calls").notNull(),
+    inputTokens: integer("input_tokens").notNull(),
+    cachedInputTokens: integer("cached_input_tokens").notNull(),
+    outputTokens: integer("output_tokens").notNull(),
+    reasoningTokens: integer("reasoning_tokens").notNull(),
+    costUsd: real("cost_usd").notNull(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.dayIdx, t.task, t.provider, t.model] }),
   }),
 );
 

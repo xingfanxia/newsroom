@@ -26,6 +26,7 @@
     "db:vector-index": "bun scripts/ops/db-create-vector-index.ts",
     "db:add-recheck-column": "bun scripts/ops/add-recheck-column.ts",
     "db:optimize": "bun scripts/ops/db-optimize.ts",
+    "db:migrate:usage-rollups": "bun scripts/migrations/create-usage-rollups-20260716.ts",
     "cron:fetch-hourly": "bun scripts/ops/run-cron.ts fetch-hourly",
     "cron:fetch-daily": "bun scripts/ops/run-cron.ts fetch-daily",
     "cron:fetch-weekly": "bun scripts/ops/run-cron.ts fetch-weekly",

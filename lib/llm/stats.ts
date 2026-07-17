@@ -1,29 +1,22 @@
 /**
- * Aggregation queries over llm_usage for the admin dashboard.
+ * Rollup-backed LLM usage queries for the admin dashboard and agent API.
+ *
+ * The raw ledger has hundreds of thousands of rows and is append-only. Reading
+ * it for every dashboard render made a cold admin request scan the whole table.
+ * A trigger-maintained daily rollup keeps these reads exact while bounded
+ * windows consult at most one partial boundary day from the raw ledger.
  */
-import { db } from "@/db/client";
-import { sql, desc } from "drizzle-orm";
-import { llmUsage } from "@/db/schema";
+import type { ResultSet, Row } from "@libsql/client";
+import { libsqlClient } from "@/db/client";
+import {
+  USAGE_DAY_MS,
+  usageBreakdownStatement,
+  usageDailySpendStatement,
+  usageTotalsStatement,
+} from "@/lib/llm/usage-rollup-sql";
 
 export const USAGE_WINDOWS = ["today", "week", "month", "all"] as const;
 export type WindowKey = (typeof USAGE_WINDOWS)[number];
-
-function windowClause(w: WindowKey) {
-  // created_at is integer ms epoch (Turso migration); windows are computed
-  // in JS and bound as numbers. "today" is UTC-day-aligned like the old
-  // date_trunc('day', now()).
-  const startOfUtcDayMs = Date.now() - (Date.now() % 86_400_000);
-  switch (w) {
-    case "today":
-      return sql`created_at >= ${startOfUtcDayMs}`;
-    case "week":
-      return sql`created_at >= ${Date.now() - 7 * 86_400_000}`;
-    case "month":
-      return sql`created_at >= ${Date.now() - 30 * 86_400_000}`;
-    case "all":
-      return sql`true`;
-  }
-}
 
 export type WindowTotals = {
   window: WindowKey;
@@ -34,36 +27,6 @@ export type WindowTotals = {
   reasoningTokens: number;
   costUsd: number;
 };
-
-export async function totalsByWindow(
-  w: WindowKey = "today",
-): Promise<WindowTotals> {
-  const client = db();
-  // T7 (2026-07-12 review finding 2c): renders on the same admin usage page as
-  // the breakdowns; the 'all' window would otherwise full-scan the fat table.
-  // Pin the covering index (created_at leading → bounded windows still prune,
-  // 'all' stays inside the index with no fat-row lookups).
-  const result = await client.all<Record<string, unknown>>(sql`
-    SELECT
-      count(*) AS calls,
-      coalesce(sum(input_tokens), 0) AS input_tokens,
-      coalesce(sum(cached_input_tokens), 0) AS cached_input_tokens,
-      coalesce(sum(output_tokens), 0) AS output_tokens,
-      coalesce(sum(reasoning_tokens), 0) AS reasoning_tokens,
-      coalesce(sum(cost_usd), 0) AS cost_usd
-    FROM llm_usage INDEXED BY llm_usage_totals_cover_idx WHERE ${windowClause(w)}
-  `);
-  const r = result[0] ?? {};
-  return {
-    window: w,
-    calls: Number(r.calls ?? 0),
-    inputTokens: Number(r.input_tokens ?? 0),
-    cachedInputTokens: Number(r.cached_input_tokens ?? 0),
-    outputTokens: Number(r.output_tokens ?? 0),
-    reasoningTokens: Number(r.reasoning_tokens ?? 0),
-    costUsd: Number(r.cost_usd ?? 0),
-  };
-}
 
 export type TaskBreakdown = {
   task: string | null;
@@ -81,101 +44,12 @@ type TaskModelBreakdown = {
   costUsd: number;
 };
 
-export async function breakdownByTask(
-  w: WindowKey = "week",
-): Promise<TaskBreakdown[]> {
-  const client = db();
-  // T7 (and the 2026-07-12 review): the two new llm_usage covering indexes are
-  // group-ordered candidates the stat-less Turso planner might now prefer over
-  // the created_at range index for bounded windows — which would drop the
-  // range prune and scan the whole index. Pin explicitly per window: all-time
-  // has no range to prune (covering index); bounded windows must keep the
-  // created_at prune.
-  const fromClause =
-    w === "all"
-      ? sql`llm_usage INDEXED BY llm_usage_breakdown_cover_idx`
-      : sql`llm_usage INDEXED BY llm_usage_created_at_idx`;
-  const result = await client.all<Record<string, unknown>>(sql`
-    SELECT
-      task, provider, model,
-      count(*) AS calls,
-      coalesce(sum(input_tokens), 0) AS input_tokens,
-      coalesce(sum(output_tokens), 0) AS output_tokens,
-      coalesce(sum(cost_usd), 0) AS cost_usd
-    FROM ${fromClause} WHERE ${windowClause(w)}
-    GROUP BY task, provider, model
-    ORDER BY cost_usd DESC
-  `);
-  const byTask = new Map<string, TaskBreakdown>();
-  for (const r of result) {
-    const task = (r.task as string | null) ?? null;
-    const key = task ?? "untagged";
-    const calls = Number(r.calls ?? 0);
-    const inputTokens = Number(r.input_tokens ?? 0);
-    const outputTokens = Number(r.output_tokens ?? 0);
-    const costUsd = Number(r.cost_usd ?? 0);
-    const existing =
-      byTask.get(key) ??
-      ({
-        task,
-        calls: 0,
-        inputTokens: 0,
-        outputTokens: 0,
-        costUsd: 0,
-        models: [],
-      } satisfies TaskBreakdown);
-    existing.calls += calls;
-    existing.inputTokens += inputTokens;
-    existing.outputTokens += outputTokens;
-    existing.costUsd += costUsd;
-    existing.models.push({
-      provider: String(r.provider),
-      model: String(r.model),
-      calls,
-      costUsd,
-    });
-    byTask.set(key, existing);
-  }
-  return Array.from(byTask.values()).sort((a, b) => b.costUsd - a.costUsd);
-}
-
 export type ModelBreakdown = {
   provider: string;
   model: string;
   calls: number;
   costUsd: number;
 };
-
-export async function breakdownByModel(
-  w: WindowKey = "week",
-): Promise<ModelBreakdown[]> {
-  const client = db();
-  // T7: for the all-time window there's no created_at range to prune on, so the
-  // GROUP BY would scan the fat table (audit: ~4.1s). Pin the covering index
-  // (provider, model, cost_usd) so the scan stays inside it. Bounded windows
-  // pin created_at instead so the range prune survives (the new covering
-  // indexes are group-ordered candidates the stat-less planner might otherwise
-  // prefer, losing the prune — 2026-07-12 review finding 2a).
-  const fromClause =
-    w === "all"
-      ? sql`llm_usage INDEXED BY llm_usage_model_cover_idx`
-      : sql`llm_usage INDEXED BY llm_usage_created_at_idx`;
-  const result = await client.all<Record<string, unknown>>(sql`
-    SELECT
-      provider, model,
-      count(*) AS calls,
-      coalesce(sum(cost_usd), 0) AS cost_usd
-    FROM ${fromClause} WHERE ${windowClause(w)}
-    GROUP BY provider, model
-    ORDER BY cost_usd DESC
-  `);
-  return result.map((r) => ({
-    provider: String(r.provider),
-    model: String(r.model),
-    calls: Number(r.calls ?? 0),
-    costUsd: Number(r.cost_usd ?? 0),
-  }));
-}
 
 export type RecentCall = {
   id: number;
@@ -192,78 +66,213 @@ export type RecentCall = {
   createdAt: Date;
 };
 
-/** Daily-spend series for the usage page sparkline. Returns the last `days`
- *  buckets oldest-first (ORDER BY date ASC), each with its ISO date + spend.
- *  Zeroes fill gaps so the bar chart keeps a stable width. */
 export type DailySpendPoint = { date: string; spend: number; calls: number };
-export async function dailySpend(days = 30): Promise<DailySpendPoint[]> {
-  const client = db();
-  // SQLite has no generate_series — build the day list in JS and unnest with
-  // json_each. Days are UTC-aligned like the old ::date.
-  //
-  // Perf (T7): the previous version JOINed on
-  // `strftime('%Y-%m-%d', created_at/1000.0, 'unixepoch') = s.value`, a
-  // function on the column that forced a full 364k-row scan every page load
-  // (~39s). Now: (1) each day carries its integer UTC-day index (ms / 86.4M)
-  // so bucketing is plain integer division, and (2) a lower bound on created_at
-  // lets the planner prune via llm_usage_created_at_idx. Turso is stat-less
-  // (rejects ANALYZE — see db-optimize.ts) so the bound is explicit and the
-  // index is pinned. 86400000 is written as a SQL literal (not a bound param)
-  // to keep the division integer.
-  const DAY_MS = 86_400_000;
-  const today = new Date();
-  today.setUTCHours(0, 0, 0, 0);
-  const dayList = Array.from({ length: days }, (_, i) => {
-    const ms = today.getTime() - (days - 1 - i) * DAY_MS;
-    return { d: new Date(ms).toISOString().slice(0, 10), i: Math.floor(ms / DAY_MS) };
-  });
-  const minBoundMs = today.getTime() - (days - 1) * DAY_MS;
-  const result = await client.all<Record<string, unknown>>(sql`
-    SELECT
-      json_extract(s.value, '$.d') AS date,
-      coalesce(agg.spend, 0) AS spend,
-      coalesce(agg.calls, 0) AS calls
-    FROM json_each(${JSON.stringify(dayList)}) s
-    LEFT JOIN (
-      SELECT
-        created_at / 86400000 AS day_idx,
-        sum(cost_usd) AS spend,
-        count(id) AS calls
-      FROM llm_usage INDEXED BY llm_usage_created_at_idx
-      WHERE created_at >= ${minBoundMs}
-      GROUP BY day_idx
-    ) agg ON agg.day_idx = json_extract(s.value, '$.i')
-    ORDER BY date ASC
-  `);
-  return result.map((r) => ({
-    date: String(r.date),
-    spend: Number(r.spend ?? 0),
-    calls: Number(r.calls ?? 0),
+
+export type UsageWindowStats = {
+  totals: WindowTotals;
+  byTask: TaskBreakdown[];
+  byModel: ModelBreakdown[];
+  recentCalls: RecentCall[];
+};
+
+export type UsageDashboardStats = Omit<UsageWindowStats, "totals"> & {
+  windowTotals: Record<WindowKey, WindowTotals>;
+  dailySpend: DailySpendPoint[];
+};
+
+export async function getUsageWindowStats(
+  window: WindowKey,
+  opts: { recentLimit?: number } = {},
+): Promise<UsageWindowStats> {
+  const nowMs = Date.now();
+  const [totalsResult, breakdownResult, recentResult] = await libsqlClient().batch(
+    [
+      usageTotalsStatement(window, nowMs),
+      usageBreakdownStatement(window, nowMs),
+      recentCallsStatement(opts.recentLimit ?? 10),
+    ],
+    "read",
+  );
+  const byTask = taskBreakdownFromResult(breakdownResult);
+  return {
+    totals: totalsFromResult(window, totalsResult),
+    byTask,
+    byModel: modelBreakdownFromTasks(byTask),
+    recentCalls: recentCallsFromResult(recentResult),
+  };
+}
+
+export async function getUsageDashboardStats(
+  window: WindowKey,
+  opts: { recentLimit?: number; dailyDays?: number } = {},
+): Promise<UsageDashboardStats> {
+  const nowMs = Date.now();
+  const dailyDays = boundedPositiveInt(opts.dailyDays ?? 30, 366);
+  const results = await libsqlClient().batch(
+    [
+      ...USAGE_WINDOWS.map((usageWindow) =>
+        usageTotalsStatement(usageWindow, nowMs),
+      ),
+      usageBreakdownStatement(window, nowMs),
+      recentCallsStatement(opts.recentLimit ?? 25),
+      usageDailySpendStatement(dailyDays, nowMs),
+    ],
+    "read",
+  );
+  const totalsResults = results.slice(0, USAGE_WINDOWS.length);
+  const breakdownResult = results[USAGE_WINDOWS.length]!;
+  const recentResult = results[USAGE_WINDOWS.length + 1]!;
+  const dailyResult = results[USAGE_WINDOWS.length + 2]!;
+  const byTask = taskBreakdownFromResult(breakdownResult);
+
+  return {
+    windowTotals: Object.fromEntries(
+      USAGE_WINDOWS.map((usageWindow, index) => [
+        usageWindow,
+        totalsFromResult(usageWindow, totalsResults[index]!),
+      ]),
+    ) as Record<WindowKey, WindowTotals>,
+    byTask,
+    byModel: modelBreakdownFromTasks(byTask),
+    recentCalls: recentCallsFromResult(recentResult),
+    dailySpend: dailySpendFromResult(dailyResult, dailyDays, nowMs),
+  };
+}
+
+function recentCallsStatement(limit: number) {
+  return {
+    sql: `SELECT
+            id, task, provider, model, input_tokens, cached_input_tokens,
+            output_tokens, reasoning_tokens, cost_usd, duration_ms, item_id,
+            created_at
+          FROM llm_usage INDEXED BY llm_usage_created_at_idx
+          ORDER BY created_at DESC
+          LIMIT ?`,
+    args: [boundedPositiveInt(limit, 100)],
+  };
+}
+
+function totalsFromResult(
+  window: WindowKey,
+  result: ResultSet,
+): WindowTotals {
+  const row = result.rows[0];
+  return {
+    window,
+    calls: numberValue(row?.calls),
+    inputTokens: numberValue(row?.input_tokens),
+    cachedInputTokens: numberValue(row?.cached_input_tokens),
+    outputTokens: numberValue(row?.output_tokens),
+    reasoningTokens: numberValue(row?.reasoning_tokens),
+    costUsd: numberValue(row?.cost_usd),
+  };
+}
+
+function taskBreakdownFromResult(result: ResultSet): TaskBreakdown[] {
+  const byTask = new Map<string, TaskBreakdown>();
+  for (const row of result.rows) {
+    const task = nullableString(row.task);
+    const key = task ?? "untagged";
+    const calls = numberValue(row.calls);
+    const inputTokens = numberValue(row.input_tokens);
+    const outputTokens = numberValue(row.output_tokens);
+    const costUsd = numberValue(row.cost_usd);
+    const existing =
+      byTask.get(key) ??
+      ({
+        task,
+        calls: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        costUsd: 0,
+        models: [],
+      } satisfies TaskBreakdown);
+    existing.calls += calls;
+    existing.inputTokens += inputTokens;
+    existing.outputTokens += outputTokens;
+    existing.costUsd += costUsd;
+    existing.models.push({
+      provider: String(row.provider),
+      model: String(row.model),
+      calls,
+      costUsd,
+    });
+    byTask.set(key, existing);
+  }
+  return [...byTask.values()].sort((left, right) => right.costUsd - left.costUsd);
+}
+
+function modelBreakdownFromTasks(tasks: readonly TaskBreakdown[]): ModelBreakdown[] {
+  const byModel = new Map<string, ModelBreakdown>();
+  for (const task of tasks) {
+    for (const model of task.models) {
+      const key = `${model.provider}\u0000${model.model}`;
+      const existing = byModel.get(key) ?? {
+        provider: model.provider,
+        model: model.model,
+        calls: 0,
+        costUsd: 0,
+      };
+      existing.calls += model.calls;
+      existing.costUsd += model.costUsd;
+      byModel.set(key, existing);
+    }
+  }
+  return [...byModel.values()].sort((left, right) => right.costUsd - left.costUsd);
+}
+
+function recentCallsFromResult(result: ResultSet): RecentCall[] {
+  return result.rows.map((row) => ({
+    id: numberValue(row.id),
+    task: nullableString(row.task),
+    provider: String(row.provider),
+    model: String(row.model),
+    inputTokens: numberValue(row.input_tokens),
+    cachedInputTokens: numberValue(row.cached_input_tokens),
+    outputTokens: numberValue(row.output_tokens),
+    reasoningTokens: numberValue(row.reasoning_tokens),
+    costUsd: nullableNumber(row.cost_usd),
+    durationMs: nullableNumber(row.duration_ms),
+    itemId: nullableNumber(row.item_id),
+    createdAt: new Date(numberValue(row.created_at)),
   }));
 }
 
-export async function recentCalls(limit = 25): Promise<RecentCall[]> {
-  const client = db();
-  const rows = await client
-    .select({
-      id: llmUsage.id,
-      task: llmUsage.task,
-      provider: llmUsage.provider,
-      model: llmUsage.model,
-      inputTokens: llmUsage.inputTokens,
-      cachedInputTokens: llmUsage.cachedInputTokens,
-      outputTokens: llmUsage.outputTokens,
-      reasoningTokens: llmUsage.reasoningTokens,
-      costUsd: llmUsage.costUsd,
-      durationMs: llmUsage.durationMs,
-      itemId: llmUsage.itemId,
-      createdAt: llmUsage.createdAt,
-    })
-    .from(llmUsage)
-    .orderBy(desc(llmUsage.createdAt))
-    .limit(limit);
-  return rows.map((r) => ({
-    ...r,
-    costUsd: r.costUsd !== null ? Number(r.costUsd) : null,
-  }));
+function dailySpendFromResult(
+  result: ResultSet,
+  days: number,
+  nowMs: number,
+): DailySpendPoint[] {
+  const byDay = new Map(
+    result.rows.map((row) => [
+      numberValue(row.day_idx),
+      { spend: numberValue(row.spend), calls: numberValue(row.calls) },
+    ]),
+  );
+  const todayDayIdx = Math.floor(nowMs / USAGE_DAY_MS);
+  return Array.from({ length: days }, (_, index) => {
+    const dayIdx = todayDayIdx - (days - 1 - index);
+    const value = byDay.get(dayIdx);
+    return {
+      date: new Date(dayIdx * USAGE_DAY_MS).toISOString().slice(0, 10),
+      spend: value?.spend ?? 0,
+      calls: value?.calls ?? 0,
+    };
+  });
+}
+
+function boundedPositiveInt(value: number, max: number): number {
+  return Number.isSafeInteger(value) && value > 0 ? Math.min(value, max) : 1;
+}
+
+function numberValue(value: Row[string] | undefined): number {
+  return value == null ? 0 : Number(value);
+}
+
+function nullableNumber(value: Row[string] | undefined): number | null {
+  return value == null ? null : Number(value);
+}
+
+function nullableString(value: Row[string] | undefined): string | null {
+  return value == null || value === "" ? null : String(value);
 }
