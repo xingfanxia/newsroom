@@ -10,6 +10,7 @@ import {
   FEED_HOT_WINDOW_HOURS_MAX,
   FEED_HOT_WINDOW_HOURS_MIN,
   FEED_LIMIT_MIN,
+  FEED_OFFSET_MAX,
   MCP_FEED_LIMIT_MAX,
   PUBLIC_FEED_LIMIT_MAX,
   V1_FEED_LIMIT_MAX,
@@ -23,7 +24,9 @@ import {
   DEFAULT_SEARCH_TIER,
   MCP_SEARCH_LIMIT_MAX,
   PUBLIC_SEARCH_LIMIT_MAX,
+  SEARCH_QUERY_MAX_LENGTH,
   SEARCH_LIMIT_MIN,
+  SEARCH_OFFSET_MAX,
   V1_SEARCH_LIMIT_MAX,
 } from "@/lib/search/query-defaults";
 import type { PublicFeedQuery as FeedQuery } from "@/lib/public-content/query";
@@ -78,12 +81,12 @@ function makeFeedQueryParamSchema(options: {
     date: ymdSchema,
     date_from: z.string().datetime().optional(),
     date_to: z.string().datetime().optional(),
-    source_id: z.string().min(1).optional(),
+    source_id: z.string().min(1).max(128).optional(),
     source_group: z.enum(SOURCE_GROUPS).optional(),
     source_kind: z.enum(SOURCE_KINDS).optional(),
     curated_only: boolParamSchema,
-    exclude_source_tags: z.string().min(1).optional(),
-    include_source_tags: z.string().min(1).optional(),
+    exclude_source_tags: z.string().min(1).max(2_048).optional(),
+    include_source_tags: z.string().min(1).max(2_048).optional(),
     limit: limitParamSchema(
       FEED_LIMIT_MIN,
       options.maxLimit,
@@ -93,6 +96,7 @@ function makeFeedQueryParamSchema(options: {
       .number()
       .int()
       .min(0)
+      .max(FEED_OFFSET_MAX)
       .optional()
       .default(DEFAULT_FEED_OFFSET),
     locale: z.enum(APP_LOCALES).optional().default(DEFAULT_API_FEED_LOCALE),
@@ -104,13 +108,16 @@ function makeSearchQueryParamSchema(options: {
   defaultLimit: number;
 }) {
   return z.object({
-    q: z.string().min(1, "q is required"),
+    q: z
+      .string()
+      .min(1, "q is required")
+      .max(SEARCH_QUERY_MAX_LENGTH),
     mode: z.enum(SEARCH_MODES).optional().default(DEFAULT_SEARCH_MODE),
     tier: z.enum(VISIBLE_ITEM_TIERS).optional().default(DEFAULT_SEARCH_TIER),
     date: ymdSchema,
     date_from: z.string().datetime().optional(),
     date_to: z.string().datetime().optional(),
-    source_id: z.string().min(1).optional(),
+    source_id: z.string().min(1).max(128).optional(),
     source_group: z.enum(SOURCE_GROUPS).optional(),
     source_kind: z.enum(SOURCE_KINDS).optional(),
     limit: limitParamSchema(
@@ -122,6 +129,7 @@ function makeSearchQueryParamSchema(options: {
       .number()
       .int()
       .min(0)
+      .max(SEARCH_OFFSET_MAX)
       .optional()
       .default(DEFAULT_SEARCH_OFFSET),
     locale: z.enum(APP_LOCALES).optional().default(DEFAULT_API_SEARCH_LOCALE),
@@ -157,33 +165,33 @@ export const mcpFeedToolInputShape = {
     .min(FEED_HOT_WINDOW_HOURS_MIN)
     .max(FEED_HOT_WINDOW_HOURS_MAX)
     .optional(),
-  source_id: z.string().optional(),
+  source_id: z.string().min(1).max(128).optional(),
   source_group: z.enum(SOURCE_GROUPS).optional(),
   source_kind: z.enum(SOURCE_KINDS).optional(),
   curated_only: z.boolean().optional(),
-  exclude_source_tags: z.array(z.string()).optional(),
-  include_source_tags: z.array(z.string()).optional(),
-  date: z.string().optional(),
-  date_from: z.string().optional(),
-  date_to: z.string().optional(),
+  exclude_source_tags: z.array(z.string().min(1).max(64)).max(32).optional(),
+  include_source_tags: z.array(z.string().min(1).max(64)).max(32).optional(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  date_from: z.string().datetime().optional(),
+  date_to: z.string().datetime().optional(),
   limit: z
     .number()
     .int()
     .min(FEED_LIMIT_MIN)
     .max(MCP_FEED_LIMIT_MAX)
     .optional(),
-  offset: z.number().int().min(0).optional(),
+  offset: z.number().int().min(0).max(FEED_OFFSET_MAX).optional(),
   locale: z.enum(APP_LOCALES).optional(),
 } as const;
 
 export const mcpSearchToolInputShape = {
-  q: z.string().min(1),
+  q: z.string().min(1).max(SEARCH_QUERY_MAX_LENGTH),
   mode: z.enum(SEARCH_MODES).optional(),
-  source_id: z.string().optional(),
+  source_id: z.string().min(1).max(128).optional(),
   source_group: z.enum(SOURCE_GROUPS).optional(),
   source_kind: z.enum(SOURCE_KINDS).optional(),
-  date_from: z.string().optional(),
-  date_to: z.string().optional(),
+  date_from: z.string().datetime().optional(),
+  date_to: z.string().datetime().optional(),
   limit: z
     .number()
     .int()

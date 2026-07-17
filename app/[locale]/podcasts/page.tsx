@@ -4,6 +4,11 @@ import { PageHead } from "@/components/shell/page-head";
 import { Item } from "@/components/feed/item";
 import { FeedEmptyState } from "@/components/feed/empty-state";
 import { DayBreak } from "../_day-break";
+import { FeedArchivePagination } from "@/components/feed/archive-pagination";
+import {
+  coerceFeedOffset,
+  FEED_PAGE_SIZE,
+} from "@/lib/feed/page-query";
 import { groupByDay, sortStoriesNewestFirst } from "@/lib/feed/group-by-day";
 import {
   coercePodcastTier,
@@ -32,12 +37,13 @@ export default async function PodcastsPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ source?: string; tier?: string }>;
+  searchParams: Promise<{ source?: string; tier?: string; offset?: string }>;
 }) {
   const [{ locale }, sp] = await Promise.all([params, searchParams]);
   const appLocale = appLocaleFromParam(locale);
   setRequestLocale(appLocale);
   const activeTier: PodcastTier = coercePodcastTier(sp.tier);
+  const offset = coerceFeedOffset(sp.offset);
 
   const {
     channels,
@@ -45,10 +51,11 @@ export default async function PodcastsPage({
     stories: filtered,
     chrome,
   } = await readPodcastsPageModel({
-      locale: appLocale,
-      source: sp.source,
-      tier: activeTier,
-    });
+    locale: appLocale,
+    source: sp.source,
+    tier: activeTier,
+    offset,
+  });
 
   const grouped = groupByDay(sortStoriesNewestFirst(filtered));
   const activeLabel = activeChannel
@@ -128,6 +135,20 @@ export default async function PodcastsPage({
             </FeedEmptyState>
           )}
         </div>
+        {filtered.length > 0 && (
+          <FeedArchivePagination
+            basePath={`/${appLocale}/podcasts`}
+            offset={offset}
+            pageSize={FEED_PAGE_SIZE}
+            currentCount={filtered.length}
+            locale={appLocale}
+            preservedParams={{
+              source: activeChannel,
+              tier:
+                activeTier === DEFAULT_PODCAST_TIER ? undefined : activeTier,
+            }}
+          />
+        )}
       </main>
     </ViewShell>
   );

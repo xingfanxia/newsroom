@@ -201,7 +201,13 @@ async function readPodcastsPageModelUncached(
       scope,
       materializedPageLogicalName.podcasts(input.locale),
     );
-    if (!input.source && input.tier === DEFAULT_PODCAST_TIER) return published;
+    if (
+      !input.source &&
+      input.tier === DEFAULT_PODCAST_TIER &&
+      input.offset === 0
+    ) {
+      return published;
+    }
     const activeChannel = activePodcastChannel(published.channels, input.source);
     const result = await readDirectPublicFeedStories(
       scope,
@@ -319,7 +325,7 @@ async function readXMonitorPageModelUncached(
       scope,
       materializedPageLogicalName.xMonitor(input.locale),
     );
-    if (!input.handle) return published;
+    if (!input.handle && input.offset === 0) return published;
     const activeIsValid = isActiveXHandle(published.handles, input.handle);
     const result = await readDirectPublicFeedStories(
       scope,

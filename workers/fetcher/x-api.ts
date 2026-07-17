@@ -17,9 +17,12 @@
  *   the full original in `note_tweet.text`. We prefer the latter.
  */
 import type { FeedItem } from "./rss";
+import { readResponseJson } from "@/lib/http/response-body";
 
 const API_BASE = "https://api.x.com/2";
 const USER_AGENT = "ax-radar/1.0 (+https://news.ax0x.ai)";
+const X_FETCH_TIMEOUT_MS = 15_000;
+const X_MAX_RESPONSE_BYTES = 1024 * 1024;
 
 /** In-memory cache of handle→userId. Survives warm invocations on Vercel
  *  Fluid Compute; cold starts pay one extra /users/by/username call per
@@ -119,6 +122,7 @@ async function xFetch<T>(path: string, params?: URLSearchParams): Promise<T> {
         Authorization: `Bearer ${bearer()}`,
         "User-Agent": USER_AGENT,
       },
+      signal: AbortSignal.timeout(X_FETCH_TIMEOUT_MS),
     });
   } catch (err) {
     throw new XApiError(
@@ -127,25 +131,37 @@ async function xFetch<T>(path: string, params?: URLSearchParams): Promise<T> {
     );
   }
   if (res.status === 401 || res.status === 403) {
+    await res.body?.cancel();
     throw new XApiError("auth", `X API ${res.status}`);
   }
   if (res.status === 404) {
+    await res.body?.cancel();
     throw new XApiError("not_found", "X API 404");
   }
   if (res.status === 429) {
     const reset = res.headers.get("x-rate-limit-reset");
+    await res.body?.cancel();
     throw new XApiError(
       "rate_limited",
       `X API 429 — reset at ${reset ?? "unknown"}`,
     );
   }
   if (res.status >= 500) {
+    await res.body?.cancel();
     throw new XApiError("server_error", `X API ${res.status}`);
   }
   if (!res.ok) {
+    await res.body?.cancel();
     throw new XApiError("server_error", `X API ${res.status}`);
   }
-  return (await res.json()) as T;
+  try {
+    return await readResponseJson<T>(res, X_MAX_RESPONSE_BYTES);
+  } catch (error) {
+    throw new XApiError(
+      "parse_error",
+      error instanceof Error ? error.message : "invalid X API response",
+    );
+  }
 }
 
 /** Resolve a handle (e.g. "dotey") to its numeric user ID. Cached. */

@@ -63,11 +63,12 @@ export function buildMaterializedPageModels(
         buildPodcastsPageModel(state, nowMs, {
           locale,
           tier: DEFAULT_PODCAST_TIER,
+          offset: 0,
         }),
       ),
       model(
         materializedPageLogicalName.xMonitor(locale),
-        buildXMonitorPageModel(state, nowMs, { locale }),
+        buildXMonitorPageModel(state, nowMs, { locale, offset: 0 }),
       ),
       model(
         materializedPageLogicalName.daily(locale),

@@ -1,7 +1,8 @@
 /**
  * GET /api/public/search — Anonymous snapshot-backed lexical search.
  *
- * `mode=lexical` (default) — LIKE substring against title/summary, fast + cheap.
+ * `mode=lexical` (default) — LIKE substring against titles + bounded summary
+ * excerpts from the compact R2 index, then item-shard hydration for hits.
  * `mode=semantic` — returns a documented 422. Semantic search remains on the
  * bearer-authenticated v1/MCP surfaces and never falls back to Turso here.
  *

@@ -7,9 +7,12 @@ export const DEFAULT_FEED_OFFSET = 0;
 export const DEFAULT_FEED_HOT_WINDOW_HOURS = 24;
 
 export const FEED_LIMIT_MIN = 1;
-export const V1_FEED_LIMIT_MAX = 500;
+export const FEED_OFFSET_MAX = 100_000;
+// Bearer and MCP callers still paginate; keeping a single response bounded
+// avoids multi-hundred-row JSON/RSC payloads and the matching Turso transfer.
+export const V1_FEED_LIMIT_MAX = 200;
 export const PUBLIC_FEED_LIMIT_MAX = 100;
-export const MCP_FEED_LIMIT_MAX = 200;
+export const MCP_FEED_LIMIT_MAX = 100;
 export const FEED_HOT_WINDOW_HOURS_MIN = 1;
 export const FEED_HOT_WINDOW_HOURS_MAX = 168;
 

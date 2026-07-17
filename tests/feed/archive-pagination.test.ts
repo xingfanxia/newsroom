@@ -66,6 +66,8 @@ describe("feed archive pagination source ownership", () => {
 
     expect(source).toContain("FEED_PAGE_SIZE");
     expect(source).toContain("offset={offset}");
-    expect(source).toContain('preservedParams={{ source_id: sourceId }}');
+    expect(source).toContain(
+      'preservedParams={{ source_id: sourceId, date: activeDate }}',
+    );
   });
 });

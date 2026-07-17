@@ -19,14 +19,16 @@ export default async function PolicyPage({
   const appLocale = appLocaleFromParam(locale);
   setRequestLocale(appLocale);
 
+  const skillPromise = getActiveSkill("editorial");
+  const chromePromise = getAdminShellChromeData();
   let skill: Awaited<ReturnType<typeof getActiveSkill>> | null = null;
   let error: string | null = null;
   try {
-    skill = await getActiveSkill("editorial");
+    skill = await skillPromise;
   } catch (err) {
     error = err instanceof Error ? err.message : String(err);
   }
-  const chrome = await getAdminShellChromeData();
+  const chrome = await chromePromise;
 
   return (
     <ViewShell

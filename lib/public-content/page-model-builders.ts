@@ -18,7 +18,10 @@ import {
   queryPublicFeed,
   type PublicFeedQuery,
 } from "@/lib/public-content/query";
-import { feedPageLimitForDate } from "@/lib/feed/page-query";
+import {
+  FEED_PAGE_SIZE,
+  feedPageLimitForDate,
+} from "@/lib/feed/page-query";
 import {
   DEFAULT_HOME_TIER,
   type HomeTier,
@@ -100,16 +103,16 @@ export function publicHomePageFeedQuery(
         ? 30
         : 7;
   return {
-      tier: input.tier,
-      locale: input.locale,
-      limit: feedPageLimitForDate(input.activeDate, 120),
-      date: input.activeDate,
-      view: input.activeDate || dailyHighlights ? "archive" : "today",
-      recencyFloorDays,
-      ...(dailyHighlights
-        ? { minImportance: 80, maxPerDay: 3, recentDayRescueDays: 3 }
-        : {}),
-      ...sourceFilter,
+    tier: input.tier,
+    locale: input.locale,
+    limit: feedPageLimitForDate(input.activeDate, 120),
+    date: input.activeDate,
+    view: input.activeDate || dailyHighlights ? "archive" : "today",
+    recencyFloorDays,
+    ...(dailyHighlights
+      ? { minImportance: 80, maxPerDay: 3, recentDayRescueDays: 3 }
+      : {}),
+    ...sourceFilter,
   };
 }
 
@@ -197,6 +200,7 @@ export type PodcastsPageModelInput = {
   locale: AppLocale;
   source?: string;
   tier: PodcastTier;
+  offset: number;
 };
 
 export function buildPodcastsPageModel(
@@ -235,7 +239,8 @@ export function podcastsPageFeedQuery(
     sourceGroup: activeChannel ? undefined : "podcast",
     sourceId: activeChannel ?? undefined,
     includeSourceGroup: true,
-    limit: activeChannel ? 300 : 120,
+    limit: FEED_PAGE_SIZE,
+    offset: input.offset,
   };
 }
 
@@ -257,7 +262,11 @@ export function buildPodcastDetailPageModel(
   };
 }
 
-export type XMonitorPageModelInput = { locale: AppLocale; handle?: string };
+export type XMonitorPageModelInput = {
+  locale: AppLocale;
+  handle?: string;
+  offset: number;
+};
 
 export function buildXMonitorPageModel(
   state: CanonicalPublicState,
@@ -294,7 +303,8 @@ export function xMonitorPageFeedQuery(
     locale: input.locale,
     sourceId: activeIsValid ? input.handle : undefined,
     sourceKind: activeIsValid ? undefined : "x-api",
-    limit: activeIsValid ? 200 : 80,
+    limit: FEED_PAGE_SIZE,
+    offset: input.offset,
   };
 }
 

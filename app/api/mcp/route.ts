@@ -80,11 +80,17 @@ import {
 } from "@/lib/api/usage-summary";
 import { APP_LOCALES } from "@/lib/types";
 import type { SessionUser } from "@/lib/auth/session";
+import {
+  readRequestBytes,
+  ResponseBodyTooLargeError,
+} from "@/lib/http/response-body";
 
 type ToolOutput = {
   content: Array<{ type: "text"; text: string }>;
   isError?: boolean;
 };
+
+const MCP_REQUEST_MAX_BYTES = 256 * 1024;
 
 function text(payload: unknown): ToolOutput {
   return {
@@ -421,13 +427,31 @@ async function handle(req: Request): Promise<Response> {
   const auth = await requireApiToken(req);
   if (auth instanceof Response) return auth;
 
+  let boundedRequest = req;
+  if (req.method === "POST") {
+    try {
+      const body = await readRequestBytes(req, MCP_REQUEST_MAX_BYTES);
+      boundedRequest = new Request(req, {
+        body: new TextDecoder().decode(body),
+      });
+    } catch (error) {
+      if (error instanceof ResponseBodyTooLargeError) {
+        return Response.json(
+          { error: "payload_too_large" },
+          { status: 413 },
+        );
+      }
+      return Response.json({ error: "invalid_body" }, { status: 400 });
+    }
+  }
+
   const server = buildServer(auth.user);
   const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: undefined, // stateless
     enableJsonResponse: true,
   });
   await server.connect(transport);
-  const res = await transport.handleRequest(req);
+  const res = await transport.handleRequest(boundedRequest);
   return res;
 }
 

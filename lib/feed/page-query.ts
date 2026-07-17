@@ -1,5 +1,12 @@
-export const FEED_PAGE_SIZE = 200;
-export const FEED_DATE_DRILLDOWN_LIMIT = 500;
+/**
+ * Server-rendered feed pages serialize every story into both HTML and the RSC
+ * payload. Keeping a page to 50 cards holds the wire response below the
+ * dynamic-page budget while archive pagination preserves full reachability.
+ */
+import { FEED_OFFSET_MAX } from "@/lib/feed/query-defaults";
+
+export const FEED_PAGE_SIZE = 50;
+export const FEED_DATE_DRILLDOWN_LIMIT = FEED_PAGE_SIZE;
 
 const FEED_DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -9,7 +16,7 @@ export function coerceFeedDateKey(date: string | undefined): string | undefined 
 
 export function coerceFeedOffset(offset: string | undefined): number {
   const n = Number.parseInt(offset ?? "0", 10);
-  return Number.isFinite(n) && n >= 0 ? n : 0;
+  return Number.isSafeInteger(n) && n >= 0 && n <= FEED_OFFSET_MAX ? n : 0;
 }
 
 export function feedPageLimitForDate(

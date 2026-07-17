@@ -40,26 +40,26 @@ export default async function AllPostsPage({
   const sourceId = sp.source_id?.trim() || undefined;
   const sourcePreset = coerceSourcePreset(sp.source);
   const activeDate = coerceFeedDateKey(sp.date);
-  // When a day is picked, show everything from that day uncapped (500 is
-  // the safety ceiling). Otherwise paginate in shared page-size chunks.
+  // Date drilldowns stay paginated too: a busy day must not turn into a
+  // multi-megabyte HTML/RSC response.
   const offset = coerceFeedOffset(sp.offset);
   const { stories, chrome, days } = await readAllPageModel({
-      locale: appLocale,
-      sourceId,
-      sourcePreset,
-      activeDate,
-      offset,
-    });
+    locale: appLocale,
+    sourceId,
+    sourcePreset,
+    activeDate,
+    offset,
+  });
 
   // /all is a chronological full-feed view — sort by publishedAt DESC
   // before grouping (the SQL already does this, but the explicit sort
   // protects against any caller that passes mixed-order input).
   const grouped = groupByDay(sortStoriesNewestFirst(stories));
   const paginationParams = sourceId
-    ? { source_id: sourceId }
+    ? { source_id: sourceId, date: activeDate }
     : sourcePreset !== "all"
-      ? { source: sourcePreset }
-      : undefined;
+      ? { source: sourcePreset, date: activeDate }
+      : { date: activeDate };
 
   return (
     <ViewShell
@@ -105,7 +105,7 @@ export default async function AllPostsPage({
           )}
         </div>
 
-        {!activeDate && stories.length > 0 && (
+        {stories.length > 0 && (
           <FeedArchivePagination
             basePath={`/${appLocale}/all`}
             offset={offset}

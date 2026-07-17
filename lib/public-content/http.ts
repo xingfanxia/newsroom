@@ -23,6 +23,7 @@ import {
 } from "@/lib/api/query-params";
 import { parsePositiveRouteId } from "@/lib/api/route-params";
 import type { RouteErrorResult } from "@/lib/api/route-result";
+import { EVENT_MEMBERS_LIMIT_MAX } from "@/lib/event-members/query-defaults";
 import {
   DAILY_COLUMN_INDEX_TAKE_MAX,
   DAILY_COLUMN_INDEX_TAKE_MIN,
@@ -689,7 +690,10 @@ export function publicEventMembersSnapshotResult(
   if (!parsed.ok) return { ok: false, error: parsed.error, status: 400 };
   const payload = toEventMembersPayload(
     parsed.clusterId,
-    getPublicEventMembers(snapshot.state, parsed.clusterId, parsed.locale),
+    getPublicEventMembers(snapshot.state, parsed.clusterId, parsed.locale).slice(
+      0,
+      EVENT_MEMBERS_LIMIT_MAX,
+    ),
   );
   return eventMembersSnapshotResult(
     snapshot.release,
@@ -729,26 +733,28 @@ export async function publicEventMembersSnapshotRequestResult(
         options.listOnly,
       );
     }
+    const selectedMemberItemIds = event.memberItemIds.slice(
+      0,
+      EVENT_MEMBERS_LIMIT_MAX,
+    );
     const itemLogicalNames = [
       ...new Set(
-        event.memberItemIds.map((id) =>
+        selectedMemberItemIds.map((id) =>
           publicEntityShardLogicalName("item", String(id)),
         ),
       ),
     ];
     const [sources, itemShards] = await Promise.all([
       readSourceShard(scope),
-      Promise.all(
-        itemLogicalNames.map((logicalName) =>
-          readItemShardByLogicalName(scope, logicalName),
-        ),
+      mapWithConcurrency(itemLogicalNames, 16, (logicalName) =>
+        readItemShardByLogicalName(scope, logicalName),
       ),
     ]);
-    const memberIds = new Set(event.memberItemIds);
+    const memberIds = new Set(selectedMemberItemIds);
     const items = itemShards.flat().filter(({ id }) => memberIds.has(id));
     const itemsById = new Map(items.map((item) => [item.id, item]));
     const sourcesById = new Map(sources.map((source) => [source.id, source]));
-    for (const memberId of event.memberItemIds) {
+    for (const memberId of selectedMemberItemIds) {
       const item =
         itemsById.get(memberId) ??
         scope.rejectRelease(new Error(`missing public event member: ${memberId}`));

@@ -20,18 +20,34 @@ const ROW = {
   sourceId: 4,
   sourceGroup: 5,
   sourceKind: 6,
-  rawTitle: 7,
-  titleZh: 8,
-  titleEn: 9,
-  summaryZh: 10,
-  summaryEn: 11,
-  canonicalTitleZh: 12,
-  canonicalTitleEn: 13,
+  searchTexts: 7,
 } as const;
 
 const nullableTextSchema = z.string().nullable();
+const SUMMARY_EXCERPT_CHARACTERS = 64;
 
 const publicLexicalRowSchema = z.tuple([
+  z.number().int().positive(),
+  z.string().datetime(),
+  z.number().int(),
+  z.enum(VISIBLE_ITEM_TIERS),
+  z.string(),
+  z.enum(SOURCE_GROUPS),
+  z.enum(SOURCE_KINDS),
+  z.array(z.string()).min(1),
+]);
+
+const publicLexicalShardSchema = z.strictObject({
+  schemaVersion: z.literal(2),
+  kind: z.literal("public-lexical-shard"),
+  bucket: z.number().int().min(0).max(PUBLIC_LEXICAL_SHARD_COUNT - 1),
+  rows: z.array(publicLexicalRowSchema),
+});
+
+// Transitional parser for releases published before the compact text-corpus
+// format. Keeping this reader makes deployment safe: the new runtime can serve
+// the active v1 release until the next publisher run flips the pointer to v2.
+const legacyPublicLexicalRowSchema = z.tuple([
   z.number().int().positive(),
   z.string().datetime(),
   z.number().int(),
@@ -48,11 +64,11 @@ const publicLexicalRowSchema = z.tuple([
   nullableTextSchema,
 ]);
 
-const publicLexicalShardSchema = z.strictObject({
+const legacyPublicLexicalShardSchema = z.strictObject({
   schemaVersion: z.literal(1),
   kind: z.literal("public-lexical-shard"),
   bucket: z.number().int().min(0).max(PUBLIC_LEXICAL_SHARD_COUNT - 1),
-  rows: z.array(publicLexicalRowSchema),
+  rows: z.array(legacyPublicLexicalRowSchema),
 });
 
 export type PublicLexicalRow = z.infer<typeof publicLexicalRowSchema>;
@@ -111,13 +127,15 @@ export function publicLexicalRowFromEntities(
     item.sourceId,
     source.group,
     source.kind,
-    item.title.raw,
-    item.title.zh,
-    item.title.en,
-    item.summary.zh,
-    item.summary.en,
-    event?.canonicalTitle.zh ?? null,
-    event?.canonicalTitle.en ?? null,
+    compactSearchTexts([
+      item.title.raw,
+      item.title.zh,
+      item.title.en,
+      excerpt(item.summary.zh),
+      excerpt(item.summary.en),
+      event?.canonicalTitle.zh,
+      event?.canonicalTitle.en,
+    ]),
   ]);
 }
 
@@ -152,7 +170,7 @@ export function buildPublicLexicalArtifactValues(
   return buckets.map((rows, bucket) => ({
     logicalName: publicLexicalShardLogicalName(bucket),
     value: publicLexicalShardSchema.parse({
-      schemaVersion: 1,
+      schemaVersion: 2,
       kind: "public-lexical-shard",
       bucket,
       rows,
@@ -165,9 +183,13 @@ export function parsePublicLexicalShard(
   bytes: Uint8Array,
 ): PublicLexicalShard {
   const bucket = bucketFromLogicalName(logicalName);
-  const parsed = publicLexicalShardSchema.parse(
-    JSON.parse(new TextDecoder().decode(bytes)) as unknown,
-  );
+  const value = JSON.parse(new TextDecoder().decode(bytes)) as unknown;
+  const current = publicLexicalShardSchema.safeParse(value);
+  const parsed = current.success
+    ? current.data
+    : normalizeLegacyPublicLexicalShard(
+        legacyPublicLexicalShardSchema.parse(value),
+      );
   if (parsed.bucket !== bucket) {
     throw new Error(`public lexical shard metadata mismatch: ${logicalName}`);
   }
@@ -238,18 +260,45 @@ function matchesRow(row: PublicLexicalRow, query: PublicFeedQuery): boolean {
       : Date.parse("2999-01-01T00:00:00.000Z");
     if (publishedMs < from || publishedMs >= to) return false;
   }
-  return matchesSqliteLikeTextValues(
-    [
-      row[ROW.rawTitle],
-      row[ROW.titleZh],
-      row[ROW.titleEn],
-      row[ROW.summaryZh],
-      row[ROW.summaryEn],
-      row[ROW.canonicalTitleZh],
-      row[ROW.canonicalTitleEn],
-    ],
-    query.searchText!,
-  );
+  return matchesSqliteLikeTextValues(row[ROW.searchTexts], query.searchText!);
+}
+
+function normalizeLegacyPublicLexicalShard(
+  legacy: z.infer<typeof legacyPublicLexicalShardSchema>,
+): PublicLexicalShard {
+  return publicLexicalShardSchema.parse({
+    schemaVersion: 2,
+    kind: legacy.kind,
+    bucket: legacy.bucket,
+    rows: legacy.rows.map((row) => [
+      row[0],
+      row[1],
+      row[2],
+      row[3],
+      row[4],
+      row[5],
+      row[6],
+      compactSearchTexts([
+        row[7],
+        row[8],
+        row[9],
+        excerpt(row[10]),
+        excerpt(row[11]),
+        row[12],
+        row[13],
+      ]),
+    ]),
+  });
+}
+
+function compactSearchTexts(
+  values: readonly (string | null | undefined)[],
+): string[] {
+  return [...new Set(values.filter((value): value is string => Boolean(value)))];
+}
+
+function excerpt(value: string | null | undefined): string | null {
+  return value ? value.slice(0, SUMMARY_EXCERPT_CHARACTERS) : null;
 }
 
 function compareRows(left: PublicLexicalRow, right: PublicLexicalRow): number {

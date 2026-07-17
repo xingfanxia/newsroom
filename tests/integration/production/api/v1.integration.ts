@@ -133,7 +133,7 @@ describe("/api/v1/feed", () => {
     expect(body.error).toBe("invalid_query");
   });
 
-  test("rejects limit over 500", async () => {
+  test("rejects limit over 200", async () => {
     const res = await feedGet(authedReq("/api/v1/feed?limit=9999"));
     expect(res.status).toBe(400);
   });

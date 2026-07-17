@@ -33,6 +33,7 @@ import {
   FEED_HOT_WINDOW_HOURS_MAX,
   FEED_HOT_WINDOW_HOURS_MIN,
   FEED_LIMIT_MIN,
+  FEED_OFFSET_MAX,
   PUBLIC_FEED_LIMIT_MAX,
 } from "@/lib/feed/query-defaults";
 import {
@@ -43,7 +44,9 @@ import {
   DEFAULT_SEARCH_TIER,
   PUBLIC_SEMANTIC_SEARCH_ERROR,
   PUBLIC_SEARCH_LIMIT_MAX,
+  SEARCH_QUERY_MAX_LENGTH,
   SEARCH_LIMIT_MIN,
+  SEARCH_OFFSET_MAX,
 } from "@/lib/search/query-defaults";
 import { DEFAULT_PUBLIC_EVENT_MEMBERS_LOCALE } from "@/lib/event-members/query-defaults";
 import { publicRateLimitPerIpLabel } from "@/lib/api/public-endpoint-config";
@@ -128,7 +131,7 @@ paths:
         - { name: include_source_tags, in: query, schema: { type: string }, description: "Comma-separated source tag list" }
         - { name: exclude_source_tags, in: query, schema: { type: string } }
         - { name: limit, in: query, schema: { type: integer, minimum: ${FEED_LIMIT_MIN}, maximum: ${PUBLIC_FEED_LIMIT_MAX}, default: ${DEFAULT_FEED_LIMIT} } }
-        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: ${DEFAULT_FEED_OFFSET} } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, maximum: ${FEED_OFFSET_MAX}, default: ${DEFAULT_FEED_OFFSET} } }
         - { name: locale, in: query, schema: { type: string, enum: ${APP_LOCALE_ENUM}, default: ${DEFAULT_API_FEED_LOCALE} } }
       responses:
         '200':
@@ -175,13 +178,14 @@ paths:
       summary: Keyword (lexical) search
       description: |
         Anonymous lexical search (${SEARCH_RATE_LIMIT_PER_IP}).
-        \`mode=lexical\` (default) does LIKE substring against title/summary;
+        \`mode=lexical\` (default) does LIKE substring against titles and a
+        bounded summary excerpt; use item detail after a hit for full text.
         \`mode=semantic\` returns HTTP 422 with
         \`{"error":"${PUBLIC_SEMANTIC_SEARCH_ERROR}"}\`. Semantic search remains
         available only on bearer-authenticated v1/MCP surfaces; the anonymous
         route never queries Turso or invokes an embedding provider.
       parameters:
-        - { name: q, in: query, required: true, schema: { type: string, minLength: 1 } }
+        - { name: q, in: query, required: true, schema: { type: string, minLength: 1, maxLength: ${SEARCH_QUERY_MAX_LENGTH} } }
         - { name: mode, in: query, schema: { type: string, enum: ${SEARCH_MODE_ENUM}, default: ${DEFAULT_SEARCH_MODE} } }
         - { name: tier, in: query, schema: { type: string, enum: ${VISIBLE_ITEM_TIER_ENUM}, default: ${DEFAULT_SEARCH_TIER} } }
         - { name: date_from, in: query, schema: { type: string, format: date-time } }
@@ -190,7 +194,7 @@ paths:
         - { name: source_group, in: query, schema: { type: string, enum: ${SOURCE_GROUP_ENUM} } }
         - { name: source_kind, in: query, schema: { type: string, enum: ${SOURCE_KIND_ENUM} } }
         - { name: limit, in: query, schema: { type: integer, minimum: ${SEARCH_LIMIT_MIN}, maximum: ${PUBLIC_SEARCH_LIMIT_MAX}, default: ${DEFAULT_SEARCH_LIMIT} } }
-        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: ${DEFAULT_SEARCH_OFFSET} }, description: "lexical mode only" }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, maximum: ${SEARCH_OFFSET_MAX}, default: ${DEFAULT_SEARCH_OFFSET} }, description: "lexical mode only" }
         - { name: locale, in: query, schema: { type: string, enum: ${APP_LOCALE_ENUM}, default: ${DEFAULT_API_SEARCH_LOCALE} } }
       responses:
         '200':

@@ -9,6 +9,7 @@ import {
   DEFAULT_FEED_VIEW,
   DEFAULT_STORY_FEED_LOCALE,
 } from "@/lib/feed/query-defaults";
+import { EVENT_MEMBERS_LIMIT_MAX } from "@/lib/event-members/query-defaults";
 import { highlightTierInSql } from "@/lib/items/tier-sql";
 import {
   eventStorySelectFields,
@@ -471,7 +472,8 @@ export async function getEventMembers(
     .from(items)
     .innerJoin(sources, eq(items.sourceId, sources.id))
     .where(eq(items.clusterId, clusterId))
-    .orderBy(sql`${items.importance} DESC NULLS LAST, ${items.publishedAt} ASC`);
+    .orderBy(sql`${items.importance} DESC NULLS LAST, ${items.publishedAt} ASC`)
+    .limit(EVENT_MEMBERS_LIMIT_MAX);
 
   return rows.map((r) => ({
     sourceId: r.sourceId,

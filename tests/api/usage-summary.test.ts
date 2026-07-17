@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   USAGE_WINDOWS,
+  emptyUsageWindowTotals,
   parseUsageSummaryQueryRequest,
   toUsageSummaryApi,
   toUsageWindowTotalsRecord,
@@ -142,6 +143,18 @@ describe("usage summary API serialization", () => {
     expect(record.week).toBeNull();
     expect(record.month?.window).toBe("month");
     expect(record.all?.window).toBe("all");
+  });
+
+  test("builds a typed zero fallback without a second totals query", () => {
+    expect(emptyUsageWindowTotals("month")).toEqual({
+      window: "month",
+      calls: 0,
+      inputTokens: 0,
+      cachedInputTokens: 0,
+      outputTokens: 0,
+      reasoningTokens: 0,
+      costUsd: 0,
+    });
   });
 });
 
