@@ -31,10 +31,10 @@ describe("feed query param schemas", () => {
       locale: "en",
       curated_only: false,
     });
-    expect(v1FeedQueryParamSchema.safeParse({ limit: "500" }).success).toBe(
+    expect(v1FeedQueryParamSchema.safeParse({ limit: "200" }).success).toBe(
       true,
     );
-    expect(v1FeedQueryParamSchema.safeParse({ limit: "501" }).success).toBe(
+    expect(v1FeedQueryParamSchema.safeParse({ limit: "201" }).success).toBe(
       false,
     );
     expect(publicFeedQueryParamSchema.safeParse({ limit: "100" }).success).toBe(
@@ -98,12 +98,21 @@ describe("feed query param schemas", () => {
         .success,
     ).toBe(false);
   });
+
+  test("rejects pathological archive offsets before reading storage", () => {
+    expect(v1FeedQueryParamSchema.safeParse({ offset: "100000" }).success).toBe(
+      true,
+    );
+    expect(v1FeedQueryParamSchema.safeParse({ offset: "100001" }).success).toBe(
+      false,
+    );
+  });
 });
 
 describe("MCP feed query input helpers", () => {
   test("validate MCP feed limits and map defaults to FeedQuery", () => {
-    expect(mcpFeedToolInputSchema.safeParse({ limit: 200 }).success).toBe(true);
-    expect(mcpFeedToolInputSchema.safeParse({ limit: 201 }).success).toBe(false);
+    expect(mcpFeedToolInputSchema.safeParse({ limit: 100 }).success).toBe(true);
+    expect(mcpFeedToolInputSchema.safeParse({ limit: 101 }).success).toBe(false);
 
     const query = feedQueryFromMcpToolArgs({});
 
@@ -158,6 +167,17 @@ describe("MCP feed query input helpers", () => {
       excludeSourceTags: ["paper"],
       includeSourceTags: ["operator", "community"],
     });
+  });
+
+  test("bounds MCP filter arrays and offsets", () => {
+    expect(
+      mcpFeedToolInputSchema.safeParse({
+        include_source_tags: Array.from({ length: 33 }, () => "tag"),
+      }).success,
+    ).toBe(false);
+    expect(mcpFeedToolInputSchema.safeParse({ offset: 100_001 }).success).toBe(
+      false,
+    );
   });
 });
 
@@ -240,6 +260,15 @@ describe("search query param schemas", () => {
       v1SearchQueryParamSchema.safeParse({ q: "agent", mode: "hybrid" })
         .success,
     ).toBe(false);
+  });
+
+  test("bounds lexical and semantic query text before execution", () => {
+    expect(publicSearchQueryParamSchema.safeParse({ q: "x".repeat(256) }).success)
+      .toBe(true);
+    expect(publicSearchQueryParamSchema.safeParse({ q: "x".repeat(257) }).success)
+      .toBe(false);
+    expect(mcpSearchToolInputSchema.safeParse({ q: "x".repeat(257) }).success)
+      .toBe(false);
   });
 
   test("keeps comma-list parsing centralized", () => {
@@ -330,11 +359,11 @@ describe("feed/search request query helpers", () => {
     if (!publicSearch.ok) expect(publicSearch.issues.length).toBeGreaterThan(0);
 
     const v1Feed = parseV1FeedQueryRequest(
-      new Request("https://example.test/api/v1/feed?limit=500"),
+      new Request("https://example.test/api/v1/feed?limit=200"),
     );
     expect(v1Feed).toMatchObject({
       ok: true,
-      data: { limit: 500 },
+      data: { limit: 200 },
     });
   });
 });

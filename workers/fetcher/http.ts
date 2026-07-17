@@ -1,4 +1,8 @@
 import { guardUrl, GuardError } from "./guard";
+import {
+  readResponseText,
+  ResponseBodyTooLargeError,
+} from "@/lib/http/response-body";
 
 const DEFAULT_TIMEOUT_MS = 15_000;
 const DEFAULT_RETRIES = 2;
@@ -128,62 +132,50 @@ async function fetchOnce(
         return { ok: false, error: "timeout" };
       return { ok: false, error: "network" };
     }
-    clearTimeout(timer);
-
-    // Manual redirect handling
-    if (res.status >= 300 && res.status < 400) {
-      const loc = res.headers.get("location");
-      if (!loc) return { ok: false, error: "network", status: res.status };
-      // Resolve relative location against current URL
-      try {
-        currentUrl = new URL(loc, currentUrl).toString();
-      } catch {
-        return { ok: false, error: "invalid_url" };
+    try {
+      // Manual redirect handling. Keep the same timeout alive until the body
+      // has been read or cancelled; a server that sends headers and then
+      // stalls must not bypass the request deadline.
+      if (res.status >= 300 && res.status < 400) {
+        const loc = res.headers.get("location");
+        await res.body?.cancel();
+        if (!loc) return { ok: false, error: "network", status: res.status };
+        try {
+          currentUrl = new URL(loc, currentUrl).toString();
+        } catch {
+          return { ok: false, error: "invalid_url" };
+        }
+        continue;
       }
-      continue;
-    }
 
-    if (res.status >= 400 && res.status < 500) {
-      return {
-        ok: false,
-        error: res.status === 429 ? "http_5xx" : "http_4xx",
-        status: res.status,
-      };
-    }
-    if (res.status >= 500) {
-      return { ok: false, error: "http_5xx", status: res.status };
-    }
+      if (res.status >= 400 && res.status < 500) {
+        await res.body?.cancel();
+        return {
+          ok: false,
+          error: res.status === 429 ? "http_5xx" : "http_4xx",
+          status: res.status,
+        };
+      }
+      if (res.status >= 500) {
+        await res.body?.cancel();
+        return { ok: false, error: "http_5xx", status: res.status };
+      }
 
-    // 2xx: read with a byte cap
-    const body = await readCapped(res);
-    if (body === null) return { ok: false, error: "response_too_large" };
-    return { ok: true, body, status: res.status };
+      try {
+        const body = await readResponseText(res, MAX_RESPONSE_BYTES);
+        return { ok: true, body, status: res.status };
+      } catch (error) {
+        return {
+          ok: false,
+          error:
+            error instanceof ResponseBodyTooLargeError
+              ? "response_too_large"
+              : "network",
+        };
+      }
+    } finally {
+      clearTimeout(timer);
+    }
   }
   return { ok: false, error: "too_many_redirects" };
-}
-
-async function readCapped(res: Response): Promise<string | null> {
-  const reader = res.body?.getReader();
-  if (!reader) return await res.text();
-
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  for (;;) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    if (!value) continue;
-    total += value.byteLength;
-    if (total > MAX_RESPONSE_BYTES) {
-      reader.cancel();
-      return null;
-    }
-    chunks.push(value);
-  }
-  const merged = new Uint8Array(total);
-  let offset = 0;
-  for (const c of chunks) {
-    merged.set(c, offset);
-    offset += c.byteLength;
-  }
-  return new TextDecoder("utf-8", { fatal: false }).decode(merged);
 }

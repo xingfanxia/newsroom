@@ -155,6 +155,18 @@ export function toUsageWindowTotalsRecord(
   ) as Record<WindowKey, WindowTotals | null>;
 }
 
+export function emptyUsageWindowTotals(window: WindowKey): WindowTotals {
+  return {
+    window,
+    calls: 0,
+    inputTokens: 0,
+    cachedInputTokens: 0,
+    outputTokens: 0,
+    reasoningTokens: 0,
+    costUsd: 0,
+  };
+}
+
 export async function getUsageSummary(
   window: WindowKey = DEFAULT_USAGE_WINDOW,
   opts: { recentLimit?: number } = {},
@@ -177,22 +189,20 @@ export async function getUsageDashboardSummary(
   window: WindowKey = DEFAULT_USAGE_WINDOW,
   opts: { recentLimit?: number; dailyDays?: number } = {},
 ): Promise<UsageDashboardSummary> {
-  const [selected, windowTotals, byTask, byModel, recent, daily] =
-    await Promise.all([
-      totalsByWindow(window),
-      Promise.all(
-        USAGE_WINDOWS.map((usageWindow) =>
-          withUsageFallback(totalsByWindow(usageWindow), null),
-        ),
-      ).then(toUsageWindowTotalsRecord),
-      withUsageFallback(breakdownByTask(window), []),
-      withUsageFallback(breakdownByModel(window), []),
-      withUsageFallback(recentCalls(opts.recentLimit ?? 25), []),
-      withUsageFallback(dailySpend(opts.dailyDays ?? 30), []),
-    ]);
+  const [windowTotals, byTask, byModel, recent, daily] = await Promise.all([
+    Promise.all(
+      USAGE_WINDOWS.map((usageWindow) =>
+        withUsageFallback(totalsByWindow(usageWindow), null),
+      ),
+    ).then(toUsageWindowTotalsRecord),
+    withUsageFallback(breakdownByTask(window), []),
+    withUsageFallback(breakdownByModel(window), []),
+    withUsageFallback(recentCalls(opts.recentLimit ?? 25), []),
+    withUsageFallback(dailySpend(opts.dailyDays ?? 30), []),
+  ]);
 
   return {
-    selected,
+    selected: windowTotals[window] ?? emptyUsageWindowTotals(window),
     windowTotals,
     byTask,
     byModel,

@@ -25,8 +25,11 @@ describe("JSON body parsing source wiring", () => {
 
     expect(source).toContain("@/lib/api/ok-response");
     expect(source).toContain("@/lib/api/plain-response");
-    expect(source).toContain("okError(error, 400, issuePayload)");
-    expect(source).toContain("plainError(error, 400, issuePayload)");
+    expect(source).toContain(
+      'const status = error === "payload_too_large" ? 413 : 400',
+    );
+    expect(source).toContain("okError(error, status, issuePayload)");
+    expect(source).toContain("plainError(error, status, issuePayload)");
     expect(source).not.toContain("Response.json(body");
     expect(source).not.toContain("ok: false, error");
     expect(source).not.toContain("{ error, ...issuePayload }");

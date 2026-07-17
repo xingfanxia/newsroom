@@ -1,9 +1,16 @@
 import type { ZodIssue, ZodType } from "zod";
 import { okError } from "@/lib/api/ok-response";
 import { plainError } from "@/lib/api/plain-response";
+import {
+  readRequestBytes,
+  ResponseBodyTooLargeError,
+} from "@/lib/http/response-body";
 
 export type JsonBodyEnvelope = "ok" | "plain";
-export type JsonBodyError = "invalid_json" | "invalid_body";
+export type JsonBodyError =
+  | "invalid_json"
+  | "invalid_body"
+  | "payload_too_large";
 
 export type ParsedJsonRequestBody<T> =
   | { ok: true; data: T }
@@ -12,7 +19,10 @@ export type ParsedJsonRequestBody<T> =
 export type ParseJsonRequestBodyOptions = {
   envelope: JsonBodyEnvelope;
   includeIssues?: boolean;
+  maxBytes?: number;
 };
+
+const DEFAULT_JSON_BODY_MAX_BYTES = 64 * 1024;
 
 export function jsonBodyErrorResponse(
   envelope: JsonBodyEnvelope,
@@ -20,9 +30,10 @@ export function jsonBodyErrorResponse(
   issues?: ZodIssue[],
 ): Response {
   const issuePayload = issues ? { issues } : {};
+  const status = error === "payload_too_large" ? 413 : 400;
   return envelope === "ok"
-    ? okError(error, 400, issuePayload)
-    : plainError(error, 400, issuePayload);
+    ? okError(error, status, issuePayload)
+    : plainError(error, status, issuePayload);
 }
 
 export async function parseJsonRequestBody<T>(
@@ -32,11 +43,20 @@ export async function parseJsonRequestBody<T>(
 ): Promise<ParsedJsonRequestBody<T>> {
   let raw: unknown;
   try {
-    raw = await req.json();
-  } catch {
+    const bytes = await readRequestBytes(
+      req,
+      options.maxBytes ?? DEFAULT_JSON_BODY_MAX_BYTES,
+    );
+    raw = JSON.parse(new TextDecoder().decode(bytes)) as unknown;
+  } catch (error) {
     return {
       ok: false,
-      response: jsonBodyErrorResponse(options.envelope, "invalid_json"),
+      response: jsonBodyErrorResponse(
+        options.envelope,
+        error instanceof ResponseBodyTooLargeError
+          ? "payload_too_large"
+          : "invalid_json",
+      ),
     };
   }
 

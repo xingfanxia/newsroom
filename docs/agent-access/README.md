@@ -35,6 +35,13 @@ All endpoints return `weak ETag` + honor `If-None-Match` → 304. CORS open (`*`
 
 Anonymous JSON feed/search reads are served from the validated R2 snapshot through `lib/public-content/http.ts`; the reader needs only `R2_PUBLIC_BASE_URL`, and request volume does not query Turso. Lexical results update when the publisher advances the release pointer. Anonymous `mode=semantic` returns HTTP 422 `semantic_search_not_supported`; semantic retrieval remains on bearer-authenticated v1/MCP. Those private surfaces retain their `unstable_cache` data-layer caches (`feed-api` / `search-api`).
 
+The public feed accepts at most 100 rows per response; bearer v1 accepts 200,
+and MCP feed calls accept 100. Search accepts at most 256 query characters and
+100 bearer/MCP results (50 public). Feed/search offsets stop at 100,000. The R2
+lexical v2 artifacts keep full titles, canonical event titles, and bounded
+summary excerpts, then hydrate only the item shards that matched. Readers also
+normalize the older full-text v1 shard shape during release transitions.
+
 There is no DB fallback on an anonymous cache miss or snapshot failure.
 
 ## Field stripping (vs `/api/v1/*`)

@@ -6,6 +6,11 @@ import { FeedEmptyState } from "@/components/feed/empty-state";
 import { DayBreak } from "../_day-break";
 import { groupByDay, sortStoriesNewestFirst } from "@/lib/feed/group-by-day";
 import { XHandlesSidebar } from "@/components/x-monitor/handles-sidebar";
+import { FeedArchivePagination } from "@/components/feed/archive-pagination";
+import {
+  coerceFeedOffset,
+  FEED_PAGE_SIZE,
+} from "@/lib/feed/page-query";
 import { readXMonitorPageModel } from "@/lib/public-content/page-models";
 import { appLocaleFromParam } from "@/lib/types";
 
@@ -16,22 +21,24 @@ export default async function XMonitorPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ handle?: string }>;
+  searchParams: Promise<{ handle?: string; offset?: string }>;
 }) {
   const [{ locale }, sp] = await Promise.all([params, searchParams]);
   const appLocale = appLocaleFromParam(locale);
   setRequestLocale(appLocale);
 
   const activeHandle = sp.handle ?? null;
+  const offset = coerceFeedOffset(sp.offset);
   const {
     handles,
     activeIsValid,
     stories: narrowedStories,
     chrome,
   } = await readXMonitorPageModel({
-      locale: appLocale,
-      handle: activeHandle ?? undefined,
-    });
+    locale: appLocale,
+    handle: activeHandle ?? undefined,
+    offset,
+  });
 
   const grouped = groupByDay(sortStoriesNewestFirst(narrowedStories));
   const activeLabel: string = activeIsValid
@@ -112,6 +119,18 @@ export default async function XMonitorPage({
                 </FeedEmptyState>
               )}
             </div>
+            {narrowedStories.length > 0 && (
+              <FeedArchivePagination
+                basePath={`/${appLocale}/x-monitor`}
+                offset={offset}
+                pageSize={FEED_PAGE_SIZE}
+                currentCount={narrowedStories.length}
+                locale={appLocale}
+                preservedParams={{
+                  handle: activeIsValid ? activeHandle : undefined,
+                }}
+              />
+            )}
           </div>
         </div>
       </main>

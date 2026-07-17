@@ -45,11 +45,11 @@ export default async function CuratedPage({
   const activeDate = coerceFeedDateKey(sp.date);
   const offset = coerceFeedOffset(sp.offset);
   const { stories, chrome, days } = await readCuratedPageModel({
-      locale: appLocale,
-      sourceId,
-      activeDate,
-      offset,
-    });
+    locale: appLocale,
+    sourceId,
+    activeDate,
+    offset,
+  });
 
   const grouped = groupByDay(sortStoriesNewestFirst(stories));
   const zh = appLocale === "zh";
@@ -94,14 +94,14 @@ export default async function CuratedPage({
             </FeedEmptyState>
           )}
         </div>
-        {!activeDate && stories.length > 0 && (
+        {stories.length > 0 && (
           <FeedArchivePagination
             basePath={`/${appLocale}/curated`}
             offset={offset}
             pageSize={FEED_PAGE_SIZE}
             currentCount={stories.length}
             locale={appLocale}
-            preservedParams={{ source_id: sourceId }}
+            preservedParams={{ source_id: sourceId, date: activeDate }}
           />
         )}
       </main>

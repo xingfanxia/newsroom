@@ -170,6 +170,41 @@ describe("saved-data privacy boundary", () => {
     }
   });
 
+  test("coalesces concurrent public-page pointer probes", async () => {
+    const originalFetch = globalThis.fetch;
+    const originalBaseUrl = process.env.R2_PUBLIC_BASE_URL;
+    let calls = 0;
+    let release: (() => void) | undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    globalThis.fetch = Object.assign(
+      async () => {
+        calls += 1;
+        await gate;
+        return new Response(null, { status: 200 });
+      },
+      { preconnect: () => undefined },
+    );
+    process.env.R2_PUBLIC_BASE_URL = "https://coalesced-content.test";
+    try {
+      const responses = Promise.all([
+        proxy(new NextRequest("https://news.ax0x.ai/en")),
+        proxy(new NextRequest("https://news.ax0x.ai/zh/all")),
+      ]);
+      await Promise.resolve();
+      expect(calls).toBe(1);
+      release?.();
+      expect((await responses).every((response) => response.status === 200))
+        .toBeTrue();
+    } finally {
+      release?.();
+      globalThis.fetch = originalFetch;
+      if (originalBaseUrl === undefined) delete process.env.R2_PUBLIC_BASE_URL;
+      else process.env.R2_PUBLIC_BASE_URL = originalBaseUrl;
+    }
+  });
+
   test("snapshot availability gate covers only snapshot-backed locale pages", () => {
     expect(isSnapshotBackedPublicPagePath("/en")).toBeTrue();
     expect(isSnapshotBackedPublicPagePath("/zh/daily/2026-07-14")).toBeTrue();

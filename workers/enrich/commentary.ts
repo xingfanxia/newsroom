@@ -49,6 +49,37 @@ type Topic = (typeof TOPICS)[number];
 const CONCURRENCY = 30;
 const MAX_PER_RUN = 200;
 
+type CommentaryItem = Pick<
+  Item,
+  | "id"
+  | "title"
+  | "body"
+  | "bodyMd"
+  | "summaryZh"
+  | "summaryEn"
+  | "tags"
+  | "tier"
+  | "importance"
+  | "url"
+  | "sourceId"
+  | "publishedAt"
+>;
+
+const commentaryItemFields = {
+  id: items.id,
+  title: items.title,
+  body: items.body,
+  bodyMd: items.bodyMd,
+  summaryZh: items.summaryZh,
+  summaryEn: items.summaryEn,
+  tags: items.tags,
+  tier: items.tier,
+  importance: items.importance,
+  url: items.url,
+  sourceId: items.sourceId,
+  publishedAt: items.publishedAt,
+} as const;
+
 export type CommentaryBackfillReport = {
   candidates: number;
   generated: number;
@@ -67,8 +98,8 @@ export async function runCommentaryBackfill(): Promise<CommentaryBackfillReport>
   //   - cluster_id IS NULL → singleton item (no cluster yet) → include
   //   - cluster.member_count = 1 → singleton cluster → include
   //   - cluster.member_count >= 2 → multi-source event → exclude (Stage D handles it)
-  const pending: Item[] = await client
-    .select({ item: items })
+  const pending: CommentaryItem[] = await client
+    .select(commentaryItemFields)
     .from(items)
     .leftJoin(clusters, eq(items.clusterId, clusters.id))
     .where(
@@ -79,8 +110,7 @@ export async function runCommentaryBackfill(): Promise<CommentaryBackfillReport>
         sql`(${items.clusterId} IS NULL OR COALESCE(${clusters.memberCount}, 1) < 2)`,
       ),
     )
-    .limit(MAX_PER_RUN)
-    .then((rows: Array<{ item: Item }>) => rows.map((r) => r.item));
+    .limit(MAX_PER_RUN);
 
   if (pending.length === 0) {
     return {
@@ -97,7 +127,7 @@ export async function runCommentaryBackfill(): Promise<CommentaryBackfillReport>
   let generated = 0;
 
   await Promise.allSettled(
-    pending.map((item: Item) =>
+    pending.map((item) =>
       limit(async () => {
         try {
           await generateOneCommentary(item);
@@ -125,7 +155,7 @@ export async function runCommentaryBackfill(): Promise<CommentaryBackfillReport>
 // Picks the right schema + system prompt + token budget based on tier.
 // featured / p1 → full deep dive. all → note only (much cheaper).
 
-async function generateOneCommentary(item: Item): Promise<void> {
+async function generateOneCommentary(item: CommentaryItem): Promise<void> {
   const tagBag = (item.tags ?? {}) as {
     capabilities?: string[];
     entities?: string[];

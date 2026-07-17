@@ -17,11 +17,13 @@
  *   4. fallback to the hardcoded table
  */
 import { LLM_MODEL_DEFAULTS } from "./model-defaults";
+import { readResponseJson } from "@/lib/http/response-body";
 import type { LLMProvider } from "./types";
 
 const PRICING_URL =
   "https://raw.githubusercontent.com/BerriAI/litellm/main/litellm/model_prices_and_context_window_backup.json";
 const TTL_MS = 24 * 60 * 60 * 1000;
+const PRICING_MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
 
 type LiteLLMModelRow = {
   input_cost_per_token?: number;
@@ -109,8 +111,14 @@ async function loadPricing(): Promise<Cache> {
         headers: { accept: "application/json" },
         signal: AbortSignal.timeout(10_000),
       });
-      if (!res.ok) throw new Error(`pricing fetch status ${res.status}`);
-      const rows = (await res.json()) as Record<string, LiteLLMModelRow>;
+      if (!res.ok) {
+        await res.body?.cancel();
+        throw new Error(`pricing fetch status ${res.status}`);
+      }
+      const rows = await readResponseJson<Record<string, LiteLLMModelRow>>(
+        res,
+        PRICING_MAX_RESPONSE_BYTES,
+      );
       cache = { fetchedAt: Date.now(), rows };
       return cache;
     } catch {

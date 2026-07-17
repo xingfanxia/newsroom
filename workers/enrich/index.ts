@@ -48,6 +48,21 @@ import {
 // thousands of LLM calls in one burst.
 const CONCURRENCY = 10;
 const MAX_PER_RUN = 60;
+
+type EnrichItem = Pick<
+  Item,
+  "id" | "title" | "body" | "bodyMd" | "url" | "sourceId" | "publishedAt"
+>;
+
+const enrichItemFields = {
+  id: items.id,
+  title: items.title,
+  body: items.body,
+  bodyMd: items.bodyMd,
+  url: items.url,
+  sourceId: items.sourceId,
+  publishedAt: items.publishedAt,
+} as const;
 export type EnrichReport = {
   processed: number;
   enriched: number;
@@ -122,7 +137,7 @@ export async function runEnrichBatch(
 async function claimPendingEnrichItems(
   client: ReturnType<typeof db>,
   opts: EnrichBatchOptions,
-): Promise<Item[]> {
+): Promise<EnrichItem[]> {
   const limit = opts.limit ?? MAX_PER_RUN;
   const maxAttempts = opts.maxAttempts ?? ENRICH_MAX_ATTEMPTS;
   const filters = [
@@ -176,9 +191,17 @@ async function claimPendingEnrichItems(
   const ids = claimedRows.map((r) => Number(r.id));
   if (ids.length === 0) return [];
 
-  const rows = await client.select().from(items).where(inArray(items.id, ids));
+  // Prompt generation needs article text, not the 3072/256-dim vectors or the
+  // rest of the enriched payload. A re-enrichment claim can already carry an
+  // old embedding, so selecting the full row wastes ~13KB per candidate.
+  const rows = await client
+    .select(enrichItemFields)
+    .from(items)
+    .where(inArray(items.id, ids));
   const byId = new Map(rows.map((row) => [row.id, row]));
-  return ids.map((id) => byId.get(id)).filter((row): row is Item => Boolean(row));
+  return ids
+    .map((id) => byId.get(id))
+    .filter((row): row is EnrichItem => Boolean(row));
 }
 
 async function markEnrichFailure(
@@ -208,7 +231,7 @@ class StageError extends Error {
 }
 
 async function enrichOne(
-  item: Item,
+  item: EnrichItem,
   policy: PolicyT,
   neverExcludeSourceIds: NeverExcludeSourceIds,
 ): Promise<void> {
@@ -264,7 +287,7 @@ async function enrichOne(
 }
 
 async function generateEnrichment(
-  item: Item,
+  item: EnrichItem,
   treatment: EnrichTreatment,
 ): Promise<EnrichOutput> {
   try {
@@ -312,7 +335,7 @@ async function generateEnrichment(
 }
 
 async function generateEmbedding(
-  item: Item,
+  item: EnrichItem,
   enriched: EnrichOutput,
 ): Promise<number[]> {
   try {
@@ -325,7 +348,7 @@ async function generateEmbedding(
 }
 
 async function generateScore(
-  item: Item,
+  item: EnrichItem,
   enriched: EnrichOutput,
   policy: PolicyT,
   treatment: EnrichTreatment,
@@ -377,7 +400,7 @@ async function generateScore(
 }
 
 async function regenerateHighValueItem(
-  item: Item,
+  item: EnrichItem,
   policy: PolicyT,
   neverExcludeSourceIds: NeverExcludeSourceIds,
 ): Promise<{

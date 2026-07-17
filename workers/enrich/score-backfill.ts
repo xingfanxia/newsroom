@@ -8,9 +8,9 @@
  * Cost: ~$0.008/item × ~150 items = ~$1.20 one-time sweep.
  */
 import pLimit from "p-limit";
-import { eq } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { items } from "@/db/schema";
+import { items, type Item } from "@/db/schema";
 import { generateStructured, profiles } from "@/lib/llm";
 import { scoreBackfillPendingSql } from "@/lib/items/score-backfill-predicate";
 import {
@@ -30,6 +30,29 @@ import { treatmentForScore, type EnrichTreatment } from "./treatment";
 const CONCURRENCY = 30;
 const MAX_PER_RUN = 300;
 
+type ScoreBackfillItem = Pick<
+  Item,
+  | "id"
+  | "title"
+  | "summaryZh"
+  | "tags"
+  | "url"
+  | "sourceId"
+  | "publishedAt"
+  | "bodyMd"
+>;
+
+const scoreBackfillItemFields = {
+  id: items.id,
+  title: items.title,
+  summaryZh: items.summaryZh,
+  tags: items.tags,
+  url: items.url,
+  sourceId: items.sourceId,
+  publishedAt: items.publishedAt,
+  bodyMd: items.bodyMd,
+} as const;
+
 export type ScoreBackfillReport = {
   candidates: number;
   rescored: number;
@@ -46,11 +69,22 @@ export async function runScoreBackfill(): Promise<ScoreBackfillReport> {
   // reasoning pair (pre-bilingual rows), or lack the per-axis reasons
   // (pre-reasons rows — the hkr json has `h/k/r` booleans but no
   // `reasonsZh`/`reasonsEn`). Each case signals a stale score row.
-  const pending = await client
-    .select()
-    .from(items)
-    .where(scoreBackfillPendingSql(items))
-    .limit(MAX_PER_RUN);
+  // Phase 1 stays wholly inside the slim partial index. Without the explicit
+  // pin, stat-less Turso has previously chosen an unrelated covering index and
+  // scanned tens of thousands of rows just to discover an empty queue.
+  const candidateRows = await client.all<{ id: number }>(sql`
+    SELECT ${items.id} AS id
+    FROM ${items} INDEXED BY items_score_backfill_pending_idx
+    WHERE ${scoreBackfillPendingSql(items)}
+    LIMIT ${MAX_PER_RUN}
+  `);
+  const candidateIds = candidateRows.map(({ id }) => Number(id));
+  const pending: ScoreBackfillItem[] = candidateIds.length
+    ? await client
+        .select(scoreBackfillItemFields)
+        .from(items)
+        .where(inArray(items.id, candidateIds))
+    : [];
 
   if (pending.length === 0) {
     return {
@@ -141,7 +175,7 @@ export async function runScoreBackfill(): Promise<ScoreBackfillReport> {
 }
 
 async function scoreItem(args: {
-  item: typeof items.$inferSelect;
+  item: ScoreBackfillItem;
   policyContent: string;
   tags: {
     capabilities: [];

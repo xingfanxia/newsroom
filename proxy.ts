@@ -12,6 +12,7 @@ const SNAPSHOT_PAGE_PATH =
   /^\/(?:zh|en)(?:\/(?:all|curated|sources|podcasts(?:\/\d+)?|x-monitor|daily(?:\/\d{4}-\d{2}-\d{2})?|agents))?\/?$/;
 
 const intl = createMiddleware(routing);
+const pointerAvailabilityChecks = new Map<string, Promise<boolean>>();
 
 /**
  * Next 16 proxy (formerly `middleware`). Two concerns:
@@ -71,17 +72,33 @@ export function isSnapshotBackedPublicPagePath(pathname: string): boolean {
 async function publicSnapshotPointerIsAvailable(): Promise<boolean> {
   const baseUrl = process.env.R2_PUBLIC_BASE_URL?.trim();
   if (!baseUrl) return false;
+  const pending = pointerAvailabilityChecks.get(baseUrl);
+  if (pending) return pending;
+
+  const check = (async () => {
+    try {
+      const pointerUrl = new URL(
+        CURRENT_POINTER_KEY,
+        `${baseUrl.replace(/\/$/, "")}/`,
+      );
+      const response = await fetch(pointerUrl, {
+        method: "HEAD",
+        redirect: "error",
+        cache: "no-store",
+        signal: AbortSignal.timeout(5_000),
+      });
+      return response.status === 200;
+    } catch {
+      return false;
+    }
+  })();
+  pointerAvailabilityChecks.set(baseUrl, check);
   try {
-    const pointerUrl = new URL(CURRENT_POINTER_KEY, `${baseUrl.replace(/\/$/, "")}/`);
-    const response = await fetch(pointerUrl, {
-      method: "HEAD",
-      redirect: "error",
-      cache: "no-store",
-      signal: AbortSignal.timeout(5_000),
-    });
-    return response.status === 200;
-  } catch {
-    return false;
+    return await check;
+  } finally {
+    if (pointerAvailabilityChecks.get(baseUrl) === check) {
+      pointerAvailabilityChecks.delete(baseUrl);
+    }
   }
 }
 

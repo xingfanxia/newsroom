@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   buildPublicLexicalArtifactValues,
   PUBLIC_LEXICAL_SHARD_COUNT,
+  parsePublicLexicalShard,
   publicLexicalRowsFromState,
   publicLexicalShardLogicalName,
   queryPublicLexicalRows,
@@ -97,6 +98,43 @@ describe("compact public lexical search artifacts", () => {
           { nowMs: PARITY_NOW_MS },
         ).total,
       );
+    expect(artifacts.every(({ value }) => value.schemaVersion === 2)).toBeTrue();
+    expect(artifacts.flatMap(({ value }) => value.rows).every((row) => row.length === 8))
+      .toBeTrue();
+  });
+
+  test("reads legacy full-text shards as the compact v2 row shape", () => {
+    const logicalName = publicLexicalShardLogicalName(1);
+    const legacy = {
+      schemaVersion: 1,
+      kind: "public-lexical-shard",
+      bucket: 1,
+      rows: [[
+        1,
+        "2026-07-14T00:00:00.000Z",
+        7,
+        "all",
+        "legacy-source",
+        "media",
+        "rss",
+        "Legacy title",
+        null,
+        null,
+        `prefix ${"x".repeat(100)} late summary term`,
+        null,
+        null,
+        null,
+      ]],
+    };
+
+    const parsed = parsePublicLexicalShard(
+      logicalName,
+      new TextEncoder().encode(JSON.stringify(legacy)),
+    );
+    expect(parsed.schemaVersion).toBe(2);
+    expect(parsed.rows[0]).toHaveLength(8);
+    expect(parsed.rows[0]?.[7]).toContain("Legacy title");
+    expect(parsed.rows[0]?.[7].join("")).not.toContain("late summary term");
   });
 
   test("migrates within the write cap and changes only the affected item bucket", async () => {

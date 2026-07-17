@@ -2,6 +2,10 @@ import {
   CURRENT_POINTER_KEY,
   parseObjectKey,
 } from "@/lib/public-content/paths";
+import {
+  readResponseBytes,
+  ResponseBodyTooLargeError,
+} from "@/lib/http/response-body";
 
 const RELEASE_MANIFEST_KEY =
   /^newsroom\/v1\/releases\/[a-z0-9][a-z0-9._-]{0,127}\/manifest\.json$/;
@@ -99,16 +103,14 @@ export class PublicSnapshotHttpFetcher {
       if (response.status !== 200) {
         throw new PublicSnapshotFetchError("status", response.status >= 500);
       }
-      const declaredLength = Number(response.headers.get("content-length"));
-      if (
-        Number.isFinite(declaredLength) &&
-        declaredLength > options.maxBytes
-      ) {
-        throw new PublicSnapshotFetchError("size");
-      }
-      const bytes = new Uint8Array(await response.arrayBuffer());
-      if (bytes.byteLength > options.maxBytes) {
-        throw new PublicSnapshotFetchError("size");
+      let bytes: Uint8Array;
+      try {
+        bytes = await readResponseBytes(response, options.maxBytes);
+      } catch (error) {
+        if (error instanceof ResponseBodyTooLargeError) {
+          throw new PublicSnapshotFetchError("size");
+        }
+        throw error;
       }
       return {
         bytes,

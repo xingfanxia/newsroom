@@ -37,6 +37,7 @@ import {
 import { publicPageItemDetailFromIndex } from "@/lib/public-content/page-data";
 import type { PublicReleaseReadScope } from "@/lib/public-content/reader/types";
 import { DEFAULT_PODCAST_TIER } from "@/lib/feed/podcast-filters";
+import { capFeedPageItems } from "@/lib/feed/page-query";
 import type { AppLocale } from "@/lib/types";
 
 const cacheOptions = {
@@ -117,7 +118,9 @@ async function readAllPageModelUncached(
       scope,
       materializedPageLogicalName.all(input.locale),
     );
-    if (isDefaultAllInput(input)) return published;
+    if (isDefaultAllInput(input)) {
+      return { ...published, stories: capFeedPageItems(published.stories) };
+    }
     const result = await readDirectPublicFeedStories(
       scope,
       allPageFeedQuery(input),
@@ -150,7 +153,9 @@ async function readCuratedPageModelUncached(
       scope,
       materializedPageLogicalName.curated(input.locale),
     );
-    if (isDefaultCuratedInput(input)) return published;
+    if (isDefaultCuratedInput(input)) {
+      return { ...published, stories: capFeedPageItems(published.stories) };
+    }
     const result = await readDirectPublicFeedStories(
       scope,
       curatedPageFeedQuery(input),
@@ -201,7 +206,13 @@ async function readPodcastsPageModelUncached(
       scope,
       materializedPageLogicalName.podcasts(input.locale),
     );
-    if (!input.source && input.tier === DEFAULT_PODCAST_TIER) return published;
+    if (
+      !input.source &&
+      input.tier === DEFAULT_PODCAST_TIER &&
+      input.offset === 0
+    ) {
+      return { ...published, stories: capFeedPageItems(published.stories) };
+    }
     const activeChannel = activePodcastChannel(published.channels, input.source);
     const result = await readDirectPublicFeedStories(
       scope,
@@ -319,7 +330,9 @@ async function readXMonitorPageModelUncached(
       scope,
       materializedPageLogicalName.xMonitor(input.locale),
     );
-    if (!input.handle) return published;
+    if (!input.handle && input.offset === 0) {
+      return { ...published, stories: capFeedPageItems(published.stories) };
+    }
     const activeIsValid = isActiveXHandle(published.handles, input.handle);
     const result = await readDirectPublicFeedStories(
       scope,

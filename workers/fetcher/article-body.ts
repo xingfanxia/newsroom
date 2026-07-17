@@ -26,11 +26,16 @@ import { db } from "@/db/client";
 import { items } from "@/db/schema";
 import { isYouTubeVideoUrl } from "@/lib/urls/media";
 import { articleBodyFetchUrlSql } from "@/lib/urls/media-sql";
+import {
+  readResponseText,
+  ResponseBodyTooLargeError,
+} from "@/lib/http/response-body";
 
 const JINA_BASE = "https://r.jina.ai/";
 const TIMEOUT_MS = 20_000;
 const MAX_BODY_CHARS = 12_000; // enough for ~2500 words, fits in enrich + commentary budgets
 const MIN_BODY_CHARS = 400; // below this, treat as a bad fetch and keep null
+const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 // Jina's anonymous tier 402-rate-limits above ~1 in-flight call. With a
 // valid Bearer key (JINA_API_KEY, 65-char `jina_…`) we fan out to 6. If
 // the key is missing or malformed we drop to a 1-concurrent + 1.2s-gap
@@ -206,24 +211,32 @@ async function fetchJinaMarkdown(url: string): Promise<JinaResult> {
     // (ironically named "Payment Required"; it's a soft rate limit). 429 is
     // the more explicit version. Both should retry, not mark as failed.
     if (res.status === 402 || res.status === 429) {
+      await res.body?.cancel();
       if (process.env.DEBUG_JINA) {
         console.warn(`[jina] ${res.status} (rate-limited) for ${url}`);
       }
       return { kind: "rate_limited" };
     }
     if (!res.ok) {
+      await res.body?.cancel();
       if (process.env.DEBUG_JINA) {
         console.warn(`[jina] ${res.status} for ${url}`);
       }
       return { kind: "error", reason: `http_${res.status}` };
     }
-    const text = await res.text();
+    const text = await readResponseText(res, MAX_RESPONSE_BYTES);
     return { kind: "ok", markdown: text.trim() };
   } catch (err) {
     if (process.env.DEBUG_JINA) {
       console.warn(`[jina] error for ${url}:`, err instanceof Error ? err.message : err);
     }
-    return { kind: "error", reason: "fetch_error" };
+    return {
+      kind: "error",
+      reason:
+        err instanceof ResponseBodyTooLargeError
+          ? "response_too_large"
+          : "fetch_error",
+    };
   } finally {
     clearTimeout(timer);
   }

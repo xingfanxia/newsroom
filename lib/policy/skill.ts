@@ -25,6 +25,7 @@ export type ActiveSkill = {
 };
 
 const SKILLS_DIR = "modules/feed/runtime/policy/skills";
+const SKILL_VERSION_HISTORY_LIMIT = 50;
 
 function skillFilePath(name: string): string {
   return path.join(process.cwd(), SKILLS_DIR, `${name}.skill.md`);
@@ -105,7 +106,8 @@ export async function listSkillVersions(name: string) {
     })
     .from(policyVersions)
     .where(eq(policyVersions.skillName, name))
-    .orderBy(desc(policyVersions.version));
+    .orderBy(desc(policyVersions.version))
+    .limit(SKILL_VERSION_HISTORY_LIMIT);
 }
 
 /**

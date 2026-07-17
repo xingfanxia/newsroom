@@ -707,13 +707,22 @@ function publicItemFromRow(row: Row) {
 
 function publicEventFromRows(row: Row, memberRows: readonly Row[]) {
   const id = numeric(row.id, "event id");
-  const members = memberRows.map((member) => ({
-    id: numeric(member.id, "event member id"),
-    enrichedAt: timestamp(member.enriched_at, "member enriched_at"),
-    importance: nullableNumeric(member.importance, "member importance"),
-    tier: nullableText(member.tier, "member tier"),
-    intendedPublic: true,
-  }));
+  const members = memberRows
+    .map((member) => ({
+      id: numeric(member.id, "event member id"),
+      enrichedAt: timestamp(member.enriched_at, "member enriched_at"),
+      importance: nullableNumeric(member.importance, "member importance"),
+      tier: nullableText(member.tier, "member tier"),
+      publishedAt: numeric(member.published_at, "member published_at"),
+      intendedPublic: true,
+    }))
+    .sort(
+      (left, right) =>
+        (right.importance ?? Number.NEGATIVE_INFINITY) -
+          (left.importance ?? Number.NEGATIVE_INFINITY) ||
+        left.publishedAt - right.publishedAt ||
+        left.id - right.id,
+    );
   const leadItemId = numeric(row.lead_item_id, "event lead id");
   const lead = members.find((member) => member.id === leadItemId);
   const tier = nullableText(row.event_tier, "event tier") ?? lead?.tier ?? null;

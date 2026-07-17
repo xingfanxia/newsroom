@@ -41,6 +41,7 @@ state/newsletters/<00-7f> up to 128 newsletter shards
 state/sources             singleton source catalog
 state/policies            singleton policy history
 views/*                   materialized page and feed artifacts
+search/lexical/<00-1f>    compact lexical metadata/text-excerpt shards
 ```
 
 `state/items/<00-7f>` holds the slim canonical records, while each
@@ -63,6 +64,12 @@ nullable field. Podcast detail materialization resolves the same split body
 before publishing its view buckets. `/api/public/sources` reads and validates
 the required `state/sources` singleton directly while preserving the
 active-to-previous-to-last-known-good fallback ladder.
+
+Archive page views materialize only the first 50 cards; older cards are read
+from bounded feed segments when the user paginates. Lexical search reads the
+compact v2 shard family, selects IDs, and hydrates only matching item/event
+shards. The v2 reader remains backward-compatible with v1 lexical artifacts so
+an application deploy can safely precede the next pointer publication.
 
 ## Environment and credentials
 

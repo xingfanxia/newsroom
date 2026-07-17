@@ -36,6 +36,13 @@ describe("jsonBodyErrorResponse", () => {
       error: "invalid_json",
     });
   });
+
+  test("uses 413 for oversized bodies", async () => {
+    const res = jsonBodyErrorResponse("plain", "payload_too_large");
+
+    expect(res.status).toBe(413);
+    expect(await res.json()).toEqual({ error: "payload_too_large" });
+  });
 });
 
 describe("parseJsonRequestBody", () => {
@@ -93,6 +100,23 @@ describe("parseJsonRequestBody", () => {
       expect(await parsed.response.json()).toEqual({
         ok: false,
         error: "invalid_body",
+      });
+    }
+  });
+
+  test("rejects JSON that exceeds the endpoint byte budget", async () => {
+    const parsed = await parseJsonRequestBody(
+      jsonRequest(JSON.stringify({ id: 1, name: "too large" })),
+      bodySchema,
+      { envelope: "ok", maxBytes: 16 },
+    );
+
+    expect(parsed.ok).toBe(false);
+    if (!parsed.ok) {
+      expect(parsed.response.status).toBe(413);
+      expect(await parsed.response.json()).toEqual({
+        ok: false,
+        error: "payload_too_large",
       });
     }
   });

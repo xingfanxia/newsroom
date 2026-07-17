@@ -9,12 +9,17 @@
  * Roundtrip from response → next request only.
  */
 import { PUBLIC_SITE_URL } from "@/lib/site";
+import {
+  readResponseJson,
+  ResponseBodyTooLargeError,
+} from "@/lib/http/response-body";
 import type { FeedItem } from "@/workers/fetcher/rss";
 
 const DEFAULT_BASE_URL = "https://aihot.virxact.com";
 const DEFAULT_USER_AGENT =
   `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 ax-radar/1.0 (+${PUBLIC_SITE_URL})`;
 const DEFAULT_TIMEOUT_MS = 15_000;
+const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 const PAGE_DELAY_MS = 80;
 
 const ITEM_CATEGORIES = [
@@ -129,15 +134,21 @@ async function aihotFetch<T>(
       err instanceof Error ? err.message : String(err),
     );
   }
-  clearTimeout(timer);
 
   let body: unknown = null;
-  if (res.status !== 204) {
-    try {
-      body = await res.json();
-    } catch {
-      // Non-JSON body — leave null and fall through to status mapping.
+  try {
+    if (res.status !== 204) {
+      try {
+        body = await readResponseJson<unknown>(res, MAX_RESPONSE_BYTES);
+      } catch (error) {
+        if (error instanceof ResponseBodyTooLargeError) {
+          throw new AihotError("parse_error", "aihot response too large");
+        }
+        // Non-JSON body — leave null and fall through to status mapping.
+      }
     }
+  } finally {
+    clearTimeout(timer);
   }
 
   const errMsg =
