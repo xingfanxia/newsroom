@@ -14,7 +14,7 @@ Read these first for current architecture and operational behavior:
 | Architecture map and ownership boundaries | [`architecture/overview.md`](./architecture/overview.md) |
 | Ingestion, enrich, scoring, clustering, cron behavior, AI HOT runtime behavior | [`architecture/ingestion.md`](./architecture/ingestion.md) |
 | Public snapshot publishing, cutover, rollback, and evidence runbook | [`operations/public-snapshots.md`](./operations/public-snapshots.md) |
-| Route latency, payload, query, and upstream-fetch budgets | [`operations/route-performance.md`](./operations/route-performance.md) |
+| Route budgets, new endpoint runbook and maintenance | [`operations/route-performance.md`](./operations/route-performance.md) |
 | Agent/API/MCP surface | [`agent-access/README.md`](./agent-access/README.md) |
 | Testing and local verification strategy | [`testing/strategy.md`](./testing/strategy.md) |
 | Security notes (RLS doc is superseded — DB is Turso token-only since 2026-07-11) | [`security/2026-04-28-rls-hardening.md`](./security/2026-04-28-rls-hardening.md) |

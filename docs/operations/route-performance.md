@@ -20,7 +20,11 @@ response-body consumption, not only until headers arrive.
 
 ## Entrypoint coverage
 
-The audit covers all 73 App Router entrypoints: 19 pages and 54 route handlers.
+The dated 2026-07-16 audit covered 73 App Router entrypoints: 19 pages and 54
+route handlers. The current page/GET/HEAD count is code-owned by
+`lib/public-content/entrypoints.ts`; do not copy the dated count forward.
+`tests/tooling/public-entrypoints-inventory.test.ts` fails closed when a page or
+read route is added without a classification.
 
 | Family | Entrypoints / ownership | Bound |
 |---|---|---|
@@ -37,6 +41,101 @@ recipients) are intentionally complete sets. Their rows are narrow and their
 cardinality is controlled by operator/user actions. Newsletter delivery is the
 only intentionally cardinality-proportional route; Resend chunks and the send
 ledger make the external work bounded per request chunk and idempotent.
+
+## New endpoint / route runbook
+
+Use this checklist for every new page or route handler and whenever an existing
+route gains a method, data source, or materially larger response. The author of
+the route owns the checklist and its evidence through the first deployment.
+
+### 1. Classify the surface
+
+- If the source is a page, `GET`, or `HEAD`, add it to
+  `lib/public-content/entrypoints.ts` with its exact app path, request pathname,
+  source, and access class; add a build-module override only when the derived
+  path is not correct. Update the frozen totals and access-class counts in
+  `tests/tooling/public-entrypoints-inventory.test.ts`. Source and build
+  discovery reject an unclassified reader.
+- Choose `snapshot-only` for anonymous dynamic reads, `static-public` for
+  generated/static content, `private-authenticated` for session or bearer
+  reads, and `operator-authenticated` for admin/cron operations.
+- A POST-only route is intentionally absent from the GET/HEAD serving
+  inventory. It still needs an explicit access class in its route-family test,
+  bounded input and work, and an update to the family table above if it creates
+  a new family.
+
+### 2. Declare the contract before implementation
+
+Copy this table into the change description and replace every value. `N/A` is
+acceptable only with a reason; a mutation still needs an end-to-end timeout.
+
+| Field | Required decision |
+|---|---|
+| Route / methods | Exact pathname, methods, and page/API/cron family |
+| Owner / access class | Owning route family and one of the four access classes |
+| Data source | R2 artifact(s), static bundle, Turso query, or named upstream |
+| Query / fan-out bound | Limit, page size, batch size, shard count, or named small-cardinality invariant |
+| Cold target | Budget from the table above or a stricter route-specific target |
+| Warm target | Budget from the table above or a stricter route-specific target |
+| Decoded response cap | Maximum bytes returned to the caller |
+| Upstream-fetch cap | Maximum decoded bytes per upstream response and maximum fetch count |
+| Cache policy | Key, scope, TTL/revalidation, and invalidation owner |
+| Auth / side effects | Authentication, authorization, rate limit, idempotency, and write behavior |
+| Failure contract | Timeout, controlled status/error body, and whether stale data is allowed |
+| Rollback condition | Measurable breach that reverts or disables the route |
+
+### 3. Design the smallest cold read
+
+- Anonymous dynamic routes are R2-only with no Turso fallback. The initial
+  screen reads a materialized first page; item detail reads one ID shard; event
+  members read only shards hit by the member index; search reads the compact
+  lexical index and hydrates only matched item shards. Do not load the full
+  historical corpus before serving the first response.
+- Admin routes may query Turso directly and must not wait on public snapshot
+  state. Use narrow projections, aggregate/covering indexes, one batch for
+  independent queries, and concurrent chrome/data reads where dependencies
+  allow it.
+- Lists require a limit or cursor. Cap search text, offsets, IDs, batch size,
+  shard fan-out, request bodies, upstream bodies, and returned error details.
+  Avoid N+1 reads by batching IDs and hydrating only the selected page/hits.
+- A new R2 format needs a version/feature marker, compatibility decision, and
+  publisher verification before readers depend on it.
+
+### 4. Verify before merge
+
+Run the smallest route-family tests first, then the applicable boundary gate:
+
+```sh
+bun test tests/tooling/public-entrypoints-inventory.test.ts
+bun test tests/docs/route-performance-runbook.test.ts
+bun run verify:public-boundary
+bun run verify
+```
+
+`verify:public-boundary` is required for anonymous/public snapshot changes.
+Run `bun run verify` once on the final relevant diff for a broad change or
+release gate. For a narrow route change, add or update a focused test covering
+auth, input/query limits, response projection, failure behavior, and data-source
+ownership.
+
+### 5. Measure and ship
+
+For safe reads, exercise preview first and then the deployed route with one
+first-request sample followed by two immediate warm samples. Record status,
+decoded response bytes, total time, cache headers/state, deployment commit, data
+source, and query/fan-out. Treat a first-request budget breach or two
+consecutive warm samples over budget as a regression that needs remediation or
+an explicitly documented exception before release.
+
+Do not invoke a production mutation or cron merely to measure it. Verify writes
+with static/focused tests and an isolated preview or fixture unless the operator
+has separately authorized the production action. After an R2 reader change,
+confirm the deployed release has the required marker and artifacts before
+judging route latency.
+
+The route is done only when it is classified, bounded, focused-test covered,
+measured where safe, documented in the correct family, and has a rollback
+condition.
 
 ## 2026-07-16 baseline and changes
 
@@ -92,3 +191,34 @@ The release gate is:
    writes merely to measure latency.
 4. Confirm the new R2 release contains compact lexical v2 and 50-card
    materialized views before judging production page results.
+
+## Maintenance
+
+The route author owns new-route evidence; the route-family maintainer owns the
+budget after handoff; the release operator owns deployed safe-read probes. Use
+the following cadence so the runbook remains a live contract.
+
+| When | Required maintenance | Durable evidence |
+|---|---|---|
+| Every route change | Re-run inventory and focused tests; update classification, family bounds, budget contract, and frozen inventory counts when applicable | Test output plus change description |
+| After every deployment that changes a route | Run the first/warm safe-read samples, compare to its declared contract, and confirm the deployed commit/artifact marker | Deployment receipt or a dated report |
+| Monthly | Sample one representative from each active read family, review response/artifact sizes and upstream/query fan-out, and remove or revise stale exceptions | Summary under `docs/reports/route-performance/` |
+| Triggered re-audit | Re-audit the affected family and its shared artifacts/queries; do not wait for the monthly check | Dated regression report linked from this document |
+
+A triggered re-audit is required when any of these occurs:
+
+- a first-request sample breaches its cold target or two consecutive warm
+  samples breach its warm target;
+- corpus size, traffic, query cardinality, or an artifact/response size doubles
+  from its last audited baseline;
+- a response exceeds its declared cap, an immutable artifact approaches 1 MiB,
+  or observability/billing reports an egress or function-duration regression;
+- a schema, index, snapshot layout, cache rule, auth boundary, or upstream API
+  changes; or
+- a list/fan-out bound is raised or a new fallback/data source is introduced.
+
+Keep current budgets and the latest accepted summary in this document. Put raw
+probe output and dated investigations under `docs/reports/route-performance/`
+instead of growing the runbook indefinitely. Current route membership and
+counts always come from runtime source plus the entrypoint inventory, never from
+an old audit paragraph.

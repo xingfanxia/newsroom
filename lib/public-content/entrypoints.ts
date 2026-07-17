@@ -5,6 +5,10 @@
  * route groups and parallel slots; `pathname` is the request path after Next's
  * app-path normalization. Keeping both prevents two distinct bundles that
  * render the same URL from being collapsed by verification tooling.
+ *
+ * New page/read-route checklist and maintenance contract:
+ * `docs/operations/route-performance.md#new-endpoint--route-runbook`.
+ * POST-only modules are outside this GET/HEAD inventory by design.
  */
 
 type EntrypointAccess =
