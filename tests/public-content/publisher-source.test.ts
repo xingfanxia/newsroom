@@ -42,7 +42,7 @@ const FULL_SCHEMA = [
     canonical_title_zh TEXT, canonical_title_en TEXT,
     editor_note_zh TEXT, editor_note_en TEXT,
     editor_analysis_zh TEXT, editor_analysis_en TEXT,
-    importance INTEGER NOT NULL, event_tier TEXT, hkr TEXT,
+    importance INTEGER, event_tier TEXT, hkr TEXT,
     no_content INTEGER NOT NULL
   )`,
   `CREATE TABLE items (
@@ -328,6 +328,44 @@ describe("bounded publisher source", () => {
       storyCount: 2,
       itemIds: [1, 2],
     });
+  });
+
+  test("keeps members standalone while event importance is pending", async () => {
+    const client = await database();
+    await seedPublicData(client);
+    const source = new LibsqlPublicContentSource(client, { now: () => NOW });
+    const initial = await source.readBatch(0);
+    const firstState = patchCanonicalPublicState(
+      EMPTY_STATE,
+      initial.changes,
+    ).state;
+
+    await client.batch(
+      [
+        `UPDATE clusters SET importance = NULL WHERE id = 10`,
+        `INSERT INTO public_content_outbox (entity_type, entity_key)
+         VALUES ('event', '10')`,
+      ],
+      "write",
+    );
+    const pending = await source.readBatch(initial.toWatermark);
+    const pendingState = patchCanonicalPublicState(
+      firstState,
+      pending.changes,
+    ).state;
+
+    expect(
+      pending.changes.find(
+        (change) =>
+          change.entityType === "event" && change.entityKey === "10",
+      )?.value,
+    ).toBeNull();
+    expect(
+      pendingState.items
+        .filter(({ id }) => id === 1 || id === 2)
+        .map(({ eventId }) => eventId),
+    ).toEqual([null, null]);
+    expect(pendingState.events.map(({ id }) => id)).toEqual([11]);
   });
 
   test("replaces a policy by logical key instead of accumulating versions", async () => {
