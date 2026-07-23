@@ -288,8 +288,10 @@ the full prod sequence ("全部自己 merge deploy apply ddl"). Executed:
    `clusters_multimember_idx` (`db:optimize`, all 12 PLAN_CHECKS PASS on real prod
    data confirming structural index selection). Verified live via PRAGMA/sqlite_master.
 3. **Digest opt-out** — targeted `set-digest-clustering-optout-20260713.ts --apply`
-   (NOT `db:seed`, to avoid clobbering manual `curated` prod drift). ai-chatgroup-daily
-   + aihot-selected → `clustering_opt_out=1`.
+   (NOT `db:seed`, to avoid clobbering manual `curated` prod drift).
+   `ai-chatgroup-daily` remains `clustering_opt_out=1`; `aihot-selected`
+   individual article rows are corrected back to `0` by
+   `scripts/migrations/enable-aihot-event-clustering-20260723.ts`.
 4. **#42 merged** (merge commit `feda34a`, `ax/cluster-recall-precision`) → deployed OK.
 5. **#43 merged** (merge commit `ce62ede`, `ax/w7-read-budget`) → prod deploy Ready,
    aliased `news.ax0x.ai`, sfo1. Prod health: `/en` 200.
@@ -391,9 +393,11 @@ commits `0528d57` + review-fix `3407978`):
   member (kills single-link chaining). Pure decision extracted to
   `resolveJoinOutcome()` (unit-tested; the "strong clustered match always wins"
   invariant is encoded in the function, not just the caller's scan-skip).
-- **W5.2 digest opt-out** — `sources.clustering_opt_out` flags 群聊日报 / AI HOT;
+- **W5.2 digest opt-out** — `sources.clustering_opt_out` flags rows that are
+  themselves multi-topic digests (currently 群聊日报);
   `notClusteringOptedOut()` excludes them from every Stage A / A.5 candidate +
-  neighbor query. They render as standalone cards, never join/bridge a cluster.
+  neighbor query. AI HOT `mode=selected` is a collection of individual articles
+  and participates in clustering (corrected 2026-07-23).
 - **W5.3 structural no_content** — `clusters.no_content` stamped by the Stage-C
   LLM is now the PRIMARY merge-skip signal (LIKE list kept as transitional
   fallback).

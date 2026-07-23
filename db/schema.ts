@@ -196,11 +196,11 @@ export const sources = sqliteTable(
      *  need this flag; newsletters/digests worth surfacing do. */
     curated: integer("curated", { mode: "boolean" }).notNull().default(false),
     /** Opt this source's items OUT of event clustering entirely (Stage A/A.5).
-     *  For multi-topic *curation* feeds (群聊日报 / AI HOT) that are digests,
-     *  not single-event coverage: they glue unrelated events together via
-     *  single-link chaining and inflate the coverage boost. Opted-out items
-     *  still render as standalone feed cards — they just never join or bridge
-     *  a cluster. (W5.2, 2026-07-12 audit.) */
+     *  Reserved for rows that are themselves multi-topic digests, such as
+     *  群聊日报. A curated feed of individual article rows (for example AI
+     *  HOT's mode=selected endpoint) must stay eligible: curation describes
+     *  source quality, not event cardinality. Opted-out items still render as
+     *  standalone feed cards. (W5.2, corrected 2026-07-23.) */
     clusteringOptOut: integer("clustering_opt_out", { mode: "boolean" })
       .notNull()
       .default(false),

@@ -19,8 +19,13 @@ const BASE_SCHEMA = [
     id TEXT PRIMARY KEY, name_en TEXT NOT NULL, name_zh TEXT NOT NULL,
     url TEXT NOT NULL
   )`,
+  `CREATE TABLE clusters (
+    id INTEGER PRIMARY KEY, lead_item_id INTEGER NOT NULL,
+    canonical_title_zh TEXT, summary_zh TEXT, editor_analysis_zh TEXT,
+    importance INTEGER, event_tier TEXT
+  )`,
   `CREATE TABLE items (
-    id INTEGER PRIMARY KEY, source_id TEXT NOT NULL,
+    id INTEGER PRIMARY KEY, source_id TEXT NOT NULL, cluster_id INTEGER,
     title TEXT NOT NULL, title_zh TEXT, summary_zh TEXT,
     editor_analysis_zh TEXT, url TEXT NOT NULL,
     tier TEXT, importance INTEGER,
@@ -242,6 +247,57 @@ describe("runNewsletterSend", () => {
     expect(digest?.sent).toBe(1);
     expect(featured?.status).toBe("skipped");
     expect(featured?.reason).toBe("no-featured");
+  });
+
+  test("精选 renders one canonical story when any cluster member is in the window", async () => {
+    await insertColumn();
+    await client.execute(
+      `INSERT INTO sources (id, name_en, name_zh, url)
+       VALUES ('src', 'The Verge', '边缘社', 'https://theverge.com')`,
+    );
+    await client.execute({
+      sql: `INSERT INTO clusters
+        (id, lead_item_id, canonical_title_zh, summary_zh,
+         editor_analysis_zh, importance, event_tier)
+        VALUES (10, 10, '同一事件的规范标题', '事件级摘要',
+                '事件级锐评', 97, 'featured')`,
+    });
+    await client.execute({
+      sql: `INSERT INTO items
+        (id, source_id, cluster_id, title, title_zh, summary_zh,
+         editor_analysis_zh, url, tier, importance, published_at,
+         created_at, enriched_at)
+        VALUES
+        (10, 'src', 10, 'Old lead', '旧 lead 标题', '旧摘要', '旧锐评',
+         'https://example.com/lead', 'featured', 90, ?, ?, ?),
+        (11, 'src', 10, 'Recent member', '重复成员标题', '成员摘要', '成员锐评',
+         'https://example.com/member', 'p1', 89, ?, ?, ?)`,
+      args: [
+        WINDOW_START.getTime() - 1000,
+        WINDOW_START.getTime() - 1000,
+        WINDOW_START.getTime() - 1000,
+        WINDOW_START.getTime() + 1000,
+        WINDOW_START.getTime() + 1000,
+        WINDOW_START.getTime() + 1000,
+      ],
+    });
+    await activateSubscriber("featured@example.com", {
+      digest: false,
+      featured: true,
+    });
+
+    const report = await run();
+    expect(
+      report.results.find((result) => result.kind === "daily_featured")?.sent,
+    ).toBe(1);
+    expect(batches).toHaveLength(1);
+    const email = batches[0]!.emails[0]!;
+    expect(email.html).toContain("同一事件的规范标题");
+    expect(email.html).toContain("事件级摘要");
+    expect(email.html).toContain("事件级锐评");
+    expect(email.html).not.toContain("旧 lead 标题");
+    expect(email.html).not.toContain("重复成员标题");
+    expect(email.html).not.toContain("https://example.com/member");
   });
 
   test("no active subscribers reports no-subscribers", async () => {

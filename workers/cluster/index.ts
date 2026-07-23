@@ -1,4 +1,4 @@
-import { sql, and, inArray, isNull, isNotNull } from "drizzle-orm";
+import { sql, and, desc, inArray, isNull, isNotNull } from "drizzle-orm";
 import { db, retryTransaction } from "@/db/client";
 import { items, clusters } from "@/db/schema";
 import { visibleTierInSql } from "@/lib/items/tier-sql";
@@ -128,6 +128,10 @@ export async function runClusterBatch(): Promise<ClusterReport> {
         notClusteringOptedOut("items"),
       ),
     )
+    // A newly-enabled source can contribute a historical backlog. Process the
+    // newest events first so current featured/newsletter output converges on
+    // the next tick while older rows drain behind it.
+    .orderBy(desc(items.publishedAt))
     .limit(MAX_PER_RUN);
 
   if (pending.length === 0) {

@@ -707,9 +707,9 @@ export const sourceCatalog: Source[] = [
     enabled: true,
     curated: true,
     neverExclude: true,
-    // Pre-curated multi-topic digest pool — opt out of clustering (W5.2). Its
-    // items span many events; clustering them bridged unrelated stories.
-    clusteringOptOut: true,
+    // mode=selected returns one article/event per row. Although the collection
+    // is curated and spans many topics, each row must participate in event
+    // clustering so cross-source coverage renders once.
     notes:
       "Hourly pull of AI HOT's mode=selected pool. Pre-curated by 卡兹克; our scorer should not demote below 'all'. Daily-report path is separate (workers/newsletter/aihot-daily.ts).",
   },
