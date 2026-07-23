@@ -1,13 +1,11 @@
 # Public Snapshot Operations
 
-Status: implementation and local verification are complete on the R2
-public-read feature branch. The Cloudflare R2 bucket `newsroom-public`, custom
-domain `content.ax0x.ai`, scoped `/newsroom/` cache rule, production outbox
-migration, first release, and real cache proof are complete. Vercel deployment,
-traffic replay, cutover, rollback, and the stability windows remain in progress
-under AX's explicit production authorization.
-Those remaining deployment, replay, rollback, and observation steps have not run
-yet; the receipts below distinguish completed work from pending gates.
+Status: production serves anonymous public reads from R2. On 2026-07-23 an
+incident review found the production pointer stalled at source watermark 1708
+(`publishedAt=2026-07-18T04:57:11.070Z`) while Turso had continued ingesting and
+the outbox had accumulated more than 2,500 rows. The code-level recovery is
+verified locally against the real backlog, but deployment and production
+recovery still require explicit authorization.
 
 ## Ownership and invariants
 
@@ -28,6 +26,46 @@ Turso (private source of truth)
   release. If none validates, return controlled 503; never query Turso.
 - The recurring publisher is proportional to outbox changes. The one full
   bootstrap is separately metered and may run exactly once.
+- A large outbox is normal backlog, not an error. Each tick reads at most 500
+  ordered rows and advances to the last row in that page. Never compare the
+  global outbox high-water mark to the per-tick cap.
+- Item changes close over their current event, and newsletter changes retain
+  only item references that satisfy public eligibility. This keeps each
+  incremental release referentially valid even when item/event outbox rows land
+  on opposite sides of a page boundary.
+- A publisher receipt with `status=failed` must make the cron request fail.
+  HTTP 200 is reserved for `succeeded` and `noop`, so Vercel monitoring can
+  detect a stopped pointer.
+
+## 2026-07-23 stalled-pointer incident
+
+The incident was not caused by missing Turso data or a stale Cloudflare cache:
+
+- Turso contained newsletters and items through 2026-07-23.
+- `public_content_outbox` continued growing after watermark 1708.
+- `content.ax0x.ai/newsroom/v1/current.json` itself pointed at the old release;
+  Cloudflare was correctly serving that old source pointer.
+
+Two publisher defects blocked recovery. First, `readBatch` captured the global
+outbox maximum, selected `maxOutboxRows + 1`, and failed whenever total backlog
+exceeded 500 instead of taking a 500-row page. Second, daily newsletters could
+reference items that later had an `excluded` tier, causing canonical-state
+derivation to reject the release for dangling references. Failed receipts were
+returned inside HTTP 200 responses, hiding the incident from the scheduler.
+
+The fixed implementation was exercised read-only against the production Turso
+backlog and the public R2 release. Six consecutive in-memory releases advanced
+`1708 → 2208 → 2708 → 3208 → 3708 → 4208 → 4274`; the next batch was empty.
+The largest batch changed 192 artifacts, below the 500-write limit. This proof
+did not acknowledge the outbox, upload objects, or change the live pointer.
+
+After an authorized deployment, monitor `current.json.sourceWatermark` on each
+scheduled run until it reaches the live outbox high-water mark. Also verify:
+
+1. every cron response is 2xx with receipt status `succeeded` or `noop`;
+2. `/api/public/dailies` exposes the latest generated daily;
+3. `/api/public/feed?curated_only=true` and `tier=featured&view=today` advance;
+4. the outbox drains rather than growing behind a stationary pointer.
 
 ## Release artifact layout
 

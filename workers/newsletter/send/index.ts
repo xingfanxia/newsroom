@@ -8,7 +8,18 @@
  * Cron: 40 5 * * * UTC — 40 min after daily-column generation starts.
  */
 import { createHash } from "node:crypto";
-import { and, desc, eq, gte, inArray, isNotNull, lt } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+  lt,
+  or,
+  sql,
+} from "drizzle-orm";
 import { db } from "@/db/client";
 import * as schema from "@/db/schema";
 import {
@@ -307,34 +318,72 @@ export async function runNewsletterSend(
   });
 
   // ── 精选 body: window's featured/p1 items with 锐评 ──
+  const effectiveTier = sql<string | null>`COALESCE(
+    ${schema.clusters.eventTier},
+    ${schema.items.tier}
+  )`;
+  const effectiveImportance = sql<number | null>`COALESCE(
+    ${schema.clusters.importance},
+    ${schema.items.importance}
+  )`;
+  const clusterHasMemberInWindow = sql<boolean>`EXISTS (
+    SELECT 1
+    FROM items recent_cluster_member
+    WHERE recent_cluster_member.cluster_id = ${schema.items.clusterId}
+      AND recent_cluster_member.enriched_at >= ${column.periodStart}
+      AND recent_cluster_member.enriched_at < ${column.periodEnd}
+  )`;
   const featuredRows = await dbc
     .select({
       id: schema.items.id,
-      title: schema.items.title,
-      titleZh: schema.items.titleZh,
+      title: sql<string>`COALESCE(
+        ${schema.clusters.canonicalTitleZh},
+        ${schema.items.titleZh},
+        ${schema.items.title}
+      )`,
       url: schema.items.url,
-      summaryZh: schema.items.summaryZh,
-      analysisZh: schema.items.editorAnalysisZh,
-      tier: schema.items.tier,
-      importance: schema.items.importance,
+      summaryZh: sql<string | null>`COALESCE(
+        ${schema.clusters.summaryZh},
+        ${schema.items.summaryZh}
+      )`,
+      analysisZh: sql<string | null>`COALESCE(
+        ${schema.clusters.editorAnalysisZh},
+        ${schema.items.editorAnalysisZh}
+      )`,
+      tier: effectiveTier,
+      importance: effectiveImportance,
       sourceNameZh: schema.sources.nameZh,
       sourceNameEn: schema.sources.nameEn,
     })
     .from(schema.items)
+    .leftJoin(
+      schema.clusters,
+      eq(schema.items.clusterId, schema.clusters.id),
+    )
     .leftJoin(schema.sources, eq(schema.items.sourceId, schema.sources.id))
     .where(
       and(
-        inArray(schema.items.tier, ["featured", "p1"]),
-        gte(schema.items.enrichedAt, column.periodStart),
-        lt(schema.items.enrichedAt, column.periodEnd),
+        inArray(effectiveTier, ["featured", "p1"]),
+        or(
+          and(
+            isNull(schema.items.clusterId),
+            gte(schema.items.enrichedAt, column.periodStart),
+            lt(schema.items.enrichedAt, column.periodEnd),
+          ),
+          and(
+            isNotNull(schema.items.clusterId),
+            eq(schema.items.id, schema.clusters.leadItemId),
+            clusterHasMemberInWindow,
+          ),
+        ),
       ),
     )
-    .orderBy(desc(schema.items.importance))
+    .orderBy(desc(effectiveImportance))
     .limit(FEATURED_CAP);
 
   const stories: FeaturedStory[] = featuredRows.map((row) => ({
     id: row.id,
-    title: row.titleZh ?? row.title,
+    title: row.title,
     url: row.url,
     sourceName: row.sourceNameZh ?? row.sourceNameEn,
     tier: row.tier,

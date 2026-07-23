@@ -65,6 +65,7 @@ type OutboxMutation = {
   id: number;
   entityType: PublicEntityType;
   entityKey: string;
+  createdAt: number;
 };
 
 export class LibsqlPublicContentSource implements PublicContentPublisherSource {
@@ -95,14 +96,17 @@ export class LibsqlPublicContentSource implements PublicContentPublisherSource {
       return this.client.execute({ sql, args: [...args] });
     };
 
-    const maximum = await execute(
-      "SELECT COALESCE(MAX(id), 0) AS high_water FROM public_content_outbox",
+    const outboxRows = await execute(
+      `SELECT id, entity_type, entity_key, created_at
+       FROM public_content_outbox
+       WHERE id > ?
+       ORDER BY id
+       LIMIT ?`,
+      [fromWatermark, this.#caps.maxOutboxRows],
     );
-    const toWatermark = Math.max(
-      fromWatermark,
-      numeric(maximum.rows[0]?.high_water, "outbox high water"),
-    );
-    if (toWatermark === fromWatermark) {
+    const candidates = outboxRows.rows.map(parseOutboxMutation);
+    const toWatermark = candidates.at(-1)?.id ?? fromWatermark;
+    if (candidates.length === 0) {
       return sourceBatch({
         fromWatermark,
         toWatermark,
@@ -114,23 +118,6 @@ export class LibsqlPublicContentSource implements PublicContentPublisherSource {
         queryCount,
       });
     }
-
-    const outboxRows = await execute(
-      `SELECT id, entity_type, entity_key
-       FROM public_content_outbox
-       WHERE id > ? AND id <= ?
-       ORDER BY id
-       LIMIT ?`,
-      [fromWatermark, toWatermark, this.#caps.maxOutboxRows + 1],
-    );
-    if (outboxRows.rows.length > this.#caps.maxOutboxRows) {
-      throw new PublisherSourceLimitError(
-        "maxOutboxRows",
-        outboxRows.rows.length,
-        this.#caps.maxOutboxRows,
-      );
-    }
-    const candidates = outboxRows.rows.map(parseOutboxMutation);
     scannedRows += candidates.length;
     const mutations = dedupeMutations(candidates);
     if (mutations.length > this.#caps.maxEntityKeys) {
@@ -143,6 +130,38 @@ export class LibsqlPublicContentSource implements PublicContentPublisherSource {
 
     const byType = groupMutations(mutations);
     const changes = new Map<string, PublicEntityChange>();
+    const dependentEventIds = new Set<number>();
+    const itemMutationTimes = [
+      ...new Set(
+        candidates
+          .filter(({ entityType }) => entityType === "item")
+          .map(({ createdAt }) => createdAt),
+      ),
+    ];
+    if (itemMutationTimes.length > 0) {
+      const causalEvents = await execute(
+        `SELECT DISTINCT entity_key
+         FROM public_content_outbox
+         WHERE entity_type = 'event'
+           AND created_at IN (${placeholders(itemMutationTimes.length)})
+         LIMIT ?`,
+        [...itemMutationTimes, this.#caps.maxDependentRows + 1],
+      );
+      if (causalEvents.rows.length > this.#caps.maxDependentRows) {
+        throw new PublisherSourceLimitError(
+          "maxDependentRows",
+          causalEvents.rows.length,
+          this.#caps.maxDependentRows,
+        );
+      }
+      returnedRows += causalEvents.rows.length;
+      scannedRows += causalEvents.rows.length;
+      for (const row of causalEvents.rows) {
+        dependentEventIds.add(
+          numeric(Number(row.entity_key), "causal event key"),
+        );
+      }
+    }
     for (const mutation of mutations) {
       changes.set(changeId(mutation.entityType, mutation.entityKey), {
         entityType: mutation.entityType,
@@ -162,10 +181,19 @@ export class LibsqlPublicContentSource implements PublicContentPublisherSource {
       );
       returnedRows += result.rows.length;
       scannedRows += itemKeys.length;
-      for (const row of result.rows) setItemChange(changes, row);
+      for (const row of result.rows) {
+        setItemChange(changes, row);
+        const eventId = nullableNumeric(row.cluster_id, "item event id");
+        if (eventId !== null) dependentEventIds.add(eventId);
+      }
     }
 
-    const eventKeys = numericKeys(byType.event, "event");
+    const eventKeys = [
+      ...new Set([
+        ...numericKeys(byType.event, "event"),
+        ...dependentEventIds,
+      ]),
+    ];
     let eventRows: Row[] = [];
     let memberRows: Row[] = [];
     if (eventKeys.length > 0) {
@@ -257,19 +285,89 @@ export class LibsqlPublicContentSource implements PublicContentPublisherSource {
     }
 
     const newsletterKeys = numericKeys(byType.newsletter, "newsletter");
-    if (newsletterKeys.length > 0) {
+    if (newsletterKeys.length > 0 || itemKeys.length > 0) {
+      const newsletterPredicates: string[] = [];
+      const newsletterArgs: InValue[] = [];
+      if (newsletterKeys.length > 0) {
+        newsletterPredicates.push(
+          `n.id IN (${placeholders(newsletterKeys.length)})`,
+        );
+        newsletterArgs.push(...newsletterKeys);
+      }
+      if (itemKeys.length > 0) {
+        newsletterPredicates.push(
+          `(EXISTS (
+              SELECT 1
+              FROM json_each(n.item_ids) referenced
+              WHERE CAST(referenced.value AS INTEGER)
+                IN (${placeholders(itemKeys.length)})
+            )
+            AND NOT EXISTS (
+              SELECT 1
+              FROM public_content_outbox pending_newsletter
+              WHERE pending_newsletter.entity_type = 'newsletter'
+                AND pending_newsletter.entity_key = CAST(n.id AS TEXT)
+                AND pending_newsletter.id > ?
+            ))`,
+        );
+        newsletterArgs.push(...itemKeys, toWatermark);
+      }
       const result = await execute(
-        `SELECT id, kind, locale, period_start, period_end, published_at,
-                story_count, item_ids, headline, overview, highlights,
-                commentary, column_title, column_theme_tag, column_summary_md,
-                column_narrative_md, column_featured_item_ids
-         FROM newsletters WHERE id IN (${placeholders(newsletterKeys.length)})`,
-        newsletterKeys,
+        `SELECT n.id, n.kind, n.locale, n.period_start, n.period_end,
+                n.published_at, n.story_count, n.item_ids, n.headline,
+                n.overview, n.highlights, n.commentary, n.column_title,
+                n.column_theme_tag, n.column_summary_md,
+                n.column_narrative_md, n.column_featured_item_ids
+         FROM newsletters n
+         WHERE ${newsletterPredicates.join(" OR ")}
+         ORDER BY n.id
+         LIMIT ?`,
+        [...newsletterArgs, this.#caps.maxDependentRows + 1],
       );
+      if (result.rows.length > this.#caps.maxDependentRows) {
+        throw new PublisherSourceLimitError(
+          "maxDependentRows",
+          result.rows.length,
+          this.#caps.maxDependentRows,
+        );
+      }
       returnedRows += result.rows.length;
-      scannedRows += newsletterKeys.length;
+      scannedRows += result.rows.length;
+
+      const referencedItemIds = [
+        ...new Set(
+          result.rows.flatMap((row) =>
+            numberArray(row.item_ids, "newsletter item_ids"),
+          ),
+        ),
+      ];
+      if (referencedItemIds.length > this.#caps.maxDependentRows) {
+        throw new PublisherSourceLimitError(
+          "maxDependentRows",
+          referencedItemIds.length,
+          this.#caps.maxDependentRows,
+        );
+      }
+      const eligibleItemIds = new Set<number>();
+      if (referencedItemIds.length > 0) {
+        const eligible = await execute(
+          `SELECT id
+           FROM items
+           WHERE id IN (${placeholders(referencedItemIds.length)})
+             AND enriched_at IS NOT NULL
+             AND importance BETWEEN 0 AND 100
+             AND tier IN ('featured', 'p1', 'all')`,
+          referencedItemIds,
+        );
+        returnedRows += eligible.rows.length;
+        scannedRows += referencedItemIds.length;
+        for (const row of eligible.rows) {
+          eligibleItemIds.add(numeric(row.id, "newsletter item id"));
+        }
+      }
+
       for (const row of result.rows) {
-        const value = publicNewsletterFromRow(row);
+        const value = publicNewsletterFromRow(row, eligibleItemIds);
         changes.set(changeId("newsletter", String(value.id)), {
           entityType: "newsletter",
           entityKey: String(value.id),
@@ -488,16 +586,6 @@ export async function exportCanonicalPublicState(
       value: publicSourceFromRow(row, recentCounts.get(key) ?? 0),
     });
   }
-  for (const row of itemRows) {
-    const value = publicItemFromRow(row);
-    if (value) {
-      changes.push({
-        entityType: "item",
-        entityKey: String(value.id),
-        value,
-      });
-    }
-  }
   const membersByEvent = new Map<number, Row[]>();
   for (const row of itemRows) {
     const eventId = nullableNumeric(row.cluster_id, "member event id");
@@ -506,9 +594,33 @@ export async function exportCanonicalPublicState(
     members.push(row);
     membersByEvent.set(eventId, members);
   }
+  const publicEventsById = new Map(
+    eventRows.map((row) => {
+      const eventId = numeric(row.id, "event id");
+      return [
+        eventId,
+        publicEventFromRows(row, membersByEvent.get(eventId) ?? []),
+      ] as const;
+    }),
+  );
+  for (const row of itemRows) {
+    const eventId = nullableNumeric(row.cluster_id, "item event id");
+    const eventOverride =
+      eventId !== null && publicEventsById.get(eventId) === null
+        ? null
+        : undefined;
+    const value = publicItemFromRow(row, eventOverride);
+    if (value) {
+      changes.push({
+        entityType: "item",
+        entityKey: String(value.id),
+        value,
+      });
+    }
+  }
   for (const row of eventRows) {
     const eventId = numeric(row.id, "event id");
-    const value = publicEventFromRows(row, membersByEvent.get(eventId) ?? []);
+    const value = publicEventsById.get(eventId) ?? null;
     if (value) {
       changes.push({
         entityType: "event",
@@ -517,8 +629,18 @@ export async function exportCanonicalPublicState(
       });
     }
   }
+  const eligibleItemIds = new Set(
+    changes
+      .filter(
+        (
+          change,
+        ): change is Extract<PublicEntityChange, { entityType: "item" }> =>
+          change.entityType === "item" && change.value !== null,
+      )
+      .map((change) => change.value!.id),
+  );
   for (const row of newsletterRows) {
-    const value = publicNewsletterFromRow(row);
+    const value = publicNewsletterFromRow(row, eligibleItemIds);
     changes.push({
       entityType: "newsletter",
       entityKey: String(value.id),
@@ -602,6 +724,7 @@ function parseOutboxMutation(row: Row): OutboxMutation {
     id: numeric(row.id, "outbox id"),
     entityType: entityType as PublicEntityType,
     entityKey,
+    createdAt: numeric(row.created_at, "outbox created_at"),
   };
 }
 
@@ -619,12 +742,16 @@ function groupMutations(rows: readonly OutboxMutation[]): Record<PublicEntityTyp
   return grouped;
 }
 
-function setItemChange(changes: Map<string, PublicEntityChange>, row: Row): void {
+function setItemChange(
+  changes: Map<string, PublicEntityChange>,
+  row: Row,
+  eventIdOverride?: number | null,
+): void {
   const id = numeric(row.id, "item id");
   changes.set(changeId("item", String(id)), {
     entityType: "item",
     entityKey: String(id),
-    value: publicItemFromRow(row),
+    value: publicItemFromRow(row, eventIdOverride),
   });
 }
 
@@ -643,15 +770,22 @@ function setEventChanges(
   }
   for (const row of events) {
     const id = numeric(row.id, "event id");
+    const eventMembers = membersByEvent.get(id) ?? [];
+    const value = publicEventFromRows(row, eventMembers);
     changes.set(changeId("event", String(id)), {
       entityType: "event",
       entityKey: String(id),
-      value: publicEventFromRows(row, membersByEvent.get(id) ?? []),
+      value,
     });
+    if (value === null) {
+      for (const member of eventMembers) {
+        setItemChange(changes, member, null);
+      }
+    }
   }
 }
 
-function publicItemFromRow(row: Row) {
+function publicItemFromRow(row: Row, eventIdOverride?: number | null) {
   const id = numeric(row.id, "item id");
   const enrichedAt = nullableNumeric(row.enriched_at, "item enriched_at");
   const importance = nullableNumeric(row.importance, "item importance");
@@ -667,7 +801,10 @@ function publicItemFromRow(row: Row) {
   ) {
     return null;
   }
-  const clusterId = publicEventIdForItem(row, tier!);
+  const clusterId =
+    eventIdOverride === undefined
+      ? publicEventIdForItem(row, tier!)
+      : eventIdOverride;
   return publicItemSchema.parse({
     schemaVersion: 1,
     id,
@@ -821,7 +958,19 @@ function publicSourceFromRow(row: Row, last24h: number) {
   });
 }
 
-function publicNewsletterFromRow(row: Row) {
+function publicNewsletterFromRow(
+  row: Row,
+  eligibleItemIds: ReadonlySet<number>,
+) {
+  const itemIds = numberArray(row.item_ids, "newsletter item_ids").filter(
+    (id) => eligibleItemIds.has(id),
+  );
+  const sanitizeRefs = (value: unknown, label: string) => {
+    const markdown = nullableText(value, label);
+    return markdown?.replace(/\[#(\d+)\]/g, (match, rawId: string) =>
+      eligibleItemIds.has(Number(rawId)) ? match : `#${rawId}`,
+    ) ?? null;
+  };
   const common = {
     schemaVersion: 1 as const,
     id: numeric(row.id, "newsletter id"),
@@ -830,8 +979,8 @@ function publicNewsletterFromRow(row: Row) {
     periodStart: iso(numeric(row.period_start, "newsletter period_start")),
     periodEnd: iso(numeric(row.period_end, "newsletter period_end")),
     publishedAt: iso(numeric(row.published_at, "newsletter published_at")),
-    storyCount: numeric(row.story_count, "newsletter story_count"),
-    itemIds: numberArray(row.item_ids, "newsletter item_ids"),
+    storyCount: itemIds.length,
+    itemIds,
   };
   const title = nullableText(row.column_title, "newsletter column title");
   return publicNewsletterSchema.parse(
@@ -841,23 +990,26 @@ function publicNewsletterFromRow(row: Row) {
           format: "daily_column",
           title,
           themeTag: nullableText(row.column_theme_tag, "newsletter theme"),
-          summaryMd: nullableText(row.column_summary_md, "newsletter summary"),
-          narrativeMd: nullableText(
+          summaryMd: sanitizeRefs(
+            row.column_summary_md,
+            "newsletter summary",
+          ),
+          narrativeMd: sanitizeRefs(
             row.column_narrative_md,
             "newsletter narrative",
           ),
           featuredItemIds: numberArray(
             row.column_featured_item_ids,
             "newsletter featured ids",
-          ),
+          ).filter((id) => eligibleItemIds.has(id)),
         }
       : {
           ...common,
           format: "structured",
           headline: nullableText(row.headline, "newsletter headline"),
-          overview: nullableText(row.overview, "newsletter overview"),
-          highlights: nullableText(row.highlights, "newsletter highlights"),
-          commentary: nullableText(row.commentary, "newsletter commentary"),
+          overview: sanitizeRefs(row.overview, "newsletter overview"),
+          highlights: sanitizeRefs(row.highlights, "newsletter highlights"),
+          commentary: sanitizeRefs(row.commentary, "newsletter commentary"),
         },
   );
 }

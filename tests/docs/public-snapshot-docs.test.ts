@@ -30,7 +30,10 @@ describe("public snapshot documentation contracts", () => {
     expect(handoff).toContain("R2 public-read decoupling implemented locally");
     expect(handoff).toContain("No production migration, R2 release, deploy");
     expect(operations).toContain("require explicit AX authorization");
-    expect(operations).toContain("have not run");
+    expect(operations).toContain(
+      "recovery still require explicit authorization",
+    );
+    expect(operations).toContain("production serves anonymous public reads from R2");
   });
 
   test("documents the exhaustive anonymous boundary and no DB fallback", () => {

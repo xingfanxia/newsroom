@@ -29,6 +29,10 @@ describe("Stage A constants", () => {
   it("WINDOW_HOURS is 72 (extended from 48)", () => {
     expect(workerSrc).toContain("const WINDOW_HOURS = 72;");
   });
+
+  it("prioritizes the newest pending items when a source backlog is enabled", () => {
+    expect(workerSrc).toContain(".orderBy(desc(items.publishedAt))");
+  });
 });
 
 // ── Threshold logic (cosine distance) ────────────────────────────────────────

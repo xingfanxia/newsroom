@@ -17,6 +17,7 @@ import {
   type AihotItem,
   type AihotItemsResponse,
 } from "../../lib/sources/aihot";
+import { sourceCatalog } from "../../lib/sources/catalog";
 
 // ── fetch mock plumbing ──────────────────────────────────────────────────
 
@@ -281,5 +282,14 @@ describe("aihotItemToFeedItem", () => {
     const raw = fi?.rawPayload as Record<string, unknown>;
     expect(raw.body).toBe("");
     expect(raw["content:encoded"]).toBe("");
+  });
+});
+
+describe("AI HOT source configuration", () => {
+  test("individual selected articles remain eligible for event clustering", () => {
+    const source = sourceCatalog.find(({ id }) => id === "aihot-selected");
+    expect(source).toBeDefined();
+    expect(source?.curated).toBe(true);
+    expect(source?.clusteringOptOut ?? false).toBe(false);
   });
 });

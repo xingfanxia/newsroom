@@ -45,6 +45,25 @@ describe("public snapshot publisher cron", () => {
     });
   });
 
+  test("fails the cron invocation when the publisher returns a failed receipt", async () => {
+    process.env.CRON_SECRET = "cron-test-secret";
+    const failedReceipt = {
+      ...runReceipt(),
+      status: "failed" as const,
+      failureStage: "read_outbox" as const,
+      releaseId: null,
+    };
+
+    await expect(
+      handlePublishPublicCron(
+        new Request("https://example.com/api/cron/publish-public", {
+          headers: { authorization: "Bearer cron-test-secret" },
+        }),
+        async () => failedReceipt,
+      ),
+    ).rejects.toThrow("public snapshot publish failed at read_outbox");
+  });
+
   test("uses the exact four-times-hourly schedule and shared runtime", async () => {
     const vercel = JSON.parse(await readFile("vercel.json", "utf8")) as {
       crons: Array<{ path: string; schedule: string }>;

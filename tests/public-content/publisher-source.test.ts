@@ -203,7 +203,8 @@ describe("bounded publisher source", () => {
       `CREATE TABLE public_content_outbox (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         entity_type TEXT NOT NULL,
-        entity_key TEXT NOT NULL
+        entity_key TEXT NOT NULL,
+        created_at INTEGER NOT NULL DEFAULT 0
       )`,
     ]);
     const batch = await new LibsqlPublicContentSource(client).readBatch(0);
@@ -238,7 +239,7 @@ describe("bounded publisher source", () => {
     expect(batch.telemetry).toMatchObject({
       candidateRows: 8,
       dedupedEntities: 7,
-      queryCount: 9,
+      queryCount: 10,
       scanMeasurementKind: "plan_upper_bound",
       verifiedPlans: [...PUBLISHER_SOURCE_VERIFIED_PLANS],
     });
@@ -297,9 +298,15 @@ describe("bounded publisher source", () => {
       firstState,
       removed.changes,
     ).state;
-    expect(removedState.items.map(({ id }) => id)).toEqual([3, 4]);
+    expect(removedState.items.map(({ id }) => id)).toEqual([2, 3, 4]);
+    expect(removedState.items.find(({ id }) => id === 2)?.eventId).toBeNull();
     expect(removedState.events.map(({ id }) => id)).toEqual([11]);
-    expect(removedState.newsletters).toEqual([]);
+    expect(removedState.newsletters).toHaveLength(1);
+    expect(removedState.newsletters[0]).toMatchObject({
+      id: 20,
+      storyCount: 1,
+      itemIds: [2],
+    });
 
     await client.batch(
       [
@@ -316,6 +323,11 @@ describe("bounded publisher source", () => {
     ).state;
     expect(restoredState.items.map(({ id }) => id)).toEqual([1, 2, 3, 4]);
     expect(restoredState.events.map(({ id }) => id)).toEqual([10, 11]);
+    expect(restoredState.newsletters[0]).toMatchObject({
+      id: 20,
+      storyCount: 2,
+      itemIds: [1, 2],
+    });
   });
 
   test("replaces a policy by logical key instead of accumulating versions", async () => {
@@ -342,7 +354,91 @@ describe("bounded publisher source", () => {
     expect(next.policies.map(({ version }) => version)).toEqual(["v3"]);
   });
 
-  test("aborts rather than returning a partial batch when a hard cap is crossed", async () => {
+  test("closes item mutations over their current event even when its outbox row is later", async () => {
+    const client = await database();
+    await seedPublicData(client);
+    const source = new LibsqlPublicContentSource(client, { now: () => NOW });
+
+    await client.execute("DELETE FROM public_content_outbox");
+    await client.execute(
+      "INSERT INTO public_content_outbox (entity_type, entity_key) VALUES ('item', '1')",
+    );
+
+    const batch = await source.readBatch(0);
+    expect(
+      batch.changes.some(
+        (change) =>
+          change.entityType === "event" &&
+          change.entityKey === "10" &&
+          change.value !== null,
+      ),
+    ).toBe(true);
+    expect(
+      batch.changes
+        .filter(
+          (change) =>
+            change.entityType === "item" &&
+            change.value?.eventId === 10,
+        )
+        .map((change) => Number(change.entityKey))
+        .sort((left, right) => left - right),
+    ).toEqual([1, 2]);
+  });
+
+  test("closes a page-boundary item move over its old and new events", async () => {
+    const client = await database();
+    await seedPublicData(client);
+    await client.batch(
+      [
+        `UPDATE items SET cluster_id = 11 WHERE id = 1`,
+        `UPDATE clusters
+         SET lead_item_id = 2, member_count = 1, coverage = 1
+         WHERE id = 10`,
+        `UPDATE clusters
+         SET member_count = 3, coverage = 3
+         WHERE id = 11`,
+        `DELETE FROM public_content_outbox`,
+        `INSERT INTO public_content_outbox
+         (entity_type, entity_key, created_at)
+         VALUES ('item', '1', ${NOW}),
+                ('event', '10', ${NOW})`,
+      ],
+      "write",
+    );
+
+    const batch = await new LibsqlPublicContentSource(client, {
+      now: () => NOW,
+      caps: { maxOutboxRows: 1 },
+    }).readBatch(0);
+
+    expect(batch.telemetry.candidateRows).toBe(1);
+    expect(
+      batch.changes.find(
+        (change) =>
+          change.entityType === "event" && change.entityKey === "10",
+      )?.value,
+    ).toBeNull();
+    expect(
+      batch.changes.find(
+        (change) =>
+          change.entityType === "event" && change.entityKey === "11",
+      )?.value,
+    ).toMatchObject({ memberItemIds: [1, 3, 4] });
+    expect(
+      batch.changes.find(
+        (change) =>
+          change.entityType === "item" && change.entityKey === "2",
+      )?.value,
+    ).toMatchObject({ eventId: null });
+    expect(
+      batch.changes.find(
+        (change) =>
+          change.entityType === "item" && change.entityKey === "1",
+      )?.value,
+    ).toMatchObject({ eventId: 11 });
+  });
+
+  test("pages through an outbox backlog while preserving hard caps", async () => {
     const client = await database();
     await seedPublicData(client);
 
@@ -353,15 +449,22 @@ describe("bounded publisher source", () => {
         }),
     ).toThrow(/cannot exceed hard limit 500/);
 
-    await expect(
-      new LibsqlPublicContentSource(client, {
-        caps: { maxOutboxRows: 1 },
-      }).readBatch(0),
-    ).rejects.toMatchObject({
-      name: "PublisherSourceLimitError",
-      dimension: "maxOutboxRows",
-      limit: 1,
+    const paged = new LibsqlPublicContentSource(client, {
+      caps: { maxOutboxRows: 1 },
     });
+    const first = await paged.readBatch(0);
+    expect(first).toMatchObject({
+      fromWatermark: 0,
+      toWatermark: 1,
+      telemetry: { candidateRows: 1, dedupedEntities: 1 },
+    });
+    const second = await paged.readBatch(first.toWatermark);
+    expect(second).toMatchObject({
+      fromWatermark: 1,
+      toWatermark: 2,
+      telemetry: { candidateRows: 1, dedupedEntities: 1 },
+    });
+
     await expect(
       new LibsqlPublicContentSource(client, {
         caps: { maxOutboxRows: 10, maxDependentRows: 1 },

@@ -12,10 +12,18 @@ export function handlePublishPublicCron(
   request: Request,
   run: PublishRunner = runIncrementalPublicPublisher,
 ): Promise<Response> {
-  return runCronJsonRoute(request, async () => ({
-    kind: "publish-public",
-    receipt: await run(),
-  }));
+  return runCronJsonRoute(request, async () => {
+    const receipt = await run();
+    if (receipt.status === "failed") {
+      throw new Error(
+        `public snapshot publish failed at ${receipt.failureStage ?? "unknown"}`,
+      );
+    }
+    return {
+      kind: "publish-public",
+      receipt,
+    };
+  });
 }
 
 export function GET(request: Request): Promise<Response> {
