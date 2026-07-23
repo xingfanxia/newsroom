@@ -844,6 +844,8 @@ function publicItemFromRow(row: Row, eventIdOverride?: number | null) {
 
 function publicEventFromRows(row: Row, memberRows: readonly Row[]) {
   const id = numeric(row.id, "event id");
+  const importance = nullableNumeric(row.importance, "event importance");
+  if (importance === null) return null;
   const members = memberRows
     .map((member) => ({
       id: numeric(member.id, "event member id"),
@@ -901,7 +903,7 @@ function publicEventFromRows(row: Row, memberRows: readonly Row[]) {
       zh: nullableText(row.editor_analysis_zh, "event analysis zh"),
       en: nullableText(row.editor_analysis_en, "event analysis en"),
     },
-    importance: numeric(row.importance, "event importance"),
+    importance,
     tier,
     hkr: hkr(row.hkr),
   });
