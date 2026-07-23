@@ -1,11 +1,9 @@
 # Public Snapshot Operations
 
-Status: production serves anonymous public reads from R2. On 2026-07-23 an
-incident review found the production pointer stalled at source watermark 1708
-(`publishedAt=2026-07-18T04:57:11.070Z`) while Turso had continued ingesting and
-the outbox had accumulated more than 2,500 rows. The code-level recovery is
-verified locally against the real backlog, but deployment and production
-recovery still require explicit authorization.
+Status: production serves anonymous public reads from R2. The 2026-07-23
+stalled-pointer incident is recovered: the pointer advanced from source
+watermark 1708 to 4772, the outbox drained to zero, and the public daily,
+curated, and today-featured APIs resumed current output.
 
 ## Ownership and invariants
 
@@ -53,14 +51,29 @@ reference items that later had an `excluded` tier, causing canonical-state
 derivation to reject the release for dangling references. Failed receipts were
 returned inside HTTP 200 responses, hiding the incident from the scheduler.
 
-The fixed implementation was exercised read-only against the production Turso
+Before deployment, the fixed implementation was exercised read-only against the production Turso
 backlog and the public R2 release. Six consecutive in-memory releases advanced
 `1708 → 2208 → 2708 → 3208 → 3708 → 4208 → 4274`; the next batch was empty.
 The largest batch changed 192 artifacts, below the 500-write limit. This proof
 did not acknowledge the outbox, upload objects, or change the live pointer.
 
-After an authorized deployment, monitor `current.json.sourceWatermark` on each
-scheduled run until it reaches the live outbox high-water mark. Also verify:
+Production recovery shipped through PRs
+[#66](https://github.com/xingfanxia/newsroom/pull/66) and
+[#67](https://github.com/xingfanxia/newsroom/pull/67). The first deployment was
+`dpl_7JV7opeEZ8YqDUpTAPtCLvDVzMTe`; the follow-up eligibility hotfix was
+`dpl_7YSQ7pGd69g4PXNEUWYjP3BaLEEt`. AI HOT article rows were re-enabled for
+normal event clustering, and the reported OpenAI/Hugging Face set converged on
+event `49417`.
+
+The final publisher receipt succeeded from watermark `4302 → 4772` as release
+`r4772-fb9f33b5df000821c293`: 107 objects uploaded, 449 reused, and no failure
+stage. The live outbox was empty after acknowledgement. Public acceptance
+showed daily `258` generated at `2026-07-23T05:02:03.928Z`, a non-empty
+today-featured feed, current curated items, and exactly one canonical
+OpenAI/Hugging Face story in both the public feed and featured-email selection.
+
+Continue monitoring `current.json.sourceWatermark` on scheduled runs and
+verify:
 
 1. every cron response is 2xx with receipt status `succeeded` or `noop`;
 2. `/api/public/dailies` exposes the latest generated daily;

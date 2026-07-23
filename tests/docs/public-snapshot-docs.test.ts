@@ -30,9 +30,8 @@ describe("public snapshot documentation contracts", () => {
     expect(handoff).toContain("R2 public-read decoupling implemented locally");
     expect(handoff).toContain("No production migration, R2 release, deploy");
     expect(operations).toContain("require explicit AX authorization");
-    expect(operations).toContain(
-      "recovery still require explicit authorization",
-    );
+    expect(operations).toContain("watermark `4302 → 4772`");
+    expect(operations).toContain("r4772-fb9f33b5df000821c293");
     expect(operations).toContain("production serves anonymous public reads from R2");
   });
 

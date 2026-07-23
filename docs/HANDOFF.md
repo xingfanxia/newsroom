@@ -1,5 +1,25 @@
 # AX's AI RADAR — Current Handoff
 
+## 2026-07-23 — public publishing and featured event dedup recovered
+
+Production recovery shipped through
+[#66](https://github.com/xingfanxia/newsroom/pull/66) and
+[#67](https://github.com/xingfanxia/newsroom/pull/67). The R2 pointer had
+stalled at watermark 1708 even though Turso and the public outbox were current.
+The incremental publisher now pages large backlogs, closes item/event
+dependencies, filters ineligible newsletter references, and surfaces failed
+receipts as cron 5xx responses. AI HOT selected articles now participate in
+normal event clustering, and featured email selection renders one canonical
+lead per event.
+
+The production pointer recovered to watermark 4772 as release
+`r4772-fb9f33b5df000821c293`; the outbox was empty after acknowledgement.
+Daily `258`, current curated items, and the today-featured feed are public
+again. The reported OpenAI/Hugging Face coverage is one canonical event
+(`49417`, coverage 13) in both the public feed and featured-email query.
+Operational evidence and the ongoing checks are in
+[`docs/operations/public-snapshots.md`](./operations/public-snapshots.md).
+
 ## 2026-07-14 — R2 public-read decoupling implemented locally; production gate pending
 
 The feature branch now separates anonymous traffic from Turso by construction.
