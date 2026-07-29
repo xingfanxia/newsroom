@@ -23,7 +23,7 @@ A production read-only rehearsal against pointer watermark `5457` and the next
 newsletter references to `derive-ok`. The candidate release planned 271 object
 writes, below the 500-write ceiling. PR
 [#70](https://github.com/xingfanxia/newsroom/pull/70) deployed that fix and
-advanced production through six successful pages to watermark `9957`.
+advanced production through nine successful pages to watermark `9957`.
 
 The next page exposed a second inverse dependency. Refreshing an event from its
 current members could remove a former member while the previous public item
@@ -36,9 +36,19 @@ items and their current events in the same release.
 
 A second production read-only rehearsal advanced `9957 → 10457` with 672
 referentially closed changes and 111 planned writes; canonical derivation
-succeeded. Deploy this follow-up, then drain through the current outbox high
-water and verify that `/api/public/dailies` exposes newsletter `264` or later
-before declaring recovery.
+succeeded. PR [#71](https://github.com/xingfanxia/newsroom/pull/71) deployed the
+follow-up as Vercel deployment `dpl_2bNtpAVhroJx3aNmUNaPw67hVfeH`. Production
+then drained five more pages through release
+`r12276-698c9fa2250bf22828d3`; the outbox was empty at acceptance.
+
+Anonymous acceptance exposed daily `264` (`2026-07-28`, generated
+`2026-07-29T05:00:56.078Z`), and the daily RSS `lastBuildDate` matched that
+generation time. The public daily ETag changed from
+`W/"public-daily-03acabbcaaf00d7e"` to
+`W/"public-daily-a6ff509c42eb04a8"`: a request with the old ETag returned HTTP
+200 and current content, while the current ETag returned 304. The stale pointer
+incident is recovered. The next scheduled publisher tick returned HTTP 200,
+left the release unchanged, and the outbox remained empty.
 
 ## 2026-07-23 — public publishing and featured event dedup recovered
 

@@ -4,9 +4,10 @@ Status: production serves anonymous public reads from R2. A second pointer stall
 was diagnosed on 2026-07-29 at release
 `r5457-56183e58be3f6d478af4`: Turso remained current, but anonymous reads still
 served daily `258` (`2026-07-22`) while `publish-public` failed at
-`failureStage=derive`. The first newsletter-reference fix advanced production
-to watermark `9957`; a follow-up former-event-member closure fix is ready for
-deployment and must be followed by the recovery checks below.
+`failureStage=derive`. Newsletter-reference and former-event-member closure
+fixes are now deployed. Production recovered at release
+`r12276-698c9fa2250bf22828d3`, the outbox was empty at acceptance, and
+anonymous reads exposed daily `264` (`2026-07-28`).
 
 ## Ownership and invariants
 
@@ -69,7 +70,7 @@ Before the fix, canonical derivation failed. After the fix, the same
 `5457 → 5957` batch derived release `r5957-7f07afd08452a0525f24` with 968
 referentially closed changes and 271 planned writes, below the 500-write limit.
 PR [#70](https://github.com/xingfanxia/newsroom/pull/70) deployed the fix and
-six production batches advanced the pointer to release
+nine production batches advanced the pointer to release
 `r9957-0d42e02fa894e5d5d584`.
 
 The next page failed on a different canonical invariant: public item `17853`
@@ -81,9 +82,44 @@ without refreshing the former member. The follow-up source closure walks
 unacknowledged event-to-item outbox pairs to a bounded fixed point. A regression
 test reproduces the page split with a newsletter-only candidate page, and a
 live read-only rehearsal of `9957 → 10457` now derives successfully with 672
-changes and 111 planned writes. After deployment, let the authenticated
-publisher drain through normal CAS/ack operations; never edit the pointer or
-acknowledge the outbox manually.
+changes and 111 planned writes.
+
+PR [#71](https://github.com/xingfanxia/newsroom/pull/71) deployed the follow-up
+as `dpl_2bNtpAVhroJx3aNmUNaPw67hVfeH`. The scheduled publisher won one expected
+ETag CAS race with a simultaneous operator trigger and advanced
+`9957 → 10457`; the losing trigger failed at `advance_pointer` without changing
+state. Five successful pages after the follow-up deployment ended at release
+`r12276-698c9fa2250bf22828d3` with zero outbox rows remaining.
+
+Acceptance checks:
+
+- `/api/public/dailies?locale=zh` and `/api/public/daily?locale=zh` returned
+  daily `264`, period date `2026-07-28`, generated at
+  `2026-07-29T05:00:56.078Z`.
+- `/api/rss/daily` returned HTTP 200 with `lastBuildDate` equal to that
+  generation time.
+- The today-featured public query returned 34 items, and the curated public
+  query returned 691 items at acceptance.
+- The daily ETag changed from `W/"public-daily-03acabbcaaf00d7e"` to
+  `W/"public-daily-a6ff509c42eb04a8"`. The old validator returned HTTP 200 with
+  current content; only the current validator returned 304.
+- The next scheduled publisher tick returned HTTP 200 with the release
+  unchanged, and a fresh Turso check still found zero outbox rows.
+
+## Downstream freshness gate
+
+HTTP 304 is only a transport/cache result. It does not prove the cached report
+is fresh, and a consumer must never relabel a cached report with the delivery
+date.
+
+For consumers that deliver after the 05:00 UTC daily-generation SLA, the
+expected inner report date is the previous UTC calendar day. Treat any earlier
+date as stale (`N = 1` day): suppress the normal report and emit one deduplicated
+stale alert containing the latest inner date, stale-day count, ETag, and last
+successful fresh delivery. Keep a body hash excluding any outer delivery-date
+heading as a secondary duplicate guard when the inner date cannot be parsed.
+Resume normal delivery only after both the inner date and content identity
+advance.
 
 ## 2026-07-23 stalled-pointer incident
 
