@@ -1,9 +1,11 @@
 # Public Snapshot Operations
 
-Status: production serves anonymous public reads from R2. The 2026-07-23
-stalled-pointer incident is recovered: the pointer advanced from source
-watermark 1708 to 4772, the outbox drained to zero, and the public daily,
-curated, and today-featured APIs resumed current output.
+Status: production serves anonymous public reads from R2. A second pointer stall
+was diagnosed on 2026-07-29 at release
+`r5457-56183e58be3f6d478af4`: Turso remained current, but anonymous reads still
+served daily `258` (`2026-07-22`) while `publish-public` failed at
+`failureStage=derive`. The newsletter-reference closure fix is ready for
+deployment and must be followed by the recovery checks below.
 
 ## Ownership and invariants
 
@@ -28,12 +30,43 @@ Turso (private source of truth)
   ordered rows and advances to the last row in that page. Never compare the
   global outbox high-water mark to the per-tick cap.
 - Item changes close over their current event, and newsletter changes retain
-  only item references that satisfy public eligibility. This keeps each
-  incremental release referentially valid even when item/event outbox rows land
-  on opposite sides of a page boundary.
+  only item references that satisfy public eligibility. Newsletter changes also
+  close over every retained item before item-to-event/member closure runs. This
+  keeps each incremental release referentially valid even when newsletter,
+  item, and event outbox rows land on opposite sides of a page boundary.
 - A publisher receipt with `status=failed` must make the cron request fail.
   HTTP 200 is reserved for `succeeded` and `noop`, so Vercel monitoring can
   detect a stopped pointer.
+
+## 2026-07-29 newsletter-reference closure incident
+
+The daily generator was not the failing component. Production Turso contained
+daily newsletter IDs `259` through `264`, each generated on schedule with 20
+stories, while the anonymous `/api/public/daily` response remained on ID `258`.
+Vercel logs showed the scheduled `newsletter-daily` request succeeding and
+every `publish-public` request failing at `derive`.
+
+The 2026-07-23 recovery closed item changes over dependent newsletters and
+filtered newsletter references by current database eligibility. That filter
+was insufficient when a newsletter mutation itself appeared before referenced
+items were present in the active release: the source could emit the newsletter
+without emitting those items. Refreshing an older monthly newsletter reproduced
+the failure with 24 dangling item references.
+
+The fixed source loads affected newsletters first, unions their retained item
+IDs into the bounded item batch, and then runs the existing event/member
+closure. Newsletter serialization retains only item changes that are non-null
+in that same batch. A new regression test starts from a valid release missing
+the referenced items and proves a newsletter-only outbox row produces a
+self-contained next state.
+
+The production read-only rehearsal used live pointer watermark `5457` and the
+next 500 outbox rows without uploading, acknowledging, or changing the pointer.
+Before the fix, canonical derivation failed. After the fix, the same
+`5457 → 5957` batch derived release `r5957-7f07afd08452a0525f24` with 968
+referentially closed changes and 271 planned writes, below the 500-write limit.
+After deployment, let scheduled publisher pages drain normally; do not bypass
+the pointer CAS or acknowledge the outbox manually.
 
 ## 2026-07-23 stalled-pointer incident
 

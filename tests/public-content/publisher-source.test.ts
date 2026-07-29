@@ -239,7 +239,7 @@ describe("bounded publisher source", () => {
     expect(batch.telemetry).toMatchObject({
       candidateRows: 8,
       dedupedEntities: 7,
-      queryCount: 10,
+      queryCount: 9,
       scanMeasurementKind: "plan_upper_bound",
       verifiedPlans: [...PUBLISHER_SOURCE_VERIFIED_PLANS],
     });
@@ -421,6 +421,47 @@ describe("bounded publisher source", () => {
         .map((change) => Number(change.entityKey))
         .sort((left, right) => left - right),
     ).toEqual([1, 2]);
+  });
+
+  test("closes newsletter mutations over referenced public items", async () => {
+    const client = await database();
+    await seedPublicData(client);
+    const source = new LibsqlPublicContentSource(client, {
+      now: () => NOW,
+    });
+    const initial = await source.readBatch(0);
+    const initialState = patchCanonicalPublicState(
+      EMPTY_STATE,
+      initial.changes,
+    ).state;
+    const previousState = {
+      ...initialState,
+      items: [],
+      events: [],
+      newsletters: [],
+    };
+    await client.execute(
+      `INSERT INTO public_content_outbox (entity_type, entity_key)
+       VALUES ('newsletter', '20')`,
+    );
+
+    const batch = await source.readBatch(initial.toWatermark);
+    const next = patchCanonicalPublicState(previousState, batch.changes).state;
+
+    expect(batch.telemetry.candidateRows).toBe(1);
+    expect(
+      batch.changes
+        .filter((change) => change.entityType === "item" && change.value)
+        .map((change) => Number(change.entityKey))
+        .sort((left, right) => left - right),
+    ).toEqual([1, 2]);
+    expect(next.items.map(({ id }) => id)).toEqual([1, 2]);
+    expect(next.events.map(({ id }) => id)).toEqual([10]);
+    expect(next.newsletters[0]).toMatchObject({
+      id: 20,
+      storyCount: 2,
+      itemIds: [1, 2],
+    });
   });
 
   test("closes a page-boundary item move over its old and new events", async () => {
