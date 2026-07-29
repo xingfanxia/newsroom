@@ -171,16 +171,100 @@ export class LibsqlPublicContentSource implements PublicContentPublisherSource {
     }
 
     const itemKeys = numericKeys(byType.item, "item");
-    if (itemKeys.length > 0) {
+    const newsletterKeys = numericKeys(byType.newsletter, "newsletter");
+    let newsletterRows: Row[] = [];
+    let referencedNewsletterItemIds: number[] = [];
+    if (newsletterKeys.length > 0 || itemKeys.length > 0) {
+      const newsletterPredicates: string[] = [];
+      const newsletterArgs: InValue[] = [];
+      if (newsletterKeys.length > 0) {
+        newsletterPredicates.push(
+          `n.id IN (${placeholders(newsletterKeys.length)})`,
+        );
+        newsletterArgs.push(...newsletterKeys);
+      }
+      if (itemKeys.length > 0) {
+        newsletterPredicates.push(
+          `(EXISTS (
+              SELECT 1
+              FROM json_each(n.item_ids) referenced
+              WHERE CAST(referenced.value AS INTEGER)
+                IN (${placeholders(itemKeys.length)})
+            )
+            AND NOT EXISTS (
+              SELECT 1
+              FROM public_content_outbox pending_newsletter
+              WHERE pending_newsletter.entity_type = 'newsletter'
+                AND pending_newsletter.entity_key = CAST(n.id AS TEXT)
+                AND pending_newsletter.id > ?
+            ))`,
+        );
+        newsletterArgs.push(...itemKeys, toWatermark);
+      }
+      const result = await execute(
+        `SELECT n.id, n.kind, n.locale, n.period_start, n.period_end,
+                n.published_at, n.story_count, n.item_ids, n.headline,
+                n.overview, n.highlights, n.commentary, n.column_title,
+                n.column_theme_tag, n.column_summary_md,
+                n.column_narrative_md, n.column_featured_item_ids
+         FROM newsletters n
+         WHERE ${newsletterPredicates.join(" OR ")}
+         ORDER BY n.id
+         LIMIT ?`,
+        [...newsletterArgs, this.#caps.maxDependentRows + 1],
+      );
+      if (result.rows.length > this.#caps.maxDependentRows) {
+        throw new PublisherSourceLimitError(
+          "maxDependentRows",
+          result.rows.length,
+          this.#caps.maxDependentRows,
+        );
+      }
+      newsletterRows = result.rows;
+      returnedRows += newsletterRows.length;
+      scannedRows += newsletterRows.length;
+
+      referencedNewsletterItemIds = [
+        ...new Set(
+          newsletterRows.flatMap((row) =>
+            numberArray(row.item_ids, "newsletter item_ids"),
+          ),
+        ),
+      ];
+      if (referencedNewsletterItemIds.length > this.#caps.maxDependentRows) {
+        throw new PublisherSourceLimitError(
+          "maxDependentRows",
+          referencedNewsletterItemIds.length,
+          this.#caps.maxDependentRows,
+        );
+      }
+    }
+
+    // A newsletter is a referential root, not just another leaf mutation. Its
+    // outbox row can land before one or more referenced item rows, and an older
+    // newsletter can be refreshed after those items fell out of the active
+    // release. Load every retained reference into this batch so the existing
+    // item -> event/member closure makes the next canonical state self-contained.
+    const itemClosureKeys = [
+      ...new Set([...itemKeys, ...referencedNewsletterItemIds]),
+    ];
+    if (itemClosureKeys.length > this.#caps.maxDependentRows) {
+      throw new PublisherSourceLimitError(
+        "maxDependentRows",
+        itemClosureKeys.length,
+        this.#caps.maxDependentRows,
+      );
+    }
+    if (itemClosureKeys.length > 0) {
       const result = await execute(
         `SELECT ${ITEM_SELECT}
          FROM items i
          LEFT JOIN clusters c ON c.id = i.cluster_id
-         WHERE i.id IN (${placeholders(itemKeys.length)})`,
-        itemKeys,
+         WHERE i.id IN (${placeholders(itemClosureKeys.length)})`,
+        itemClosureKeys,
       );
       returnedRows += result.rows.length;
-      scannedRows += itemKeys.length;
+      scannedRows += itemClosureKeys.length;
       for (const row of result.rows) {
         setItemChange(changes, row);
         const eventId = nullableNumeric(row.cluster_id, "item event id");
@@ -284,89 +368,16 @@ export class LibsqlPublicContentSource implements PublicContentPublisherSource {
       }
     }
 
-    const newsletterKeys = numericKeys(byType.newsletter, "newsletter");
-    if (newsletterKeys.length > 0 || itemKeys.length > 0) {
-      const newsletterPredicates: string[] = [];
-      const newsletterArgs: InValue[] = [];
-      if (newsletterKeys.length > 0) {
-        newsletterPredicates.push(
-          `n.id IN (${placeholders(newsletterKeys.length)})`,
-        );
-        newsletterArgs.push(...newsletterKeys);
-      }
-      if (itemKeys.length > 0) {
-        newsletterPredicates.push(
-          `(EXISTS (
-              SELECT 1
-              FROM json_each(n.item_ids) referenced
-              WHERE CAST(referenced.value AS INTEGER)
-                IN (${placeholders(itemKeys.length)})
-            )
-            AND NOT EXISTS (
-              SELECT 1
-              FROM public_content_outbox pending_newsletter
-              WHERE pending_newsletter.entity_type = 'newsletter'
-                AND pending_newsletter.entity_key = CAST(n.id AS TEXT)
-                AND pending_newsletter.id > ?
-            ))`,
-        );
-        newsletterArgs.push(...itemKeys, toWatermark);
-      }
-      const result = await execute(
-        `SELECT n.id, n.kind, n.locale, n.period_start, n.period_end,
-                n.published_at, n.story_count, n.item_ids, n.headline,
-                n.overview, n.highlights, n.commentary, n.column_title,
-                n.column_theme_tag, n.column_summary_md,
-                n.column_narrative_md, n.column_featured_item_ids
-         FROM newsletters n
-         WHERE ${newsletterPredicates.join(" OR ")}
-         ORDER BY n.id
-         LIMIT ?`,
-        [...newsletterArgs, this.#caps.maxDependentRows + 1],
+    if (newsletterRows.length > 0) {
+      const eligibleItemIds = new Set(
+        referencedNewsletterItemIds.filter((id) => {
+          const itemChange = changes.get(changeId("item", String(id)));
+          return (
+            itemChange?.entityType === "item" && itemChange.value !== null
+          );
+        }),
       );
-      if (result.rows.length > this.#caps.maxDependentRows) {
-        throw new PublisherSourceLimitError(
-          "maxDependentRows",
-          result.rows.length,
-          this.#caps.maxDependentRows,
-        );
-      }
-      returnedRows += result.rows.length;
-      scannedRows += result.rows.length;
-
-      const referencedItemIds = [
-        ...new Set(
-          result.rows.flatMap((row) =>
-            numberArray(row.item_ids, "newsletter item_ids"),
-          ),
-        ),
-      ];
-      if (referencedItemIds.length > this.#caps.maxDependentRows) {
-        throw new PublisherSourceLimitError(
-          "maxDependentRows",
-          referencedItemIds.length,
-          this.#caps.maxDependentRows,
-        );
-      }
-      const eligibleItemIds = new Set<number>();
-      if (referencedItemIds.length > 0) {
-        const eligible = await execute(
-          `SELECT id
-           FROM items
-           WHERE id IN (${placeholders(referencedItemIds.length)})
-             AND enriched_at IS NOT NULL
-             AND importance BETWEEN 0 AND 100
-             AND tier IN ('featured', 'p1', 'all')`,
-          referencedItemIds,
-        );
-        returnedRows += eligible.rows.length;
-        scannedRows += referencedItemIds.length;
-        for (const row of eligible.rows) {
-          eligibleItemIds.add(numeric(row.id, "newsletter item id"));
-        }
-      }
-
-      for (const row of result.rows) {
+      for (const row of newsletterRows) {
         const value = publicNewsletterFromRow(row, eligibleItemIds);
         changes.set(changeId("newsletter", String(value.id)), {
           entityType: "newsletter",
