@@ -1,6 +1,6 @@
 # AX's AI RADAR — Current Handoff
 
-## 2026-07-29 — public publisher newsletter closure fix
+## 2026-07-29 — public publisher referential-closure recovery
 
 The public R2 pointer stalled again after release
 `r5457-56183e58be3f6d478af4`, while Turso continued generating daily columns
@@ -9,7 +9,7 @@ through newsletter `264` for the `2026-07-28` window. The live
 pages, JSON, and RSS kept serving daily `258` (`2026-07-22`) even though the
 daily generator itself was healthy.
 
-The remaining referential gap was the inverse of the 2026-07-23 fix.
+The first referential gap was the inverse of the 2026-07-23 fix.
 Item mutations already refreshed newsletters that referenced them, but a
 newsletter mutation did not load its referenced public items into the same
 bounded batch. When an older newsletter was refreshed, database-eligible item
@@ -21,9 +21,24 @@ existing item-to-event/member closure.
 A production read-only rehearsal against pointer watermark `5457` and the next
 500-row outbox page (`5457 → 5957`) changed the result from 24 dangling
 newsletter references to `derive-ok`. The candidate release planned 271 object
-writes, below the 500-write ceiling. Deploy the fix, then record the advanced
-release/watermark and verify that `/api/public/dailies` exposes newsletter
-`264` or later before declaring recovery.
+writes, below the 500-write ceiling. PR
+[#70](https://github.com/xingfanxia/newsroom/pull/70) deployed that fix and
+advanced production through six successful pages to watermark `9957`.
+
+The next page exposed a second inverse dependency. Refreshing an event from its
+current members could remove a former member while the previous public item
+still pointed at that event. The production witness was item `17853`: its
+public value still referenced event `27489`, while Turso had moved it to
+single-member cluster `51059` and the causal item/event outbox pair was beyond
+the current 500-row boundary. The source now follows unacknowledged
+event-to-item causal pairs to a bounded fixed point, refreshing moved/deleted
+items and their current events in the same release.
+
+A second production read-only rehearsal advanced `9957 → 10457` with 672
+referentially closed changes and 111 planned writes; canonical derivation
+succeeded. Deploy this follow-up, then drain through the current outbox high
+water and verify that `/api/public/dailies` exposes newsletter `264` or later
+before declaring recovery.
 
 ## 2026-07-23 — public publishing and featured event dedup recovered
 

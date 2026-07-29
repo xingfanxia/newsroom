@@ -272,12 +272,105 @@ export class LibsqlPublicContentSource implements PublicContentPublisherSource {
       }
     }
 
-    const eventKeys = [
-      ...new Set([
-        ...numericKeys(byType.event, "event"),
-        ...dependentEventIds,
-      ]),
-    ];
+    // Refreshing an event from its current members can remove a member that the
+    // previous public release still points at. Page boundaries make that easy
+    // to hit: a newsletter closes over a retained member, while the former
+    // member's item/event outbox pair sits just beyond this page. Follow those
+    // unacknowledged causal pairs to a fixed point so moved/deleted items and
+    // their current events are emitted in the same referentially closed batch.
+    const eventKeySet = new Set([
+      ...numericKeys(byType.event, "event"),
+      ...dependentEventIds,
+    ]);
+    const queriedCausalEventIds = new Set<number>();
+    const loadedItemIds = new Set(itemClosureKeys);
+    const causalItemIds = new Set<number>();
+    for (;;) {
+      const eventFrontier = [...eventKeySet].filter(
+        (id) => !queriedCausalEventIds.has(id),
+      );
+      if (eventFrontier.length === 0) break;
+      for (const id of eventFrontier) queriedCausalEventIds.add(id);
+
+      const causalItems = await execute(
+        `SELECT DISTINCT pending_item.entity_key
+         FROM public_content_outbox pending_event
+         JOIN public_content_outbox pending_item
+           ON pending_item.created_at = pending_event.created_at
+          AND pending_item.entity_type = 'item'
+         WHERE pending_event.entity_type = 'event'
+           AND pending_event.entity_key IN (${placeholders(eventFrontier.length)})
+           AND pending_event.id > ?
+           AND pending_item.id > ?
+           AND (pending_event.id > ? OR pending_item.id > ?)
+         LIMIT ?`,
+        [
+          ...eventFrontier.map(String),
+          fromWatermark,
+          fromWatermark,
+          toWatermark,
+          toWatermark,
+          this.#caps.maxDependentRows + 1,
+        ],
+      );
+      if (causalItems.rows.length > this.#caps.maxDependentRows) {
+        throw new PublisherSourceLimitError(
+          "maxDependentRows",
+          causalItems.rows.length,
+          this.#caps.maxDependentRows,
+        );
+      }
+      returnedRows += causalItems.rows.length;
+      scannedRows += causalItems.rows.length;
+      for (const row of causalItems.rows) {
+        causalItemIds.add(
+          numeric(Number(row.entity_key), "causal item key"),
+        );
+      }
+      if (causalItemIds.size > this.#caps.maxDependentRows) {
+        throw new PublisherSourceLimitError(
+          "maxDependentRows",
+          causalItemIds.size,
+          this.#caps.maxDependentRows,
+        );
+      }
+
+      const pendingItemIds = [...causalItemIds].filter(
+        (id) => !loadedItemIds.has(id),
+      );
+      if (pendingItemIds.length === 0) continue;
+      for (const id of pendingItemIds) {
+        loadedItemIds.add(id);
+        changes.set(changeId("item", String(id)), {
+          entityType: "item",
+          entityKey: String(id),
+          value: null,
+        });
+      }
+      const result = await execute(
+        `SELECT ${ITEM_SELECT}
+         FROM items i
+         LEFT JOIN clusters c ON c.id = i.cluster_id
+         WHERE i.id IN (${placeholders(pendingItemIds.length)})`,
+        pendingItemIds,
+      );
+      returnedRows += result.rows.length;
+      scannedRows += pendingItemIds.length;
+      for (const row of result.rows) {
+        setItemChange(changes, row);
+        const eventId = nullableNumeric(row.cluster_id, "item event id");
+        if (eventId !== null) eventKeySet.add(eventId);
+      }
+      if (eventKeySet.size > this.#caps.maxDependentRows) {
+        throw new PublisherSourceLimitError(
+          "maxDependentRows",
+          eventKeySet.size,
+          this.#caps.maxDependentRows,
+        );
+      }
+    }
+
+    const eventKeys = [...eventKeySet];
     let eventRows: Row[] = [];
     let memberRows: Row[] = [];
     if (eventKeys.length > 0) {

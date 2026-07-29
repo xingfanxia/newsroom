@@ -239,7 +239,7 @@ describe("bounded publisher source", () => {
     expect(batch.telemetry).toMatchObject({
       candidateRows: 8,
       dedupedEntities: 7,
-      queryCount: 9,
+      queryCount: 10,
       scanMeasurementKind: "plan_upper_bound",
       verifiedPlans: [...PUBLISHER_SOURCE_VERIFIED_PLANS],
     });
@@ -461,6 +461,70 @@ describe("bounded publisher source", () => {
       id: 20,
       storyCount: 2,
       itemIds: [1, 2],
+    });
+  });
+
+  test("closes newsletter-driven event refreshes over former members beyond the page boundary", async () => {
+    const client = await database();
+    await seedPublicData(client);
+    const source = new LibsqlPublicContentSource(client, { now: () => NOW });
+    const initial = await source.readBatch(0);
+    const previousState = patchCanonicalPublicState(
+      EMPTY_STATE,
+      initial.changes,
+    ).state;
+
+    await client.batch(
+      [
+        `UPDATE newsletters
+         SET story_count = 1, item_ids = '[2]'
+         WHERE id = 20`,
+        `UPDATE items SET cluster_id = 11 WHERE id = 1`,
+        `UPDATE clusters
+         SET lead_item_id = 2, member_count = 1, coverage = 1
+         WHERE id = 10`,
+        `UPDATE clusters
+         SET member_count = 3, coverage = 3
+         WHERE id = 11`,
+        `DELETE FROM public_content_outbox`,
+        `INSERT INTO public_content_outbox
+         (entity_type, entity_key, created_at)
+         VALUES ('newsletter', '20', ${NOW - 1}),
+                ('item', '1', ${NOW}),
+                ('event', '10', ${NOW})`,
+      ],
+      "write",
+    );
+
+    const batch = await new LibsqlPublicContentSource(client, {
+      now: () => NOW,
+      caps: { maxOutboxRows: 1 },
+    }).readBatch(0);
+    const next = patchCanonicalPublicState(previousState, batch.changes).state;
+
+    expect(batch.telemetry.candidateRows).toBe(1);
+    expect(
+      batch.changes.find(
+        (change) =>
+          change.entityType === "event" && change.entityKey === "10",
+      )?.value,
+    ).toBeNull();
+    expect(
+      batch.changes.find(
+        (change) =>
+          change.entityType === "event" && change.entityKey === "11",
+      )?.value,
+    ).toMatchObject({ memberItemIds: [1, 3, 4] });
+    expect(
+      next.items.find(({ id }) => id === 1),
+    ).toMatchObject({ eventId: 11 });
+    expect(
+      next.items.find(({ id }) => id === 2),
+    ).toMatchObject({ eventId: null });
+    expect(next.newsletters[0]).toMatchObject({
+      id: 20,
+      storyCount: 1,
+      itemIds: [2],
     });
   });
 
