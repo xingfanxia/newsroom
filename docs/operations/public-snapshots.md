@@ -4,7 +4,8 @@ Status: production serves anonymous public reads from R2. A second pointer stall
 was diagnosed on 2026-07-29 at release
 `r5457-56183e58be3f6d478af4`: Turso remained current, but anonymous reads still
 served daily `258` (`2026-07-22`) while `publish-public` failed at
-`failureStage=derive`. The newsletter-reference closure fix is ready for
+`failureStage=derive`. The first newsletter-reference fix advanced production
+to watermark `9957`; a follow-up former-event-member closure fix is ready for
 deployment and must be followed by the recovery checks below.
 
 ## Ownership and invariants
@@ -32,13 +33,15 @@ Turso (private source of truth)
 - Item changes close over their current event, and newsletter changes retain
   only item references that satisfy public eligibility. Newsletter changes also
   close over every retained item before item-to-event/member closure runs. This
+  closure follows unacknowledged event-to-item causal pairs to a bounded fixed
+  point, so former members and their current events are refreshed too. This
   keeps each incremental release referentially valid even when newsletter,
   item, and event outbox rows land on opposite sides of a page boundary.
 - A publisher receipt with `status=failed` must make the cron request fail.
   HTTP 200 is reserved for `succeeded` and `noop`, so Vercel monitoring can
   detect a stopped pointer.
 
-## 2026-07-29 newsletter-reference closure incident
+## 2026-07-29 referential-closure incident
 
 The daily generator was not the failing component. Production Turso contained
 daily newsletter IDs `259` through `264`, each generated on schedule with 20
@@ -65,8 +68,22 @@ next 500 outbox rows without uploading, acknowledging, or changing the pointer.
 Before the fix, canonical derivation failed. After the fix, the same
 `5457 → 5957` batch derived release `r5957-7f07afd08452a0525f24` with 968
 referentially closed changes and 271 planned writes, below the 500-write limit.
-After deployment, let scheduled publisher pages drain normally; do not bypass
-the pointer CAS or acknowledge the outbox manually.
+PR [#70](https://github.com/xingfanxia/newsroom/pull/70) deployed the fix and
+six production batches advanced the pointer to release
+`r9957-0d42e02fa894e5d5d584`.
+
+The next page failed on a different canonical invariant: public item `17853`
+still referenced event `27489` after the refreshed event no longer contained
+it. Turso had moved that item to single-member cluster `51059`; its causal
+item/event outbox rows were just beyond the 500-row page. Newsletter closure
+had refreshed a retained member of event `27489`, which refreshed the event
+without refreshing the former member. The follow-up source closure walks
+unacknowledged event-to-item outbox pairs to a bounded fixed point. A regression
+test reproduces the page split with a newsletter-only candidate page, and a
+live read-only rehearsal of `9957 → 10457` now derives successfully with 672
+changes and 111 planned writes. After deployment, let the authenticated
+publisher drain through normal CAS/ack operations; never edit the pointer or
+acknowledge the outbox manually.
 
 ## 2026-07-23 stalled-pointer incident
 
