@@ -6,7 +6,10 @@ import {
 
 const DEFAULT_TIMEOUT_MS = 15_000;
 const DEFAULT_RETRIES = 2;
-const MAX_RESPONSE_BYTES = 5 * 1024 * 1024; // 5 MB — caps memory + mitigates DoS
+// Caps memory + mitigates DoS. 10 MB (was 5): wechat2rss full-content feeds
+// grow past 5 MB in practice — tencent-tech-w2r hit 5.6 MB on 2026-07-27 and
+// went into response_too_large until this was raised.
+const MAX_RESPONSE_BYTES = 10 * 1024 * 1024;
 const MAX_REDIRECTS = 5;
 
 export type FetchErrorCode =
@@ -33,7 +36,7 @@ export type FetchResult<T> =
  *  - SSRF guard (blocks private/loopback/link-local IPs) pre-fetch and on every redirect hop
  *  - exponential backoff with jitter
  *  - 15s timeout
- *  - 5 MB response cap (streaming byte counter)
+ *  - 10 MB response cap (streaming byte counter)
  *  - structured error codes (no raw URL / error text leakage to callers)
  */
 export async function fetchWithRetry<T = string>(
