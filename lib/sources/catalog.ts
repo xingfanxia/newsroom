@@ -213,8 +213,9 @@ export const sourceCatalog: Source[] = [
     cadence: "hourly",
     priority: 2,
     tags: ["X", "twitter", "chinese-ai"],
-    enabled: true,
-    notes: "宝玉 — 资深 AI 工程师、翻译家、博主",
+    enabled: false,
+    notes:
+      "Disabled 2026-08-02 — X API 402 (billing lapsed 2026-04-29), not renewing for now; flip back to enabled + db:seed when the plan is renewed. 宝玉 — 资深 AI 工程师、翻译家、博主",
   },
   {
     id: "x-khazix",
@@ -226,8 +227,9 @@ export const sourceCatalog: Source[] = [
     cadence: "hourly",
     priority: 2,
     tags: ["X", "twitter", "chinese-ai"],
-    enabled: true,
-    notes: "Khazix — AI 写作 / 长文观察",
+    enabled: false,
+    notes:
+      "Disabled 2026-08-02 — X API 402 (billing lapsed 2026-04-29), not renewing for now; flip back to enabled + db:seed when the plan is renewed. Khazix — AI 写作 / 长文观察",
   },
   {
     id: "x-yuchenj",
@@ -239,8 +241,9 @@ export const sourceCatalog: Source[] = [
     cadence: "hourly",
     priority: 2,
     tags: ["X", "twitter", "infrastructure"],
-    enabled: true,
-    notes: "Yuchen Jin (Hyperbolic) — 推理基础设施、模型部署",
+    enabled: false,
+    notes:
+      "Disabled 2026-08-02 — X API 402 (billing lapsed 2026-04-29), not renewing for now; flip back to enabled + db:seed when the plan is renewed. Yuchen Jin (Hyperbolic) — 推理基础设施、模型部署",
   },
   {
     id: "x-op7418",
@@ -252,8 +255,9 @@ export const sourceCatalog: Source[] = [
     cadence: "hourly",
     priority: 2,
     tags: ["X", "twitter", "tutorial"],
-    enabled: true,
-    notes: "歸藏 — AI 工具 / 教程 / 案例分享",
+    enabled: false,
+    notes:
+      "Disabled 2026-08-02 — X API 402 (billing lapsed 2026-04-29), not renewing for now; flip back to enabled + db:seed when the plan is renewed. 歸藏 — AI 工具 / 教程 / 案例分享",
   },
   // Vendor-official X accounts: product announcements, model releases,
   // researcher highlights. Hourly cadence keeps us on top of launches.
@@ -267,8 +271,9 @@ export const sourceCatalog: Source[] = [
     cadence: "hourly",
     priority: 1,
     tags: ["X", "twitter", "Anthropic"],
-    enabled: true,
-    notes: "Anthropic 官方 — 模型发布、产品更新",
+    enabled: false,
+    notes:
+      "Disabled 2026-08-02 — X API 402 (billing lapsed 2026-04-29), not renewing for now; flip back to enabled + db:seed when the plan is renewed. Anthropic 官方 — 模型发布、产品更新",
   },
   {
     id: "x-claude",
@@ -280,8 +285,9 @@ export const sourceCatalog: Source[] = [
     cadence: "hourly",
     priority: 1,
     tags: ["X", "twitter", "Anthropic", "Claude"],
-    enabled: true,
-    notes: "Claude 产品账号 — 使用技巧、新功能",
+    enabled: false,
+    notes:
+      "Disabled 2026-08-02 — X API 402 (billing lapsed 2026-04-29), not renewing for now; flip back to enabled + db:seed when the plan is renewed. Claude 产品账号 — 使用技巧、新功能",
   },
   {
     id: "x-openai",
@@ -293,8 +299,9 @@ export const sourceCatalog: Source[] = [
     cadence: "hourly",
     priority: 1,
     tags: ["X", "twitter", "OpenAI"],
-    enabled: true,
-    notes: "OpenAI 官方 — 模型发布、产品更新",
+    enabled: false,
+    notes:
+      "Disabled 2026-08-02 — X API 402 (billing lapsed 2026-04-29), not renewing for now; flip back to enabled + db:seed when the plan is renewed. OpenAI 官方 — 模型发布、产品更新",
   },
   {
     id: "bluesky-ai",
