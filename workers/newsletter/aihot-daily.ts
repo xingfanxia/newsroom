@@ -6,6 +6,9 @@
  * - Once we've persisted a newsletters row with aihot_daily_payload for a
  *   given date, we read it back instead of hitting AI HOT's API.
  * - Cache key is `aihot_daily_date` (YYYY-MM-DD UTC).
+ * - Exception: a cached THIN report (< AIHOT_THIN_REPORT_ITEM_COUNT items —
+ *   upstream curation-layer outage) is re-fetched and the richer copy wins,
+ *   because AI HOT sometimes regenerates the daily later in the day.
  *
  * Graceful degradation:
  * - 404 from AI HOT (no report for that date) → return null
@@ -41,6 +44,26 @@ export function utcYmdFromDate(d: Date): string {
 }
 
 /**
+ * Below this many section+flash items a report is treated as a degraded
+ * upstream artifact, not a quiet news day. AI HOT generates the daily at
+ * 00:00Z from their curated pool; when their curation layer stalls (observed
+ * 2026-07-26 and 2026-08-01/02) the report ships with 1-2 items while their
+ * raw firehose stays healthy. Healthy reports run ~20+ items.
+ */
+const AIHOT_THIN_REPORT_ITEM_COUNT = 8;
+
+export function aihotDailyItemCount(payload: AihotDailyReport): number {
+  return (
+    payload.sections.reduce((n, sec) => n + sec.items.length, 0) +
+    payload.flashes.length
+  );
+}
+
+export function isThinAihotDaily(payload: AihotDailyReport): boolean {
+  return aihotDailyItemCount(payload) < AIHOT_THIN_REPORT_ITEM_COUNT;
+}
+
+/**
  * Fetch (or read from cache) AI HOT daily for a UTC date.
  *
  * Returns null on missing / failure — callers must handle the null path
@@ -70,16 +93,42 @@ export async function fetchAihotDailyForDate(
     )
     .limit(1);
 
-  if (cached.length > 0 && cached[0]!.payload) {
-    return stripPaperFromAihotDaily(
-      cached[0]!.payload as unknown as AihotDailyReport,
-    );
+  const cachedPayload =
+    cached.length > 0 && cached[0]!.payload
+      ? stripPaperFromAihotDaily(
+          cached[0]!.payload as unknown as AihotDailyReport,
+        )
+      : null;
+
+  return resolveAihotDaily({
+    dateUtcYmd,
+    cached: cachedPayload,
+    fetchLive: async () =>
+      stripPaperFromAihotDaily(await fetchDailyByDate(dateUtcYmd)), // null on 404 — that's fine, propagate
+  });
+}
+
+/**
+ * Cache-vs-live resolution, extracted for testability (no DB/HTTP inside):
+ * a rich cached copy is final; a thin one stays refreshable because AI HOT
+ * sometimes regenerates the report later in the day (observed 12:22Z and
+ * 22:53Z generatedAt), so a curation-outage report cached at our 05:00Z run
+ * must not block picking up the richer rerun. Never throws.
+ */
+export async function resolveAihotDaily(input: {
+  dateUtcYmd: string;
+  cached: AihotDailyReport | null;
+  fetchLive: () => Promise<AihotDailyReport | null>;
+}): Promise<AihotDailyReport | null> {
+  const { dateUtcYmd, cached, fetchLive } = input;
+
+  if (cached && !isThinAihotDaily(cached)) {
+    return cached;
   }
 
-  // ── 2. Live fetch ───────────────────────────────────────────────
+  let livePayload: AihotDailyReport | null = null;
   try {
-    const payload = await fetchDailyByDate(dateUtcYmd);
-    return stripPaperFromAihotDaily(payload); // null on 404 — that's fine, propagate
+    livePayload = await fetchLive();
   } catch (err) {
     if (err instanceof AihotError) {
       console.warn(
@@ -91,8 +140,27 @@ export async function fetchAihotDailyForDate(
         err instanceof Error ? err.message : err,
       );
     }
-    return null;
   }
+
+  const result = pickRicherAihotDaily(cached, livePayload);
+  if (result && isThinAihotDaily(result)) {
+    console.warn(
+      `[aihot-daily] degraded upstream report for ${dateUtcYmd}: ` +
+        `${aihotDailyItemCount(result)} items — AI HOT curation-layer outage ` +
+        `signature (their mode=all firehose is usually still healthy)`,
+    );
+  }
+  return result;
+}
+
+/** Prefer the copy with more items; ties go to `live` (fresher generatedAt). */
+export function pickRicherAihotDaily(
+  a: AihotDailyReport | null,
+  live: AihotDailyReport | null,
+): AihotDailyReport | null {
+  if (!a) return live;
+  if (!live) return a;
+  return aihotDailyItemCount(live) >= aihotDailyItemCount(a) ? live : a;
 }
 
 /**
