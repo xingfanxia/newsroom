@@ -8,4 +8,6 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 Start with [`docs/README.md`](./docs/README.md) before using historical plans
 or handoffs as implementation guidance. Runtime code remains authoritative; if
-docs and code conflict, fix the relevant current doc in the same change.
+docs and code conflict, correct the relevant current doc when it is in scope or
+needed to make the requested change correct. Report unrelated stale guidance
+with its source path; do not expand the task solely to repair it.
