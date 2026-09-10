@@ -1,5 +1,51 @@
 # AX's AI RADAR — Current Handoff
 
+## 2026-09-10 — cron outage from a staged audit deployment (78h), recovered
+
+Symptom: subscribers reported the 日报 email stopped after the 2026-09-06 issue.
+The whole pipeline had stopped: last fetch 2026-09-07T13:17Z, last column id
+`308` (period 2026-09-06), last send period_key 2026-09-07, R2 pointer frozen at
+2026-09-07T13:28Z. `news.ax0x.ai` kept serving, so the site looked healthy.
+
+Root cause: at 2026-09-07T13:43Z a Codex agent auditing production model env
+(Linear AX-272/AX-274) ran
+`vercel deploy --prod --skip-domain --cwd /tmp/ax272-vercel-model-audit/newsroom`
+from a throwaway directory whose `vercel.json` had no `crons`
+(`dpl_9MDNddx9At8S3CWLxKxufn2wvhXp`, meta `ax272=isolated-model-config-audit`).
+The deployment stayed STAGED and never took the domain, but Vercel rebound the
+project's cron set to it: `crons.deploymentId` = that deployment,
+`definitions: []`, while `targets.production` stayed on the 2026-07-29 build.
+Every cron silently stopped.
+
+Recovery: PR [#73](https://github.com/xingfanxia/newsroom/pull/73) merged and
+the git production deploy `dpl_Ceinth3txYaEjBjGA9sLrwev2EE7` rebound all 13
+crons (2026-09-10T19:28Z). Then: immediate fetch (284 raw rows; HN, Bloomberg,
+Verge, NYT CN, FT and Reddit-hot gap items had already rolled off and are lost),
+an AI HOT `since`-paged backfill (+10 curated items the take=50 page missed),
+TechCrunch `?paged=2` (+12), a local article-body drain with a Jina key
+(production has none: 20 items per run), enrich/cluster/commentary on
+production, then columns `309`/`310`/`311` — issue dates 2026-09-07/08/09
+(window start, the site key) = send period_keys 2026-09-08/09/10 (window end)
+— generated oldest-first with pinned 05:00Z windows (20 stories each, QC
+clean) and published by 20:30Z.
+
+Pending owner decisions (recorded 2026-09-10): the missed 日报 emails for
+period_keys 2026-09-08/09/10 are NOT sent (dry-run: 3 日报 + 1 精选 to 4
+subscribers); the `VERCEL_TOKEN` Actions secret is not configured, so the
+monitor's cron-binding check logs SKIPPED; the staged rogue deployment
+`dpl_9MDNddx9At8S3CWLxKxufn2wvhXp` still exists.
+
+Follow-ups shipped with the recovery:
+- `docs/operations/production-monitoring.md` — the git-only production
+  deployment invariant, the recovery runbook, and a new hourly GitHub Actions
+  monitor (`scripts/ops/check-production-health.ts`) checking public freshness
+  and, with a `VERCEL_TOKEN` secret, the cron binding.
+- `runNewsletterSend({ periodKey })` / `NEWSLETTER_SEND_PERIOD_KEY` for
+  missed-issue sends; the cron still sends only the newest column.
+- Email web-version links used the window-END date while the site keys issues
+  by window START, so every 日报 linked the next issue (or a 404 for the
+  newest). Emails now show and link the issue date.
+
 ## 2026-07-29 — public publisher referential-closure recovery
 
 The public R2 pointer stalled again after release

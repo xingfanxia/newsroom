@@ -1,0 +1,43 @@
+# Hourly production health guardrail (2026-09-07 cron-unbinding incident).
+#
+# Runs scripts/ops/check-production-health.ts and FAILS THE JOB (→ GitHub emails
+# the owner) when the public snapshot or the daily column stops advancing, or —
+# when the VERCEL_TOKEN secret is configured — when the project's cron set is
+# not bound to the deployment serving news.ax0x.ai. This must stay OUTSIDE
+# Vercel Cron: the failure it detects switches Vercel crons off.
+#
+# Runbook: docs/operations/production-monitoring.md
+#
+# SECURITY hardening (same as read-budget-monitor.yml; the repo is public):
+#   - triggers are schedule + manual only (NO pull_request);
+#   - permissions: contents: read;
+#   - actions are SHA-pinned;
+#   - no `bun install` — the script imports only node:fs + a pure local module.
+name: production-health-monitor
+
+on:
+  schedule:
+    - cron: "7 * * * *" # hourly, off the Vercel cron minutes
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-health-monitor
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+
+      - name: Check production health
+        env:
+          # Optional: without it the cron-binding check logs SKIPPED and only
+          # the public freshness signals run.
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: bun scripts/ops/check-production-health.ts

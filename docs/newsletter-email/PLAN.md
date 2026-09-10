@@ -150,7 +150,7 @@ lib/email/
   resend.ts           ResendClient port + fetch adapter: sendEmail(), sendBatch(emails, {idempotencyKey}); loud-throw RESEND_API_KEY; non-2xx → typed error (log + throw)
   subscribers.ts      repo layer: subscribeOrRevive, confirmByToken, unsubscribeByToken, listPendingRecipients(kind, periodKey), recordSends
 workers/newsletter/send/
-  index.ts            runNewsletterSend({now?, dryRun?}) → SendReport — resolves column + featured pool, renders once per kind, personalizes unsubscribe URL, chunks ≤100, ledger-first idempotency
+  index.ts            runNewsletterSend({now?, periodKey?, dryRun?}) → SendReport — resolves column + featured pool, renders once per kind, personalizes unsubscribe URL, chunks ≤100, ledger-first idempotency
 app/api/newsletter/
   subscribe/route.ts  POST — zod {email, locale?, kinds?}; rate-limited (new family 'newsletter-subscribe', e.g. 10/min); always {ok:true} on valid email (no enumeration oracle); sends confirm email
   confirm/route.ts    GET ?token= → redirect /{locale}/newsletter?status=confirmed|invalid
@@ -172,10 +172,12 @@ on `app/[locale]/daily/page.tsx`, `.env.example` (+RESEND_API_KEY section),
 ## 4. Send algorithm (idempotent, retry-safe)
 
 ```
-runNewsletterSend(now):
+runNewsletterSend(now, periodKey?):
   column   = latest newsletters row: kind='daily', locale='zh', columnTitle NOT NULL,
              period_end within last 26h          — else skip daily_digest ("no-column")
-  periodKey = utcYmd(column.periodEnd)           — same key for both kinds
+             (operator periodKey: period_end on that UTC date instead, any age)
+  periodKey = utcYmd(column.periodEnd)           — ledger key, same for both kinds
+  issueDate = utcYmd(column.periodStart)         — shown in both emails + web permalink
   featured = items tier IN ('featured','p1'), enriched in [column.periodStart, column.periodEnd),
              order importance DESC, cap 10       — if 0 rows skip daily_featured ("no-featured")
   for kind in [daily_digest, daily_featured]:
@@ -188,10 +190,18 @@ runNewsletterSend(now):
                          List-Unsubscribe-Post: List-Unsubscribe=One-Click
     on chunk success → insert ledger rows (status='sent', resend ids)
     on chunk failure → log loud, insert NOTHING (next run retries), continue other chunks
-  return SendReport {kind results, sent/skipped counts, durationMs}
+  return SendReport {periodKey, issueDate, columnId, kind results (+subject), durationMs}
 ```
 
-`dryRun` renders + counts but calls no network — used by ops smoke and tests.
+`dryRun` renders + counts but calls no network — used by ops smoke and tests;
+the report carries `columnId`, `issueDate` and each kind's rendered `subject`.
+
+Missed-issue backfill (the cron only ever sends the newest column): generate
+the column first, then
+`NEWSLETTER_SEND_PERIOD_KEY=<window-end YYYY-MM-DD> [NEWSLETTER_SEND_DRY_RUN=1] bun --env-file=.env.local scripts/ops/run-cron.ts newsletter-send`.
+The ledger makes a repeat a no-op. Only the 日报 backfills faithfully: 精选
+selects by `enriched_at`, so after a cron outage the gap windows have no (or
+partial) 精选 and the first regular send's 精选 is a best-of the backlog.
 
 ## 5. Email templates (NLE-2) — design contract
 
@@ -207,7 +217,8 @@ runNewsletterSend(now):
 - Header: brand line `AX 的 AI 雷达 · AI RADAR` + date; theme_tag as a chip.
 - 日报 subject: `【AX 日报】{columnTitle}`; body = lede (summary_md) →
   narrative sections (##→styled h2) → 精选 callout (featured items) → footer.
-  Web version link → `https://news.ax0x.ai/zh/daily/<date>`.
+  Web version link → `https://news.ax0x.ai/zh/daily/<issueDate>` (window
+  START date, the site's permalink key — not the window-end period_key).
 - 精选 subject: `【AX 精选】{top item title} 等 {N} 条`; body = per item:
   linked title (external `items.url`), source/tier/importance meta line,
   summary, 锐评 (editor_analysis) as styled blockquote.

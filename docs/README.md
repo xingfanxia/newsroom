@@ -15,6 +15,7 @@ Read these first for current architecture and operational behavior:
 | Ingestion, enrich, scoring, clustering, cron behavior, AI HOT runtime behavior | [`architecture/ingestion.md`](./architecture/ingestion.md) |
 | Public snapshot publishing, cutover, rollback, and evidence runbook | [`operations/public-snapshots.md`](./operations/public-snapshots.md) |
 | Route budgets, new endpoint runbook and maintenance | [`operations/route-performance.md`](./operations/route-performance.md) |
+| Production deployment invariant, health monitor, cron-outage recovery | [`operations/production-monitoring.md`](./operations/production-monitoring.md) |
 | Agent/API/MCP surface | [`agent-access/README.md`](./agent-access/README.md) |
 | Testing and local verification strategy | [`testing/strategy.md`](./testing/strategy.md) |
 | Security notes (RLS doc is superseded — DB is Turso token-only since 2026-07-11) | [`security/2026-04-28-rls-hardening.md`](./security/2026-04-28-rls-hardening.md) |
@@ -26,9 +27,9 @@ trust code and update the doc in the same change.
 
 - [`newsletter-email/PLAN.md`](./newsletter-email/PLAN.md) — newsletter EMAIL
   feature (subscribers + Resend delivery + 日报/精选 daily sends + subscribe
-  UI). NLE-1…6 implemented 2026-07-16 (see phase table in the plan); NLE-7
-  gated ops (prod migration apply, Vercel env, prod smoke) remains. The
-  existing `workers/newsletter/` content pipeline is unchanged.
+  UI). NLE-1…7 shipped 2026-07-16 and production sends daily; only the
+  optional DMARC TXT remains (see the plan's §8). The existing
+  `workers/newsletter/` content pipeline is unchanged.
 - [`R2-PUBLIC-READ-PLAN-2026-07-14.md`](./R2-PUBLIC-READ-PLAN-2026-07-14.md) —
   approved public-read decoupling authority. The implementation is complete in
   the feature branch and the R2 custom domain/cache rule is provisioned, but the

@@ -61,13 +61,19 @@ type SendKindResult = {
   /** 'failed' = recipients existed but zero chunks were delivered. */
   status: "sent" | "skipped" | "failed";
   reason?: "no-column" | "no-featured" | "no-subscribers" | "all-sent";
+  /** Rendered subject — lets a dry run show exactly what would go out. */
+  subject?: string;
   sent: number;
   failed: number;
   chunks: number;
 };
 
 export type SendReport = {
+  /** Ledger key: UTC date of the column window END. */
   periodKey: string | null;
+  /** Issue date: UTC date of the window START — the site permalink key. */
+  issueDate: string | null;
+  columnId: number | null;
   results: SendKindResult[];
   dryRun: boolean;
   durationMs: number;
@@ -75,11 +81,31 @@ export type SendReport = {
 
 export type RunNewsletterSendOptions = {
   now?: Date;
+  /** Operator backfill: send the column whose window ends on this UTC date
+   *  (YYYY-MM-DD, the ledger period_key) instead of the newest column within
+   *  26h. The cron never sets it. */
+  periodKey?: string;
   /** Render + count recipients, but no network and no ledger writes. */
   dryRun?: boolean;
   dbc?: EmailDb;
   resend?: ResendClient;
 };
+
+const PERIOD_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** [start, end) of the UTC day named by a YYYY-MM-DD period key. */
+function periodKeyDayRange(periodKey: string): { start: Date; end: Date } {
+  const start = new Date(`${periodKey}T00:00:00Z`);
+  if (
+    !PERIOD_KEY_RE.test(periodKey) ||
+    Number.isNaN(start.getTime()) ||
+    utcYmdFromDate(start) !== periodKey
+  ) {
+    throw new Error(`periodKey must be a real YYYY-MM-DD date, got "${periodKey}"`);
+  }
+  return { start, end: new Date(start.getTime() + DAY_MS) };
+}
 
 function unsubscribeUrlFor(token: string): string {
   return `${SITE_ORIGIN}/api/newsletter/unsubscribe?token=${token}`;
@@ -145,6 +171,7 @@ async function sendKind(args: {
     return {
       kind,
       status: "sent",
+      subject: args.rendered.subject,
       sent: recipients.length,
       failed: 0,
       chunks: chunk(recipients, RESEND_BATCH_LIMIT).length,
@@ -215,6 +242,7 @@ async function sendKind(args: {
   return {
     kind,
     status: sent === 0 && failed > 0 ? "failed" : "sent",
+    subject: args.rendered.subject,
     sent,
     failed,
     chunks,
@@ -235,6 +263,17 @@ export async function runNewsletterSend(
     return resendClient;
   };
 
+  const target = opts.periodKey ? periodKeyDayRange(opts.periodKey) : null;
+  const periodEndFilter = target
+    ? and(
+        gte(schema.newsletters.periodEnd, target.start),
+        lt(schema.newsletters.periodEnd, target.end),
+      )
+    : gte(
+        schema.newsletters.periodEnd,
+        new Date(now.getTime() - COLUMN_MAX_AGE_MS),
+      );
+
   const columns = await dbc
     .select({
       id: schema.newsletters.id,
@@ -253,10 +292,7 @@ export async function runNewsletterSend(
         eq(schema.newsletters.kind, DAILY_NEWSLETTER_KIND),
         eq(schema.newsletters.locale, DAILY_COLUMN_LOCALE),
         isNotNull(schema.newsletters.columnTitle),
-        gte(
-          schema.newsletters.periodEnd,
-          new Date(now.getTime() - COLUMN_MAX_AGE_MS),
-        ),
+        periodEndFilter,
       ),
     )
     .orderBy(desc(schema.newsletters.periodEnd))
@@ -266,6 +302,8 @@ export async function runNewsletterSend(
   if (!column) {
     return {
       periodKey: null,
+      issueDate: null,
+      columnId: null,
       results: [
         skipped("daily_digest", "no-column"),
         skipped("daily_featured", "no-column"),
@@ -276,6 +314,9 @@ export async function runNewsletterSend(
   }
 
   const periodKey = utcYmdFromDate(column.periodEnd);
+  // The site keys an issue by its window START date (/zh/daily/<date>); the
+  // ledger keys by window END. Emails show and link the issue date.
+  const issueDate = utcYmdFromDate(column.periodStart);
   const unsubscribeUrlTemplate = unsubscribeUrlFor(UNSUB_TOKEN_PLACEHOLDER);
 
   // ── 日报 body: resolve [#NNNN] refs + featured callout to EXTERNAL urls ──
@@ -302,7 +343,7 @@ export async function runNewsletterSend(
   const digestEmail = renderDailyDigestEmail({
     title: column.columnTitle ?? "",
     themeTag: column.columnThemeTag,
-    dateKey: periodKey,
+    dateKey: issueDate,
     summaryMd: column.columnSummaryMd ?? "",
     narrativeMd: column.columnNarrativeMd ?? "",
     featured: (column.columnFeaturedItemIds ?? [])
@@ -410,7 +451,7 @@ export async function runNewsletterSend(
           periodKey,
           from: EMAIL_FROM_DAILY_FEATURED,
           rendered: renderDailyFeaturedEmail({
-            dateKey: periodKey,
+            dateKey: issueDate,
             stories,
             unsubscribeUrl: unsubscribeUrlTemplate,
           }),
@@ -421,6 +462,8 @@ export async function runNewsletterSend(
 
   return {
     periodKey,
+    issueDate,
+    columnId: column.id,
     results: [digestResult, featuredResult],
     dryRun,
     durationMs: Date.now() - started,

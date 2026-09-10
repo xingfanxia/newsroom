@@ -358,7 +358,12 @@ created exclusively (`wx`, mode 0600) so a later run cannot overwrite evidence.
   verified pointer using the current ETag. Never overwrite unconditionally and
   never point at an unverified manifest.
 - **Bad application deployment:** roll back the Vercel deployment while keeping
-  R2 releases intact.
+  R2 releases intact. Only target a git-built app deployment, then confirm the
+  cron binding with `VERCEL_TOKEN=… bun scripts/ops/check-production-health.ts`
+  (without the token it prints SKIPPED, which is not a confirmation). A
+  rollback also stops `main` deploys from taking the domain until it is undone
+  with `vercel promote` — see
+  [production-monitoring.md](./production-monitoring.md).
 - **R2/cache incident:** correct or disable only the scoped Cloudflare rule, or
   serve previous/last-known-good. Do not enable a DB fallback.
 - **Publisher failure:** leave the pointer and outbox unchanged and retry the

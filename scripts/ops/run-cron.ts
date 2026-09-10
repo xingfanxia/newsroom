@@ -42,9 +42,12 @@ export const CRON_RUNNERS = {
   "cluster": () => runClusterPipeline(),
   "newsletter-daily": async () => ({ report: await runDailyColumn() }),
   // NEWSLETTER_SEND_DRY_RUN=1 renders + counts without network/ledger.
+  // NEWSLETTER_SEND_PERIOD_KEY=YYYY-MM-DD (window-end date) targets a past
+  // column for a missed-issue backfill; the ledger still dedupes.
   "newsletter-send": async () => ({
     send: await runNewsletterSend({
       dryRun: process.env.NEWSLETTER_SEND_DRY_RUN === "1",
+      periodKey: process.env.NEWSLETTER_SEND_PERIOD_KEY || undefined,
     }),
   }),
   "newsletter-monthly": async () => ({

@@ -76,6 +76,11 @@ preserving any historical `raw_items`/`items` that still reference them.
 **Responsibility**: pull new items from a source, dedupe by `(source_id, external_id)`, write raw payload to `raw_items` table.
 
 - Runs on **Vercel Cron** route handlers declared in `vercel.json`.
+- The project's cron set follows the latest production-target deployment —
+  even a staged `--skip-domain` one — so production deploys come only from the
+  git integration on `main`. A 2026-09-07 CLI audit deploy with no crons
+  stopped every cron for 78h; the hourly GitHub Actions monitor and recovery
+  runbook live in [`../operations/production-monitoring.md`](../operations/production-monitoring.md).
 - Each source has `cadence` → scheduler bucket.
 - Local operator triggers use the table-driven `scripts/ops/run-cron.ts`
   runner. Canonical package aliases mirror `vercel.json` cron route slugs
