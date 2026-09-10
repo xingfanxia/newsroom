@@ -29,11 +29,13 @@ production, then columns `309`/`310`/`311` — issue dates 2026-09-07/08/09
 — generated oldest-first with pinned 05:00Z windows (20 stories each, QC
 clean) and published by 20:30Z.
 
-Pending owner decisions (recorded 2026-09-10): the missed 日报 emails for
-period_keys 2026-09-08/09/10 are NOT sent (dry-run: 3 日报 + 1 精选 to 4
-subscribers); the `VERCEL_TOKEN` Actions secret is not configured, so the
-monitor's cron-binding check logs SKIPPED; the staged rogue deployment
-`dpl_9MDNddx9At8S3CWLxKxufn2wvhXp` still exists.
+Owner decisions (2026-09-10): the missed issues were emailed via
+`NEWSLETTER_SEND_PERIOD_KEY` 2026-09-08/09/10 (3 日报 + 1 精选, 4 subscribers
+each, 0 failures; 精选 for 09-09/09-10 skipped as `no-featured`); the rogue
+deployment `dpl_9MDNddx9At8S3CWLxKxufn2wvhXp` was removed; the monitor stays
+freshness-only — no `VERCEL_TOKEN` Actions secret by choice, so its
+cron-binding check logs SKIPPED; the no-production-CLI-deploy rule was added
+to the global Claude and Codex agent rules.
 
 Follow-ups shipped with the recovery:
 - `docs/operations/production-monitoring.md` — the git-only production
