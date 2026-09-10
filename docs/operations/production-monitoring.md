@@ -46,7 +46,9 @@ Vercel cron — the failure it detects switches Vercel crons off.
 - **Without `VERCEL_TOKEN`** the binding check logs `cron-binding: SKIPPED` and
   exits 0 if freshness passes — that is not a binding confirmation. Freshness
   alone catches a cron outage within ~6h instead of ~1h. The Actions secret is
-  not configured yet (pending owner decision, see HANDOFF).
+  deliberately not configured (owner decision 2026-09-10: a Vercel token is not
+  read-only and the repo is public); run the binding check locally with a token
+  after any deploy-path change.
 - **A no-column day alerts until the next issue.** When `newsletter-daily`
   skips (`insufficient-signal`, fewer than 5 stories) or fails, the daily check
   fails every hour until the next 05:00Z column publishes. Confirm the cause in
