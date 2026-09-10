@@ -101,7 +101,23 @@ export async function runDailyColumn(
     utcYmdFromDate(pool.windowEnd),
   );
 
-  const userPrompt = renderItemsForPrompt(pool.rows, aihotPayload);
+  // Previous column title — fed to the prompt so consecutive days don't ship
+  // the same headline (observed 7/30 + 7/31 both titled "今天 AI 圈在拼安全，
+  // 不是模型": distinct content, independently converged title).
+  const prevRows = await client
+    .select({ title: newsletters.columnTitle })
+    .from(newsletters)
+    .where(
+      sql`${newsletters.kind} = ${DAILY_NEWSLETTER_KIND}
+        AND ${newsletters.locale} = ${DAILY_COLUMN_LOCALE}
+        AND ${newsletters.periodStart} < ${pool.windowStart.getTime()}
+        AND ${newsletters.columnTitle} IS NOT NULL`,
+    )
+    .orderBy(sql`${newsletters.periodStart} DESC`)
+    .limit(1);
+  const previousTitle = prevRows[0]?.title ?? null;
+
+  const userPrompt = renderItemsForPrompt(pool.rows, aihotPayload, previousTitle);
   const systemPrompt = loadDailyColumnPrompt();
 
   const result = await generateStructured({
@@ -205,6 +221,7 @@ export function normalizeFeaturedItemIds(
 function renderItemsForPrompt(
   rows: SelectedRow[],
   aihotDaily: AihotDailyReport | null,
+  previousTitle: string | null = null,
 ): string {
   const lines = rows.map((r) => {
     const title = r.canonicalTitleZh ?? r.titleZh ?? r.titleEn ?? r.title;
@@ -238,9 +255,13 @@ function renderItemsForPrompt(
 
   const aihotBlock = renderAihotDailyForPrompt(aihotDaily);
 
+  const previousTitleNote = previousTitle
+    ? `\n\n昨天日报的总标题是「${previousTitle}」— 今天的 title 不要与它重复，也不要用同一句式换词。`
+    : "";
+
   return `<window kind="daily-column" locale="${DAILY_COLUMN_LOCALE}" story_count="${rows.length}">
 ${lines.join("\n\n")}
-</window>${aihotBlock ? `\n\n${aihotBlock}` : ""}
+</window>${aihotBlock ? `\n\n${aihotBlock}` : ""}${previousTitleNote}
 
 注意，上方 <window> items 中可能有同一事件的多源覆盖（不同 cluster_id 但讲同一件事），如果你看到比如 3 条都是 Google 投资 Anthropic 的报道，把它们合并成 summary 里的一条编号项，narrative 里也作为一个事件深聊。你的任务是写 1 篇日报，不是写新闻摘要的列表。${aihotBlock ? "\n\n上方 <aihot-daily> 是 AI HOT 当天精编日报 (https://aihot.virxact.com), 是 must-cover 基线 — 你的 narrative 必须覆盖它的 lead.title 和所有 sections.items。flashes 选择性提及。覆盖时用我们的 voice 重写, 不要照抄他们的措辞。" : ""}`;
 }

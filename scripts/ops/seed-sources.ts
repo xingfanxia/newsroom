@@ -84,7 +84,9 @@ async function upsertCatalogSource(client: DbClient, s: Source): Promise<void> {
         nameZh: sql`EXCLUDED.name_zh`,
         url: sql`EXCLUDED.url`,
         kind: sql`EXCLUDED.kind`,
-        group: sql`EXCLUDED.group`,
+        // "group" is a reserved keyword — unquoted EXCLUDED.group is a libSQL
+        // syntax error (this silently broke db:seed after the Turso migration).
+        group: sql`EXCLUDED."group"`,
         locale: sql`EXCLUDED.locale`,
         cadence: sql`EXCLUDED.cadence`,
         priority: sql`EXCLUDED.priority`,

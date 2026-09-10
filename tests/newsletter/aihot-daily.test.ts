@@ -9,6 +9,10 @@ import {
   utcYmdFromDate,
   renderAihotDailyForPrompt,
   stripPaperFromAihotDaily,
+  aihotDailyItemCount,
+  pickRicherAihotDaily,
+  isThinAihotDaily,
+  resolveAihotDaily,
 } from "@/workers/newsletter/aihot-daily";
 import type { AihotDailyReport } from "@/lib/sources/aihot";
 
@@ -106,6 +110,103 @@ describe("renderAihotDailyForPrompt", () => {
     const noFlashes: AihotDailyReport = { ...minimalPayload, flashes: [] };
     const out = renderAihotDailyForPrompt(noFlashes);
     expect(out).toContain("flashes:\n  (none)");
+  });
+
+  it("counts section items + flashes for thin-report detection", () => {
+    // minimalPayload: 1 section item + 1 flash
+    expect(aihotDailyItemCount(minimalPayload)).toBe(2);
+    expect(aihotDailyItemCount({ ...minimalPayload, flashes: [] })).toBe(1);
+  });
+
+  it("classifies the 2026-08-02 outage shape (2 items) as thin, healthy (20+) as rich", () => {
+    // Mirrors the real outage report: 2 sections × 1 item, no lead, no flashes.
+    const outageShaped: AihotDailyReport = {
+      ...minimalPayload,
+      lead: null,
+      flashes: [],
+      sections: [
+        { label: "行业动态", items: [minimalPayload.sections[0]!.items[0]!] },
+        { label: "技巧与观点", items: [minimalPayload.sections[0]!.items[0]!] },
+      ],
+    };
+    expect(isThinAihotDaily(outageShaped)).toBe(true);
+    expect(isThinAihotDaily(richPayload(20))).toBe(false);
+  });
+
+  it("pickRicherAihotDaily prefers the copy with more items, live on tie", () => {
+    const thin: AihotDailyReport = { ...minimalPayload, flashes: [] };
+    const rich = richPayload(10);
+    expect(pickRicherAihotDaily(thin, rich)).toBe(rich);
+    expect(pickRicherAihotDaily(rich, thin)).toBe(rich);
+    expect(pickRicherAihotDaily(null, thin)).toBe(thin);
+    expect(pickRicherAihotDaily(thin, null)).toBe(thin);
+    expect(pickRicherAihotDaily(null, null)).toBeNull();
+    // Tie → live wins (fresher generatedAt).
+    const cachedTwin: AihotDailyReport = { ...rich, generatedAt: "old" };
+    expect(pickRicherAihotDaily(cachedTwin, rich)).toBe(rich);
+  });
+
+  /** A payload with `n` flash items on top of minimalPayload's 1 section item. */
+  function richPayload(n: number): AihotDailyReport {
+    return {
+      ...minimalPayload,
+      generatedAt: "2026-05-08T12:22:00.000Z",
+      flashes: Array.from({ length: n }, (_, i) => ({
+        title: `flash ${i}`,
+        sourceName: "X",
+        sourceUrl: `https://example.com/${i}`,
+        publishedAt: "2026-05-07T08:00:00.000Z",
+      })),
+    };
+  }
+
+  describe("resolveAihotDaily (cache-vs-live control flow)", () => {
+    const thin: AihotDailyReport = { ...minimalPayload, flashes: [] };
+
+    it("rich cache short-circuits — live fetch is never called", async () => {
+      const rich = richPayload(20);
+      let liveCalled = false;
+      const out = await resolveAihotDaily({
+        dateUtcYmd: "2026-08-02",
+        cached: rich,
+        fetchLive: async () => {
+          liveCalled = true;
+          return null;
+        },
+      });
+      expect(out).toBe(rich);
+      expect(liveCalled).toBe(false);
+    });
+
+    it("thin cache triggers a live fetch and the richer copy wins", async () => {
+      const rich = richPayload(20);
+      const out = await resolveAihotDaily({
+        dateUtcYmd: "2026-08-02",
+        cached: thin,
+        fetchLive: async () => rich,
+      });
+      expect(out).toBe(rich);
+    });
+
+    it("thin cache + failing live fetch falls back to cached thin, never throws", async () => {
+      const out = await resolveAihotDaily({
+        dateUtcYmd: "2026-08-02",
+        cached: thin,
+        fetchLive: async () => {
+          throw new Error("network down");
+        },
+      });
+      expect(out).toBe(thin);
+    });
+
+    it("no cache + null live (404) resolves to null", async () => {
+      const out = await resolveAihotDaily({
+        dateUtcYmd: "2026-08-02",
+        cached: null,
+        fetchLive: async () => null,
+      });
+      expect(out).toBeNull();
+    });
   });
 
   it("strips AI HOT paper sections before prompt rendering", () => {
