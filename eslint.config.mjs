@@ -12,9 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
-    // Scratch dir — gitignored + tsconfig-excluded; throwaway ad-hoc scripts
+    // Scratch dirs — gitignored + tsconfig-excluded; throwaway ad-hoc scripts
     // must not gate lint/verify.
     "tmp/**",
+    "scratch/**",
     "backups/**",
   ]),
 ]);
