@@ -1,3 +1,4 @@
+import { dailyColumnIssueRoute } from "@/lib/daily-column/routes";
 import type { RenderedEmail } from "@/lib/email/contracts";
 import { SITE_ORIGIN } from "@/lib/email/contracts";
 import {
@@ -18,7 +19,8 @@ import {
 export type DailyDigestEmailInput = {
   title: string;
   themeTag: string | null;
-  /** YYYY-MM-DD of the column window end — also the web permalink key. */
+  /** Issue date: YYYY-MM-DD of the column window START — the site's
+   *  permalink key. Not the ledger period_key (window end). */
   dateKey: string;
   summaryMd: string;
   narrativeMd: string;
@@ -32,7 +34,7 @@ export type DailyDigestEmailInput = {
 export function renderDailyDigestEmail(
   input: DailyDigestEmailInput,
 ): RenderedEmail {
-  const webVersionUrl = `${SITE_ORIGIN}/zh/daily/${input.dateKey}`;
+  const webVersionUrl = `${SITE_ORIGIN}${dailyColumnIssueRoute(input.dateKey)}`;
   const markdownOpts = { itemUrlById: input.itemUrlById };
 
   const featuredHtml =

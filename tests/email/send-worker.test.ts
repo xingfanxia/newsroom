@@ -68,19 +68,24 @@ const fakeResend: ResendClient = {
   },
 };
 
-async function insertColumn(): Promise<void> {
+async function insertColumn(
+  start: Date = WINDOW_START,
+  end: Date = WINDOW_END,
+  title = "今天的三件事",
+): Promise<void> {
   await client.execute({
     sql: `INSERT INTO newsletters
       (kind, locale, period_start, period_end, column_title,
        column_summary_md, column_narrative_md, column_featured_item_ids,
        column_theme_tag, item_ids, story_count, published_at)
-      VALUES ('daily', 'zh', ?, ?, '今天的三件事',
+      VALUES ('daily', 'zh', ?, ?, ?,
        '开场 **白**。', ?, '[1]', '测试主题', '[1,2]', 2, ?)`,
     args: [
-      WINDOW_START.getTime(),
-      WINDOW_END.getTime(),
+      start.getTime(),
+      end.getTime(),
+      title,
       "## 第一件事\n\n细节见 [#1]。\n\n## 第二件事\n\n正文。",
-      WINDOW_END.getTime(),
+      end.getTime(),
     ],
   });
 }
@@ -131,9 +136,10 @@ async function activateSubscriber(
   await confirmByToken(created.subscriber!.confirmToken, dbc);
 }
 
-function run(opts: { dryRun?: boolean } = {}) {
+function run(opts: { dryRun?: boolean; now?: Date; periodKey?: string } = {}) {
   return runNewsletterSend({
-    now: NOW,
+    now: opts.now ?? NOW,
+    periodKey: opts.periodKey,
     dryRun: opts.dryRun,
     dbc,
     resend: fakeResend,
@@ -194,11 +200,18 @@ describe("runNewsletterSend", () => {
     // [#1] resolves to the item's EXTERNAL url.
     expect(emailA.html).toContain("https://example.com/1");
     expect(emailA.html).not.toContain("/zh/items/");
+    // Web version links the site's issue key (window START date), while the
+    // ledger keys by window END — the 2026-09 emails linked the next issue.
+    expect(report.issueDate).toBe("2026-07-15");
+    expect(emailA.html).toContain("https://news.ax0x.ai/zh/daily/2026-07-15");
+    expect(emailA.html).not.toContain(`/zh/daily/${PERIOD_KEY}`);
+    expect(digest?.subject).toBe("【AX 日报】今天的三件事");
 
     // 精选 e-mail: window-scoped stories only (old item excluded), 锐评 present.
     const featuredEmail = batches[1]!.emails[0]!;
     expect(featuredEmail.html).toContain("第一条");
     expect(featuredEmail.html).toContain("锐评一");
+    expect(featuredEmail.text).toContain("ax-radar --featured 2026-07-15");
     expect(featuredEmail.html).not.toContain("旧条");
     expect(featuredEmail.html).not.toContain("__NLE_UNSUB_TOKEN");
     expect(featuredEmail.text).not.toContain("__NLE_UNSUB_TOKEN");
@@ -347,6 +360,62 @@ describe("runNewsletterSend", () => {
       "SELECT COUNT(*) AS n FROM newsletter_email_sends WHERE email_kind = 'daily_digest'",
     );
     expect(Number(ledger.rows[0]?.n)).toBe(101);
+  });
+
+  test("periodKey targets a past column even when a newer one exists", async () => {
+    const nextEnd = new Date("2026-07-17T05:00:00Z");
+    await insertColumn();
+    await insertColumn(WINDOW_END, nextEnd, "第二天的专栏");
+    await activateSubscriber("a@example.com", { featured: false });
+    const later = new Date("2026-07-17T05:40:00Z");
+
+    // Without a target the newest column wins, as the cron expects.
+    const latest = await run({ now: later, dryRun: true });
+    expect(latest.periodKey).toBe("2026-07-17");
+
+    const report = await run({ now: later, periodKey: PERIOD_KEY });
+    expect(report.periodKey).toBe(PERIOD_KEY);
+    expect(report.issueDate).toBe("2026-07-15");
+    expect(batches).toHaveLength(1);
+    expect(batches[0]!.emails[0]!.subject).toBe("【AX 日报】今天的三件事");
+    expect(batches[0]!.idempotencyKey).toContain(
+      `newsroom/daily_digest/${PERIOD_KEY}/`,
+    );
+  });
+
+  test("periodKey reaches a column older than the 26h send window", async () => {
+    await insertColumn();
+    await activateSubscriber("a@example.com", { featured: false });
+    const weekLater = new Date("2026-07-23T05:40:00Z");
+    expect((await run({ now: weekLater, dryRun: true })).periodKey).toBeNull();
+    const report = await run({
+      now: weekLater,
+      periodKey: PERIOD_KEY,
+      dryRun: true,
+    });
+    expect(report.periodKey).toBe(PERIOD_KEY);
+    expect(report.columnId).not.toBeNull();
+  });
+
+  test("periodKey with no column that day skips both kinds", async () => {
+    await insertColumn();
+    await activateSubscriber("a@example.com");
+    const report = await run({ periodKey: "2026-07-14" });
+    expect(report.periodKey).toBeNull();
+    expect(report.results.map((r) => r.reason)).toEqual([
+      "no-column",
+      "no-column",
+    ]);
+    expect(batches).toHaveLength(0);
+  });
+
+  test("malformed periodKey is rejected before any send", async () => {
+    await insertColumn();
+    await activateSubscriber("a@example.com");
+    for (const bad of ["2026-7-16", "2026-02-30", "20260716"]) {
+      await expect(run({ periodKey: bad })).rejects.toThrow("periodKey");
+    }
+    expect(batches).toHaveLength(0);
   });
 
   test("dryRun renders and counts but sends nothing and writes no ledger", async () => {
