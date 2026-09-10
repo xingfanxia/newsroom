@@ -91,4 +91,4 @@ backup/observability, unbounded queries, and lock-contention handling.**
 Full machine-readable findings (evidence + verifier reasoning per item):
 this session's audit ran as workflow `wf_889559c6-11b`; summary JSON was
 extracted to the session scratchpad. Empirical probes used are under
-`tmp/audit/` (gitignored).
+`scratch/scripts/turso-residue-audit/` (gitignored).

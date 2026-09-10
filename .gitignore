@@ -54,3 +54,6 @@ backups/
 
 # read-budget monitor local snapshot (scripts/ops/read-budget.ts)
 .read-budget-snapshot.json
+
+# Local agent artifacts
+/scratch/
