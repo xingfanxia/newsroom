@@ -114,7 +114,7 @@ describe("expectedDailyWindowEnd", () => {
       crons: CronDefinition[];
     };
     const daily = vercel.crons.find((c) => c.path === "/api/cron/newsletter-daily");
-    expect(daily?.schedule).toBe(`0 ${DAILY_BOUNDARY_UTC_HOUR} * * *`);
+    expect(daily?.schedule).toBe(`0,20 ${DAILY_BOUNDARY_UTC_HOUR} * * *`);
   });
 });
 

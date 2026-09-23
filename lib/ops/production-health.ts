@@ -30,8 +30,8 @@ export type HealthProblem = {
   detail: string;
 };
 
-/** newsletter-daily runs at 05:00 UTC (vercel.json `0 5 * * *`); the column
- *  window ends on that boundary. A test pins this to vercel.json. */
+/** newsletter-daily starts at 05:00 UTC and retries at 05:20 if missing;
+ * both runs end the column window at 05:00. A test pins the schedule. */
 export const DAILY_BOUNDARY_UTC_HOUR = 5;
 /** 2x the longest gap between enrichments in the 30 days before the incident
  *  (3h) — every enrich queues a publish, so a quiet pointer this old is a stall. */
