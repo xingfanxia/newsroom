@@ -49,11 +49,17 @@ Vercel cron — the failure it detects switches Vercel crons off.
   deliberately not configured (owner decision 2026-09-10: a Vercel token is not
   read-only and the repo is public); run the binding check locally with a token
   after any deploy-path change.
-- **A no-column day alerts until the next issue.** When `newsletter-daily`
-  skips (`insufficient-signal`, fewer than 5 stories) or fails, the daily check
-  fails every hour until the next 05:00Z column publishes. Confirm the cause in
-  the newsletter-daily cron log; a backfill run would skip again for the same
-  reason.
+- **Daily generation has one recovery tick.** It runs at 05:00Z and 05:20Z.
+  Both ticks select the same 05:00Z window; an existing column returns `exists`
+  before any model call. The 20-minute spacing exceeds the route's 800-second
+  maximum duration, so this retry does not overlap the first scheduled run.
+  This recovers a transient model failure without changing the content window
+  or the separate 05:40Z email schedule. The 2026-09-22 issue was missed after
+  a model timeout while all 13 cron bindings remained healthy.
+- **A no-column day still alerts.** When both `newsletter-daily` attempts
+  skip (`insufficient-signal`, fewer than 5 stories) or fail, the daily check
+  fails every hour until the column publishes. Confirm the cause in the cron
+  log; an insufficient-signal backfill would skip again for the same reason.
 - **GitHub disables schedules in public repos after 60 days without repository
   activity.** Check `gh workflow view production-health-monitor.yml` and
   re-enable with `gh workflow enable production-health-monitor.yml`.

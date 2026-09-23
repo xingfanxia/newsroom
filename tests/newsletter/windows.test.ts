@@ -22,11 +22,11 @@ describe("newsletter windows", () => {
   test("keeps daily windows idempotent within the same UTC hour", () => {
     const a = computeNewsletterWindow(
       "daily",
-      new Date("2026-04-25T10:00:00Z"),
+      new Date("2026-04-25T05:00:00Z"),
     );
     const b = computeNewsletterWindow(
       "daily",
-      new Date("2026-04-25T10:59:59Z"),
+      new Date("2026-04-25T05:20:00Z"),
     );
 
     expect(a.start.getTime()).toBe(b.start.getTime());
