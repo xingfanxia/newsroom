@@ -1,5 +1,12 @@
 # Newsroom — agent guide
 
+> **Moved (2026-09-30):** the live site is now **AX AI 日报** at `https://ai-daily.ax0x.ai`, built in the
+> private repo `xingfanxia/ax-ai-daily` (`~/projects/portfolio/ax-ai-daily`, plan and state in its
+> `docs/newsroom-port/README.md`). `news.ax0x.ai` belongs to the new Vercel project as a compatibility
+> host. This repo is legacy: its crons are empty (PR #77) and it is kept only for rollback and history —
+> do not add features here or re-enable crons without the cutover runbook's rollback steps.
+
+
 ## Project scale and verification
 
 **Profile: personal publishing service.** AI news ingestion and a public radar with private editorial/subscriber state. UI/editorial edits stay lightweight. Public/private database separation, newsletter recipients, provider costs and destructive migrations need focused tests. Preserve the main-only deployment rule and existing production monitors.

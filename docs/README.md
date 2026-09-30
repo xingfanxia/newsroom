@@ -1,5 +1,12 @@
 # Project Docs Index
 
+> **Moved (2026-09-30):** the live site is now **AX AI 日报** at `https://ai-daily.ax0x.ai`, built in the
+> private repo `xingfanxia/ax-ai-daily` (`~/projects/portfolio/ax-ai-daily`, plan and state in its
+> `docs/newsroom-port/README.md`). `news.ax0x.ai` belongs to the new Vercel project as a compatibility
+> host. This repo is legacy: its crons are empty (PR #77) and it is kept only for rollback and history —
+> do not add features here or re-enable crons without the cutover runbook's rollback steps.
+
+
 This repo has many historical design plans and handoffs. Treat this file as
 the routing layer before using a document as implementation guidance.
 
